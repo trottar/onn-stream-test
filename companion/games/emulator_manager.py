@@ -42,6 +42,12 @@ _n64 = None
 if (os.environ.get("PRIVYHUB_N64") or "").strip() == "1":
     import n64_session as _n64
 
+# B69: the GameCube launch kind (Dolphin), only with PRIVYHUB_GAMECUBE=1. Absent = today: nothing imported, a
+# `gamecube` title refused (no `gamecube` profile in emulators.json), nothing under data/games/gamecube/ touched.
+_gc = None
+if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
+    import gamecube_session as _gc
+
 
 class EmulatorError(RuntimeError):
     pass
@@ -98,6 +104,10 @@ class EmulatorManager:
         # B49: "pcsx2" while a PS2 session runs (None = RetroArch, today) and its process helper
         self._launch_kind: str | None = None
         self._ps2: Any = None
+        # B69: the Dolphin process helper ("dolphin" kind) and the last Dolphin's session id (its AppImage helper,
+        # waited for at the next GameCube launch); both None outside a GameCube session (today)
+        self._gc: Any = None
+        self._gc_helper_sid: int | None = None
         # B61: the N64 core while an N64 session runs (only with PRIVYHUB_N64=1); None = every other session (today)
         self._n64_core: str | None = None
         # B65: the last N64 load's row for the plugin (continue_load / continue_skipped); None otherwise
@@ -184,6 +194,9 @@ class EmulatorManager:
             and self._active_cheat_session.get("session_kind", "cheat") == "cheat"
         )
 
+        # B69: a Dolphin that ended by itself: its helper waited for at the next launch, its logs collected
+        if self._launch_kind == "dolphin" and self._gc is not None:
+            self._dolphin_ended(self.process.pid)
         self._close_quietly(self.process.stdin)
         self._close_quietly(self.log_handle)
         self.process = None
@@ -197,6 +210,7 @@ class EmulatorManager:
         self._players_session = None
         self._launch_kind = None
         self._ps2 = None
+        self._gc = None
         self._n64_core = None
 
         if cheat_runtime_cleanup:
@@ -1866,6 +1880,9 @@ class EmulatorManager:
         # B59: nor an N64 title (Core default; its ports are the launch's four, n64_session.plan)
         if _n64 is not None and system_id == _n64.SYSTEM_ID:
             return system_id, "", {}
+        # B69: nor a GameCube title (Core default; Dolphin's four ports, GCPadNew.ini)
+        if _gc is not None and system_id == _gc.SYSTEM_ID:
+            return system_id, "", {}
 
         config = self._load_config()
         systems = config.get(
@@ -2173,6 +2190,9 @@ class EmulatorManager:
     # B49: class defaults, so a manager made without __init__ (a test's) reads RetroArch (today)
     _launch_kind: str | None = None
     _ps2: Any = None
+    # B69
+    _gc: Any = None
+    _gc_helper_sid: int | None = None
 
     # PRIVYHUB_PHASE_A_PS1_MULTITAP_GAME_OPTIONS
     PS1_MULTITAP_CORE_LIBRARY = "Beetle PSX HW"
@@ -5553,6 +5573,9 @@ class EmulatorManager:
             # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
             if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
                 return self._launch_pcsx2(game, players_chosen)
+            # B69: a GameCube title launches Dolphin (only with PRIVYHUB_GAMECUBE=1; absent = today's refusal below)
+            if _gc is not None and str(game.get("system", "")).strip().casefold() == _gc.SYSTEM_ID:
+                return self._launch_dolphin(game, players_chosen)
 
             # B46: the chooser's pick for this launch (None = today: the metadata alone)
             players_plan: dict[str, Any] | None = None
@@ -7346,6 +7369,7 @@ class EmulatorManager:
         self._players_session = None
         self._launch_kind = None
         self._ps2 = None
+        self._gc = None
         self._n64_core = None
         payload = self.status()
         payload["action"] = "stop"
@@ -7353,6 +7377,382 @@ class EmulatorManager:
         payload["graceful"] = how.startswith("sigterm")
         payload["save_flush_confirmed"] = how.startswith("sigterm")
         payload["ps2_exit"] = how
+        return payload
+
+    # ------------------------------------------------------------------
+    # B69: the GameCube launch kind (Dolphin), reached only with PRIVYHUB_GAMECUBE=1
+    # ------------------------------------------------------------------
+
+    def _launch_dolphin(
+        self,
+        game: dict[str, Any],
+        players_chosen: int | None,
+    ) -> dict[str, Any]:
+        root = self.project_root
+        try:
+            content = _gc.resolve_title(_gc.read_dir(root), str(game.get("relative_path", "")))
+            appimage = _gc.find_appimage(root)
+        except (_gc.GCError, OSError) as exc:
+            raise EmulatorError(f"GameCube launch refused: {exc}") from exc
+
+        # four native ports on every launch, whatever the pick or the join (no multitap, no relaunch)
+        plan = _gc.plan()
+        user = self._project_path(_gc.USER_DIR)
+        helper = None
+        if self._gc_helper_sid is not None:
+            # the previous Dolphin's AppImage helper (<= 10 s, then SIGKILL) before the next Popen
+            helper = _gc.wait_helpers(self._gc_helper_sid)
+            self._gc_helper_sid = None
+        try:
+            _gc.write_config(user)
+        except OSError as exc:
+            raise EmulatorError(f"GameCube launch refused: {exc}") from exc
+
+        logs_dir = self._project_path("logs/games")
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        log_path = logs_dir / (time.strftime("%Y%m%d-%H%M%S") + "-gamecube.log")
+        log_handle = log_path.open("a", encoding="utf-8", buffering=1)
+
+        def utc_ms() -> str:
+            t = time.time()
+            return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + f".{int((t % 1) * 1000):03d}Z"
+
+        log_handle.write("PrivyHub game session (GameCube)\n")
+        log_handle.write(f"{utc_ms()} GC launch: dolphin ports={plan['ports']} backend=vulkan adapter=0 config=whole\n")
+        if helper is not None:
+            log_handle.write(f"{utc_ms()} GC helper: {helper}\n")
+        # Dolphin's own log for this launch, kept 30 days (the name: the UTC launch time only)
+        launched_at = time.time()
+        dolphin_log = _gc.log_for_launch(root, launched_at)
+        try:
+            _gc.prune_logs(dolphin_log.parent, launched_at)
+            kept = _gc.link_log(user, dolphin_log)
+        except OSError as exc:
+            log_handle.close()
+            raise EmulatorError(f"GameCube launch refused: {exc}") from exc
+        log_handle.write(f"{utc_ms()} GC dolphin-log: {dolphin_log.name}"
+                         + (f" (kept an earlier one: {kept})" if kept != "none" else "") + "\n")
+        log_handle.flush()
+        try:
+            process = subprocess.Popen(
+                _gc.command(appimage, user, content),
+                cwd=str(user),
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                env=dict(os.environ),
+                start_new_session=True,
+            )
+        except Exception as exc:
+            log_handle.close()
+            raise EmulatorError(f"GameCube launch failed: {exc}") from exc
+
+        def log_line(line: str) -> None:
+            try:
+                log_handle.write(f"{utc_ms()} {line}\n")
+                log_handle.flush()
+            except Exception:
+                pass
+
+        self.process = process
+        self.log_handle = log_handle
+        self.active_game = dict(game)
+        self.started_at = time.monotonic()
+        self._paused = False
+        self._host_window_policy = None
+        self._network_cmd_port = None
+        self._active_cheat_session = None
+        self._players_session = plan
+        self._hold_rewind_core = None
+        self._launch_kind = "dolphin"
+        self._last_device_args = []       # B66: Dolphin takes its ports from Dolphin.ini / GCPadNew.ini
+        self._gc = _gc.Session(process.pid, log_line, log_path=dolphin_log, user_dir=user)
+
+        sess = self._gc
+        t0 = sess.clock()
+        if sess.wait_window(alive=lambda: process.poll() is None) is None:
+            try:
+                self._dolphin_stop()
+            except Exception:
+                pass
+            raise EmulatorError("GameCube launch failed: Dolphin showed no window")
+        log_line(f"GC window: {sess.clock() - t0:.1f}s")
+        # the shader pre-compile window (the emulation starts after it), then the audio stream (B50's lesson): the
+        # stream's start and its stabilization pause come after both
+        boot = sess.wait_boot(alive=lambda: process.poll() is None)
+        log_line(f"GC boot: cpu thread {'%.1fs' % boot if boot is not None else 'none'}")
+        waited = sess.wait_audio(alive=lambda: process.poll() is None)
+        log_line(f"GC audio: sink-input {'%.1fs' % waited if waited is not None else 'none'}")
+        try:
+            sess.note_pads(force=True)
+        except Exception:
+            pass
+
+        payload = self.status()
+        payload["action"] = "launch"
+        payload["launch_kind"] = "dolphin"
+        payload["gc_mode"] = True
+        payload["players_session"] = dict(plan)
+        return payload
+
+    def _dolphin_ended(self, pid: int) -> None:
+        """The exit's bookkeeping: the helper's session for the next launch, Dolphin's logs collected."""
+        self._gc_helper_sid = int(pid)
+        sess = self._gc
+        if sess is not None and sess.user_dir is not None and sess.log_path is not None:
+            try:
+                _gc.collect_after_exit(sess.user_dir, sess.log_path)
+            except OSError:
+                pass
+
+    def _dolphin_state_folder(self) -> Path:
+        folder = self._project_path(_gc.USER_DIR) / "StateSaves"
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder
+
+    def _dolphin_save_slot(self, slot: int, what: str, bound: float) -> tuple[Path, float]:
+        """Shift+F<slot> and the file's stable check (the caller holds the lock and made the pause hotkey-able)."""
+        sess = self._gc
+        folder = self._dolphin_state_folder()
+        before = _gc.state_files(folder)
+        if not sess.press_save(slot):
+            sess.log(f"GC {what}: slot {slot} hotkey not sent (no window)")
+            raise EmulatorError("Dolphin's window was not found for the save key")
+        got = sess.wait_state_file(folder, slot, before, bound=bound)
+        if got is None:
+            sess.log(f"GC {what}: slot {slot} hotkey; file not stable in {bound:.1f}s")
+            raise EmulatorError("PrivyHub could not verify the saved GameCube state")
+        sess.log(f"GC {what}: slot {slot} hotkey; file stable {got[1]:.1f}s")
+        return got
+
+    # B69: PrivyHub's SAVE / LOAD buttons for a GameCube session, through Dolphin's state hotkeys
+    def _dolphin_save_state(self, slot: int, replace: bool = False) -> dict[str, Any]:
+        with self.lock:
+            normalized = self._normalize_save_state_slot(slot)
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._gc is None:
+                raise EmulatorError("No PrivyHub game session is running")
+            existing = self._save_state_slot_detail(normalized)
+            replacing = bool(existing.get("exists") or existing.get("invalid"))
+            try:
+                self._gc.ensure_hotkey_pause()
+            except _gc.GCError as exc:
+                raise EmulatorError(str(exc)) from exc
+            path, _ = self._dolphin_save_slot(normalized, "save", _gc.SAVE_BOUND_S)
+            self._record_state_slot_index(normalized, path)
+            payload = self.status()
+            payload["action"] = "save_state"
+            payload["slot"] = normalized
+            payload["accepted"] = True
+            payload["confirmed"] = True
+            payload["replaced_existing"] = replacing
+            payload["overwrite_requires_confirmation"] = False
+            payload["control"] = "dolphin_hotkey_save_state"
+            payload["hotkey"] = f"Shift+F{normalized}"
+            payload["slot_detail"] = self._save_state_slot_detail(normalized)
+            payload["state_file"] = str(path.relative_to(self.project_root)).replace("\\", "/")
+            return payload
+
+    def _dolphin_load_slot(self, slot: int, what: str) -> tuple[str, float]:
+        """Paused: F<slot>, a settle, the resume, B52's picture check (the caller pauses again or leaves it running)."""
+        sess = self._gc
+        if not sess.booted():
+            sess.log(f"GC {what}: slot {slot} held; the CPU thread is not up")
+            raise EmulatorError("The game is still starting; play a moment, then load again")
+        try:
+            sess.ensure_hotkey_pause()
+        except _gc.GCError as exc:
+            raise EmulatorError(str(exc)) from exc
+        pre = sess.picture()
+        if not sess.press_load(slot):
+            sess.log(f"GC {what}: slot {slot} hotkey not sent (no window)")
+            raise EmulatorError("Dolphin's window was not found for the load key")
+        sess.sleep(_gc.LOAD_SETTLE_S)
+        try:
+            sess.resume()
+            verdict, seconds = sess.check_picture(pre[0] if pre else None)
+        except _gc.GCError:
+            verdict, seconds = "static", 0.0
+        sess.log(f"GC {what}: slot {slot} hotkey; picture {verdict} {seconds:.1f}s")
+        return verdict, seconds
+
+    def _dolphin_load_state(self, slot: int) -> dict[str, Any]:
+        with self.lock:
+            normalized = self._normalize_save_state_slot(slot)
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._gc is None:
+                raise EmulatorError("No active game session is available to load")
+            if not self._paused:
+                raise EmulatorError("Load State requires the game to be paused")
+            detail = self._save_state_slot_detail(normalized)
+            if detail.get("invalid_reason") == "zero_byte_state":
+                raise EmulatorError(f"Slot {normalized} contains an invalid 0-byte savestate; create a new save")
+            if not detail.get("exists"):
+                raise EmulatorError(f"No save state exists in Slot {normalized}")
+            verdict, _ = self._dolphin_load_slot(normalized, "load")
+            try:
+                self._gc.pause()
+            except _gc.GCError:
+                pass
+            if verdict != "ok":
+                raise EmulatorError("The game did not resume from the save")
+            payload = self.status()
+            payload["action"] = "load_state"
+            payload["slot"] = normalized
+            payload["accepted"] = True
+            payload["confirmed"] = True
+            payload["verification"] = "picture"
+            payload["paused"] = True
+            payload["control"] = "dolphin_hotkey_load_state"
+            payload["hotkey"] = f"F{normalized}"
+            payload["slot_detail"] = self._save_state_slot_detail(normalized)
+            payload["state_file"] = detail.get("state_file")
+            return payload
+
+    def _dolphin_save_recovery_state(self) -> dict[str, Any]:
+        """Shift+F8 (the reserved slot), the file waited, the recovery index written as PS1's."""
+        with self.lock:
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._gc is None:
+                raise EmulatorError("No PrivyHub game session is running")
+            try:
+                self._gc.ensure_hotkey_pause()
+            except _gc.GCError as exc:
+                raise EmulatorError(str(exc)) from exc
+            path, _ = self._dolphin_save_slot(_gc.RECOVERY_SLOT, "recovery save", _gc.RECOVERY_BOUND_S)
+            identity = self._active_game_state_identity()
+            game = self.active_game if isinstance(self.active_game, dict) else {}
+            relative = str(path.relative_to(self.project_root)).replace("\\", "/")
+            saved_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+            self._write_recovery_index({
+                "schema": "privyhub_recovery_save_v1",
+                "state_file": relative,
+                "saved_at": saved_at,
+                "game_id": game.get("id"),
+                "game_title": identity.get("game_title"),
+                "game_key": identity.get("game_key"),
+            })
+            return {
+                "ok": True,
+                "action": "save_recovery_state",
+                "state_file": relative,
+                "saved_at": saved_at,
+                "size_bytes": int(path.stat().st_size),
+                "gc_states": "hotkey",
+            }
+
+    def _dolphin_recovery_source(self) -> Path:
+        detail = self.recovery_state_detail()
+        if not detail.get("exists") or not detail.get("state_file"):
+            raise EmulatorError("No recovery save exists for this game")
+        source = self._project_path(str(detail["state_file"]))
+        if not source.name.endswith(_gc.slot_suffix(_gc.RECOVERY_SLOT)):
+            raise EmulatorError("The recovery save is not this session's GameCube state")
+        return source
+
+    def _dolphin_load_recovery_state_running(self) -> dict[str, Any]:
+        """The prompt's Resume in a fresh GameCube launch: F8 into the paused game, the picture, left running."""
+        with self.lock:
+            self._refresh_process()
+            if self.process is None or self.active_game is None or self._gc is None:
+                raise EmulatorError("No active game session is available to load")
+            if self._paused:
+                raise EmulatorError("The running-core recovery load requires the game to be running")
+            source = self._dolphin_recovery_source()
+            sess = self._gc
+            if not sess.booted():
+                raise EmulatorError("The game is still starting; play a moment, then load again")
+            try:
+                if sess.paused_by is None:
+                    sess.pause()
+            except _gc.GCError as exc:
+                raise EmulatorError(str(exc)) from exc
+            verdict, _ = self._dolphin_load_slot(_gc.RECOVERY_SLOT, "recovery load")
+            if sess.paused_by is not None:
+                try:
+                    sess.resume()
+                except _gc.GCError:
+                    pass
+            if verdict != "ok":
+                raise EmulatorError("The game did not resume from the save")
+            payload = self.status()
+            payload["action"] = "load_recovery_state_running"
+            payload["accepted"] = True
+            payload["verification"] = "picture"
+            payload["retroarch_response"] = None
+            payload["retroarch_loading_line"] = None
+            payload["source_sha256"] = self._state_file_diagnostic(source).get("sha256")
+            payload["gc_states"] = "hotkey"
+            return payload
+
+    def _dolphin_copy_recovery_state_to_slot(self, slot: int, *, replace: bool = False) -> dict[str, Any]:
+        """The slot-8 file copied to the user slot's Dolphin name (`.s0N`), verified, the slot index written."""
+        with self.lock:
+            normalized = self._normalize_save_state_slot(slot)
+            source = self._dolphin_recovery_source()
+            source_diag = self._state_file_diagnostic(source)
+            if int(source_diag.get("size_bytes", 0) or 0) <= 0:
+                raise EmulatorError("The recovery save is an invalid 0-byte file")
+            prefix = source.name[: -len(_gc.slot_suffix(_gc.RECOVERY_SLOT))]
+            destination = source.with_name(prefix + _gc.slot_suffix(normalized))
+            self._copy_state_file(source, destination)
+            destination_diag = self._state_file_diagnostic(destination)
+            if (
+                int(destination_diag.get("size_bytes", 0) or 0) <= 0
+                or destination_diag.get("sha256") != source_diag.get("sha256")
+            ):
+                raise EmulatorError("PrivyHub could not verify the copied savestate")
+            self._record_state_slot_index(normalized, destination)
+            payload = self.status()
+            payload["action"] = "copy_recovery_state"
+            payload["slot"] = normalized
+            payload["accepted"] = True
+            payload["confirmed"] = True
+            payload["replaced_existing"] = False
+            payload["slot_detail"] = self._save_state_slot_detail(normalized)
+            payload["state_file"] = str(destination.relative_to(self.project_root)).replace("\\", "/")
+            payload["gc_states"] = "hotkey"
+            return payload
+
+    def _dolphin_pause_resume(self, action: str) -> dict[str, Any]:
+        try:
+            how = self._gc.pause() if action == "pause" else self._gc.resume()
+        except Exception as exc:
+            raise EmulatorError(f"GameCube {action} failed: {exc}") from exc
+        self._paused = action == "pause"
+        payload = self.status()
+        payload["action"] = action
+        payload["paused"] = self._paused
+        payload["gc_" + action] = how
+        payload["gc_mode"] = True
+        return payload
+
+    def _dolphin_stop(self) -> dict[str, Any]:
+        process = self.process
+        how = "gone"
+        if process is not None and self._gc is not None:
+            how = self._gc.stop(process)
+            self._dolphin_ended(process.pid)
+        self._close_quietly(self.log_handle)
+        self.process = None
+        self.log_handle = None
+        self.active_game = None
+        self.started_at = None
+        self._paused = False
+        self._host_window_policy = None
+        self._network_cmd_port = None
+        self._active_cheat_session = None
+        self._players_session = None
+        self._launch_kind = None
+        self._ps2 = None
+        self._gc = None
+        self._n64_core = None
+        payload = self.status()
+        payload["action"] = "stop"
+        payload["stopped"] = True
+        payload["graceful"] = how.startswith("sigterm")
+        payload["save_flush_confirmed"] = how.startswith("sigterm")
+        payload["gc_exit"] = how
         return payload
 
     def pause(self) -> dict[str, Any]:
@@ -7365,6 +7765,9 @@ class EmulatorManager:
             # B49: PCSX2's pause (the hotkey confirmed by PINE, else SIGSTOP)
             if self._launch_kind == "pcsx2":
                 return self._pcsx2_pause_resume("pause")
+            # B69: Dolphin's pause (the F10 hotkey confirmed by the CPU thread's clock, else SIGSTOP)
+            if self._launch_kind == "dolphin":
+                return self._dolphin_pause_resume("pause")
 
             observed = self._retroarch_network_status()
 
@@ -7404,6 +7807,9 @@ class EmulatorManager:
             # B49: PCSX2's resume (the way it was paused)
             if self._launch_kind == "pcsx2":
                 return self._pcsx2_pause_resume("resume")
+            # B69: Dolphin's resume (the way it was paused)
+            if self._launch_kind == "dolphin":
+                return self._dolphin_pause_resume("resume")
 
             observed = self._retroarch_network_status()
 
@@ -7589,6 +7995,9 @@ class EmulatorManager:
         # B49 skipped it; B55: a PS2 session's give-up save goes through PINE (slot 8), the recovery index as PS1's
         if self._launch_kind == "pcsx2":
             return self._pcsx2_save_recovery_state()
+        # B69: a GameCube session's give-up save: Shift+F8, the file, the recovery index as PS1's
+        if self._launch_kind == "dolphin":
+            return self._dolphin_save_recovery_state()
         with self.lock:
             self._refresh_process()
             if (
@@ -7700,6 +8109,9 @@ class EmulatorManager:
         # B49: refused in a PS2 session
         if self._launch_kind == "pcsx2":
             raise EmulatorError(PS2_NO_STATES)
+        # B69: and in a GameCube session (its recovery load is the running one below)
+        if self._launch_kind == "dolphin":
+            raise EmulatorError("The paused recovery load is not used in a GameCube session")
         with self.lock:
             self._refresh_process()
             if (
@@ -7820,6 +8232,9 @@ class EmulatorManager:
         # B54 refused it; B57: a PS2 relaunch saves to PINE's reserved slot 7 (B52's file-complete check)
         if self._launch_kind == "pcsx2":
             return self._pcsx2_save_relaunch_state()
+        # B69: four native ports never relaunch
+        if self._launch_kind == "dolphin":
+            raise EmulatorError(_gc.NO_RELAUNCH)
         with self.lock:
             self._refresh_process()
             if self.process is None or self.process.poll() is not None:
@@ -7868,6 +8283,11 @@ class EmulatorManager:
             if source is None:
                 return self._pcsx2_load_recovery_state_running()
             return self._pcsx2_load_recovery_state_running(source)
+        # B69: a GameCube recovery save loads by F8 (the picture checked), left running; no relaunch source
+        if self._launch_kind == "dolphin":
+            if source is not None:
+                raise EmulatorError(_gc.NO_RELAUNCH)
+            return self._dolphin_load_recovery_state_running()
         with self.lock:
             self._refresh_process()
             if (
@@ -8023,6 +8443,9 @@ class EmulatorManager:
         # B49 refused it; B55: the PS2 recovery file copied to the user slot's PCSX2 name
         if self._launch_kind == "pcsx2":
             return self._pcsx2_copy_recovery_state_to_slot(slot, replace=replace)
+        # B69: the GameCube recovery file copied to the user slot's Dolphin name
+        if self._launch_kind == "dolphin":
+            return self._dolphin_copy_recovery_state_to_slot(slot, replace=replace)
         with self.lock:
             normalized = self._normalize_save_state_slot(slot)
 
@@ -8373,6 +8796,9 @@ class EmulatorManager:
         # B51: a PS2 session saves through PINE, answering exactly as the PS1 path (B49's refusal gone for the button)
         if self._launch_kind == "pcsx2":
             return self._pcsx2_save_state(slot, replace)
+        # B69: a GameCube session saves by Shift+F<n>, answering exactly as the PS1 path
+        if self._launch_kind == "dolphin":
+            return self._dolphin_save_state(slot, replace)
         with self.lock:
             normalized = self._normalize_save_state_slot(
                 slot
@@ -8526,6 +8952,9 @@ class EmulatorManager:
         # B51: a PS2 session loads through PINE, answering exactly as the PS1 path
         if self._launch_kind == "pcsx2":
             return self._pcsx2_load_state(slot)
+        # B69: a GameCube session loads by F<n> (B52's picture check), answering exactly as the PS1 path
+        if self._launch_kind == "dolphin":
+            return self._dolphin_load_state(slot)
         with self.lock:
             normalized = (
                 self._normalize_save_state_slot(
@@ -9368,6 +9797,9 @@ class EmulatorManager:
             # B49: a PCSX2 session ends by SIGTERM (SIGKILL after 5 s)
             if self._launch_kind == "pcsx2":
                 return self._pcsx2_stop()
+            # B69: a Dolphin session ends by SIGTERM (SIGKILL after 5 s)
+            if self._launch_kind == "dolphin":
+                return self._dolphin_stop()
 
             process = self.process
             active_cheat_session = (
@@ -9489,6 +9921,7 @@ class EmulatorManager:
             self._players_session = None
             self._launch_kind = None
             self._ps2 = None
+            self._gc = None
             self._n64_core = None
 
             if cheat_runtime_cleanup:

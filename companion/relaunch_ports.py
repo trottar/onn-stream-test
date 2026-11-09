@@ -54,6 +54,9 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
     target = int(players)
     if target not in (2, 4):
         raise RelaunchRefused("players must be 2 or 4")
+    # B69: a GameCube session has its four native ports from the launch: never relaunched (PRIVYHUB_GAMECUBE=1 only)
+    if getattr(emulator, "_launch_kind", None) == "dolphin":
+        raise RelaunchRefused("GameCube has four ports; no relaunch")
     system = str(game.get("system", "")).strip().casefold()
     if target == 4 and system not in _players_session.MULTITAP_SYSTEMS:
         raise RelaunchRefused("No multitap on this system")

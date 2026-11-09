@@ -196,8 +196,9 @@ def append_native_stream_heartbeat(
     # B46: the chooser's pick (only a client that picked sends it)
     # B49: a PS2 session's heartbeats carry ps2_mode (only set with PRIVYHUB_PS2=1)
     # B54: hold-to-join's count and mode (only a hold-to-join client sends them)
+    # B69: a GameCube session's heartbeats carry gc_mode (only set with PRIVYHUB_GAMECUBE=1)
     for field in ("pad_slots", "updates_by_player", "packets_by_player", "pad_slots_bad", "players_chosen",
-                  "ps2_mode", "join", "players_joined"):
+                  "ps2_mode", "join", "players_joined", "gc_mode"):
         if field in values:
             record[field] = values[field]
 

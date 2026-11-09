@@ -131,6 +131,12 @@ _n64_session = None
 if (os.environ.get("PRIVYHUB_N64") or "").strip() == "1":
     import n64_session as _n64_session
 
+# B69: the GameCube system listed in place (Dolphin), only with PRIVYHUB_GAMECUBE=1. Absent = today: nothing imported,
+# SYSTEMS unchanged.
+_gc_session = None
+if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
+    import gamecube_session as _gc_session
+
 # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
 # Absent = today: nothing imported.
 _import_marks = None
@@ -194,6 +200,10 @@ class GamesPlugin:
         if _n64_session is not None:
             self.SYSTEMS = {**self.SYSTEMS, _n64_session.SYSTEM_ID: {
                 "name": _n64_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
+        # B69: the GameCube system listed from the drive's GameCube folder (instance only; absent = today)
+        if _gc_session is not None:
+            self.SYSTEMS = {**self.SYSTEMS, _gc_session.SYSTEM_ID: {
+                "name": _gc_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
         self._lock = threading.RLock()
         self._cached_at = 0.0
         self._cached_games: list[dict[str, Any]] = []
@@ -1861,6 +1871,15 @@ class GamesPlugin:
             if _n64_session is not None and system_id == _n64_session.SYSTEM_ID:
                 games.extend(_n64_session.titles_for_plugin(
                     _n64_session.read_dir(self.PROJECT_ROOT), self._stable_id, self._clean_name)
+                    [:max(0, self.MAX_GAMES - len(games))])
+                if len(games) >= self.MAX_GAMES:
+                    break
+                continue
+            # B69: GameCube titles read in place from the folder the paths file names, never written; absent: never
+            # reached
+            if _gc_session is not None and system_id == _gc_session.SYSTEM_ID:
+                games.extend(_gc_session.titles_for_plugin(
+                    _gc_session.read_dir(self.PROJECT_ROOT), self._stable_id, self._clean_name)
                     [:max(0, self.MAX_GAMES - len(games))])
                 if len(games) >= self.MAX_GAMES:
                     break
@@ -3879,6 +3898,9 @@ class GamesPlugin:
             # B49: every heartbeat row of a PS2 session says so (absent: never set)
             if _ps2_session is not None and _ps2_session.active(self._emulator):
                 values["ps2_mode"] = True
+            # B69: and of a GameCube session (absent: never set)
+            if _gc_session is not None and _gc_session.active(self._emulator):
+                values["gc_mode"] = True
 
             result = append_native_stream_heartbeat(
                 self.PROJECT_ROOT,
@@ -4062,6 +4084,18 @@ class GamesPlugin:
                     self._recovery._log("ps2_session", ps2_mode=True, savestates="pine", ps2_states="pine",
                                         pine=list(_ps2_session.PINE_BEHAVIOURS),
                                         off=list(_ps2_session.OFF_BEHAVIOURS))
+                # B69: a GameCube session: the states by Dolphin's hotkeys, said in the response and a row (with the
+                # pads Dolphin's log has added so far)
+                if _gc_session is not None and _gc_session.active(self._emulator):
+                    payload["gc_mode"] = True
+                    sess = getattr(self._emulator, "_gc", None)
+                    try:
+                        pads = sess.note_pads() if sess is not None else None
+                    except Exception:
+                        pads = None
+                    self._recovery._log("gc_session", gc_mode=True, gc_states="hotkey",
+                                        live=list(_gc_session.LIVE_BEHAVIOURS), off=list(_gc_session.OFF_BEHAVIOURS),
+                                        pads=pads)
                 # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
                 if self._first(query, "player_prompt") == "1":
                     import player_count as _player_count

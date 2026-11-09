@@ -536,6 +536,8 @@ class LinkDropRecovery:
                 **({"ps2_mode": True, "save_skipped": True} if saved.get("skipped") == "ps2_mode" else {}),
                 # B55: a PS2 session's give-up save went through PINE (only the PS2 path returns this key)
                 **({"ps2_states": saved["ps2_states"]} if saved.get("ps2_states") else {}),
+                # B69: a GameCube session's give-up save went through Dolphin's hotkey (only its path returns this key)
+                **({"gc_states": saved["gc_states"]} if saved.get("gc_states") else {}),
             )
 
     def _end_after_timeout(self) -> None:

@@ -45,10 +45,13 @@ GAME_LOG = re.compile(r"^(\d{8})-(\d{6})-game_([a-z0-9]+)_([0-9a-f]{4})[0-9a-f]*
 # B50: a PS2 session's game log (B49: no id or title in its name); its sessions read system `ps2`, core `pcsx2`
 PS2_LOG = re.compile(r"^(\d{8})-(\d{6})-ps2\.log$")
 PS2_CORE = "pcsx2"
+# B69: a GameCube session's game log (no id or title in its name); its sessions read system `gamecube`, core `dolphin`
+GC_LOG = re.compile(r"^(\d{8})-(\d{6})-gamecube\.log$")
+GC_CORE = "dolphin"
 
 
 def is_game_log(name: str) -> bool:
-    return bool(GAME_LOG.match(name) or PS2_LOG.match(name))
+    return bool(GAME_LOG.match(name) or PS2_LOG.match(name) or GC_LOG.match(name))
 
 
 # B53: PCSX2's own log per launch (`<UTC launch>-pcsx2.log`, live under data/games/ps2/logs/, the keeper's raw/ps2logs__*)
@@ -81,6 +84,54 @@ def pcsx2_events(name: str, data: bytes) -> list[tuple[datetime, str]]:
             if rx.search(lm.group(2)):
                 out.append((t0 + timedelta(seconds=float(lm.group(1))), kind))
     return out
+
+# B69: Dolphin's own log per launch (`<UTC launch>-dolphin.log`, live under data/games/gamecube/logs/, the keeper's
+# raw/gclogs__*); its lines `MM:SS:mmm file:line L[TYPE]: text` (minutes and seconds only: the hour from the launch)
+DOLPHIN_LOG = re.compile(r"^(\d{8}T\d{6}Z)-dolphin\.log$")
+DOLPHIN_LINE = re.compile(r"^(\d{2}):(\d{2}):(\d{3}) (\S+) ([NEWID])\[([^\]]+)\]: (.*)$")
+DOLPHIN_NOISE = "Translation.cpp"          # its E / W lines on every start (no translation file in the AppImage)
+DOLPHIN_COUNTS = ("boot", "pad_added", "pad_removed", "error", "warning")
+
+
+def dolphin_kinds(src: str, level: str, text: str) -> list[str]:
+    out = []
+    if text.startswith("Booting from "):
+        out.append("boot")
+    if re.match(r"Added device: evdev/\d+/PrivyHub Virtual Gamepad P[1-4]\b", text):
+        out.append("pad_added")
+    if re.match(r"Removed device: evdev/\d+/PrivyHub Virtual Gamepad P[1-4]\b", text):
+        out.append("pad_removed")
+    if DOLPHIN_NOISE not in src:
+        if level == "E":
+            out.append("error")
+        elif level == "W":
+            out.append("warning")
+    return out
+
+
+def dolphin_events(name: str, data: bytes) -> list[tuple[datetime, str]]:
+    """(UTC, kind) for each counted line of one per-launch Dolphin log: the launch's hour + each line's MM:SS, carried
+    forward an hour whenever a line reads earlier than the one before (whole-hour time zones)."""
+    m = DOLPHIN_LOG.match(name)
+    if not m:
+        return []
+    t0 = datetime.strptime(m.group(1), "%Y%m%dT%H%M%SZ")
+    base = t0.replace(minute=0, second=0)
+    out: list[tuple[datetime, str]] = []
+    last: datetime | None = None
+    for line in data.decode("utf-8", "replace").splitlines():
+        lm = DOLPHIN_LINE.match(line)
+        if not lm:
+            continue
+        t = base + timedelta(minutes=int(lm.group(1)), seconds=int(lm.group(2)), milliseconds=int(lm.group(3)))
+        floor = last if last is not None else t0 - timedelta(seconds=5)
+        while t < floor:
+            t += timedelta(hours=1)
+        last = t
+        for kind in dolphin_kinds(lm.group(4), lm.group(5), lm.group(7)):
+            out.append((t, kind))
+    return out
+
 
 # the trip's known titles (game id prefix -> class + tag); others read "<SYSTEM> <4-hex>"
 TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
@@ -184,6 +235,7 @@ class Logs:
         self.reports: list[dict[str, Any]] = []
         self.game_logs: list[str] = []          # game log file names (they carry the launch time and the title)
         self.pcsx2_logs: dict[str, bytes] = defaultdict(bytes)   # B53: per-launch PCSX2 logs, by file name
+        self.dolphin_logs: dict[str, bytes] = defaultdict(bytes)  # B69: per-launch Dolphin logs, by file name
         self.overlay: list[dict[str, Any]] = []
         self.sources: list[str] = []
 
@@ -204,6 +256,11 @@ class Logs:
                 if sub.startswith("ps2logs__") and PCSX2_LOG.match(sub[len("ps2logs__"):]):
                     for f in files:
                         self.pcsx2_logs[sub[len("ps2logs__"):]] += (p / f).read_bytes()
+                    continue
+                # B69: the keeper's copies of Dolphin's per-launch logs
+                if sub.startswith("gclogs__") and DOLPHIN_LOG.match(sub[len("gclogs__"):]):
+                    for f in files:
+                        self.dolphin_logs[sub[len("gclogs__"):]] += (p / f).read_bytes()
                     continue
                 if base == "decoder_sessions":
                     for f in files:
@@ -251,6 +308,14 @@ class Logs:
             if PCSX2_LOG.match(f):
                 try:
                     self.pcsx2_logs[f] = (p2 / f).read_bytes()
+                except OSError:
+                    continue
+        # B69: Dolphin's per-launch logs beside the repo's logs (data/games/gamecube/logs/)
+        gl = logs_root.parent / "data" / "games" / "gamecube" / "logs"
+        for f in sorted(os.listdir(gl)) if gl.is_dir() else []:
+            if DOLPHIN_LOG.match(f):
+                try:
+                    self.dolphin_logs[f] = (gl / f).read_bytes()
                 except OSError:
                     continue
         d = games / "decoder_sessions"
@@ -316,6 +381,11 @@ class Analysis:
         for f in sorted(logs.game_logs):
             m = GAME_LOG.match(f)
             if m is None:                                   # B50: a PS2 launch
+                m3 = GC_LOG.match(f)                        # B69: a GameCube launch
+                if m3 is not None:
+                    t = local_to_utc(datetime.strptime(m3.group(1) + m3.group(2), "%Y%m%d%H%M%S"), tz)
+                    self.launches.append((t, "GameCube", GC_CORE))
+                    continue
                 m2 = PS2_LOG.match(f)
                 if m2 is None:
                     continue
@@ -330,6 +400,10 @@ class Analysis:
         self.pcsx2_launches = sorted(datetime.strptime(PCSX2_LOG.match(n).group(1), "%Y%m%dT%H%M%SZ")
                                      for n in logs.pcsx2_logs)
         self.pcsx2 = sorted(ev for n, data in logs.pcsx2_logs.items() for ev in pcsx2_events(n, data))
+        # B69: Dolphin's per-launch logs: the launch times and every counted line (UTC)
+        dl = getattr(logs, "dolphin_logs", {})
+        self.dolphin_launches = sorted(datetime.strptime(DOLPHIN_LOG.match(n).group(1), "%Y%m%dT%H%M%SZ") for n in dl)
+        self.dolphin = sorted(ev for n, data in dl.items() for ev in dolphin_events(n, data))
         self._sessions()
         self._seconds()
 
@@ -359,10 +433,13 @@ class Analysis:
         cur = None
         last_cfg = None
         ps2_at = None                                       # B50: the newest `ps2_session` row (the stream's start)
+        gc_at = None                                        # B69: the newest `gc_session` row
         for r in self.rec:
             t, ev = ts(r["at_utc"]), r.get("event")
             if ev == "ps2_session":
                 ps2_at = t
+            if ev == "gc_session":
+                gc_at = t
             if ev == "remote_config":
                 last_cfg = r
             elif ev == "session_started":
@@ -371,6 +448,10 @@ class Analysis:
                 if ps2_at is not None and timedelta(0) <= t - ps2_at <= timedelta(seconds=120):
                     cur["ps2"] = True
                 ps2_at = None
+                # B69: the same for a GameCube stream start
+                if gc_at is not None and timedelta(0) <= t - gc_at <= timedelta(seconds=120):
+                    cur["gc"] = True
+                gc_at = None
                 self.sessions.append(cur)
             elif cur is not None:
                 cur["events"].append(r)
@@ -391,6 +472,8 @@ class Analysis:
             s["tag"], s["core"] = self.title_at(s["start"])
             if s.get("ps2"):                                # B50: the session's own row wins over the launch order
                 s["tag"], s["core"] = "PS2", PS2_CORE
+            if s.get("gc"):                                 # B69: so does a GameCube session's
+                s["tag"], s["core"] = "GameCube", GC_CORE
         self.restarts = [r for r in self.rec if r.get("event") == "restart_fast"]
         self.transitions = [r for r in self.lad if r.get("event") == "transition"]
         # B32-host writes `in_place` on the step's `transition_done` row (adaptive_bitrate_live), not on `transition`:
@@ -585,6 +668,22 @@ class Analysis:
                 out[kind] += 1
         return out
 
+    def dolphin_counts(self, s: dict[str, Any]) -> dict[str, int] | None:
+        """B69: the counted Dolphin lines from the previous session's end (or this launch) to this session's end."""
+        launches = [t for t in getattr(self, "dolphin_launches", []) if t <= s["start"]
+                    and s["start"] - t <= timedelta(hours=6)]
+        if not launches:
+            return None
+        launch = launches[-1]
+        ends = [x["end"] for x in self.sessions if x["end"] is not None and launch <= x["end"] < s["start"]]
+        lo = max(ends) if ends else launch
+        hi = (s["end"] or s["start"]) + timedelta(seconds=5)
+        out = {k: 0 for k in DOLPHIN_COUNTS}
+        for t, kind in self.dolphin:
+            if lo <= t < hi:
+                out[kind] += 1
+        return out
+
     @staticmethod
     def ps1_reference(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """B50: the PS1 sessions a comparison may use as its reference (a PS2 session never)."""
@@ -631,6 +730,9 @@ class Analysis:
             **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
             # B53: PCSX2's own log lines for this session, when its launch's log exists (no key otherwise)
             **({"pcsx2_log": c} if s["core"] == PS2_CORE and (c := self.pcsx2_counts(s)) is not None else {}),
+            # B69: a GameCube session says its system, and Dolphin's own log lines when its launch's log exists
+            **({"system": "gamecube"} if s["core"] == GC_CORE else {}),
+            **({"dolphin_log": c} if s["core"] == GC_CORE and (c := self.dolphin_counts(s)) is not None else {}),
             "silences": m["silences"], "silences_user": m["silences_user"],
             "silences_per_10min": round(m["silences"] / per10, 1) if per10 else None,
             "max_silence_ms": round(m["max_silence_ms"]), "underruns": m["underruns"], "starvation": m["starvation"],
@@ -792,6 +894,14 @@ def render(an: Analysis, label: str, around: list[datetime], around_saves: bool)
         L += ["", "## PCSX2 logs (B53)", ""]
         L += md_table(["start", "end"] + list(PCSX2_COUNTS), [[hms(s["start"]), hms(s["end"] or s["start"])]
                                                             + [r["pcsx2_log"][k] for k in PCSX2_COUNTS] for s, r in p2])
+    # B69: Dolphin's own log per GameCube session (only when one exists)
+    gq = [(s, an.session_row(s)) for s in an.sessions if s["core"] == GC_CORE]
+    gq = [(s, r) for s, r in gq if "dolphin_log" in r]
+    if gq:
+        L += ["", "## Dolphin logs (B69)", ""]
+        L += md_table(["start", "end"] + list(DOLPHIN_COUNTS), [[hms(s["start"]), hms(s["end"] or s["start"])]
+                                                              + [r["dolphin_log"][k] for k in DOLPHIN_COUNTS]
+                                                              for s, r in gq])
     L += ["", "## VOD (B35)", ""]
     if an.vod_client:
         L += md_table(["UTC", "event", "detail"], [[hms(Analysis._t(r)), r.get("event"),

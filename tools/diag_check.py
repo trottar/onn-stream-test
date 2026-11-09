@@ -184,8 +184,9 @@ def line_last_session(path: Path) -> str | None:
     except ValueError:
         return None
     # B66: an N64 row too; both with the bar's number and the hold-resume seconds (other systems: no line, today)
+    # B69: a GameCube row too (`system: gamecube`, written only for a Dolphin session)
     system = r.get("system") or ("n64" if r.get("core") == "mupen64plus-next" else None)
-    if system not in ("ps2", "n64"):
+    if system not in ("ps2", "n64", "gamecube"):
         return None
     bar = ""
     if "hitch_s_bar_per_10min" in r:

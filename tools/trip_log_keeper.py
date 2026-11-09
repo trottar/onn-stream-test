@@ -43,9 +43,12 @@ GAMES_TAILS = ["adaptive_bitrate_shadow.jsonl", "native_stream_heartbeat.log", "
 TOP_TAILS = ["wan_sessions.jsonl", "session_audit.jsonl", "impairment.jsonl"]
 NEWDIRS = ["decoder_sessions", "audio_timing"]
 # B50: a PS2 session's game log (`<date>-<time>-ps2.log`, no id or title by B49's design) is a game log too
-GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2)\.log$")
+# B69: a GameCube session's game log (`<date>-<time>-gamecube.log`, no id or title) is one too
+GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2|gamecube)\.log$")
 # B53: PCSX2's own per-launch logs (data/games/ps2/logs/<UTC launch>-pcsx2.log), copied like the game logs
 PCSX2_LOG = re.compile(r"^\d{8}T\d{6}Z-pcsx2\.log$")
+# B69: Dolphin's own per-launch logs (data/games/gamecube/logs/<UTC launch>-dolphin.log), copied the same way
+DOLPHIN_LOG = re.compile(r"^\d{8}T\d{6}Z-dolphin\.log$")
 UNIT = "privyhub-companion"
 STATUS_URL = "http://127.0.0.1:8765/plugins/games/status"
 QUIET_S = 10.0
@@ -244,6 +247,7 @@ class Keeper:
         self.games = self.logs / "games"
         self.arch = self.games / "stream_log_archive"
         self.ps2logs = self.logs.parent / "data" / "games" / "ps2" / "logs"      # B53
+        self.gclogs = self.logs.parent / "data" / "games" / "gamecube" / "logs"  # B69
         self.raw, self.samples = self.out / "raw", self.out / "samples"
         self.redactor = redactor if redactor is not None else Redactor()
         self._overlay = overlay if overlay is not None else overlay_state
@@ -315,6 +319,8 @@ class Keeper:
         self.seen["game_logs"] = {f for f in (os.listdir(self.games) if self.games.is_dir() else []) if GAME_LOG.match(f)}
         self.seen["ps2_logs"] = {f for f in (os.listdir(self.ps2logs) if self.ps2logs.is_dir() else [])
                                  if PCSX2_LOG.match(f)}
+        self.seen["gc_logs"] = {f for f in (os.listdir(self.gclogs) if self.gclogs.is_dir() else [])
+                                if DOLPHIN_LOG.match(f)}                                  # B69
         self.jsince = int(self.clock())
 
     def copy(self, final: bool = False) -> dict[str, Any]:
@@ -334,6 +340,13 @@ class Keeper:
                 if PCSX2_LOG.match(f) and f not in seen:
                     seen.add(f)
                     self.tails[f"ps2logs/{f}"] = Tail(self.ps2logs / f, None, from_start=True)
+        # B69: new Dolphin per-launch logs too (kept as raw/gclogs__<name>/)
+        if self.gclogs.is_dir():
+            seen = self.seen.setdefault("gc_logs", set())
+            for f in sorted(os.listdir(self.gclogs)):
+                if DOLPHIN_LOG.match(f) and f not in seen:
+                    seen.add(f)
+                    self.tails[f"gclogs/{f}"] = Tail(self.gclogs / f, None, from_start=True)
         for key, t in self.tails.items():
             try:
                 data, rotated = t.step()

@@ -35,6 +35,7 @@ FILE_SLACK_S = 1.0
 PAUSE_CONFIRM_LAG_FRAMES = 4   # B4's
 N64_SKIP = "n64: no save into a running core"          # B61 (only an N64 session, PRIVYHUB_N64=1)
 N64_RELEASE = "n64: plain resume (no state)"           # B61
+RELEASE_SETTLE_GC_S = 0.2    # B69: F9 then this, so Dolphin's hotkey thread has run the load before the resume key
 
 
 def mode(environ: Mapping[str, str]) -> str | None:
@@ -231,6 +232,9 @@ class Cores:
         # B55: a PS2 session's slot-9 save goes through PINE (B49 skipped it)
         if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
             return self._save_ps2(silence_start, mark_at, kind)
+        # B69: a GameCube session's slot-9 save is Dolphin's Shift+F9 into the running game
+        if getattr(self.emulator, "_launch_kind", None) == "dolphin":
+            return self._save_gc(silence_start, mark_at, kind)
         port = getattr(self.emulator, "_network_cmd_port", None)
         if port is None or self.nci_factory is None:
             return
@@ -293,6 +297,9 @@ class Cores:
         # B55: a PS2 session loads its slot-9 save through PINE (the picture checked after the recovery's resume)
         if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
             return self._release_ps2(rw, recovery, fields, pending, s, onset)
+        # B69: a GameCube session loads its slot-9 save by F9 (the picture checked after the recovery's resume)
+        if getattr(self.emulator, "_launch_kind", None) == "dolphin":
+            return self._release_gc(rw, recovery, fields, pending, s, onset)
         why = self._file_problem(s)
         if why:
             return rw._row(recovery, "rewind_skipped", fields, reason=why)
@@ -430,6 +437,99 @@ class Cores:
                       slot=fields.get("slot"), via=fields.get("via"))
         try:
             sess.log(f"PS2 state load: slot {fields.get('slot')} picture {verdict} {seconds:.1f}s")
+        except Exception:
+            pass
+        if verdict != "ok":
+            rw._row(recovery, "rewind_failed", fields,
+                    reason=f"the game did not resume from the save (picture {verdict})")
+
+    # --- B69: the GameCube branches (reached only in a Dolphin session, i.e. with PRIVYHUB_GAMECUBE=1) ----------------
+
+    def _save_gc(self, silence_start: float, mark_at: float, kind: str) -> None:
+        import gamecube_session as _gc
+        sess = getattr(self.emulator, "_gc", None)
+        if sess is None:
+            return
+        lock = getattr(self.emulator, "lock", None) or threading.RLock()
+        wall = self._wall()
+        with lock:
+            folder = sess.state_dir()
+            folder.mkdir(parents=True, exist_ok=True)
+            before = _gc.state_files(folder)
+            t0 = self._clock()
+            ok = bool(sess.press_save(_gc.SCRATCH_SLOT))
+            sent_at = t0
+        ack = "hotkey sent" if ok else "hotkey not sent"
+        with self._lock:
+            self.last_save = {"onset": silence_start, "sent_at": sent_at, "wall": wall, "ack": ack, "ok": ok,
+                              "kind": kind, "gc_before": before}
+            self.saves += 1
+        self.recovery._log("state_saved" if ok else "state_save_failed", slot=_gc.SCRATCH_SLOT, core="dolphin",
+                           kind=kind, silence_ms=round((mark_at - silence_start) * 1000.0, 1),
+                           save_after_onset_ms=round((sent_at - silence_start) * 1000.0, 1), ack=ack,
+                           gc_states="hotkey")
+        try:
+            sess.log(f"GC state save: slot {_gc.SCRATCH_SLOT} {ack} ({kind})")
+        except Exception:
+            pass
+
+    def _release_gc(self, rw: Any, recovery: Any, fields: dict[str, Any], pending: Mapping[str, Any],
+                    s: Mapping[str, Any], onset: float) -> dict[str, Any]:
+        import gamecube_session as _gc
+        sess = getattr(self.emulator, "_gc", None)
+        slot = _gc.SCRATCH_SLOT
+        fields.update(slot=slot, core="dolphin", gc_states="hotkey",
+                      save_after_onset_ms=round((s["sent_at"] - onset) * 1000.0, 1))
+        if sess is None:
+            return rw._row(recovery, "rewind_failed", fields, reason="no Dolphin session")
+        got = sess.wait_state_file(sess.state_dir(), slot, dict(s.get("gc_before") or {}), bound=_gc.RELEASE_SHARE_S)
+        if got is None:
+            with self._lock:
+                self.last_save = None
+            return rw._row(recovery, "rewind_skipped", fields, reason="the GameCube state file is not stable")
+        lock = getattr(self.emulator, "lock", None) or threading.RLock()
+        with lock:
+            t0 = self._clock()
+            try:
+                sess.ensure_hotkey_pause()
+            except Exception as exc:
+                with self._lock:
+                    self.last_save = None
+                return rw._row(recovery, "rewind_failed", fields, reason=f"Dolphin not paused for the load: {exc}")
+            pre = sess.picture()
+            sent = sess.press_load(slot)
+            if sent:
+                sess.sleep(RELEASE_SETTLE_GC_S)          # Dolphin's hotkey thread runs the load before the resume key
+            ms = round((self._clock() - t0) * 1000.0, 1)
+        with self._lock:
+            self.last_save = None                                 # one load per save
+        fields.update(rewind_ms=ms, load_ms=ms)
+        if not sent:
+            return rw._row(recovery, "rewind_failed", fields, reason="the load key was not sent (no window)")
+        fields.update(verification="picture_after_resume")
+        try:
+            sess.log(f"GC state load: slot {slot} hotkey; {ms:.0f} ms")
+        except Exception:
+            pass
+        row = rw._row(recovery, "input_release", fields)
+        verify_fields = dict(fields)
+        self._spawn(lambda: self._verify_gc(rw, recovery, sess, pre, verify_fields))
+        return row
+
+    def _verify_gc(self, rw: Any, recovery: Any, sess: Any, pre: Any, fields: dict[str, Any]) -> None:
+        """After the recovery's resume: B52's picture check; static -> the PS1-shaped `rewind_failed` row."""
+        import gamecube_session as _gc
+        try:
+            t0 = sess.clock()
+            while sess.paused_by is not None and sess.clock() - t0 < _gc.VERIFY_RUNNING_S:
+                sess.sleep(_gc.POLL_S)
+            verdict, seconds = sess.check_picture(pre[0] if pre else None)
+        except Exception:
+            verdict, seconds = "static", 0.0
+        recovery._log("gc_states", check="picture", verdict=verdict, s=round(float(seconds), 1),
+                      slot=fields.get("slot"), via=fields.get("via"))
+        try:
+            sess.log(f"GC state load: slot {fields.get('slot')} picture {verdict} {seconds:.1f}s")
         except Exception:
             pass
         if verdict != "ok":

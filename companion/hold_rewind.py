@@ -253,6 +253,11 @@ class Rewinder:
                     self.b9 is not None and getattr(self.b9, "mode", None) == "state"):
                 return self._row(recovery, "rewind_skipped", fields, reason="ps2: no rewind in PCSX2",
                                  ps2_mode=True)
+            # B69: nor has a GameCube session (in `state` mode its slot-9 load goes through Cores.release)
+            if getattr(self.emulator, "_launch_kind", None) == "dolphin" and not (
+                    self.b9 is not None and getattr(self.b9, "mode", None) == "state"):
+                return self._row(recovery, "rewind_skipped", fields, reason="gamecube: no rewind in Dolphin",
+                                 gc_mode=True)
             # B9: a core off the allow-list is skipped; `state` loads the scratch savestate instead of rewinding
             if self.b9 is not None and self.b9.handles(pending):
                 return self.b9.release(self, recovery, fields, pending)

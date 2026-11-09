@@ -1,0 +1,3145 @@
+--- /dev/null
++++ b/companion/gamecube_session.py
+@@ -0,0 +1,741 @@
++"""B69: the GameCube launch kind (`dolphin`), only with `PRIVYHUB_GAMECUBE=1` in the companion's environment.
++
++**Absent = today byte for byte:** the plugin and the emulator manager never import this module, `SYSTEMS` has no
++`gamecube`, a `gamecube` launch is today's refusal (no emulator profile), and nothing under `data/games/gamecube/` is
++touched.
++
++With the flag (H2-P1's findings, `docs/memory/evidence/H2_P1_GAMECUBE_PROBE_2026-11-09.md`):
++- titles are listed read-only in place from the folder `GAMECUBE_DIR=` names in the gitignored paths file
++  (`inplace_library`): `.rvz` > `.gcm` > `.iso` > `.ciso`, one per stem; the small `.bin` never (its suffix), nothing
++  under 1 MiB (its size). **Nothing is ever written to the drive**;
++- Dolphin (the single AppImage in `runtime/emulators/dolphin/`) is launched as `-b -u data/games/gamecube/user -e
++  <title>`, its five config files written whole per launch (H2-P1's keys, the FPS overlay off, the hotkeys fixed, the
++  four virtual pads in `GCPadNew.ini` by their evdev names, the GameCube layout);
++- pause / resume: the F10 hotkey with the window focused (`xdotool`), confirmed by the `CPU thread`'s clock standing /
++  growing within 0.5 s, else SIGSTOP / SIGCONT (the method kept). States: Shift+F<n> / F<n>, the file's stable check,
++  B52's picture check on a load. Exit: SIGTERM (SIGKILL after 5 s); the AppImage's helper waited for at the next launch;
++- four native ports always (no multitap, no relaunch).
++
++Design: `docs/memory/evidence/b69_2026-11-09/design_written_before_code.md` (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import hashlib
++import os
++import re
++import signal
++import subprocess
++import time
++from pathlib import Path
++from typing import Any, Callable, Iterable, Mapping
++
++import inplace_library as _inplace
++
++FLAG_ENV = "PRIVYHUB_GAMECUBE"
++DIR_KEY = "GAMECUBE_DIR"
++SYSTEM_ID = "gamecube"
++SYSTEM_NAME = "GameCube"
++RELATIVE_PREFIX = "gamecube/"
++SUFFIX_RANK = {".rvz": 0, ".gcm": 1, ".iso": 2, ".ciso": 3}
++MIN_TITLE_BYTES = 1 << 20          # a disc image is far larger; the drive's small .bin (and any stub) is not a title
++APPIMAGE_DIR = "runtime/emulators/dolphin"
++DATA_DIR = "data/games/gamecube"
++USER_DIR = DATA_DIR + "/user"
++LOGS_DIR = DATA_DIR + "/logs"
++PLAN_SOURCE = "gamecube"
++PORTS = 4
++LAUNCH_KIND = "dolphin"
++
++# the waits (H2-P1: the window by 4 s, the title by ~15 s on a first boot, the sink-input by 12.6 s)
++WINDOW_WAIT_S = 30.0
++BOOT_WAIT_S = 90.0
++AUDIO_WAIT_S = 45.0
++# the hotkey and the clock (H2-P1: keydown / 0.12 s / keyup; the CPU thread 13-36 ticks a second running)
++KEY_HOLD_S = 0.12
++POLL_S = 0.05
++STAND_WINDOW_S = 0.5
++CONFIRM_S = 1.5
++GROW_TICKS = 2
++# the exit (H2-P1: SIGTERM 0.31-0.47 s; the AppImage's FUSE helper gone a few seconds later)
++TERM_WAIT_S = 5.0
++KILL_WAIT_S = 2.0
++HELPER_WAIT_S = 10.0
++# the states (H2-P1: the file stable <= 0.21 s; a load's picture by 0.2 s)
++SAVE_BOUND_S = 1.0
++RECOVERY_BOUND_S = 5.0
++STABLE_S = 0.25
++LOAD_SETTLE_S = 0.5
++RELEASE_SHARE_S = 0.45
++VERIFY_RUNNING_S = 2.0
++PICTURE_BOUND_S = 5.0
++PICTURE_STEP_S = 0.2
++PICTURE_DISTINCT = 3
++PICTURE_BLACK_MEAN = 20
++GRAB_W, GRAB_H = 64, 36
++
++USER_SLOTS = (1, 2, 3)
++RECOVERY_SLOT = 8
++SCRATCH_SLOT = 9
++HOTKEY_SLOTS = (1, 2, 3, RECOVERY_SLOT, SCRATCH_SLOT)
++PAUSE_KEY = "F10"
++CPU_THREAD = "CPU thread"
++LIVE_BEHAVIOURS = ("state_save_slot9", "hold_return_load", "stall_resume_load", "recovery_save")
++OFF_BEHAVIOURS = ("rewind", "relaunch")
++NO_RELAUNCH = "GameCube has four ports; no relaunch"
++NO_REWIND = "gamecube: no rewind in Dolphin"
++PROC_ROOT = Path("/proc")          # the clock and the helper are read here (a test points it at a fake tree)
++
++HOTKEY_DEVICE = "XInput2/0/Virtual core pointer"
++PAD_DEVICE = "evdev/0/PrivyHub Virtual Gamepad P{n}"
++# The GameCube layout on the companion's uinput pad (Dolphin's evdev names: libevdev's code name without BTN_; the
++# absolute axes numbered in code order X Y Z RX RY RZ HAT0X HAT0Y = 0-7; `-+` = the whole travel)
++PAD_LAYOUT = (
++    ("Buttons/A", "SOUTH"), ("Buttons/B", "WEST"), ("Buttons/X", "EAST"), ("Buttons/Y", "NORTH"),
++    ("Buttons/Z", "TR"), ("Buttons/Start", "START"),
++    ("Main Stick/Up", "Axis 1-"), ("Main Stick/Down", "Axis 1+"),
++    ("Main Stick/Left", "Axis 0-"), ("Main Stick/Right", "Axis 0+"),
++    ("C-Stick/Up", "Axis 4-"), ("C-Stick/Down", "Axis 4+"), ("C-Stick/Left", "Axis 3-"), ("C-Stick/Right", "Axis 3+"),
++    ("Triggers/L", "Axis 2-+"), ("Triggers/R", "Axis 5-+"),
++    ("Triggers/L-Analog", "Axis 2-+"), ("Triggers/R-Analog", "Axis 5-+"),
++    ("D-Pad/Up", "Axis 7-"), ("D-Pad/Down", "Axis 7+"), ("D-Pad/Left", "Axis 6-"), ("D-Pad/Right", "Axis 6+"),
++)
++# Dolphin 2609b's log types (the names its own Logger.ini lists); these on, every other off
++LOG_TYPES = (
++    "AUDIO", "BOOT", "COMMON", "CORE", "VIDEO", "ActionReplay", "AI", "AMMB", "AMMB_NET", "CI", "CONSOLE", "CP", "DIO",
++    "DSP", "DSPHLE", "DSPLLE", "DSPMails", "DVD", "EXI", "FileMon", "FRAMEDUMP", "GDB_STUB", "GP", "HLE", "Host GPU",
++    "HSP", "IOS", "IOS_DI", "IOS_ES", "IOS_FS", "IOS_NET", "IOS_SD", "IOS_SSL", "IOS_STM", "IOS_USB", "IOS_WC24",
++    "IOS_WFS", "IOS_WIIMOTE", "JIT", "MASTER", "MemCard Manager", "MI", "NETPLAY", "OSREPORT", "OSREPORT_HLE", "PE",
++    "PI", "PowerPC", "RetroAchievements", "SI", "SI_AMBB", "SI_CARD", "SI_JVS", "SP1", "SYMBOLS", "VI", "WII_IPC",
++    "Wiimote",
++)
++LOG_ON = ("BOOT", "CORE", "VIDEO", "AUDIO", "COMMON", "CI")
++
++
++class GCError(Exception):
++    pass
++
++
++def enabled(environ: Mapping[str, str] | None = None) -> bool:
++    env = os.environ if environ is None else environ
++    return (env.get(FLAG_ENV) or "").strip() == "1"
++
++
++def active(emulator: Any) -> bool:
++    """A GameCube session is running on this emulator manager."""
++    return getattr(emulator, "_launch_kind", None) == LAUNCH_KIND
++
++
++# --- the folder and the list (read-only) ---------------------------------------------------------------------------
++
++def read_dir(project_root: Path, environ: Mapping[str, str] | None = None) -> Path | None:
++    return _inplace.read_dir(project_root, DIR_KEY, environ)
++
++
++def list_titles(folder: Path | None) -> list[dict[str, Any]]:
++    """`.rvz` > `.gcm` > `.iso` > `.ciso`, one per stem; anything under 1 MiB skipped by its size (never opened)."""
++    return [t for t in _inplace.list_titles(folder, SUFFIX_RANK) if int(t["size_bytes"]) >= MIN_TITLE_BYTES]
++
++
++def resolve_title(folder: Path | None, relative_path: str) -> Path:
++    try:
++        return _inplace.resolve(folder, relative_path, RELATIVE_PREFIX, "GameCube")
++    except _inplace.InPlaceError as exc:
++        raise GCError(str(exc)) from exc
++
++
++def titles_for_plugin(folder: Path | None, stable_id: Callable[[str, str], str],
++                      clean_name: Callable[[Path], str]) -> list[dict[str, Any]]:
++    out = []
++    for t in list_titles(folder):
++        rel = RELATIVE_PREFIX + t["relative"]
++        out.append({"id": stable_id(SYSTEM_ID, rel), "title": clean_name(t["path"]), "system": SYSTEM_ID,
++                    "system_name": SYSTEM_NAME, "relative_path": rel, "format": t["suffix"].lstrip("."),
++                    "size_bytes": t["size_bytes"]})
++    return out
++
++
++def find_appimage(project_root: Path) -> Path:
++    found = sorted(p for p in (Path(project_root) / APPIMAGE_DIR).glob("*.AppImage") if p.is_file())
++    if len(found) != 1:
++        raise GCError(f"Dolphin: expected one AppImage in {APPIMAGE_DIR}/, found {len(found)}")
++    return found[0]
++
++
++def plan(source: str = PLAN_SOURCE) -> dict[str, Any]:
++    """Four native ports on every GameCube launch (B46's plan shape): no multitap, so the client never relaunches."""
++    return {"players_chosen": PORTS, "ports": PORTS, "multitap": False, "multitap_available": False,
++            "ps1_mode": None, "device_args": [], "source": source}
++
++
++# --- the config, written whole per launch --------------------------------------------------------------------------
++
++def ini_text(sections: Iterable[tuple[str, Iterable[tuple[str, str]]]]) -> str:
++    lines: list[str] = []
++    for name, keys in sections:
++        lines.append(f"[{name}]")
++        lines.extend(f"{k} = {v}" for k, v in keys)
++    return "\n".join(lines) + "\n"
++
++
++def _q(name: str) -> str:
++    return f"`{name}`"
++
++
++def dolphin_ini() -> str:
++    return ini_text([
++        ("General", [("UseDiscordPresence", "False")]),
++        ("Interface", [("ConfirmStop", "False"), ("UsePanicHandlers", "False"), ("OnScreenDisplayMessages", "False"),
++                       ("PauseOnFocusLost", "False")]),
++        ("Display", [("RenderToMain", "True"), ("Fullscreen", "True")]),
++        ("Core", [("CPUThread", "True"), ("SkipIPL", "True"), ("GFXBackend", "Vulkan")]
++         + [(f"SIDevice{i}", "6") for i in range(PORTS)]
++         + [("SlotA", "8"), ("SlotB", "255"), ("EnableCheats", "False")]),
++        ("DSP", [("Backend", "Cubeb"), ("DSPThread", "True")]),
++        ("Input", [("BackgroundInput", "True")]),
++        ("Analytics", [("PermissionAsked", "True"), ("Enabled", "False")]),
++        ("AutoUpdate", [("UpdateTrack", "")]),
++    ])
++
++
++def gfx_ini() -> str:
++    return ini_text([
++        ("Hardware", [("Adapter", "0")]),
++        ("Settings", [("InternalResolution", "1"), ("ShaderCompilationMode", "2"),
++                      ("WaitForShadersBeforeStarting", "True"), ("ShowFPS", "False"), ("LogRenderTimeToFile", "True")]),
++    ])
++
++
++def hotkeys_ini() -> str:
++    keys = [("Device", HOTKEY_DEVICE), ("General/Toggle Pause", _q(PAUSE_KEY))]
++    keys += [(f"Load State/Load State Slot {n}", _q(f"F{n}")) for n in HOTKEY_SLOTS]
++    keys += [(f"Save State/Save State Slot {n}", f"@(Shift+{_q(f'F{n}')})") for n in HOTKEY_SLOTS]
++    return ini_text([("Hotkeys", keys)])
++
++
++def gcpad_ini() -> str:
++    sections = []
++    for n in range(1, PORTS + 1):
++        sections.append((f"GCPad{n}", [("Device", PAD_DEVICE.format(n=n))]
++                         + [(k, _q(v)) for k, v in PAD_LAYOUT]))
++    return ini_text(sections)
++
++
++def logger_ini() -> str:
++    return ini_text([
++        ("Options", [("Verbosity", "4"), ("WriteToFile", "True"), ("WriteToConsole", "False"),
++                     ("WriteToWindow", "False")]),
++        ("Logs", [(t, "True" if t in LOG_ON else "False") for t in LOG_TYPES]),
++    ])
++
++
++def config_files() -> dict[str, str]:
++    return {"Dolphin.ini": dolphin_ini(), "GFX.ini": gfx_ini(), "Hotkeys.ini": hotkeys_ini(),
++            "GCPadNew.ini": gcpad_ini(), "Logger.ini": logger_ini()}
++
++
++def write_config(user_dir: Path) -> list[str]:
++    """Each file written whole (a temp name, then renamed over Dolphin's own). Returns the names written."""
++    folder = Path(user_dir) / "Config"
++    folder.mkdir(parents=True, exist_ok=True)
++    names = []
++    for name, text in config_files().items():
++        tmp = folder / (name + ".privyhub.tmp")
++        tmp.write_text(text, encoding="utf-8")
++        tmp.replace(folder / name)
++        names.append(name)
++    return names
++
++
++def command(appimage: Path, user_dir: Path, content: Path) -> list[str]:
++    return [str(appimage), "-b", "-u", str(Path(user_dir).resolve()), "-e", str(content)]
++
++
++# --- Dolphin's log per launch --------------------------------------------------------------------------------------
++
++LAUNCH_FILE_RE = re.compile(r"^(\d{8}T\d{6}Z)-(dolphin\.log|render_times\.txt|vblank_times\.txt)$")
++LOG_RETAIN_DAYS = 30
++COUNTERS = ("render_times.txt", "vblank_times.txt")
++
++
++def stamp_of(t: float) -> str:
++    return time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(t))
++
++
++def log_for_launch(project_root: Path, launched_at: float) -> Path:
++    return (Path(project_root) / LOGS_DIR / f"{stamp_of(launched_at)}-dolphin.log").resolve()
++
++
++def link_log(user_dir: Path, target: Path) -> str:
++    """`user/Logs/dolphin.log` -> the per-launch file (made empty). A regular file left there by an earlier launch
++    (Dolphin replaced the link and the exit was missed) is kept first, named by its own mtime."""
++    logs = Path(user_dir) / "Logs"
++    logs.mkdir(parents=True, exist_ok=True)
++    target.parent.mkdir(parents=True, exist_ok=True)
++    target.touch(exist_ok=True)
++    link = logs / "dolphin.log"
++    kept = "none"
++    if link.is_symlink():
++        link.unlink()
++    elif link.exists():
++        old = target.parent / f"{stamp_of(link.stat().st_mtime)}-dolphin.log"
++        with open(old, "ab") as out:
++            out.write(link.read_bytes())
++        link.unlink()
++        kept = old.name
++    os.symlink(target, link)
++    return kept
++
++
++def collect_after_exit(user_dir: Path, target: Path) -> dict[str, Any]:
++    """After the exit: a file Dolphin put in place of the link appended to the per-launch log; the render / vblank
++    counters moved beside it under the launch's stamp."""
++    logs = Path(user_dir) / "Logs"
++    link = logs / "dolphin.log"
++    out: dict[str, Any] = {"appended": False, "moved": []}
++    if link.exists() and not link.is_symlink():
++        with open(target, "ab") as fh:
++            fh.write(link.read_bytes())
++        link.unlink()
++        os.symlink(target, link)
++        out["appended"] = True
++    stamp = target.name[: -len("-dolphin.log")]
++    for name in COUNTERS:
++        p = logs / name
++        if p.is_file() and not p.is_symlink():
++            os.replace(p, target.parent / f"{stamp}-{name}")
++            out["moved"].append(name)
++    return out
++
++
++def prune_logs(folder: Path, now: float, days: int = LOG_RETAIN_DAYS) -> list[str]:
++    """B53's rule: this folder's per-launch files whose name is older than `days` removed (others untouched)."""
++    removed = []
++    try:
++        names = sorted(os.listdir(folder))
++    except OSError:
++        return removed
++    for name in names:
++        m = LAUNCH_FILE_RE.match(name)
++        if not m:
++            continue
++        try:
++            t = time.mktime(time.strptime(m.group(1), "%Y%m%dT%H%M%SZ")) - time.timezone
++        except ValueError:
++            continue
++        if now - t > days * 86400:
++            try:
++                (Path(folder) / name).unlink()
++                removed.append(name)
++            except OSError:
++                pass
++    return removed
++
++
++PAD_LINE = re.compile(r"(Added|Removed) device: evdev/(\d+)/PrivyHub Virtual Gamepad P([1-4])\b")
++
++
++def pads_seen(log_path: Path | None) -> dict[str, str]:
++    """`P<n>` -> `evdev/<index>` for each virtual pad Dolphin's log added (and did not remove since)."""
++    seen: dict[str, str] = {}
++    if log_path is None:
++        return seen
++    try:
++        text = Path(log_path).read_text(encoding="utf-8", errors="replace")
++    except OSError:
++        return seen
++    for m in PAD_LINE.finditer(text):
++        key = f"P{m.group(3)}"
++        if m.group(1) == "Added":
++            seen[key] = f"evdev/{m.group(2)}"
++        else:
++            seen.pop(key, None)
++    return seen
++
++
++def pads_line(seen: Mapping[str, str]) -> str:
++    if not seen:
++        return "none yet"
++    parts = " ".join(f"{k}={seen[k]}" for k in sorted(seen))
++    return parts + ("" if all(v == "evdev/0" for v in seen.values()) else " MISMATCH (the ini names evdev/0)")
++
++
++# --- the process: the window, the clock, the keys -------------------------------------------------------------------
++
++def _run(cmd: list[str], timeout: float = 2.0) -> subprocess.CompletedProcess:
++    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
++
++
++def find_window(pid: int, run: Callable[..., Any] = _run) -> str | None:
++    """The PID's visible window, by the same `xdotool` search the capture uses."""
++    try:
++        r = run(["xdotool", "search", "--onlyvisible", "--pid", str(int(pid))])
++    except Exception:
++        return None
++    ids = [x.strip() for x in (getattr(r, "stdout", "") or "").splitlines() if x.strip().isdigit()]
++    return ids[0] if ids else None
++
++
++def has_sink_input(pid: int, run: Callable[..., Any] = _run) -> bool:
++    try:
++        r = run(["pactl", "list", "sink-inputs"])
++    except Exception:
++        return False
++    return f'application.process.id = "{int(pid)}"' in (getattr(r, "stdout", "") or "")
++
++
++def grab_window(window: str) -> bytes | None:
++    """B52: one frame of an X11 window, 64x36 gray (ffmpeg x11grab, the display of the companion's environment)."""
++    display = os.environ.get("DISPLAY", "")
++    if not display:
++        return None
++    r = subprocess.run(["ffmpeg", "-loglevel", "error", "-f", "x11grab", "-window_id", str(window), "-i", display,
++                        "-frames:v", "1", "-vf", f"scale={GRAB_W}:{GRAB_H},format=gray", "-f", "rawvideo", "-"],
++                       capture_output=True, timeout=5, check=False)
++    return r.stdout if r.returncode == 0 and len(r.stdout) == GRAB_W * GRAB_H else None
++
++
++def state_files(folder: Path) -> dict[str, tuple[int, int, int]]:
++    """Dolphin's state files (`<id>.s01` ... `.s10`): name -> (mtime ns, size, inode); the hub's folder only."""
++    out: dict[str, tuple[int, int, int]] = {}
++    try:
++        for p in Path(folder).glob("*.s[0-9][0-9]"):
++            st = p.stat()
++            out[p.name] = (st.st_mtime_ns, st.st_size, st.st_ino)
++    except OSError:
++        pass
++    return out
++
++
++def slot_suffix(slot: int) -> str:
++    return f".s{int(slot):02d}"
++
++
++def session_members(sid: int, proc_root: Path | None = None) -> list[int]:
++    """The processes still in the session `sid` whose argv[0] is an AppImage (the runtime's FUSE helper)."""
++    proc_root = PROC_ROOT if proc_root is None else Path(proc_root)
++    out = []
++    try:
++        names = os.listdir(proc_root)
++    except OSError:
++        return out
++    for name in names:
++        if not name.isdigit():
++            continue
++        try:
++            stat = (Path(proc_root) / name / "stat").read_text()
++            fields = stat.rsplit(")", 1)[1].split()
++            if int(fields[3]) != int(sid):
++                continue
++            argv0 = (Path(proc_root) / name / "cmdline").read_bytes().split(b"\0")[0].decode("utf-8", "replace")
++        except (OSError, IndexError, ValueError):
++            continue
++        if argv0.endswith(".AppImage"):
++            out.append(int(name))
++    return sorted(out)
++
++
++def wait_helpers(sid: int, bound: float = HELPER_WAIT_S, *, proc_root: Path | None = None,
++                 kill: Callable[[int, int], None] | None = None, sleep: Callable[[float], None] = time.sleep,
++                 clock: Callable[[], float] = time.monotonic) -> str:
++    """Before a launch: the previous launch's helper gone within `bound`, else SIGKILLed (the bound)."""
++    kill = os.kill if kill is None else kill
++    t0 = clock()
++    left = session_members(sid, proc_root)
++    if not left:
++        return "none"
++    while left and clock() - t0 < bound:
++        sleep(0.25)
++        left = session_members(sid, proc_root)
++    if not left:
++        return f"gone {clock() - t0:.1f}s"
++    for p in left:
++        try:
++            kill(p, signal.SIGKILL)
++        except ProcessLookupError:
++            pass
++    return f"killed {len(left)} after {bound:.0f}s"
++
++
++class Session:
++    """One Dolphin process: the pause method kept, so a SIGSTOP pause is undone by SIGCONT (never by the hotkey)."""
++
++    def __init__(self, pid: int, log: Callable[[str], None], *, run: Callable[..., Any] = _run,
++                 kill: Callable[[int, int], None] = os.kill, sleep: Callable[[float], None] = time.sleep,
++                 clock: Callable[[], float] = time.monotonic, proc_root: Path | None = None,
++                 grab: Callable[[str], bytes | None] | None = None, log_path: Path | None = None,
++                 user_dir: Path | None = None) -> None:
++        self.pid = int(pid)
++        self.log = log
++        self.run = run
++        self.kill = kill
++        self.sleep = sleep
++        self.clock = clock
++        self.proc_root = PROC_ROOT if proc_root is None else Path(proc_root)
++        self.grab = grab or grab_window
++        self.log_path = log_path
++        self.user_dir = user_dir
++        self.paused_by: str | None = None
++        self._pads_logged: str | None = None
++
++    # -- the window and the clock --------------------------------------------------------------------------------
++    def window(self) -> str | None:
++        return find_window(self.pid, self.run)
++
++    def wait_window(self, bound: float = WINDOW_WAIT_S, alive: Callable[[], bool] = lambda: True) -> str | None:
++        end = self.clock() + bound
++        while self.clock() < end and alive():
++            w = self.window()
++            if w:
++                return w
++            self.sleep(0.25)
++        return None
++
++    def cpu_tid(self) -> int | None:
++        task = self.proc_root / str(self.pid) / "task"
++        try:
++            tids = sorted(os.listdir(task))
++        except OSError:
++            return None
++        for t in tids:
++            try:
++                if (task / t / "comm").read_text().strip() == CPU_THREAD:
++                    return int(t)
++            except (OSError, ValueError):
++                continue
++        return None
++
++    def ticks(self, tid: int | None) -> int | None:
++        if tid is None:
++            return None
++        try:
++            f = (self.proc_root / str(self.pid) / "task" / str(tid) / "stat").read_text().rsplit(")", 1)[1].split()
++            return int(f[11]) + int(f[12])
++        except (OSError, IndexError, ValueError):
++            return None
++
++    def wait_boot(self, bound: float = BOOT_WAIT_S, alive: Callable[[], bool] = lambda: True) -> float | None:
++        """The shader pre-compile window: seconds until the `CPU thread` exists and its clock grows, else None."""
++        t0 = self.clock()
++        first: dict[int, int] = {}
++        while self.clock() - t0 < bound and alive():
++            tid = self.cpu_tid()
++            v = self.ticks(tid)
++            if tid is not None and v is not None:
++                if tid not in first:
++                    first[tid] = v
++                elif v - first[tid] >= GROW_TICKS:
++                    return self.clock() - t0
++            self.sleep(0.25)
++        return None
++
++    def wait_audio(self, bound: float = AUDIO_WAIT_S, alive: Callable[[], bool] = lambda: True) -> float | None:
++        t0 = self.clock()
++        while self.clock() - t0 < bound and alive():
++            if has_sink_input(self.pid, self.run):
++                return self.clock() - t0
++            self.sleep(0.1)
++        return None
++
++    def key(self, *keys: str) -> bool:
++        """H2-P1's injection: activate + focus the PID's window (sync), keydown, 0.12 s, keyup in reverse."""
++        w = self.window()
++        if not w:
++            return False
++        try:
++            self.run(["xdotool", "windowactivate", "--sync", w])
++            self.run(["xdotool", "windowfocus", "--sync", w])
++            self.run(["xdotool", "keydown", *keys])
++            self.sleep(KEY_HOLD_S)
++            self.run(["xdotool", "keyup", *reversed(keys)])
++        except Exception:
++            return False
++        return True
++
++    def watch(self, tid: int | None, stand: bool, bound: float = CONFIRM_S) -> bool | None:
++        """`stand`: True once the clock stood for a 0.5-s window starting within `bound`; else True once it grew by
++        >= GROW_TICKS within a 0.5-s window. False at the end; None when the clock cannot be read."""
++        t0 = self.clock()
++        hist: list[tuple[float, int]] = []
++        while True:
++            now = self.clock()
++            v = self.ticks(tid)
++            if v is None:
++                return None
++            hist.append((now, v))
++            if stand:
++                old = [(t, a) for t, a in hist if now - t >= STAND_WINDOW_S - 1e-9]
++                if old and old[-1][0] - t0 <= bound + 1e-9 and old[-1][1] == v:
++                    return True
++            else:
++                recent = [a for t, a in hist if now - t <= STAND_WINDOW_S + 1e-9]
++                if v - min(recent) >= GROW_TICKS:
++                    return True
++            if now - t0 >= bound + STAND_WINDOW_S:
++                return False
++            self.sleep(POLL_S)
++
++    def note_pads(self, force: bool = False) -> str:
++        line = pads_line(pads_seen(self.log_path))
++        if force or line != self._pads_logged:
++            self._pads_logged = line
++            self.log(f"GC pads: {line}")
++        return line
++
++    # -- pause / resume ------------------------------------------------------------------------------------------
++    def pause(self) -> str:
++        if self.paused_by is not None:
++            return self.paused_by
++        tid = self.cpu_tid()
++        if tid is None or self.ticks(tid) is None or not self.window():
++            self.kill(self.pid, signal.SIGSTOP)                 # a silent clock: no key at all
++            self.paused_by = "sigstop"
++        elif self.key(PAUSE_KEY) and self.watch(tid, stand=True):
++            self.paused_by = "hotkey"
++        else:
++            self.kill(self.pid, signal.SIGSTOP)                 # an unconfirmed key: no second key
++            self.paused_by = "sigstop"
++        self.log(f"GC pause: {self.paused_by}")
++        try:
++            self.note_pads()
++        except Exception:
++            pass
++        return self.paused_by
++
++    def resume(self) -> str:
++        how = self.paused_by
++        if how is None:
++            return "running"
++        tid = self.cpu_tid()
++        if how == "sigstop":
++            self.kill(self.pid, signal.SIGCONT)
++            done = "sigcont"
++            if self.watch(tid, stand=False) is False:
++                # the clock still stands: a late key had paused Dolphin as well
++                if self.key(PAUSE_KEY) and self.watch(tid, stand=False):
++                    done = "sigcont+hotkey"
++                else:
++                    raise GCError("Dolphin did not resume after SIGCONT")
++        else:
++            got = self.watch(tid, stand=False) if self.key(PAUSE_KEY) else None
++            if got is False:                                    # still standing: one more key
++                got = self.watch(tid, stand=False) if self.key(PAUSE_KEY) else None
++            if not got:
++                raise GCError("Dolphin did not resume after its pause hotkey")
++            done = "hotkey"
++        self.paused_by = None
++        self.log(f"GC resume: {done}")
++        return done
++
++    def ensure_hotkey_pause(self) -> None:
++        """A SIGSTOP-paused Dolphin cannot read a key: SIGCONT, then its own pause hotkey confirmed by the clock."""
++        if self.paused_by != "sigstop":
++            return
++        self.kill(self.pid, signal.SIGCONT)
++        self.paused_by = None
++        tid = self.cpu_tid()
++        if tid is not None and self.ticks(tid) is not None and self.key(PAUSE_KEY) and self.watch(tid, stand=True):
++            self.paused_by = "hotkey"
++            self.log("GC pause: hotkey (for a state key)")
++            return
++        self.kill(self.pid, signal.SIGSTOP)
++        self.paused_by = "sigstop"
++        raise GCError("Dolphin could not be paused by its hotkey, so the state key cannot be sent")
++
++    # -- states ----------------------------------------------------------------------------------------------------
++    def state_dir(self) -> Path:
++        if self.user_dir is None:
++            raise GCError("the GameCube user folder is unknown")
++        return Path(self.user_dir) / "StateSaves"
++
++    def press_save(self, slot: int) -> bool:
++        return self.key("Shift_L", f"F{int(slot)}")
++
++    def press_load(self, slot: int) -> bool:
++        return self.key(f"F{int(slot)}")
++
++    def wait_state_file(self, folder: Path, slot: int, before: Mapping[str, tuple[int, int, int]],
++                        bound: float = SAVE_BOUND_S) -> tuple[Path, float] | None:
++        """The slot's file new or changed since `before`, non-empty, its size and mtime standing for 0.25 s;
++        (path, seconds from the key) or None at the bound."""
++        suffix = slot_suffix(slot)
++        t0 = self.clock()
++        seen: dict[str, tuple[tuple[int, int], float]] = {}
++        while True:
++            now = self.clock()
++            for name, (mtime, size, ino) in state_files(folder).items():
++                if not name.endswith(suffix) or before.get(name) == (mtime, size, ino) or size <= 0:
++                    continue
++                sig = (mtime, size)
++                prev = seen.get(name)
++                if prev is None or prev[0] != sig:
++                    seen[name] = (sig, now)
++                elif now - prev[1] >= STABLE_S - 1e-9:
++                    return Path(folder) / name, now - t0
++            if now - t0 >= bound:
++                return None
++            self.sleep(POLL_S)
++
++    def picture(self) -> tuple[str, float] | None:
++        """B52: (hash, mean) of one frame of the PID's window, or None."""
++        w = self.window()
++        if not w:
++            return None
++        try:
++            data = self.grab(w)
++        except Exception:
++            data = None
++        if not data:
++            return None
++        return hashlib.sha256(data).hexdigest()[:16], sum(data) / len(data)
++
++    def check_picture(self, pre: str | None, bound: float = PICTURE_BOUND_S) -> tuple[str, float]:
++        """B52 after the resume: `ok` (3 distinct frames, not the pre-load one, one not black, the clock growing)
++        or `static`; with the seconds it took."""
++        t0 = self.clock()
++        tid = self.cpu_tid()
++        start = self.ticks(tid)
++        seen: dict[str, float] = {}
++        while True:
++            v = self.ticks(tid)
++            running = start is not None and v is not None and v - start >= GROW_TICKS
++            p = self.picture()
++            if p is not None and p[0] != pre:
++                seen[p[0]] = p[1]
++            if running and len(seen) >= PICTURE_DISTINCT and any(m > PICTURE_BLACK_MEAN for m in seen.values()):
++                return "ok", self.clock() - t0
++            if self.clock() - t0 >= bound:
++                return "static", self.clock() - t0
++            self.sleep(PICTURE_STEP_S)
++
++    def booted(self) -> bool:
++        return self.ticks(self.cpu_tid()) is not None
++
++    # -- the exit --------------------------------------------------------------------------------------------------
++    def stop(self, process: Any) -> str:
++        """SIGCONT if stopped, SIGTERM, <= 5 s, else SIGKILL (<= 2 s); the helper count logged."""
++        t0 = self.clock()
++        try:
++            if self.paused_by == "sigstop":
++                self.kill(self.pid, signal.SIGCONT)
++            self.kill(self.pid, signal.SIGTERM)
++        except ProcessLookupError:
++            self.log("GC exit: gone")
++            return "gone"
++        try:
++            process.wait(timeout=TERM_WAIT_S)
++            how = f"sigterm {self.clock() - t0:.1f}s"
++        except subprocess.TimeoutExpired:
++            try:
++                self.kill(self.pid, signal.SIGKILL)
++                process.wait(timeout=KILL_WAIT_S)
++            except (ProcessLookupError, subprocess.TimeoutExpired):
++                pass
++            how = "sigkill"
++        self.paused_by = None
++        self.log(f"GC exit: {how} helper={len(session_members(self.pid, self.proc_root))}")
++        return how
++
++
++def iter_off_behaviours() -> Iterable[str]:
++    return iter(OFF_BEHAVIOURS)
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -42,6 +42,12 @@
+ if (os.environ.get("PRIVYHUB_N64") or "").strip() == "1":
+     import n64_session as _n64
+ 
++# B69: the GameCube launch kind (Dolphin), only with PRIVYHUB_GAMECUBE=1. Absent = today: nothing imported, a
++# `gamecube` title refused (no `gamecube` profile in emulators.json), nothing under data/games/gamecube/ touched.
++_gc = None
++if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
++    import gamecube_session as _gc
++
+ 
+ class EmulatorError(RuntimeError):
+     pass
+@@ -98,6 +104,10 @@
+         # B49: "pcsx2" while a PS2 session runs (None = RetroArch, today) and its process helper
+         self._launch_kind: str | None = None
+         self._ps2: Any = None
++        # B69: the Dolphin process helper ("dolphin" kind) and the last Dolphin's session id (its AppImage helper,
++        # waited for at the next GameCube launch); both None outside a GameCube session (today)
++        self._gc: Any = None
++        self._gc_helper_sid: int | None = None
+         # B61: the N64 core while an N64 session runs (only with PRIVYHUB_N64=1); None = every other session (today)
+         self._n64_core: str | None = None
+         # B65: the last N64 load's row for the plugin (continue_load / continue_skipped); None otherwise
+@@ -184,6 +194,9 @@
+             and self._active_cheat_session.get("session_kind", "cheat") == "cheat"
+         )
+ 
++        # B69: a Dolphin that ended by itself: its helper waited for at the next launch, its logs collected
++        if self._launch_kind == "dolphin" and self._gc is not None:
++            self._dolphin_ended(self.process.pid)
+         self._close_quietly(self.process.stdin)
+         self._close_quietly(self.log_handle)
+         self.process = None
+@@ -197,6 +210,7 @@
+         self._players_session = None
+         self._launch_kind = None
+         self._ps2 = None
++        self._gc = None
+         self._n64_core = None
+ 
+         if cheat_runtime_cleanup:
+@@ -1866,6 +1880,9 @@
+         # B59: nor an N64 title (Core default; its ports are the launch's four, n64_session.plan)
+         if _n64 is not None and system_id == _n64.SYSTEM_ID:
+             return system_id, "", {}
++        # B69: nor a GameCube title (Core default; Dolphin's four ports, GCPadNew.ini)
++        if _gc is not None and system_id == _gc.SYSTEM_ID:
++            return system_id, "", {}
+ 
+         config = self._load_config()
+         systems = config.get(
+@@ -2173,6 +2190,9 @@
+     # B49: class defaults, so a manager made without __init__ (a test's) reads RetroArch (today)
+     _launch_kind: str | None = None
+     _ps2: Any = None
++    # B69
++    _gc: Any = None
++    _gc_helper_sid: int | None = None
+ 
+     # PRIVYHUB_PHASE_A_PS1_MULTITAP_GAME_OPTIONS
+     PS1_MULTITAP_CORE_LIBRARY = "Beetle PSX HW"
+@@ -5553,6 +5573,9 @@
+             # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
+             if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
+                 return self._launch_pcsx2(game, players_chosen)
++            # B69: a GameCube title launches Dolphin (only with PRIVYHUB_GAMECUBE=1; absent = today's refusal below)
++            if _gc is not None and str(game.get("system", "")).strip().casefold() == _gc.SYSTEM_ID:
++                return self._launch_dolphin(game, players_chosen)
+ 
+             # B46: the chooser's pick for this launch (None = today: the metadata alone)
+             players_plan: dict[str, Any] | None = None
+@@ -7346,6 +7369,7 @@
+         self._players_session = None
+         self._launch_kind = None
+         self._ps2 = None
++        self._gc = None
+         self._n64_core = None
+         payload = self.status()
+         payload["action"] = "stop"
+@@ -7355,6 +7379,382 @@
+         payload["ps2_exit"] = how
+         return payload
+ 
++    # ------------------------------------------------------------------
++    # B69: the GameCube launch kind (Dolphin), reached only with PRIVYHUB_GAMECUBE=1
++    # ------------------------------------------------------------------
++
++    def _launch_dolphin(
++        self,
++        game: dict[str, Any],
++        players_chosen: int | None,
++    ) -> dict[str, Any]:
++        root = self.project_root
++        try:
++            content = _gc.resolve_title(_gc.read_dir(root), str(game.get("relative_path", "")))
++            appimage = _gc.find_appimage(root)
++        except (_gc.GCError, OSError) as exc:
++            raise EmulatorError(f"GameCube launch refused: {exc}") from exc
++
++        # four native ports on every launch, whatever the pick or the join (no multitap, no relaunch)
++        plan = _gc.plan()
++        user = self._project_path(_gc.USER_DIR)
++        helper = None
++        if self._gc_helper_sid is not None:
++            # the previous Dolphin's AppImage helper (<= 10 s, then SIGKILL) before the next Popen
++            helper = _gc.wait_helpers(self._gc_helper_sid)
++            self._gc_helper_sid = None
++        try:
++            _gc.write_config(user)
++        except OSError as exc:
++            raise EmulatorError(f"GameCube launch refused: {exc}") from exc
++
++        logs_dir = self._project_path("logs/games")
++        logs_dir.mkdir(parents=True, exist_ok=True)
++        log_path = logs_dir / (time.strftime("%Y%m%d-%H%M%S") + "-gamecube.log")
++        log_handle = log_path.open("a", encoding="utf-8", buffering=1)
++
++        def utc_ms() -> str:
++            t = time.time()
++            return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(t)) + f".{int((t % 1) * 1000):03d}Z"
++
++        log_handle.write("PrivyHub game session (GameCube)\n")
++        log_handle.write(f"{utc_ms()} GC launch: dolphin ports={plan['ports']} backend=vulkan adapter=0 config=whole\n")
++        if helper is not None:
++            log_handle.write(f"{utc_ms()} GC helper: {helper}\n")
++        # Dolphin's own log for this launch, kept 30 days (the name: the UTC launch time only)
++        launched_at = time.time()
++        dolphin_log = _gc.log_for_launch(root, launched_at)
++        try:
++            _gc.prune_logs(dolphin_log.parent, launched_at)
++            kept = _gc.link_log(user, dolphin_log)
++        except OSError as exc:
++            log_handle.close()
++            raise EmulatorError(f"GameCube launch refused: {exc}") from exc
++        log_handle.write(f"{utc_ms()} GC dolphin-log: {dolphin_log.name}"
++                         + (f" (kept an earlier one: {kept})" if kept != "none" else "") + "\n")
++        log_handle.flush()
++        try:
++            process = subprocess.Popen(
++                _gc.command(appimage, user, content),
++                cwd=str(user),
++                stdin=subprocess.DEVNULL,
++                stdout=log_handle,
++                stderr=subprocess.STDOUT,
++                env=dict(os.environ),
++                start_new_session=True,
++            )
++        except Exception as exc:
++            log_handle.close()
++            raise EmulatorError(f"GameCube launch failed: {exc}") from exc
++
++        def log_line(line: str) -> None:
++            try:
++                log_handle.write(f"{utc_ms()} {line}\n")
++                log_handle.flush()
++            except Exception:
++                pass
++
++        self.process = process
++        self.log_handle = log_handle
++        self.active_game = dict(game)
++        self.started_at = time.monotonic()
++        self._paused = False
++        self._host_window_policy = None
++        self._network_cmd_port = None
++        self._active_cheat_session = None
++        self._players_session = plan
++        self._hold_rewind_core = None
++        self._launch_kind = "dolphin"
++        self._last_device_args = []       # B66: Dolphin takes its ports from Dolphin.ini / GCPadNew.ini
++        self._gc = _gc.Session(process.pid, log_line, log_path=dolphin_log, user_dir=user)
++
++        sess = self._gc
++        t0 = sess.clock()
++        if sess.wait_window(alive=lambda: process.poll() is None) is None:
++            try:
++                self._dolphin_stop()
++            except Exception:
++                pass
++            raise EmulatorError("GameCube launch failed: Dolphin showed no window")
++        log_line(f"GC window: {sess.clock() - t0:.1f}s")
++        # the shader pre-compile window (the emulation starts after it), then the audio stream (B50's lesson): the
++        # stream's start and its stabilization pause come after both
++        boot = sess.wait_boot(alive=lambda: process.poll() is None)
++        log_line(f"GC boot: cpu thread {'%.1fs' % boot if boot is not None else 'none'}")
++        waited = sess.wait_audio(alive=lambda: process.poll() is None)
++        log_line(f"GC audio: sink-input {'%.1fs' % waited if waited is not None else 'none'}")
++        try:
++            sess.note_pads(force=True)
++        except Exception:
++            pass
++
++        payload = self.status()
++        payload["action"] = "launch"
++        payload["launch_kind"] = "dolphin"
++        payload["gc_mode"] = True
++        payload["players_session"] = dict(plan)
++        return payload
++
++    def _dolphin_ended(self, pid: int) -> None:
++        """The exit's bookkeeping: the helper's session for the next launch, Dolphin's logs collected."""
++        self._gc_helper_sid = int(pid)
++        sess = self._gc
++        if sess is not None and sess.user_dir is not None and sess.log_path is not None:
++            try:
++                _gc.collect_after_exit(sess.user_dir, sess.log_path)
++            except OSError:
++                pass
++
++    def _dolphin_state_folder(self) -> Path:
++        folder = self._project_path(_gc.USER_DIR) / "StateSaves"
++        folder.mkdir(parents=True, exist_ok=True)
++        return folder
++
++    def _dolphin_save_slot(self, slot: int, what: str, bound: float) -> tuple[Path, float]:
++        """Shift+F<slot> and the file's stable check (the caller holds the lock and made the pause hotkey-able)."""
++        sess = self._gc
++        folder = self._dolphin_state_folder()
++        before = _gc.state_files(folder)
++        if not sess.press_save(slot):
++            sess.log(f"GC {what}: slot {slot} hotkey not sent (no window)")
++            raise EmulatorError("Dolphin's window was not found for the save key")
++        got = sess.wait_state_file(folder, slot, before, bound=bound)
++        if got is None:
++            sess.log(f"GC {what}: slot {slot} hotkey; file not stable in {bound:.1f}s")
++            raise EmulatorError("PrivyHub could not verify the saved GameCube state")
++        sess.log(f"GC {what}: slot {slot} hotkey; file stable {got[1]:.1f}s")
++        return got
++
++    # B69: PrivyHub's SAVE / LOAD buttons for a GameCube session, through Dolphin's state hotkeys
++    def _dolphin_save_state(self, slot: int, replace: bool = False) -> dict[str, Any]:
++        with self.lock:
++            normalized = self._normalize_save_state_slot(slot)
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._gc is None:
++                raise EmulatorError("No PrivyHub game session is running")
++            existing = self._save_state_slot_detail(normalized)
++            replacing = bool(existing.get("exists") or existing.get("invalid"))
++            try:
++                self._gc.ensure_hotkey_pause()
++            except _gc.GCError as exc:
++                raise EmulatorError(str(exc)) from exc
++            path, _ = self._dolphin_save_slot(normalized, "save", _gc.SAVE_BOUND_S)
++            self._record_state_slot_index(normalized, path)
++            payload = self.status()
++            payload["action"] = "save_state"
++            payload["slot"] = normalized
++            payload["accepted"] = True
++            payload["confirmed"] = True
++            payload["replaced_existing"] = replacing
++            payload["overwrite_requires_confirmation"] = False
++            payload["control"] = "dolphin_hotkey_save_state"
++            payload["hotkey"] = f"Shift+F{normalized}"
++            payload["slot_detail"] = self._save_state_slot_detail(normalized)
++            payload["state_file"] = str(path.relative_to(self.project_root)).replace("\\", "/")
++            return payload
++
++    def _dolphin_load_slot(self, slot: int, what: str) -> tuple[str, float]:
++        """Paused: F<slot>, a settle, the resume, B52's picture check (the caller pauses again or leaves it running)."""
++        sess = self._gc
++        if not sess.booted():
++            sess.log(f"GC {what}: slot {slot} held; the CPU thread is not up")
++            raise EmulatorError("The game is still starting; play a moment, then load again")
++        try:
++            sess.ensure_hotkey_pause()
++        except _gc.GCError as exc:
++            raise EmulatorError(str(exc)) from exc
++        pre = sess.picture()
++        if not sess.press_load(slot):
++            sess.log(f"GC {what}: slot {slot} hotkey not sent (no window)")
++            raise EmulatorError("Dolphin's window was not found for the load key")
++        sess.sleep(_gc.LOAD_SETTLE_S)
++        try:
++            sess.resume()
++            verdict, seconds = sess.check_picture(pre[0] if pre else None)
++        except _gc.GCError:
++            verdict, seconds = "static", 0.0
++        sess.log(f"GC {what}: slot {slot} hotkey; picture {verdict} {seconds:.1f}s")
++        return verdict, seconds
++
++    def _dolphin_load_state(self, slot: int) -> dict[str, Any]:
++        with self.lock:
++            normalized = self._normalize_save_state_slot(slot)
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._gc is None:
++                raise EmulatorError("No active game session is available to load")
++            if not self._paused:
++                raise EmulatorError("Load State requires the game to be paused")
++            detail = self._save_state_slot_detail(normalized)
++            if detail.get("invalid_reason") == "zero_byte_state":
++                raise EmulatorError(f"Slot {normalized} contains an invalid 0-byte savestate; create a new save")
++            if not detail.get("exists"):
++                raise EmulatorError(f"No save state exists in Slot {normalized}")
++            verdict, _ = self._dolphin_load_slot(normalized, "load")
++            try:
++                self._gc.pause()
++            except _gc.GCError:
++                pass
++            if verdict != "ok":
++                raise EmulatorError("The game did not resume from the save")
++            payload = self.status()
++            payload["action"] = "load_state"
++            payload["slot"] = normalized
++            payload["accepted"] = True
++            payload["confirmed"] = True
++            payload["verification"] = "picture"
++            payload["paused"] = True
++            payload["control"] = "dolphin_hotkey_load_state"
++            payload["hotkey"] = f"F{normalized}"
++            payload["slot_detail"] = self._save_state_slot_detail(normalized)
++            payload["state_file"] = detail.get("state_file")
++            return payload
++
++    def _dolphin_save_recovery_state(self) -> dict[str, Any]:
++        """Shift+F8 (the reserved slot), the file waited, the recovery index written as PS1's."""
++        with self.lock:
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._gc is None:
++                raise EmulatorError("No PrivyHub game session is running")
++            try:
++                self._gc.ensure_hotkey_pause()
++            except _gc.GCError as exc:
++                raise EmulatorError(str(exc)) from exc
++            path, _ = self._dolphin_save_slot(_gc.RECOVERY_SLOT, "recovery save", _gc.RECOVERY_BOUND_S)
++            identity = self._active_game_state_identity()
++            game = self.active_game if isinstance(self.active_game, dict) else {}
++            relative = str(path.relative_to(self.project_root)).replace("\\", "/")
++            saved_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
++            self._write_recovery_index({
++                "schema": "privyhub_recovery_save_v1",
++                "state_file": relative,
++                "saved_at": saved_at,
++                "game_id": game.get("id"),
++                "game_title": identity.get("game_title"),
++                "game_key": identity.get("game_key"),
++            })
++            return {
++                "ok": True,
++                "action": "save_recovery_state",
++                "state_file": relative,
++                "saved_at": saved_at,
++                "size_bytes": int(path.stat().st_size),
++                "gc_states": "hotkey",
++            }
++
++    def _dolphin_recovery_source(self) -> Path:
++        detail = self.recovery_state_detail()
++        if not detail.get("exists") or not detail.get("state_file"):
++            raise EmulatorError("No recovery save exists for this game")
++        source = self._project_path(str(detail["state_file"]))
++        if not source.name.endswith(_gc.slot_suffix(_gc.RECOVERY_SLOT)):
++            raise EmulatorError("The recovery save is not this session's GameCube state")
++        return source
++
++    def _dolphin_load_recovery_state_running(self) -> dict[str, Any]:
++        """The prompt's Resume in a fresh GameCube launch: F8 into the paused game, the picture, left running."""
++        with self.lock:
++            self._refresh_process()
++            if self.process is None or self.active_game is None or self._gc is None:
++                raise EmulatorError("No active game session is available to load")
++            if self._paused:
++                raise EmulatorError("The running-core recovery load requires the game to be running")
++            source = self._dolphin_recovery_source()
++            sess = self._gc
++            if not sess.booted():
++                raise EmulatorError("The game is still starting; play a moment, then load again")
++            try:
++                if sess.paused_by is None:
++                    sess.pause()
++            except _gc.GCError as exc:
++                raise EmulatorError(str(exc)) from exc
++            verdict, _ = self._dolphin_load_slot(_gc.RECOVERY_SLOT, "recovery load")
++            if sess.paused_by is not None:
++                try:
++                    sess.resume()
++                except _gc.GCError:
++                    pass
++            if verdict != "ok":
++                raise EmulatorError("The game did not resume from the save")
++            payload = self.status()
++            payload["action"] = "load_recovery_state_running"
++            payload["accepted"] = True
++            payload["verification"] = "picture"
++            payload["retroarch_response"] = None
++            payload["retroarch_loading_line"] = None
++            payload["source_sha256"] = self._state_file_diagnostic(source).get("sha256")
++            payload["gc_states"] = "hotkey"
++            return payload
++
++    def _dolphin_copy_recovery_state_to_slot(self, slot: int, *, replace: bool = False) -> dict[str, Any]:
++        """The slot-8 file copied to the user slot's Dolphin name (`.s0N`), verified, the slot index written."""
++        with self.lock:
++            normalized = self._normalize_save_state_slot(slot)
++            source = self._dolphin_recovery_source()
++            source_diag = self._state_file_diagnostic(source)
++            if int(source_diag.get("size_bytes", 0) or 0) <= 0:
++                raise EmulatorError("The recovery save is an invalid 0-byte file")
++            prefix = source.name[: -len(_gc.slot_suffix(_gc.RECOVERY_SLOT))]
++            destination = source.with_name(prefix + _gc.slot_suffix(normalized))
++            self._copy_state_file(source, destination)
++            destination_diag = self._state_file_diagnostic(destination)
++            if (
++                int(destination_diag.get("size_bytes", 0) or 0) <= 0
++                or destination_diag.get("sha256") != source_diag.get("sha256")
++            ):
++                raise EmulatorError("PrivyHub could not verify the copied savestate")
++            self._record_state_slot_index(normalized, destination)
++            payload = self.status()
++            payload["action"] = "copy_recovery_state"
++            payload["slot"] = normalized
++            payload["accepted"] = True
++            payload["confirmed"] = True
++            payload["replaced_existing"] = False
++            payload["slot_detail"] = self._save_state_slot_detail(normalized)
++            payload["state_file"] = str(destination.relative_to(self.project_root)).replace("\\", "/")
++            payload["gc_states"] = "hotkey"
++            return payload
++
++    def _dolphin_pause_resume(self, action: str) -> dict[str, Any]:
++        try:
++            how = self._gc.pause() if action == "pause" else self._gc.resume()
++        except Exception as exc:
++            raise EmulatorError(f"GameCube {action} failed: {exc}") from exc
++        self._paused = action == "pause"
++        payload = self.status()
++        payload["action"] = action
++        payload["paused"] = self._paused
++        payload["gc_" + action] = how
++        payload["gc_mode"] = True
++        return payload
++
++    def _dolphin_stop(self) -> dict[str, Any]:
++        process = self.process
++        how = "gone"
++        if process is not None and self._gc is not None:
++            how = self._gc.stop(process)
++            self._dolphin_ended(process.pid)
++        self._close_quietly(self.log_handle)
++        self.process = None
++        self.log_handle = None
++        self.active_game = None
++        self.started_at = None
++        self._paused = False
++        self._host_window_policy = None
++        self._network_cmd_port = None
++        self._active_cheat_session = None
++        self._players_session = None
++        self._launch_kind = None
++        self._ps2 = None
++        self._gc = None
++        self._n64_core = None
++        payload = self.status()
++        payload["action"] = "stop"
++        payload["stopped"] = True
++        payload["graceful"] = how.startswith("sigterm")
++        payload["save_flush_confirmed"] = how.startswith("sigterm")
++        payload["gc_exit"] = how
++        return payload
++
+     def pause(self) -> dict[str, Any]:
+         with self.lock:
+             self._refresh_process()
+@@ -7365,6 +7765,9 @@
+             # B49: PCSX2's pause (the hotkey confirmed by PINE, else SIGSTOP)
+             if self._launch_kind == "pcsx2":
+                 return self._pcsx2_pause_resume("pause")
++            # B69: Dolphin's pause (the F10 hotkey confirmed by the CPU thread's clock, else SIGSTOP)
++            if self._launch_kind == "dolphin":
++                return self._dolphin_pause_resume("pause")
+ 
+             observed = self._retroarch_network_status()
+ 
+@@ -7404,6 +7807,9 @@
+             # B49: PCSX2's resume (the way it was paused)
+             if self._launch_kind == "pcsx2":
+                 return self._pcsx2_pause_resume("resume")
++            # B69: Dolphin's resume (the way it was paused)
++            if self._launch_kind == "dolphin":
++                return self._dolphin_pause_resume("resume")
+ 
+             observed = self._retroarch_network_status()
+ 
+@@ -7589,6 +7995,9 @@
+         # B49 skipped it; B55: a PS2 session's give-up save goes through PINE (slot 8), the recovery index as PS1's
+         if self._launch_kind == "pcsx2":
+             return self._pcsx2_save_recovery_state()
++        # B69: a GameCube session's give-up save: Shift+F8, the file, the recovery index as PS1's
++        if self._launch_kind == "dolphin":
++            return self._dolphin_save_recovery_state()
+         with self.lock:
+             self._refresh_process()
+             if (
+@@ -7700,6 +8109,9 @@
+         # B49: refused in a PS2 session
+         if self._launch_kind == "pcsx2":
+             raise EmulatorError(PS2_NO_STATES)
++        # B69: and in a GameCube session (its recovery load is the running one below)
++        if self._launch_kind == "dolphin":
++            raise EmulatorError("The paused recovery load is not used in a GameCube session")
+         with self.lock:
+             self._refresh_process()
+             if (
+@@ -7820,6 +8232,9 @@
+         # B54 refused it; B57: a PS2 relaunch saves to PINE's reserved slot 7 (B52's file-complete check)
+         if self._launch_kind == "pcsx2":
+             return self._pcsx2_save_relaunch_state()
++        # B69: four native ports never relaunch
++        if self._launch_kind == "dolphin":
++            raise EmulatorError(_gc.NO_RELAUNCH)
+         with self.lock:
+             self._refresh_process()
+             if self.process is None or self.process.poll() is not None:
+@@ -7868,6 +8283,11 @@
+             if source is None:
+                 return self._pcsx2_load_recovery_state_running()
+             return self._pcsx2_load_recovery_state_running(source)
++        # B69: a GameCube recovery save loads by F8 (the picture checked), left running; no relaunch source
++        if self._launch_kind == "dolphin":
++            if source is not None:
++                raise EmulatorError(_gc.NO_RELAUNCH)
++            return self._dolphin_load_recovery_state_running()
+         with self.lock:
+             self._refresh_process()
+             if (
+@@ -8023,6 +8443,9 @@
+         # B49 refused it; B55: the PS2 recovery file copied to the user slot's PCSX2 name
+         if self._launch_kind == "pcsx2":
+             return self._pcsx2_copy_recovery_state_to_slot(slot, replace=replace)
++        # B69: the GameCube recovery file copied to the user slot's Dolphin name
++        if self._launch_kind == "dolphin":
++            return self._dolphin_copy_recovery_state_to_slot(slot, replace=replace)
+         with self.lock:
+             normalized = self._normalize_save_state_slot(slot)
+ 
+@@ -8373,6 +8796,9 @@
+         # B51: a PS2 session saves through PINE, answering exactly as the PS1 path (B49's refusal gone for the button)
+         if self._launch_kind == "pcsx2":
+             return self._pcsx2_save_state(slot, replace)
++        # B69: a GameCube session saves by Shift+F<n>, answering exactly as the PS1 path
++        if self._launch_kind == "dolphin":
++            return self._dolphin_save_state(slot, replace)
+         with self.lock:
+             normalized = self._normalize_save_state_slot(
+                 slot
+@@ -8526,6 +8952,9 @@
+         # B51: a PS2 session loads through PINE, answering exactly as the PS1 path
+         if self._launch_kind == "pcsx2":
+             return self._pcsx2_load_state(slot)
++        # B69: a GameCube session loads by F<n> (B52's picture check), answering exactly as the PS1 path
++        if self._launch_kind == "dolphin":
++            return self._dolphin_load_state(slot)
+         with self.lock:
+             normalized = (
+                 self._normalize_save_state_slot(
+@@ -9368,6 +9797,9 @@
+             # B49: a PCSX2 session ends by SIGTERM (SIGKILL after 5 s)
+             if self._launch_kind == "pcsx2":
+                 return self._pcsx2_stop()
++            # B69: a Dolphin session ends by SIGTERM (SIGKILL after 5 s)
++            if self._launch_kind == "dolphin":
++                return self._dolphin_stop()
+ 
+             process = self.process
+             active_cheat_session = (
+@@ -9489,6 +9921,7 @@
+             self._players_session = None
+             self._launch_kind = None
+             self._ps2 = None
++            self._gc = None
+             self._n64_core = None
+ 
+             if cheat_runtime_cleanup:
+--- a/companion/games/link_drop_recovery.py
++++ b/companion/games/link_drop_recovery.py
+@@ -536,6 +536,8 @@
+                 **({"ps2_mode": True, "save_skipped": True} if saved.get("skipped") == "ps2_mode" else {}),
+                 # B55: a PS2 session's give-up save went through PINE (only the PS2 path returns this key)
+                 **({"ps2_states": saved["ps2_states"]} if saved.get("ps2_states") else {}),
++                # B69: a GameCube session's give-up save went through Dolphin's hotkey (only its path returns this key)
++                **({"gc_states": saved["gc_states"]} if saved.get("gc_states") else {}),
+             )
+ 
+     def _end_after_timeout(self) -> None:
+--- a/companion/games/native_stream_heartbeat.py
++++ b/companion/games/native_stream_heartbeat.py
+@@ -196,8 +196,9 @@
+     # B46: the chooser's pick (only a client that picked sends it)
+     # B49: a PS2 session's heartbeats carry ps2_mode (only set with PRIVYHUB_PS2=1)
+     # B54: hold-to-join's count and mode (only a hold-to-join client sends them)
++    # B69: a GameCube session's heartbeats carry gc_mode (only set with PRIVYHUB_GAMECUBE=1)
+     for field in ("pad_slots", "updates_by_player", "packets_by_player", "pad_slots_bad", "players_chosen",
+-                  "ps2_mode", "join", "players_joined"):
++                  "ps2_mode", "join", "players_joined", "gc_mode"):
+         if field in values:
+             record[field] = values[field]
+ 
+--- a/companion/hold_rewind.py
++++ b/companion/hold_rewind.py
+@@ -253,6 +253,11 @@
+                     self.b9 is not None and getattr(self.b9, "mode", None) == "state"):
+                 return self._row(recovery, "rewind_skipped", fields, reason="ps2: no rewind in PCSX2",
+                                  ps2_mode=True)
++            # B69: nor has a GameCube session (in `state` mode its slot-9 load goes through Cores.release)
++            if getattr(self.emulator, "_launch_kind", None) == "dolphin" and not (
++                    self.b9 is not None and getattr(self.b9, "mode", None) == "state"):
++                return self._row(recovery, "rewind_skipped", fields, reason="gamecube: no rewind in Dolphin",
++                                 gc_mode=True)
+             # B9: a core off the allow-list is skipped; `state` loads the scratch savestate instead of rewinding
+             if self.b9 is not None and self.b9.handles(pending):
+                 return self.b9.release(self, recovery, fields, pending)
+--- a/companion/players_session.py
++++ b/companion/players_session.py
+@@ -101,7 +101,8 @@
+         session = getattr(emulator, "_players_session", None)
+         # B54: a hold-to-join launch (`join`) and a mid-session relaunch (`relaunch`) are plans too
+         # B59: an N64 launch's four ports are a plan too (`n64`; reached only with PRIVYHUB_N64=1)
+-        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch", "n64"):
++        # B69: so are a GameCube launch's (`gamecube`; reached only with PRIVYHUB_GAMECUBE=1)
++        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch", "n64", "gamecube"):
+             return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
+                                                           "source")} | {"players": int(session["ports"])}
+                     | {k: session[k] for k in ("capable", "capped_from") if k in session}}   # B63
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -131,6 +131,12 @@
+ if (os.environ.get("PRIVYHUB_N64") or "").strip() == "1":
+     import n64_session as _n64_session
+ 
++# B69: the GameCube system listed in place (Dolphin), only with PRIVYHUB_GAMECUBE=1. Absent = today: nothing imported,
++# SYSTEMS unchanged.
++_gc_session = None
++if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
++    import gamecube_session as _gc_session
++
+ # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
+ # Absent = today: nothing imported.
+ _import_marks = None
+@@ -194,6 +200,10 @@
+         if _n64_session is not None:
+             self.SYSTEMS = {**self.SYSTEMS, _n64_session.SYSTEM_ID: {
+                 "name": _n64_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
++        # B69: the GameCube system listed from the drive's GameCube folder (instance only; absent = today)
++        if _gc_session is not None:
++            self.SYSTEMS = {**self.SYSTEMS, _gc_session.SYSTEM_ID: {
++                "name": _gc_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
+         self._lock = threading.RLock()
+         self._cached_at = 0.0
+         self._cached_games: list[dict[str, Any]] = []
+@@ -1865,6 +1875,15 @@
+                 if len(games) >= self.MAX_GAMES:
+                     break
+                 continue
++            # B69: GameCube titles read in place from the folder the paths file names, never written; absent: never
++            # reached
++            if _gc_session is not None and system_id == _gc_session.SYSTEM_ID:
++                games.extend(_gc_session.titles_for_plugin(
++                    _gc_session.read_dir(self.PROJECT_ROOT), self._stable_id, self._clean_name)
++                    [:max(0, self.MAX_GAMES - len(games))])
++                if len(games) >= self.MAX_GAMES:
++                    break
++                continue
+             system_root = (
+                 self.GAMES_ROOT / str(config["folder"])
+             )
+@@ -3879,6 +3898,9 @@
+             # B49: every heartbeat row of a PS2 session says so (absent: never set)
+             if _ps2_session is not None and _ps2_session.active(self._emulator):
+                 values["ps2_mode"] = True
++            # B69: and of a GameCube session (absent: never set)
++            if _gc_session is not None and _gc_session.active(self._emulator):
++                values["gc_mode"] = True
+ 
+             result = append_native_stream_heartbeat(
+                 self.PROJECT_ROOT,
+@@ -4062,6 +4084,18 @@
+                     self._recovery._log("ps2_session", ps2_mode=True, savestates="pine", ps2_states="pine",
+                                         pine=list(_ps2_session.PINE_BEHAVIOURS),
+                                         off=list(_ps2_session.OFF_BEHAVIOURS))
++                # B69: a GameCube session: the states by Dolphin's hotkeys, said in the response and a row (with the
++                # pads Dolphin's log has added so far)
++                if _gc_session is not None and _gc_session.active(self._emulator):
++                    payload["gc_mode"] = True
++                    sess = getattr(self._emulator, "_gc", None)
++                    try:
++                        pads = sess.note_pads() if sess is not None else None
++                    except Exception:
++                        pads = None
++                    self._recovery._log("gc_session", gc_mode=True, gc_states="hotkey",
++                                        live=list(_gc_session.LIVE_BEHAVIOURS), off=list(_gc_session.OFF_BEHAVIOURS),
++                                        pads=pads)
+                 # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
+                 if self._first(query, "player_prompt") == "1":
+                     import player_count as _player_count
+--- a/companion/relaunch_ports.py
++++ b/companion/relaunch_ports.py
+@@ -54,6 +54,9 @@
+     target = int(players)
+     if target not in (2, 4):
+         raise RelaunchRefused("players must be 2 or 4")
++    # B69: a GameCube session has its four native ports from the launch: never relaunched (PRIVYHUB_GAMECUBE=1 only)
++    if getattr(emulator, "_launch_kind", None) == "dolphin":
++        raise RelaunchRefused("GameCube has four ports; no relaunch")
+     system = str(game.get("system", "")).strip().casefold()
+     if target == 4 and system not in _players_session.MULTITAP_SYSTEMS:
+         raise RelaunchRefused("No multitap on this system")
+--- a/companion/rewind_cores.py
++++ b/companion/rewind_cores.py
+@@ -35,6 +35,7 @@
+ PAUSE_CONFIRM_LAG_FRAMES = 4   # B4's
+ N64_SKIP = "n64: no save into a running core"          # B61 (only an N64 session, PRIVYHUB_N64=1)
+ N64_RELEASE = "n64: plain resume (no state)"           # B61
++RELEASE_SETTLE_GC_S = 0.2    # B69: F9 then this, so Dolphin's hotkey thread has run the load before the resume key
+ 
+ 
+ def mode(environ: Mapping[str, str]) -> str | None:
+@@ -231,6 +232,9 @@
+         # B55: a PS2 session's slot-9 save goes through PINE (B49 skipped it)
+         if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
+             return self._save_ps2(silence_start, mark_at, kind)
++        # B69: a GameCube session's slot-9 save is Dolphin's Shift+F9 into the running game
++        if getattr(self.emulator, "_launch_kind", None) == "dolphin":
++            return self._save_gc(silence_start, mark_at, kind)
+         port = getattr(self.emulator, "_network_cmd_port", None)
+         if port is None or self.nci_factory is None:
+             return
+@@ -293,6 +297,9 @@
+         # B55: a PS2 session loads its slot-9 save through PINE (the picture checked after the recovery's resume)
+         if getattr(self.emulator, "_launch_kind", None) == "pcsx2":
+             return self._release_ps2(rw, recovery, fields, pending, s, onset)
++        # B69: a GameCube session loads its slot-9 save by F9 (the picture checked after the recovery's resume)
++        if getattr(self.emulator, "_launch_kind", None) == "dolphin":
++            return self._release_gc(rw, recovery, fields, pending, s, onset)
+         why = self._file_problem(s)
+         if why:
+             return rw._row(recovery, "rewind_skipped", fields, reason=why)
+@@ -433,6 +440,99 @@
+         except Exception:
+             pass
+         if verdict != "ok":
++            rw._row(recovery, "rewind_failed", fields,
++                    reason=f"the game did not resume from the save (picture {verdict})")
++
++    # --- B69: the GameCube branches (reached only in a Dolphin session, i.e. with PRIVYHUB_GAMECUBE=1) ----------------
++
++    def _save_gc(self, silence_start: float, mark_at: float, kind: str) -> None:
++        import gamecube_session as _gc
++        sess = getattr(self.emulator, "_gc", None)
++        if sess is None:
++            return
++        lock = getattr(self.emulator, "lock", None) or threading.RLock()
++        wall = self._wall()
++        with lock:
++            folder = sess.state_dir()
++            folder.mkdir(parents=True, exist_ok=True)
++            before = _gc.state_files(folder)
++            t0 = self._clock()
++            ok = bool(sess.press_save(_gc.SCRATCH_SLOT))
++            sent_at = t0
++        ack = "hotkey sent" if ok else "hotkey not sent"
++        with self._lock:
++            self.last_save = {"onset": silence_start, "sent_at": sent_at, "wall": wall, "ack": ack, "ok": ok,
++                              "kind": kind, "gc_before": before}
++            self.saves += 1
++        self.recovery._log("state_saved" if ok else "state_save_failed", slot=_gc.SCRATCH_SLOT, core="dolphin",
++                           kind=kind, silence_ms=round((mark_at - silence_start) * 1000.0, 1),
++                           save_after_onset_ms=round((sent_at - silence_start) * 1000.0, 1), ack=ack,
++                           gc_states="hotkey")
++        try:
++            sess.log(f"GC state save: slot {_gc.SCRATCH_SLOT} {ack} ({kind})")
++        except Exception:
++            pass
++
++    def _release_gc(self, rw: Any, recovery: Any, fields: dict[str, Any], pending: Mapping[str, Any],
++                    s: Mapping[str, Any], onset: float) -> dict[str, Any]:
++        import gamecube_session as _gc
++        sess = getattr(self.emulator, "_gc", None)
++        slot = _gc.SCRATCH_SLOT
++        fields.update(slot=slot, core="dolphin", gc_states="hotkey",
++                      save_after_onset_ms=round((s["sent_at"] - onset) * 1000.0, 1))
++        if sess is None:
++            return rw._row(recovery, "rewind_failed", fields, reason="no Dolphin session")
++        got = sess.wait_state_file(sess.state_dir(), slot, dict(s.get("gc_before") or {}), bound=_gc.RELEASE_SHARE_S)
++        if got is None:
++            with self._lock:
++                self.last_save = None
++            return rw._row(recovery, "rewind_skipped", fields, reason="the GameCube state file is not stable")
++        lock = getattr(self.emulator, "lock", None) or threading.RLock()
++        with lock:
++            t0 = self._clock()
++            try:
++                sess.ensure_hotkey_pause()
++            except Exception as exc:
++                with self._lock:
++                    self.last_save = None
++                return rw._row(recovery, "rewind_failed", fields, reason=f"Dolphin not paused for the load: {exc}")
++            pre = sess.picture()
++            sent = sess.press_load(slot)
++            if sent:
++                sess.sleep(RELEASE_SETTLE_GC_S)          # Dolphin's hotkey thread runs the load before the resume key
++            ms = round((self._clock() - t0) * 1000.0, 1)
++        with self._lock:
++            self.last_save = None                                 # one load per save
++        fields.update(rewind_ms=ms, load_ms=ms)
++        if not sent:
++            return rw._row(recovery, "rewind_failed", fields, reason="the load key was not sent (no window)")
++        fields.update(verification="picture_after_resume")
++        try:
++            sess.log(f"GC state load: slot {slot} hotkey; {ms:.0f} ms")
++        except Exception:
++            pass
++        row = rw._row(recovery, "input_release", fields)
++        verify_fields = dict(fields)
++        self._spawn(lambda: self._verify_gc(rw, recovery, sess, pre, verify_fields))
++        return row
++
++    def _verify_gc(self, rw: Any, recovery: Any, sess: Any, pre: Any, fields: dict[str, Any]) -> None:
++        """After the recovery's resume: B52's picture check; static -> the PS1-shaped `rewind_failed` row."""
++        import gamecube_session as _gc
++        try:
++            t0 = sess.clock()
++            while sess.paused_by is not None and sess.clock() - t0 < _gc.VERIFY_RUNNING_S:
++                sess.sleep(_gc.POLL_S)
++            verdict, seconds = sess.check_picture(pre[0] if pre else None)
++        except Exception:
++            verdict, seconds = "static", 0.0
++        recovery._log("gc_states", check="picture", verdict=verdict, s=round(float(seconds), 1),
++                      slot=fields.get("slot"), via=fields.get("via"))
++        try:
++            sess.log(f"GC state load: slot {fields.get('slot')} picture {verdict} {seconds:.1f}s")
++        except Exception:
++            pass
++        if verdict != "ok":
+             rw._row(recovery, "rewind_failed", fields,
+                     reason=f"the game did not resume from the save (picture {verdict})")
+ 
+--- /dev/null
++++ b/tests/gamecube_session/fake_dolphin.py
+@@ -0,0 +1,128 @@
++"""B69 tests: a fake Dolphin -- a fake /proc tree (the started PID's `CPU thread` with a clock that grows while it runs),
++a fake `xdotool` / `pactl` runner (the F10 toggle, Shift+F<n> writing a fake state file 0.2 s later, F<n> a load),
++fake signals and a fake window grab. No real process, display or file outside the test's temp dir."""
++
++from __future__ import annotations
++
++import signal
++import types
++from pathlib import Path
++
++FAKE_ID = "FAKE01"          # a made-up game id (the state file's prefix)
++
++
++class FakeDolphin:
++    def __init__(self, root: Path, pid: int = 4242, *, rate: float = 30.0, hotkeys: bool = True,
++                 clock_ok: bool = True, window: bool = True, writes_state: bool = True, picture: str = "moving",
++                 save_delay: float = 0.2, user_dir: Path | None = None, sink: bool = True) -> None:
++        self.root = Path(root)
++        self.proc = self.root / "proc"
++        self.pid = pid
++        self.rate = rate
++        self.hotkeys = hotkeys
++        self.clock_ok = clock_ok
++        self.has_window = window
++        self.writes_state = writes_state
++        self.picture = picture
++        self.save_delay = save_delay
++        self.sink = sink
++        self.user_dir = Path(user_dir) if user_dir is not None else self.root / "user"
++        self.t = 0.0
++        self.ticks = 100.0
++        self.paused = False
++        self.stopped = False
++        self.keys: list[str] = []
++        self.signals: list[int] = []
++        self.loaded: list[int] = []
++        self.pending: list[tuple[float, int]] = []
++        self.saves = 0
++        self.cmds: list[list[str]] = []
++        self.ignore_keys = 0                            # the next N keys are not read (a missed key)
++        self.task = self.proc / str(pid) / "task"
++        (self.task / str(pid)).mkdir(parents=True, exist_ok=True)
++        (self.task / str(pid) / "comm").write_text("AppRun\n")
++        if clock_ok:
++            (self.task / str(pid + 1)).mkdir(parents=True, exist_ok=True)
++            (self.task / str(pid + 1) / "comm").write_text("CPU thread\n")
++        (self.task / str(pid + 2)).mkdir(parents=True, exist_ok=True)
++        (self.task / str(pid + 2) / "comm").write_text("Video thread\n")
++        self._write()
++
++    # -- the clock -------------------------------------------------------------------------------------------------
++    def running(self) -> bool:
++        return not (self.paused or self.stopped)
++
++    def _write(self) -> None:
++        if self.clock_ok:
++            u = int(self.ticks)
++            (self.task / str(self.pid + 1) / "stat").write_text(
++                f"{self.pid + 1} (CPU thread) S 1 1 1 0 -1 0 0 0 0 0 {u} 0 0 0 20 0 9 0 0 0 0\n")
++
++    def sleep(self, d: float) -> None:
++        self.t += d
++        if self.running():
++            self.ticks += self.rate * d
++        self._write()
++        due = [p for p in self.pending if p[0] <= self.t]
++        self.pending = [p for p in self.pending if p[0] > self.t]
++        for _, n in due:
++            self._state_file(n)
++
++    def clock(self) -> float:
++        return self.t
++
++    # -- the keys, the signals, the picture ----------------------------------------------------------------------
++    def _state_file(self, n: int) -> None:
++        folder = self.user_dir / "StateSaves"
++        folder.mkdir(parents=True, exist_ok=True)
++        self.saves += 1
++        p = folder / f"{FAKE_ID}.s{n:02d}"
++        tmp = folder / f"{FAKE_ID}.s{n:02d}.tmp"
++        tmp.write_bytes(b"S" * (1000 + self.saves))
++        tmp.replace(p)                                  # Dolphin writes a temp file and renames it
++
++    def run(self, cmd, **kw):
++        cmd = list(cmd)
++        self.cmds.append(cmd)
++        if cmd[:2] == ["xdotool", "search"]:
++            return types.SimpleNamespace(stdout="77\n" if self.has_window else "")
++        if cmd[:2] == ["xdotool", "keyup"]:
++            keys = tuple(reversed(cmd[2:]))
++            self.keys.append("+".join(keys))
++            if self.ignore_keys > 0:
++                self.ignore_keys -= 1
++            elif self.hotkeys and not self.stopped:
++                self._on_key(keys)
++        if cmd[:3] == ["pactl", "list", "sink-inputs"]:
++            return types.SimpleNamespace(stdout=f'application.process.id = "{self.pid}"\n' if self.sink else "")
++        return types.SimpleNamespace(stdout="")
++
++    def _on_key(self, keys: tuple[str, ...]) -> None:
++        if keys == ("F10",):
++            self.paused = not self.paused
++        elif keys[0] == "Shift_L":
++            if self.writes_state:
++                self.pending.append((self.t + self.save_delay, int(keys[1][1:])))
++        else:
++            self.loaded.append(int(keys[0][1:]))
++
++    def kill(self, pid: int, sig: int) -> None:
++        self.signals.append(int(sig))
++        if sig == signal.SIGSTOP:
++            self.stopped = True
++        elif sig == signal.SIGCONT:
++            self.stopped = False
++
++    def grab(self, window: str) -> bytes:
++        if self.picture == "static":
++            return bytes([100]) * 2304
++        frame = int(self.ticks)
++        return bytes([40 + frame % 200]) * 2304
++
++    # -- the session (gamecube_session.Session wired to this fake) ------------------------------------------------
++    def session(self, gc, log=None, log_path: Path | None = None):
++        lines: list[str] = []
++        self.lines = lines
++        return gc.Session(self.pid, log or lines.append, run=self.run, kill=self.kill, sleep=self.sleep,
++                          clock=self.clock, proc_root=self.proc, grab=self.grab, log_path=log_path,
++                          user_dir=self.user_dir)
+--- /dev/null
++++ b/tests/gamecube_session/test_gamecube_session.py
+@@ -0,0 +1,920 @@
++#!/usr/bin/env python3
++"""B69 (host): the GameCube launch kind (Dolphin) behind PRIVYHUB_GAMECUBE=1 -- the in-place list, the config written
++whole, GCPadNew.ini for the four virtual pads, the pause by the F10 hotkey confirmed by the CPU thread's clock (SIGSTOP
++on a silent one), SAVE / LOAD through the state hotkeys (the file check, B52's picture check), the hold / stall /
++give-up through the reserved slots, four ports with no relaunch, the exit and its helper wait, the rows and logs, the
++keeper / diag_read label, the per-segment metric -- and absent = today. Fakes only (fake_dolphin.py): no Dolphin, no
++display, no title; the real folder never used.
++
++    python3 -m unittest discover -s tests/gamecube_session -v
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import signal
++import subprocess
++import sys
++import tempfile
++import threading
++import types
++import unittest
++from datetime import datetime
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401  (this run's temp dirs removed at exit)
++sys.path.insert(0, str(ROOT / "tools"))
++
++import gamecube_session as gc  # noqa: E402
++import players_session  # noqa: E402
++import relaunch_ports  # noqa: E402
++import rewind_cores  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++from fake_dolphin import FAKE_ID, FakeDolphin  # noqa: E402
++
++MIB = 1 << 20
++
++
++def tree(files: dict[str, bytes | str | int]) -> Path:
++    """A temp tree; an int value is a sparse file of that size."""
++    root = Path(tempfile.mkdtemp(prefix="b69_"))
++    for rel, data in files.items():
++        p = root / rel
++        p.parent.mkdir(parents=True, exist_ok=True)
++        if isinstance(data, int):
++            with open(p, "wb") as fh:
++                fh.truncate(data)
++        else:
++            p.write_bytes(data if isinstance(data, bytes) else data.encode())
++    return root
++
++
++def snapshot(root: Path) -> list[tuple[str, int, float]]:
++    return sorted((str(p.relative_to(root)), p.stat().st_size, p.stat().st_mtime) for p in root.rglob("*"))
++
++
++def ini(text: str) -> dict[str, dict[str, str]]:
++    out: dict[str, dict[str, str]] = {}
++    cur = None
++    for line in text.splitlines():
++        if line.startswith("[") and line.endswith("]"):
++            cur = out.setdefault(line[1:-1], {})
++        elif cur is not None and " = " in line:
++            k, _, v = line.partition(" = ")
++            cur[k] = v
++    return out
++
++
++# --- the list ------------------------------------------------------------------------------------------------------
++
++class Listing(unittest.TestCase):
++    def test_the_rules_and_nothing_written(self):
++        d = tree({"one.iso": MIB, "one.rvz": MIB, "one.gcm": MIB, "two.ciso": MIB, "two.iso": MIB,
++                  "three.GCM": 2 * MIB, ".hidden.rvz": MIB, "sub/four.rvz": MIB, ".dot/five.rvz": MIB,
++                  "notes.txt": "t", "region/small.bin": 2048, "stub.rvz": 4096, "six.zip": MIB})
++        before = snapshot(d)
++        got = [(t["relative"], t["suffix"]) for t in gc.list_titles(d)]
++        self.assertEqual(got, [("one.rvz", ".rvz"), ("sub/four.rvz", ".rvz"), ("three.GCM", ".gcm"),
++                               ("two.iso", ".iso")])
++        self.assertEqual(before, snapshot(d))                                   # read-only
++
++    def test_no_folder_is_an_empty_list_and_never_made(self):
++        self.assertEqual(gc.list_titles(None), [])
++        absent = Path(tempfile.mkdtemp()) / "absent"
++        self.assertEqual(gc.list_titles(absent), [])
++        self.assertFalse(absent.exists())
++
++    def test_the_paths_file_key_only(self):
++        proj = tree({"runtime/h3_p1_paths.txt": "GAMES_DIR=/x/ps2\nN64_DIR=/y\nGAMECUBE_DIR=/z/gc\nT1=secret\n"})
++        self.assertEqual(gc.read_dir(proj, {}), Path("/z/gc"))
++        self.assertIsNone(gc.read_dir(tree({}), {}))
++
++    def test_resolve_refuses_escapes_prefixes_and_missing(self):
++        d = tree({"one.rvz": MIB})
++        outside = tree({"x.rvz": MIB})
++        self.assertEqual(gc.resolve_title(d, "gamecube/one.rvz"), (d / "one.rvz").resolve())
++        for bad in ("gamecube/../" + os.path.relpath(outside / "x.rvz", d), "n64/one.rvz", "gamecube/none.rvz",
++                    "one.rvz"):
++            with self.assertRaises(gc.GCError):
++                gc.resolve_title(d, bad)
++        with self.assertRaises(gc.GCError):
++            gc.resolve_title(None, "gamecube/one.rvz")
++
++    def test_the_plugin_entries(self):
++        d = tree({"one.rvz": MIB})
++        e = gc.titles_for_plugin(d, lambda s, r: f"id:{s}:{r}", lambda p: p.stem)
++        self.assertEqual(e, [{"id": "id:gamecube:gamecube/one.rvz", "title": "one", "system": "gamecube",
++                              "system_name": "GameCube", "relative_path": "gamecube/one.rvz", "format": "rvz",
++                              "size_bytes": MIB}])
++
++    def test_one_appimage(self):
++        proj = tree({"runtime/emulators/dolphin/dolphin-x.AppImage": "x"})
++        self.assertEqual(gc.find_appimage(proj).name, "dolphin-x.AppImage")
++        (proj / "runtime/emulators/dolphin/other.AppImage").write_text("y")
++        with self.assertRaises(gc.GCError):
++            gc.find_appimage(proj)
++
++
++# --- the config ----------------------------------------------------------------------------------------------------
++
++class Config(unittest.TestCase):
++    def test_the_command(self):
++        u = Path(tempfile.mkdtemp())
++        self.assertEqual(gc.command(Path("/r/d.AppImage"), u, Path("/g/t.rvz")),
++                         ["/r/d.AppImage", "-b", "-u", str(u.resolve()), "-e", "/g/t.rvz"])
++
++    def test_five_files_written_whole(self):
++        u = Path(tempfile.mkdtemp())
++        (u / "Config").mkdir()
++        (u / "Config" / "Dolphin.ini").write_text("[Core]\nCPUThread = False\nStale = yes\n[Old]\nX = 1\n")
++        (u / "Config" / "Hotkeys.ini").write_text("[Hotkeys]\nGeneral/Stop = Escape\n")
++        self.assertEqual(sorted(gc.write_config(u)), ["Dolphin.ini", "GCPadNew.ini", "GFX.ini", "Hotkeys.ini",
++                                                      "Logger.ini"])
++        d = ini((u / "Config" / "Dolphin.ini").read_text())
++        self.assertNotIn("Old", d)
++        self.assertNotIn("Stale", d["Core"])                                     # nothing carried over
++        self.assertEqual({k: d["Core"][k] for k in ("CPUThread", "SkipIPL", "GFXBackend", "SlotA")},
++                         {"CPUThread": "True", "SkipIPL": "True", "GFXBackend": "Vulkan", "SlotA": "8"})
++        self.assertEqual([d["Core"][f"SIDevice{i}"] for i in range(4)], ["6"] * 4)
++        self.assertEqual((d["Display"]["RenderToMain"], d["Display"]["Fullscreen"]), ("True", "True"))
++        self.assertEqual((d["Interface"]["ConfirmStop"], d["Interface"]["UsePanicHandlers"],
++                          d["Interface"]["OnScreenDisplayMessages"]), ("False", "False", "False"))
++        self.assertEqual((d["Analytics"]["PermissionAsked"], d["Analytics"]["Enabled"]), ("True", "False"))
++        self.assertEqual((d["DSP"]["Backend"], d["Input"]["BackgroundInput"]), ("Cubeb", "True"))
++        self.assertIn("UpdateTrack = \n", (u / "Config" / "Dolphin.ini").read_text())
++        g = ini((u / "Config" / "GFX.ini").read_text())
++        self.assertEqual(g, {"Hardware": {"Adapter": "0"},
++                             "Settings": {"InternalResolution": "1", "ShaderCompilationMode": "2",
++                                          "WaitForShadersBeforeStarting": "True", "ShowFPS": "False",
++                                          "LogRenderTimeToFile": "True"}})
++        lg = ini((u / "Config" / "Logger.ini").read_text())
++        self.assertEqual(lg["Options"]["Verbosity"], "4")
++        self.assertEqual(sorted(k for k, v in lg["Logs"].items() if v == "True"), sorted(gc.LOG_ON))
++        self.assertIn("CI", gc.LOG_ON)
++        self.assertEqual(list((u / "Config").glob("*.tmp")), [])
++
++    def test_the_hotkeys_and_nothing_else(self):
++        h = ini(gc.hotkeys_ini())["Hotkeys"]
++        want = {"Device": "XInput2/0/Virtual core pointer", "General/Toggle Pause": "`F10`"}
++        for n in (1, 2, 3, 8, 9):
++            want[f"Load State/Load State Slot {n}"] = f"`F{n}`"
++            want[f"Save State/Save State Slot {n}"] = f"@(Shift+`F{n}`)"
++        self.assertEqual(h, want)                       # no Stop on Escape, no fullscreen toggle, no other slot
++
++    def test_gcpadnew_for_four_pads(self):
++        p = ini(gc.gcpad_ini())
++        self.assertEqual(sorted(p), ["GCPad1", "GCPad2", "GCPad3", "GCPad4"])
++        for n in range(1, 5):
++            sec = p[f"GCPad{n}"]
++            self.assertEqual(sec["Device"], f"evdev/0/PrivyHub Virtual Gamepad P{n}")
++            self.assertEqual({k: sec[k] for k in ("Buttons/A", "Buttons/B", "Buttons/X", "Buttons/Y", "Buttons/Z",
++                                                  "Buttons/Start")},
++                             {"Buttons/A": "`SOUTH`", "Buttons/B": "`WEST`", "Buttons/X": "`EAST`",
++                              "Buttons/Y": "`NORTH`", "Buttons/Z": "`TR`", "Buttons/Start": "`START`"})
++            self.assertEqual((sec["Main Stick/Up"], sec["Main Stick/Right"], sec["C-Stick/Up"],
++                              sec["C-Stick/Left"]), ("`Axis 1-`", "`Axis 0+`", "`Axis 4-`", "`Axis 3-`"))
++            self.assertEqual((sec["Triggers/L-Analog"], sec["Triggers/R-Analog"], sec["Triggers/L"],
++                              sec["Triggers/R"]), ("`Axis 2-+`", "`Axis 5-+`", "`Axis 2-+`", "`Axis 5-+`"))
++            self.assertEqual((sec["D-Pad/Up"], sec["D-Pad/Down"], sec["D-Pad/Left"], sec["D-Pad/Right"]),
++                             ("`Axis 7-`", "`Axis 7+`", "`Axis 6-`", "`Axis 6+`"))
++
++    def test_the_layout_matches_the_companions_pad(self):
++        import native_session_io as nsi
++        c = nsi.NativeControllerBridge
++        self.assertEqual(c.LINUX_GAMEPAD_NAME.format(player=3), gc.PAD_DEVICE.format(n=3).split("/", 2)[2])
++        # the onn's cross / square / circle / triangle reach SOUTH / WEST / EAST / NORTH (the XUSB mapping)
++        src = (ROOT / "companion/native_session_io.py").read_text()
++        for xusb, code in (("XUSB_A", "BTN_SOUTH"), ("XUSB_X", "BTN_WEST"), ("XUSB_B", "BTN_EAST"),
++                           ("XUSB_Y", "BTN_NORTH"), ("XUSB_RIGHT_SHOULDER", "BTN_TR")):
++            self.assertIn(f"(self.{xusb}, ecodes.{code})", src)
++
++    def test_the_pads_read_from_dolphins_log(self):
++        d = Path(tempfile.mkdtemp())
++        log = d / "x-dolphin.log"
++        log.write_text("17:01:00:001 InputCommon/ControllerInterface/ControllerInterface.cpp:300 N[CI]: Added device: "
++                       "evdev/0/PrivyHub Virtual Gamepad P1\n"
++                       "17:01:00:002 x.cpp:1 N[CI]: Added device: evdev/0/PrivyHub Virtual Gamepad P2\n"
++                       "17:01:00:003 x.cpp:1 N[CI]: Added device: evdev/1/PrivyHub Virtual Gamepad P3\n"
++                       "17:01:00:004 x.cpp:1 N[CI]: Removed device: evdev/0/PrivyHub Virtual Gamepad P2\n")
++        seen = gc.pads_seen(log)
++        self.assertEqual(seen, {"P1": "evdev/0", "P3": "evdev/1"})
++        self.assertEqual(gc.pads_line(seen), "P1=evdev/0 P3=evdev/1 MISMATCH (the ini names evdev/0)")
++        self.assertEqual(gc.pads_line({}), "none yet")
++        self.assertEqual(gc.pads_line({"P1": "evdev/0"}), "P1=evdev/0")
++
++
++# --- pause / resume ------------------------------------------------------------------------------------------------
++
++class PauseResume(unittest.TestCase):
++    def fake(self, **kw):
++        f = FakeDolphin(Path(tempfile.mkdtemp(prefix="b69_")), **kw)
++        return f, f.session(gc)
++
++    def test_the_hotkey_confirmed_by_the_clock(self):
++        f, s = self.fake()
++        self.assertEqual(s.pause(), "hotkey")
++        self.assertEqual((f.keys, f.signals, f.paused), (["F10"], [], True))
++        self.assertIn(["xdotool", "windowactivate", "--sync", "77"], f.cmds)
++        self.assertIn(["xdotool", "windowfocus", "--sync", "77"], f.cmds)
++        self.assertEqual(s.resume(), "hotkey")
++        self.assertEqual((f.keys, f.paused), (["F10", "F10"], False))
++        self.assertIn("GC pause: hotkey", f.lines)
++        self.assertIn("GC resume: hotkey", f.lines)
++
++    def test_a_silent_clock_is_sigstop_with_no_key(self):
++        f, s = self.fake(clock_ok=False)
++        self.assertEqual(s.pause(), "sigstop")
++        self.assertEqual((f.keys, f.signals), ([], [int(signal.SIGSTOP)]))
++        self.assertEqual(s.resume(), "sigcont")
++        self.assertEqual((f.keys, f.signals), ([], [int(signal.SIGSTOP), int(signal.SIGCONT)]))
++
++    def test_an_unconfirmed_key_falls_back_to_sigstop_once(self):
++        f, s = self.fake(hotkeys=False)
++        self.assertEqual(s.pause(), "sigstop")
++        self.assertEqual((f.keys, f.signals), (["F10"], [int(signal.SIGSTOP)]))
++        self.assertEqual(s.resume(), "sigcont")
++        self.assertEqual(f.keys, ["F10"])                                     # no second key
++
++    def test_a_late_key_after_sigstop_is_undone_on_resume(self):
++        f, s = self.fake()
++        f.paused = True                                                       # the key landed after the SIGSTOP
++        f.kill(f.pid, signal.SIGSTOP)
++        s.paused_by = "sigstop"
++        self.assertEqual(s.resume(), "sigcont+hotkey")
++        self.assertFalse(f.paused or f.stopped)
++
++    def test_a_missed_resume_key_is_sent_once_more(self):
++        f, s = self.fake()
++        s.pause()
++        f.ignore_keys = 1
++        self.assertEqual(s.resume(), "hotkey")
++        self.assertEqual(f.keys, ["F10", "F10", "F10"])
++        self.assertFalse(f.paused)
++
++    def test_a_resume_that_never_comes_is_an_error(self):
++        f, s = self.fake()
++        s.pause()
++        f.hotkeys = False
++        with self.assertRaises(gc.GCError):
++            s.resume()
++
++    def test_no_window_is_sigstop(self):
++        f, s = self.fake(window=False)
++        self.assertEqual(s.pause(), "sigstop")
++        self.assertEqual(f.keys, [])
++
++    def test_a_sigstop_pause_is_made_hotkey_for_a_state_key(self):
++        f, s = self.fake(clock_ok=True, hotkeys=False)
++        s.pause()                                                             # sigstop (the key was not read)
++        f.hotkeys = True
++        s.ensure_hotkey_pause()
++        self.assertEqual((s.paused_by, f.paused, f.stopped), ("hotkey", True, False))
++        self.assertEqual(f.signals, [int(signal.SIGSTOP), int(signal.SIGCONT)])
++
++    def test_the_boot_wait_needs_the_clock_to_grow(self):
++        f, s = self.fake()
++        self.assertIsNotNone(s.wait_boot())
++        f2, s2 = self.fake(clock_ok=False)
++        self.assertIsNone(s2.wait_boot(bound=2.0))
++        f3, s3 = self.fake()
++        f3.paused = True                                                      # the pre-compile: no emulation yet
++        self.assertIsNone(s3.wait_boot(bound=2.0))
++
++
++# --- the manager: launch, SAVE / LOAD, stop ------------------------------------------------------------------------
++
++class FakeProc:
++    def __init__(self, pid):
++        self.pid = pid
++        self.returncode = None
++        self.stdin = None
++
++    def poll(self):
++        return self.returncode
++
++    def wait(self, timeout=None):
++        self.returncode = 0
++        return 0
++
++
++class Rig(unittest.TestCase):
++    """The manager with `_gc` set as PRIVYHUB_GAMECUBE=1 sets it, a fake Popen and the fake Dolphin."""
++
++    def setUp(self):
++        self.old_gc, self.old_popen, self.old_session = em._gc, em.subprocess.Popen, gc.Session
++        self.old_wait = gc.wait_helpers
++        em._gc = gc
++        self.games = tree({"one.rvz": MIB})
++        self.proj = tree({"runtime/emulators/dolphin/dolphin-fake.AppImage": "x"})
++        (self.proj / "runtime" / "h3_p1_paths.txt").write_text(f"GAMECUBE_DIR={self.games}\n")
++        self.user = (self.proj / "data/games/gamecube/user").resolve()
++        self.popen: list[dict] = []
++        self.helper_calls: list[int] = []
++
++    def tearDown(self):
++        em._gc, em.subprocess.Popen, gc.Session, gc.wait_helpers = (self.old_gc, self.old_popen, self.old_session,
++                                                                   self.old_wait)
++
++    def launch(self, players_chosen=None, **fake_kw):
++        f = FakeDolphin(self.proj, user_dir=self.user, **fake_kw)
++        self.fake = f
++        rig = self
++
++        def popen(cmd, **kw):
++            rig.popen.append({"cmd": cmd, **{k: kw.get(k) for k in ("cwd", "start_new_session")}})
++            return FakeProc(f.pid)
++
++        class S(rig.old_session):
++            def __init__(self, pid, log, **kw):
++                super().__init__(pid, log, run=f.run, kill=f.kill, sleep=f.sleep, clock=f.clock, proc_root=f.proc,
++                                 grab=f.grab, **kw)
++
++        em.subprocess.Popen = popen
++        gc.Session = S
++        gc.wait_helpers = lambda sid, *a, **k: (rig.helper_calls.append(sid), "gone 1.0s")[1]
++        m = em.EmulatorManager(self.proj, config_path=ROOT / "companion/games/config/emulators.json")
++        self.addCleanup(lambda: m._close_quietly(m.log_handle))
++        game = {"id": "game_gc_fake", "system": "gamecube", "title": "made-up", "relative_path": "gamecube/one.rvz"}
++        r = m.launch(game, players_chosen=players_chosen)
++        return m, r
++
++    def log_text(self):
++        return next((self.proj / "logs/games").glob("*-gamecube.log")).read_text()
++
++
++class Launch(Rig):
++    def test_the_launch_the_config_the_ports_and_the_log(self):
++        before = snapshot(self.games)
++        m, r = self.launch()
++        self.assertEqual((r["launch_kind"], r["gc_mode"], m._launch_kind), ("dolphin", True, "dolphin"))
++        cmd = self.popen[0]["cmd"]
++        self.assertEqual(cmd[1:], ["-b", "-u", str(self.user), "-e", str((self.games / "one.rvz").resolve())])
++        self.assertTrue(self.popen[0]["start_new_session"])
++        self.assertEqual(self.popen[0]["cwd"], str(self.user))
++        self.assertEqual(sorted(p.name for p in (self.user / "Config").glob("*.ini")),
++                         ["Dolphin.ini", "GCPadNew.ini", "GFX.ini", "Hotkeys.ini", "Logger.ini"])
++        self.assertEqual(r["players_session"], gc.plan())
++        ports = players_session.ports_set(m, None)["ports_set"]
++        self.assertEqual((ports["ports"], ports["players"], ports["multitap"], ports["multitap_available"],
++                          ports["source"]), (4, 4, False, False, "gamecube"))
++        self.assertNotIn("capable", ports)
++        log = self.log_text()
++        for line in ("GC launch: dolphin ports=4 backend=vulkan adapter=0 config=whole", "GC window: ",
++                     "GC boot: cpu thread ", "GC audio: sink-input ", "GC pads: none yet", "GC dolphin-log: "):
++            self.assertIn(line, log)
++        self.assertNotIn("one.rvz", log); self.assertNotIn("made-up", log); self.assertNotIn("game_gc_fake", log)
++        self.assertNotIn(str(self.games), log)
++        self.assertEqual(before, snapshot(self.games))                          # the drive's folder never written
++        link = self.user / "Logs" / "dolphin.log"
++        self.assertTrue(link.is_symlink())
++        self.assertRegex(os.readlink(link), r"/data/games/gamecube/logs/\d{8}T\d{6}Z-dolphin\.log$")
++
++    def test_four_ports_whatever_the_join_no_relaunch(self):
++        for chosen in (None, 1, 2, 4):
++            m, r = self.launch(players_chosen=chosen)
++            self.assertEqual(m._players_session["ports"], 4)
++            self.assertEqual(m._last_device_args, [])
++            m.stop()
++
++    def test_the_relaunch_is_refused(self):
++        m, r = self.launch()
++        plugin = types.SimpleNamespace(_emulator=m, _native_stream=None, _recovery_start_args={"client_ip": "x"})
++        for players in (2, 4):
++            with self.assertRaises(relaunch_ports.RelaunchRefused) as cm:
++                relaunch_ports.run(plugin, players)
++            self.assertIn("GameCube has four ports", str(cm.exception))
++        with self.assertRaises(em.EmulatorError):
++            m.save_relaunch_state()
++
++    def test_unconfigured_folder_refuses_with_no_popen(self):
++        (self.proj / "runtime" / "h3_p1_paths.txt").unlink()
++        with self.assertRaises(em.EmulatorError):
++            self.launch()
++        self.assertEqual(self.popen, [])
++
++    def test_no_window_ends_the_launch(self):
++        with self.assertRaises(em.EmulatorError):
++            self.launch(window=False)
++        self.assertIn(int(signal.SIGTERM), self.fake.signals)
++
++    def test_the_exit_and_the_next_launchs_helper_wait(self):
++        m, r = self.launch()
++        out = m.stop()
++        self.assertTrue(out["gc_exit"].startswith("sigterm"))
++        self.assertIsNone(m._launch_kind)
++        self.assertIn(int(signal.SIGTERM), self.fake.signals)
++        self.assertEqual(m._gc_helper_sid, self.fake.pid)
++        self.assertIn("GC exit: sigterm", self.log_text())
++        game = {"id": "game_gc_fake", "system": "gamecube", "title": "made-up", "relative_path": "gamecube/one.rvz"}
++        m.launch(game)
++        self.assertEqual(self.helper_calls, [self.fake.pid])
++        self.assertIsNone(m._gc_helper_sid)
++        self.assertTrue(any("GC helper: gone 1.0s" in p.read_text()
++                            for p in (self.proj / "logs/games").glob("*-gamecube.log")))
++
++
++class SaveLoad(Rig):
++    def paused(self, **kw):
++        m, r = self.launch(**kw)
++        p = m.pause()
++        self.assertEqual((p["gc_pause"], m._paused), ("hotkey", True))
++        return m
++
++    def test_save_by_shift_f1_the_file_check_and_the_ps1_shaped_reply(self):
++        m = self.paused()
++        r = m.save_state(1)
++        self.assertEqual(self.fake.keys[-1], "Shift_L+F1")
++        for k, v in (("action", "save_state"), ("slot", 1), ("accepted", True), ("confirmed", True),
++                     ("replaced_existing", False), ("control", "dolphin_hotkey_save_state"), ("hotkey", "Shift+F1")):
++            self.assertEqual(r[k], v)
++        self.assertTrue(r["state_file"].endswith(f"StateSaves/{FAKE_ID}.s01"))
++        self.assertTrue(m._save_state_slot_detail(1)["exists"])
++        self.assertTrue(m._paused and self.fake.paused)                         # saved paused, left paused
++        self.assertRegex(self.log_text(), r"GC save: slot 1 hotkey; file stable 0\.\ds")
++        self.assertTrue(m.save_state(1)["replaced_existing"])
++
++    def test_a_file_that_never_comes_is_the_error(self):
++        m = self.paused(writes_state=False)
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.save_state(2)
++        self.assertEqual(str(cm.exception), "PrivyHub could not verify the saved GameCube state")
++        self.assertIn("GC save: slot 2 hotkey; file not stable in 1.0s", self.log_text())
++
++    def test_a_file_still_growing_at_the_bound_is_not_confirmed(self):
++        m = self.paused(save_delay=0.9)                       # appears at 0.9 s: cannot stand 0.25 s by 1.0 s
++        with self.assertRaises(em.EmulatorError):
++            m.save_state(3)
++
++    def test_load_by_f1_with_the_picture_check(self):
++        m = self.paused()
++        m.save_state(1)
++        r = m.load_state(1)
++        self.assertIn("F1", self.fake.keys)
++        self.assertEqual(self.fake.loaded, [1])
++        for k, v in (("action", "load_state"), ("confirmed", True), ("verification", "picture"), ("paused", True),
++                     ("control", "dolphin_hotkey_load_state"), ("hotkey", "F1")):
++            self.assertEqual(r[k], v)
++        self.assertTrue(m._paused and self.fake.paused)                         # paused again after the check
++        self.assertIn("GC load: slot 1 hotkey; picture ok", self.log_text())
++
++    def test_a_static_picture_is_the_error_with_the_game_paused(self):
++        m = self.paused(picture="static")
++        m.save_state(1)
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(1)
++        self.assertEqual(str(cm.exception), "The game did not resume from the save")
++        self.assertTrue(m._paused and self.fake.paused)
++        self.assertIn("GC load: slot 1 hotkey; picture static", self.log_text())
++
++    def test_load_refused_running_or_empty(self):
++        m, r = self.launch()
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(1)
++        self.assertEqual(str(cm.exception), "Load State requires the game to be paused")
++        m.pause()
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.load_state(2)
++        self.assertEqual(str(cm.exception), "No save state exists in Slot 2")
++
++
++# --- the hold, the stall, the give-up --------------------------------------------------------------------------------
++
++class Rec:
++    def __init__(self):
++        self.rows = []
++
++    def _log(self, event, **f):
++        self.rows.append({"event": event, **f})
++
++    def of(self, event):
++        return [r for r in self.rows if r["event"] == event]
++
++
++def rw():
++    return types.SimpleNamespace(fps=60.0, _row=lambda recovery, event, fields, **extra: (
++        recovery._log(event, **{**fields, **extra}), {**fields, **extra})[1])
++
++
++class Recovery(Rig):
++    def cores(self, **kw):
++        m, r = self.launch(**kw)
++        rec = Rec()
++        c = rewind_cores.Cores("state", m, rec, clock=self.fake.clock, wall=lambda: 1000.0 + self.fake.t,
++                               threaded=False)
++        spawned = []
++        c._spawn = spawned.append
++        return m, rec, c, spawned
++
++    def hold(self, kind="silence", onset=10.0, **kw):
++        m, rec, c, spawned = self.cores(**kw)
++        c.save(onset, onset + 0.4, kind)                          # the quiet mark: the game running
++        self.assertFalse(self.fake.paused)
++        m.pause()                                                 # the hold owns a pause
++        pending = {"onset": onset, "paused_at": onset + 1.0}
++        row = c.release(rw(), rec, {"via": "client_ready_stall" if kind == "stall" else "input_release"}, pending)
++        return m, rec, c, spawned, row
++
++    def test_the_slot9_save_is_shift_f9_into_the_running_game(self):
++        m, rec, c, _ = self.cores()
++        c.save(10.0, 10.4, "silence")
++        self.assertEqual(self.fake.keys[-1], "Shift_L+F9")
++        row = rec.of("state_saved")[-1]
++        self.assertEqual((row["slot"], row["core"], row["gc_states"], row["ack"]), (9, "dolphin", "hotkey",
++                                                                                     "hotkey sent"))
++        self.assertIn("GC state save: slot 9 hotkey sent (silence)", self.log_text())
++
++    def test_the_hold_s_return_loads_slot_9_then_the_picture_after_the_resume(self):
++        m, rec, c, spawned, row = self.hold()
++        self.assertEqual(self.fake.loaded, [9])
++        self.assertEqual((row["slot"], row["core"], row["gc_states"], row["verification"]),
++                         (9, "dolphin", "hotkey", "picture_after_resume"))
++        self.assertLessEqual(row["load_ms"], gc.RELEASE_SHARE_S * 1000.0)
++        self.assertTrue(self.fake.paused)                          # the resume is the recovery's
++        m.resume()
++        spawned[0]()
++        self.assertEqual(rec.of("gc_states")[-1]["verdict"], "ok")
++        self.assertEqual(rec.of("rewind_failed"), [])
++        self.assertIsNone(c.last_save)
++
++    def test_the_stall_resume_loads_the_stall_save(self):
++        m, rec, c, spawned, row = self.hold(kind="stall", onset=20.0)
++        self.assertEqual(rec.of("input_release")[-1]["via"], "client_ready_stall")
++        self.assertEqual(self.fake.loaded, [9])
++
++    def test_a_static_picture_is_the_ps1_shaped_rewind_failed_row(self):
++        m, rec, c, spawned, row = self.hold(picture="static")
++        m.resume()
++        spawned[0]()
++        self.assertEqual(rec.of("rewind_failed")[-1]["reason"],
++                         "the game did not resume from the save (picture static)")
++
++    def test_no_file_resumes_without_a_load(self):
++        m, rec, c, spawned, row = self.hold(writes_state=False)
++        self.assertEqual(self.fake.loaded, [])
++        self.assertEqual(rec.of("rewind_skipped")[-1]["reason"], "the GameCube state file is not stable")
++        self.assertEqual(spawned, [])
++
++    def test_the_rewind_is_off_outside_the_state_mode(self):
++        import hold_rewind
++        m, r = self.launch()
++        rec = Rec()
++        rw_obj = object.__new__(hold_rewind.Rewinder)
++        rw_obj._lock = threading.Lock()
++        rw_obj.cap, rw_obj.b9, rw_obj.emulator, rw_obj.fps = 30, None, m, 60.0
++        rw_obj.counter_before = lambda pending: 50
++        rw_obj._row = rw()._row
++        rec._state_since = 7
++        rw_obj._pending = {"key": 7, "onset": 10.0, "paused_at": 11.0}
++        rw_obj.rewind(rec, "input_release")
++        row = rec.of("rewind_skipped")[-1]
++        self.assertEqual((row["reason"], row["gc_mode"]), ("gamecube: no rewind in Dolphin", True))
++
++    def test_the_give_up_save_the_prompts_resume_and_the_copy(self):
++        m, r = self.launch()
++        m.pause()
++        saved = m.save_recovery_state()
++        self.assertEqual(self.fake.keys[-1], "Shift_L+F8")
++        self.assertEqual(saved["gc_states"], "hotkey")
++        self.assertTrue(saved["state_file"].endswith(".s08"))
++        self.assertTrue(m.recovery_state_detail()["exists"])
++        m.resume()
++        out = m.load_recovery_state_running()
++        self.assertEqual((out["verification"], out["gc_states"]), ("picture", "hotkey"))
++        self.assertEqual(self.fake.loaded, [8])
++        self.assertFalse(self.fake.paused)                                       # left running
++        cp = m.copy_recovery_state_to_slot(2)
++        self.assertTrue(cp["state_file"].endswith(f"{FAKE_ID}.s02"))
++        self.assertTrue(m._save_state_slot_detail(2)["exists"])
++        with self.assertRaises(em.EmulatorError):
++            m.load_recovery_state_running(source=Path("x.s07"))
++
++    def test_the_give_up_row_carries_gc_states(self):
++        from games import link_drop_recovery as ldr
++        rec = ldr.LinkDropRecovery(Path(tempfile.mkdtemp(prefix="b69_")), pause_game=lambda: None,
++                                   resume_game=lambda: None,
++                                   save_recovery_state=lambda: {"state_file": "x.s08", "gc_states": "hotkey"},
++                                   restart_encoder=lambda: {}, full_start_encoder=lambda: {}, stream_active=lambda: True,
++                                   end_session=lambda: None, client_packet_age_ms=lambda: 10.0,
++                                   recovery_save_detail=lambda: {})
++        rec._give_up_and_save()
++        row = [json.loads(x) for x in rec.log_path().read_text().splitlines() if '"gave_up_saved"' in x][0]
++        self.assertEqual(row["gc_states"], "hotkey")
++        self.assertNotIn("ps2_states", row)
++
++
++# --- Dolphin's log per launch, the exit's helper ------------------------------------------------------------------
++
++class LogsAndHelper(unittest.TestCase):
++    def test_the_link_the_fallback_and_the_counters(self):
++        proj = Path(tempfile.mkdtemp(prefix="b69_"))
++        user = proj / "data/games/gamecube/user"
++        target = gc.log_for_launch(proj, 1_800_000_000.0)
++        self.assertEqual(target.name, "20270115T080000Z-dolphin.log")
++        (user / "Logs").mkdir(parents=True)
++        (user / "Logs" / "dolphin.log").write_text("from a missed exit\n")
++        kept = gc.link_log(user, target)
++        self.assertRegex(kept, r"^\d{8}T\d{6}Z-dolphin\.log$")
++        self.assertEqual((target.parent / kept).read_text(), "from a missed exit\n")
++        with open(user / "Logs" / "dolphin.log", "a") as fh:                    # Dolphin writes through the link
++            fh.write("line one\n")
++        self.assertEqual(target.read_text(), "line one\n")
++        (user / "Logs" / "dolphin.log").unlink()
++        (user / "Logs" / "dolphin.log").write_text("line two\n")                # Dolphin replaced the link
++        (user / "Logs" / "vblank_times.txt").write_text("16.6\n")
++        (user / "Logs" / "render_times.txt").write_text("16.6\n")
++        out = gc.collect_after_exit(user, target)
++        self.assertEqual((out["appended"], sorted(out["moved"])), (True, ["render_times.txt", "vblank_times.txt"]))
++        self.assertEqual(target.read_text(), "line one\nline two\n")
++        self.assertTrue((target.parent / "20270115T080000Z-vblank_times.txt").is_file())
++
++    def test_the_30_day_prune(self):
++        d = Path(tempfile.mkdtemp(prefix="b69_"))
++        now = 1_800_000_000.0
++        for name in (gc.stamp_of(now - 31 * 86400) + "-dolphin.log", gc.stamp_of(now - 31 * 86400) + "-vblank_times.txt",
++                     gc.stamp_of(now - 29 * 86400) + "-dolphin.log", "other.txt"):
++            (d / name).write_text("x")
++        removed = gc.prune_logs(d, now)
++        self.assertEqual(len(removed), 2)
++        self.assertEqual(sorted(p.name for p in d.iterdir()), sorted([gc.stamp_of(now - 29 * 86400) + "-dolphin.log",
++                                                                      "other.txt"]))
++
++    def proc(self, entries):
++        root = Path(tempfile.mkdtemp(prefix="b69_"))
++        for pid, (sid, argv0) in entries.items():
++            (root / str(pid)).mkdir()
++            (root / str(pid) / "stat").write_text(f"{pid} (x y) S 1 {sid} {sid} 0 -1 0\n")
++            (root / str(pid) / "cmdline").write_bytes(argv0.encode() + b"\0--appimage-mount\0")
++        return root
++
++    def test_the_helper_count_and_the_wait(self):
++        root = self.proc({501: (500, "/r/dolphin.AppImage"), 502: (500, "/usr/bin/other"), 601: (600, "/r/x.AppImage")})
++        self.assertEqual(gc.session_members(500, root), [501])
++        clock = [0.0]
++        kills = []
++
++        def sleep(d):
++            clock[0] += d
++            if clock[0] >= 2.0 and (root / "501").exists():
++                for f in (root / "501").iterdir():
++                    f.unlink()
++                (root / "501").rmdir()
++        got = gc.wait_helpers(500, proc_root=root, kill=lambda p, s: kills.append(p), sleep=sleep,
++                              clock=lambda: clock[0])
++        self.assertEqual((got, kills), ("gone 2.0s", []))
++        self.assertEqual(gc.wait_helpers(500, proc_root=root, kill=lambda p, s: kills.append(p)), "none")
++
++    def test_the_sigkill_bound(self):
++        root = self.proc({701: (700, "/r/dolphin.AppImage")})
++        clock = [0.0]
++        kills = []
++        got = gc.wait_helpers(700, proc_root=root, kill=lambda p, s: kills.append((p, s)),
++                              sleep=lambda d: clock.__setitem__(0, clock[0] + d), clock=lambda: clock[0])
++        self.assertEqual((got, kills), ("killed 1 after 10s", [(701, signal.SIGKILL)]))
++
++
++# --- the hooks: the flag absent / 0 / 1 (fresh interpreters) -----------------------------------------------------------
++
++PLUGIN_CODE = r"""
++import json, os, sys, importlib.util
++from pathlib import Path
++sys.path.insert(0, "companion")
++spec = importlib.util.spec_from_file_location("g", "companion/plugins/games.py")
++G = importlib.util.module_from_spec(spec); spec.loader.exec_module(G)
++from games import emulator_manager as em
++proj = Path(os.environ["B69_PROJ"])
++out = {"gc_imported": "gamecube_session" in sys.modules, "em_gc": em._gc is not None}
++p = object.__new__(G.GamesPlugin)                 # (no __init__: the services stay off; its SYSTEMS lines as written)
++if G._gc_session is not None:
++    p.SYSTEMS = {**G.GamesPlugin.SYSTEMS, G._gc_session.SYSTEM_ID: {"name": G._gc_session.SYSTEM_NAME,
++                                                                    "folder": None, "extensions": set()}}
++out["systems"] = sorted(p.SYSTEMS)
++p.PROJECT_ROOT = proj; p.GAMES_ROOT = proj / "games"
++p._lock = __import__("threading").RLock(); p._cached_at = 0.0; p._cached_games = []
++out["scan"] = sorted([g["system"], g["relative_path"]] for g in p._scan())
++m = em.EmulatorManager(proj, config_path=Path("companion/games/config/emulators.json").resolve())
++try:
++    out["catalog"] = list(m._controller_profile_catalog({"system": "gamecube"}))
++except Exception as exc:
++    out["catalog"] = type(exc).__name__
++if em._gc is None:                                # absent: today's launch refusal, nothing made
++    try:
++        m.launch({"id": "g", "system": "gamecube", "title": "t", "relative_path": "gamecube/one.rvz"})
++        out["launch"] = "launched"
++    except em.EmulatorError:
++        out["launch"] = "EmulatorError"
++out["data_gc"] = (proj / "data/games/gamecube").exists()
++print(json.dumps(out))
++"""
++
++
++def run_plugin(flag, proj):
++    env = {"PATH": "/usr/bin:/bin", "B69_PROJ": str(proj)}
++    if flag is not None:
++        env["PRIVYHUB_GAMECUBE"] = flag
++    r = subprocess.run([sys.executable, "-c", PLUGIN_CODE], cwd=ROOT, env=env, capture_output=True, text=True)
++    if r.returncode:
++        raise AssertionError(r.stderr[-2000:])
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++class Hooks(unittest.TestCase):
++    def setUp(self):
++        self.games = tree({"one.rvz": MIB, "two.iso": MIB, "region/x.bin": 100})
++        self.proj = tree({"games/ps1/p.chd": b"x", "runtime/emulators/dolphin/d.AppImage": "x"})
++        (self.proj / "runtime" / "h3_p1_paths.txt").write_text(f"GAMECUBE_DIR={self.games}\n")
++
++    def test_absent_is_today(self):
++        before = snapshot(self.games)
++        out = run_plugin(None, self.proj)
++        self.assertEqual((out["gc_imported"], out["em_gc"]), (False, False))
++        self.assertNotIn("gamecube", out["systems"])
++        self.assertEqual(out["scan"], [["ps1", "games/ps1/p.chd"]])
++        self.assertEqual(out["catalog"], "EmulatorError")                     # today's refusal: no profile
++        self.assertEqual(out["launch"], "EmulatorError")
++        self.assertFalse(out["data_gc"])
++        self.assertEqual(run_plugin("0", self.proj), out)
++        self.assertEqual(before, snapshot(self.games))
++
++    def test_with_the_flag_the_list_and_the_catalog(self):
++        before = snapshot(self.games)
++        out = run_plugin("1", self.proj)
++        self.assertTrue(out["gc_imported"] and out["em_gc"])
++        self.assertIn("gamecube", out["systems"])
++        self.assertEqual(out["scan"], [["gamecube", "gamecube/one.rvz"], ["gamecube", "gamecube/two.iso"],
++                                       ["ps1", "games/ps1/p.chd"]])
++        self.assertEqual(out["catalog"], ["gamecube", "", {}])
++        self.assertFalse(out["data_gc"])                                        # the list touches no hub file
++        self.assertEqual(before, snapshot(self.games))                          # the drive's folder never written
++
++
++# --- the rows: gc_mode on the start and every heartbeat, the gc_session row ----------------------------------------
++
++ROWS_CODE = r"""
++import json, os, sys, types, importlib.util, tempfile
++from pathlib import Path
++sys.path.insert(0, "companion")
++spec = importlib.util.spec_from_file_location("g", "companion/plugins/games.py")
++G = importlib.util.module_from_spec(spec); spec.loader.exec_module(G)
++from games import link_drop_recovery as ldr
++root = Path(tempfile.mkdtemp())
++rec = ldr.LinkDropRecovery(root, pause_game=lambda: None, resume_game=lambda: None, save_recovery_state=lambda: {},
++    restart_encoder=lambda: {}, full_start_encoder=lambda: {}, stream_active=lambda: True, end_session=lambda: None,
++    client_packet_age_ms=lambda: 10.0, recovery_save_detail=lambda: {})
++class Sess:
++    def note_pads(self): return "P1=evdev/0"
++class Emu:
++    active_game = {"id": "g", "system": "gamecube", "title": "t"}
++    _launch_kind = os.environ.get("B69_KIND") or None
++    _players_session = None
++    _gc = Sess()
++    def status(self): return {"active": True, "paused": True, "pid": 1}
++    def ps1_multitap(self, g): return {"enabled": False}
++p = object.__new__(G.GamesPlugin)
++p.PROJECT_ROOT = root; p._emulator = Emu(); p._recovery = rec
++p._native_stream = types.SimpleNamespace(start=lambda **kw: {"active": True}, _session_io=types.SimpleNamespace(controller=None))
++p._diagnostic_heartbeat_interval_ms = lambda: 2000
++p._adaptive_bitrate_session_ended = lambda: None
++r = p.handle_post_request("native-stream-start", "port=48100", "127.0.0.1")
++p.handle_post_request("native-stream-heartbeat", "sequence=1&interval_ms=2000&last_output_age_ms=16&rendered_frames=6&queued_frames=0&rx_packets=9&elapsed_ms=100", "127.0.0.1")
++rows = [json.loads(x) for x in rec.log_path().read_text().splitlines()] if rec.log_path().exists() else []
++hb = [json.loads(x) for x in (root / "logs/games/native_stream_heartbeat.log").read_text().splitlines()]
++print(json.dumps({"start_gc_mode": r.get("gc_mode"), "gc_rows": [x for x in rows if x["event"] == "gc_session"],
++                  "hb_gc_mode": hb[-1].get("gc_mode"), "hb_keys": sorted(hb[-1])}))
++"""
++
++
++def run_rows(flag, kind):
++    env = {"PATH": "/usr/bin:/bin"}
++    if flag:
++        env["PRIVYHUB_GAMECUBE"] = flag
++    if kind:
++        env["B69_KIND"] = kind
++    r = subprocess.run([sys.executable, "-c", ROWS_CODE], cwd=ROOT, env=env, capture_output=True, text=True)
++    if r.returncode:
++        raise AssertionError(r.stderr[-2000:])
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++class Rows(unittest.TestCase):
++    def test_a_gamecube_session_says_so_on_the_start_and_every_heartbeat(self):
++        out = run_rows("1", "dolphin")
++        self.assertTrue(out["start_gc_mode"])
++        self.assertEqual(len(out["gc_rows"]), 1)
++        row = out["gc_rows"][0]
++        self.assertEqual((row["gc_mode"], row["gc_states"], row["live"], row["off"], row["pads"]),
++                         (True, "hotkey", list(gc.LIVE_BEHAVIOURS), ["rewind", "relaunch"], "P1=evdev/0"))
++        self.assertTrue(out["hb_gc_mode"])
++
++    def test_a_retroarch_session_and_the_flag_absent_are_today(self):
++        for flag, kind in (("1", None), (None, None), (None, "dolphin")):
++            out = run_rows(flag, kind)
++            self.assertIsNone(out["start_gc_mode"])
++            self.assertEqual(out["gc_rows"], [])
++            self.assertNotIn("gc_mode", out["hb_keys"])
++
++
++# --- the keeper and diag_read ------------------------------------------------------------------------------------------
++
++class KeeperAndRead(unittest.TestCase):
++    def test_the_game_log_name_and_the_keeper_copies_a_new_dolphin_log(self):
++        import trip_log_keeper as tlk
++        self.assertTrue(tlk.GAME_LOG.match("20261109-031500-gamecube.log"))
++        self.assertTrue(tlk.DOLPHIN_LOG.match("20261109T081500Z-dolphin.log"))
++        repo = Path(tempfile.mkdtemp(prefix="b69_"))
++        logs = repo / "logs"
++        (logs / "games").mkdir(parents=True)
++        gl = repo / "data/games/gamecube/logs"
++        gl.mkdir(parents=True)
++        (gl / "20261109T070000Z-dolphin.log").write_text("old\n")
++        out = repo / "keep"
++        k = tlk.Keeper(out, cap=3600, start=0, logs_root=logs, overlay=lambda: {}, session=lambda: {},
++                       journal=lambda a, b: b"", peers=lambda: None, clock=lambda: 1_800_000_000.0)
++        k.begin()
++        (gl / "20261109T081500Z-dolphin.log").write_text("00:01:000 Core/Boot/Boot.cpp:1 N[BOOT]: Booting from disc\n")
++        k.copy()
++        raw = out / "raw"
++        self.assertTrue((raw / "gclogs__20261109T081500Z-dolphin.log").is_dir())
++        self.assertFalse((raw / "gclogs__20261109T070000Z-dolphin.log").exists())   # present at the start: seen
++
++    def test_diag_read_labels_and_counts_a_gamecube_session(self):
++        import diag_read as dr
++        name = "20261109T080000Z-dolphin.log"
++        data = ("00:05:000 DolphinQt/Translation.cpp:301 E[COMMON]: No suitable translation file found\n"
++                "00:06:000 Core/Boot/Boot.cpp:529 N[BOOT]: Booting from disc: x\n"
++                "00:07:000 InputCommon/ControllerInterface/ControllerInterface.cpp:1 N[CI]: Added device: "
++                "evdev/0/PrivyHub Virtual Gamepad P1\n"
++                "59:59:000 Core/x.cpp:1 W[CORE]: a warning before the hour turns\n"
++                "00:10:000 Core/x.cpp:1 E[CORE]: an error after it\n").encode()
++        ev = dr.dolphin_events(name, data)
++        kinds = [k for _, k in ev]
++        self.assertEqual(kinds, ["boot", "pad_added", "warning", "error"])           # Translation.cpp not counted
++        self.assertEqual(ev[-1][0], datetime(2026, 11, 9, 9, 0, 10))                 # carried into the next hour
++        self.assertEqual(ev[0][0], datetime(2026, 11, 9, 8, 0, 6))
++
++        class L:
++            pcsx2_logs = {}
++            dolphin_logs = {name: data}
++        a = object.__new__(dr.Analysis)
++        a.dolphin_launches = [datetime(2026, 11, 9, 8, 0, 0)]
++        a.dolphin = ev
++        s = {"start": datetime(2026, 11, 9, 8, 1, 0), "end": datetime(2026, 11, 9, 8, 59, 59, 500000)}
++        a.sessions = [s]
++        self.assertEqual(a.dolphin_counts(s), {"boot": 1, "pad_added": 1, "pad_removed": 0, "error": 0,
++                                               "warning": 1})
++        self.assertTrue(dr.is_game_log("20261109-030000-gamecube.log"))
++
++    def test_diag_check_names_a_gamecube_row(self):
++        import diag_check as dc
++        p = Path(tempfile.mkdtemp(prefix="b69_")) / "sessions.jsonl"
++        p.write_text(json.dumps({"system": "gamecube", "core": "dolphin", "end_utc": "2026-11-09T08:10:00Z",
++                                 "hitch_s_per_10min": 1.0, "hitch_s_bar_per_10min": 0.5, "hold_resume_s": 2}) + "\n")
++        self.assertTrue(dc.line_last_session(p).startswith("last session: gamecube (dolphin)"))
++
++
++# --- the metric ------------------------------------------------------------------------------------------------------
++
++class Metric(unittest.TestCase):
++    def frames(self):
++        out, t, i = [], 0.0, 0
++        for sec in range(30):                      # 12 s at 60, 18 s at 30 (each frame twice), one hitch second
++            rate = 60 if sec < 12 else 30
++            for k in range(60):
++                h = f"{i:08X}"
++                if rate == 30 and k % 2:
++                    h = out[-1][1]
++                elif sec == 20 and k >= 20:        # a 30-fps second with only 10 distinct frames
++                    h = out[-1][1]
++                else:
++                    i += 1
++                out.append((sec + k / 60.0, h, 100.0))
++        return out
++
++    def test_two_segments_a_transition_and_a_hitch(self):
++        import gc_frames
++        r = gc_frames.capture(self.frames())
++        segs = [(s["start_s"], s["end_s"], s["rate"]) for s in r["segments"]]
++        self.assertEqual(segs, [(0, 11, 60), (13, 29, 30)])
++        self.assertEqual(r["transition_or_short_seconds"], 2)
++        self.assertEqual(r["segments"][0]["hitch_seconds"], 0)
++        self.assertEqual(r["segments"][1]["hitch_seconds"], 1)
++        self.assertEqual(r["hitch_seconds_total"], 1)
++
++    def test_dolphins_render_times_and_vblank_beside(self):
++        import gc_frames
++        intervals = [1000 / 60] * 600 + [1000 / 30] * 300 + [250.0, 250.0] + [1000 / 30] * 300
++        r = gc_frames.render(intervals)
++        # the half-second gap inside the 30-fps part is a hitch second of that segment, not a new segment
++        self.assertEqual([s["rate"] for s in r["segments"]], [60, 30])
++        self.assertEqual([s["hitch_seconds"] for s in r["segments"]], [0, 1])
++        self.assertEqual(r["transition_or_short_seconds"], 2)
++        v = gc_frames.vblank([1000 / 59.94] * 600 + [40.0])
++        self.assertEqual((v["n"], v["gt_34ms"], v["gt_100ms"]), (601, 1, 0))
++        self.assertAlmostEqual(v["per_s"], 59.9, places=0)
++
++
++if __name__ == "__main__":
++    unittest.main()
+--- /dev/null
++++ b/tests/gamecube_session/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B69 (test hygiene, B53's helper): every temporary directory a tests/gamecube_session run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+--- a/tools/diag_check.py
++++ b/tools/diag_check.py
+@@ -184,8 +184,9 @@
+     except ValueError:
+         return None
+     # B66: an N64 row too; both with the bar's number and the hold-resume seconds (other systems: no line, today)
++    # B69: a GameCube row too (`system: gamecube`, written only for a Dolphin session)
+     system = r.get("system") or ("n64" if r.get("core") == "mupen64plus-next" else None)
+-    if system not in ("ps2", "n64"):
++    if system not in ("ps2", "n64", "gamecube"):
+         return None
+     bar = ""
+     if "hitch_s_bar_per_10min" in r:
+--- a/tools/diag_keeper.py
++++ b/tools/diag_keeper.py
+@@ -159,6 +159,9 @@
+             # B53: a PCSX2 per-launch log tail from the last run
+             if t is None and k.startswith("ps2logs/") and tlk.PCSX2_LOG.match(k[len("ps2logs/"):]):
+                 t = self.tails[k] = tlk.Tail(self.ps2logs / k[len("ps2logs/"):], None)
++            # B69: a Dolphin per-launch log tail from the last run
++            if t is None and k.startswith("gclogs/") and tlk.DOLPHIN_LOG.match(k[len("gclogs/"):]):
++                t = self.tails[k] = tlk.Tail(self.gclogs / k[len("gclogs/"):], None)
+             if t is not None and v.get("ino") is not None and t.ino == v["ino"] and v.get("off", 0) <= self._size(t):
+                 t.off = v["off"]                               # the same file: resume where the last run stopped
+         for k, v in (st.get("seen") or {}).items():
+--- a/tools/diag_read.py
++++ b/tools/diag_read.py
+@@ -45,10 +45,13 @@
+ # B50: a PS2 session's game log (B49: no id or title in its name); its sessions read system `ps2`, core `pcsx2`
+ PS2_LOG = re.compile(r"^(\d{8})-(\d{6})-ps2\.log$")
+ PS2_CORE = "pcsx2"
++# B69: a GameCube session's game log (no id or title in its name); its sessions read system `gamecube`, core `dolphin`
++GC_LOG = re.compile(r"^(\d{8})-(\d{6})-gamecube\.log$")
++GC_CORE = "dolphin"
+ 
+ 
+ def is_game_log(name: str) -> bool:
+-    return bool(GAME_LOG.match(name) or PS2_LOG.match(name))
++    return bool(GAME_LOG.match(name) or PS2_LOG.match(name) or GC_LOG.match(name))
+ 
+ 
+ # B53: PCSX2's own log per launch (`<UTC launch>-pcsx2.log`, live under data/games/ps2/logs/, the keeper's raw/ps2logs__*)
+@@ -82,6 +85,54 @@
+                 out.append((t0 + timedelta(seconds=float(lm.group(1))), kind))
+     return out
+ 
++# B69: Dolphin's own log per launch (`<UTC launch>-dolphin.log`, live under data/games/gamecube/logs/, the keeper's
++# raw/gclogs__*); its lines `MM:SS:mmm file:line L[TYPE]: text` (minutes and seconds only: the hour from the launch)
++DOLPHIN_LOG = re.compile(r"^(\d{8}T\d{6}Z)-dolphin\.log$")
++DOLPHIN_LINE = re.compile(r"^(\d{2}):(\d{2}):(\d{3}) (\S+) ([NEWID])\[([^\]]+)\]: (.*)$")
++DOLPHIN_NOISE = "Translation.cpp"          # its E / W lines on every start (no translation file in the AppImage)
++DOLPHIN_COUNTS = ("boot", "pad_added", "pad_removed", "error", "warning")
++
++
++def dolphin_kinds(src: str, level: str, text: str) -> list[str]:
++    out = []
++    if text.startswith("Booting from "):
++        out.append("boot")
++    if re.match(r"Added device: evdev/\d+/PrivyHub Virtual Gamepad P[1-4]\b", text):
++        out.append("pad_added")
++    if re.match(r"Removed device: evdev/\d+/PrivyHub Virtual Gamepad P[1-4]\b", text):
++        out.append("pad_removed")
++    if DOLPHIN_NOISE not in src:
++        if level == "E":
++            out.append("error")
++        elif level == "W":
++            out.append("warning")
++    return out
++
++
++def dolphin_events(name: str, data: bytes) -> list[tuple[datetime, str]]:
++    """(UTC, kind) for each counted line of one per-launch Dolphin log: the launch's hour + each line's MM:SS, carried
++    forward an hour whenever a line reads earlier than the one before (whole-hour time zones)."""
++    m = DOLPHIN_LOG.match(name)
++    if not m:
++        return []
++    t0 = datetime.strptime(m.group(1), "%Y%m%dT%H%M%SZ")
++    base = t0.replace(minute=0, second=0)
++    out: list[tuple[datetime, str]] = []
++    last: datetime | None = None
++    for line in data.decode("utf-8", "replace").splitlines():
++        lm = DOLPHIN_LINE.match(line)
++        if not lm:
++            continue
++        t = base + timedelta(minutes=int(lm.group(1)), seconds=int(lm.group(2)), milliseconds=int(lm.group(3)))
++        floor = last if last is not None else t0 - timedelta(seconds=5)
++        while t < floor:
++            t += timedelta(hours=1)
++        last = t
++        for kind in dolphin_kinds(lm.group(4), lm.group(5), lm.group(7)):
++            out.append((t, kind))
++    return out
++
++
+ # the trip's known titles (game id prefix -> class + tag); others read "<SYSTEM> <4-hex>"
+ TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 first-person RPG",
+         "3699": "PS1 football (Blitz)", "7bf5": "PS1 brawler", "6d53": "PS1 kart racer", "33df": "PS1 golf",
+@@ -184,6 +235,7 @@
+         self.reports: list[dict[str, Any]] = []
+         self.game_logs: list[str] = []          # game log file names (they carry the launch time and the title)
+         self.pcsx2_logs: dict[str, bytes] = defaultdict(bytes)   # B53: per-launch PCSX2 logs, by file name
++        self.dolphin_logs: dict[str, bytes] = defaultdict(bytes)  # B69: per-launch Dolphin logs, by file name
+         self.overlay: list[dict[str, Any]] = []
+         self.sources: list[str] = []
+ 
+@@ -205,6 +257,11 @@
+                     for f in files:
+                         self.pcsx2_logs[sub[len("ps2logs__"):]] += (p / f).read_bytes()
+                     continue
++                # B69: the keeper's copies of Dolphin's per-launch logs
++                if sub.startswith("gclogs__") and DOLPHIN_LOG.match(sub[len("gclogs__"):]):
++                    for f in files:
++                        self.dolphin_logs[sub[len("gclogs__"):]] += (p / f).read_bytes()
++                    continue
+                 if base == "decoder_sessions":
+                     for f in files:
+                         self._report((p / f).read_bytes())
+@@ -253,6 +310,14 @@
+                     self.pcsx2_logs[f] = (p2 / f).read_bytes()
+                 except OSError:
+                     continue
++        # B69: Dolphin's per-launch logs beside the repo's logs (data/games/gamecube/logs/)
++        gl = logs_root.parent / "data" / "games" / "gamecube" / "logs"
++        for f in sorted(os.listdir(gl)) if gl.is_dir() else []:
++            if DOLPHIN_LOG.match(f):
++                try:
++                    self.dolphin_logs[f] = (gl / f).read_bytes()
++                except OSError:
++                    continue
+         d = games / "decoder_sessions"
+         for f in sorted(os.listdir(d)) if d.is_dir() else []:
+             try:
+@@ -316,6 +381,11 @@
+         for f in sorted(logs.game_logs):
+             m = GAME_LOG.match(f)
+             if m is None:                                   # B50: a PS2 launch
++                m3 = GC_LOG.match(f)                        # B69: a GameCube launch
++                if m3 is not None:
++                    t = local_to_utc(datetime.strptime(m3.group(1) + m3.group(2), "%Y%m%d%H%M%S"), tz)
++                    self.launches.append((t, "GameCube", GC_CORE))
++                    continue
+                 m2 = PS2_LOG.match(f)
+                 if m2 is None:
+                     continue
+@@ -330,6 +400,10 @@
+         self.pcsx2_launches = sorted(datetime.strptime(PCSX2_LOG.match(n).group(1), "%Y%m%dT%H%M%SZ")
+                                      for n in logs.pcsx2_logs)
+         self.pcsx2 = sorted(ev for n, data in logs.pcsx2_logs.items() for ev in pcsx2_events(n, data))
++        # B69: Dolphin's per-launch logs: the launch times and every counted line (UTC)
++        dl = getattr(logs, "dolphin_logs", {})
++        self.dolphin_launches = sorted(datetime.strptime(DOLPHIN_LOG.match(n).group(1), "%Y%m%dT%H%M%SZ") for n in dl)
++        self.dolphin = sorted(ev for n, data in dl.items() for ev in dolphin_events(n, data))
+         self._sessions()
+         self._seconds()
+ 
+@@ -359,10 +433,13 @@
+         cur = None
+         last_cfg = None
+         ps2_at = None                                       # B50: the newest `ps2_session` row (the stream's start)
++        gc_at = None                                        # B69: the newest `gc_session` row
+         for r in self.rec:
+             t, ev = ts(r["at_utc"]), r.get("event")
+             if ev == "ps2_session":
+                 ps2_at = t
++            if ev == "gc_session":
++                gc_at = t
+             if ev == "remote_config":
+                 last_cfg = r
+             elif ev == "session_started":
+@@ -371,6 +448,10 @@
+                 if ps2_at is not None and timedelta(0) <= t - ps2_at <= timedelta(seconds=120):
+                     cur["ps2"] = True
+                 ps2_at = None
++                # B69: the same for a GameCube stream start
++                if gc_at is not None and timedelta(0) <= t - gc_at <= timedelta(seconds=120):
++                    cur["gc"] = True
++                gc_at = None
+                 self.sessions.append(cur)
+             elif cur is not None:
+                 cur["events"].append(r)
+@@ -391,6 +472,8 @@
+             s["tag"], s["core"] = self.title_at(s["start"])
+             if s.get("ps2"):                                # B50: the session's own row wins over the launch order
+                 s["tag"], s["core"] = "PS2", PS2_CORE
++            if s.get("gc"):                                 # B69: so does a GameCube session's
++                s["tag"], s["core"] = "GameCube", GC_CORE
+         self.restarts = [r for r in self.rec if r.get("event") == "restart_fast"]
+         self.transitions = [r for r in self.lad if r.get("event") == "transition"]
+         # B32-host writes `in_place` on the step's `transition_done` row (adaptive_bitrate_live), not on `transition`:
+@@ -585,6 +668,22 @@
+                 out[kind] += 1
+         return out
+ 
++    def dolphin_counts(self, s: dict[str, Any]) -> dict[str, int] | None:
++        """B69: the counted Dolphin lines from the previous session's end (or this launch) to this session's end."""
++        launches = [t for t in getattr(self, "dolphin_launches", []) if t <= s["start"]
++                    and s["start"] - t <= timedelta(hours=6)]
++        if not launches:
++            return None
++        launch = launches[-1]
++        ends = [x["end"] for x in self.sessions if x["end"] is not None and launch <= x["end"] < s["start"]]
++        lo = max(ends) if ends else launch
++        hi = (s["end"] or s["start"]) + timedelta(seconds=5)
++        out = {k: 0 for k in DOLPHIN_COUNTS}
++        for t, kind in self.dolphin:
++            if lo <= t < hi:
++                out[kind] += 1
++        return out
++
+     @staticmethod
+     def ps1_reference(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+         """B50: the PS1 sessions a comparison may use as its reference (a PS2 session never)."""
+@@ -631,6 +730,9 @@
+             **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
+             # B53: PCSX2's own log lines for this session, when its launch's log exists (no key otherwise)
+             **({"pcsx2_log": c} if s["core"] == PS2_CORE and (c := self.pcsx2_counts(s)) is not None else {}),
++            # B69: a GameCube session says its system, and Dolphin's own log lines when its launch's log exists
++            **({"system": "gamecube"} if s["core"] == GC_CORE else {}),
++            **({"dolphin_log": c} if s["core"] == GC_CORE and (c := self.dolphin_counts(s)) is not None else {}),
+             "silences": m["silences"], "silences_user": m["silences_user"],
+             "silences_per_10min": round(m["silences"] / per10, 1) if per10 else None,
+             "max_silence_ms": round(m["max_silence_ms"]), "underruns": m["underruns"], "starvation": m["starvation"],
+@@ -792,6 +894,14 @@
+         L += ["", "## PCSX2 logs (B53)", ""]
+         L += md_table(["start", "end"] + list(PCSX2_COUNTS), [[hms(s["start"]), hms(s["end"] or s["start"])]
+                                                             + [r["pcsx2_log"][k] for k in PCSX2_COUNTS] for s, r in p2])
++    # B69: Dolphin's own log per GameCube session (only when one exists)
++    gq = [(s, an.session_row(s)) for s in an.sessions if s["core"] == GC_CORE]
++    gq = [(s, r) for s, r in gq if "dolphin_log" in r]
++    if gq:
++        L += ["", "## Dolphin logs (B69)", ""]
++        L += md_table(["start", "end"] + list(DOLPHIN_COUNTS), [[hms(s["start"]), hms(s["end"] or s["start"])]
++                                                              + [r["dolphin_log"][k] for k in DOLPHIN_COUNTS]
++                                                              for s, r in gq])
+     L += ["", "## VOD (B35)", ""]
+     if an.vod_client:
+         L += md_table(["UTC", "event", "detail"], [[hms(Analysis._t(r)), r.get("event"),
+--- /dev/null
++++ b/tools/gc_frames.py
+@@ -0,0 +1,194 @@
++#!/usr/bin/env python3
++"""B69: the GameCube frame metric per segment -- a title can switch between 60 and 30 (H2-P1's T1: a 60-fps title
++screen, a 30-fps attract demo), so one rate over a whole capture misreads both parts.
++
++- **a capture** (ffmpeg `showinfo`, YUV first, as `n64_frames`): each second's distinct frames snapped to 30 / 60;
++  runs of one rate >= `--min-segment` seconds (default 5) are the segments, the one second at each side of a change
++  and the shorter runs dropped as transitions; **each segment is read by `n64_frames.analyze(..., internal_fps=rate)`**
++  (its hitch bar: < 5/6 of the rate; static / black seconds excluded);
++- **`--render render_times.txt`** (Dolphin's `LogRenderTimeToFile`: one interval in ms per presented frame): the same
++  segments and bar on Dolphin's own presented frames per second, no capture needed;
++- **`--vblank vblank_times.txt`** beside: Dolphin's emulated VIs per second, p50 / p95 / p99 and the intervals over
++  34 / 100 ms (`--window START:END` in Dolphin's own seconds since its start, else the whole file).
++
++    python3 tools/gc_frames.py [showinfo.txt] [--render render_times.txt] [--vblank vblank_times.txt] [--json out]
++
++Prints numbers only (no path, no title). Design: docs/memory/evidence/b69_2026-11-09/design_written_before_code.md.
++"""
++
++from __future__ import annotations
++
++import argparse
++import json
++import statistics
++import sys
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import n64_frames as _n64  # noqa: E402  (the per-segment reading)
++import ps2_p2_frames as _p2  # noqa: E402  (the showinfo parser, the static / black rule)
++
++RATES = (30, 60)
++MIN_SEGMENT_S = 5
++HITCH_SHARE = _n64.HITCH_SHARE
++
++
++def snap(n: float) -> int:
++    return min(RATES, key=lambda r: (abs(r - n), -r))
++
++
++def segments(rates: dict[int, int | None], min_len: int = MIN_SEGMENT_S) -> tuple[list[tuple[int, int, int]], int]:
++    """(start, end exclusive, rate) runs of one rate in consecutive seconds, one second trimmed at each side that
++    borders another rate; runs shorter than `min_len` dropped. Returns (segments, seconds dropped)."""
++    keys = sorted(rates)
++    runs: list[list[int]] = []                      # [start, end exclusive, rate]
++    for k in keys:
++        r = rates[k]
++        if r is None:
++            continue
++        if runs and runs[-1][1] == k and runs[-1][2] == r:
++            runs[-1][1] = k + 1
++        else:
++            runs.append([k, k + 1, r])
++    out = []
++    used = 0
++    for i, (a, b, r) in enumerate(runs):
++        if i > 0 and runs[i - 1][1] == a:          # a change right before: its first second is a transition
++            a += 1
++        if i + 1 < len(runs) and runs[i + 1][0] == b:
++            b -= 1
++        if b - a >= min_len:
++            out.append((a, b, r))
++            used += b - a
++    total = sum(1 for k in keys if rates[k] is not None)
++    return out, total - used
++
++
++def capture(frames: list[tuple[float, str, float]], min_len: int = MIN_SEGMENT_S) -> dict:
++    if not frames:
++        return {"frames": 0, "error": "no frames"}
++    t0 = frames[0][0]
++    secs: dict[int, dict] = {}
++    for i, (t, h, y) in enumerate(frames):
++        s = secs.setdefault(int(t - t0), {"frames": 0, "distinct": 0, "black": 0})
++        s["frames"] += 1
++        if i == 0 or h != frames[i - 1][1]:
++            s["distinct"] += 1
++        if y <= _p2.BLACK_Y:
++            s["black"] += 1
++    last = max(secs)
++    rates: dict[int, int | None] = {}
++    for k, v in secs.items():
++        if k >= last:
++            continue                                # the partial last second
++        static = v["black"] >= _p2.BLACK_SHARE * v["frames"] or v["distinct"] <= _p2.STATIC_UNIQUE
++        rates[k] = None if static else snap(v["distinct"])
++    segs, dropped = segments(rates, min_len)
++    out = []
++    for a, b, r in segs:
++        # the frames of seconds a..b inclusive: n64_frames drops the last (partial) second, so a..b-1 are read
++        sub = [f for f in frames if a <= int(f[0] - t0) <= b]
++        res = _n64.analyze(sub, internal_fps=r)
++        out.append({"start_s": a, "end_s": b, "rate": r, **{k: res.get(k) for k in (
++            "kept_seconds", "median_distinct_fps", "min_distinct_fps", "hitch_bar_lt", "hitch_seconds",
++            "hitch_per_10min", "excluded_static_or_black_seconds")}})
++    return {"frames": len(frames), "seconds": len(rates), "segments": out, "transition_or_short_seconds": dropped,
++            **totals(out)}
++
++
++def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S) -> dict:
++    """Dolphin's presented frames per second (cumulative intervals), segmented and barred as a capture."""
++    if not intervals_ms:
++        return {"presents": 0, "error": "no render times"}
++    counts: dict[int, int] = {}
++    t = 0.0
++    for v in intervals_ms:
++        t += v
++        counts[int(t // 1000)] = counts.get(int(t // 1000), 0) + 1
++    last = max(counts)
++    rates: dict[int, int | None] = {}
++    for k in range(0, last):                        # the partial last second dropped; an empty second is static
++        n = counts.get(k, 0)
++        rates[k] = None if n <= _p2.STATIC_UNIQUE else snap(n)
++    segs, dropped = segments(rates, min_len)
++    out = []
++    for a, b, r in segs:
++        vals = [counts.get(k, 0) for k in range(a, b)]
++        bar = r * HITCH_SHARE
++        hitches = [k for k in range(a, b) if counts.get(k, 0) < bar]
++        minutes = len(vals) / 60.0
++        out.append({"start_s": a, "end_s": b, "rate": r, "kept_seconds": len(vals),
++                    "median_distinct_fps": statistics.median(vals), "min_distinct_fps": min(vals),
++                    "hitch_bar_lt": round(bar, 2), "hitch_seconds": len(hitches),
++                    "hitch_per_10min": round(len(hitches) / minutes * 10, 2) if minutes else None})
++    return {"presents": len(intervals_ms), "seconds": len(rates), "segments": out,
++            "transition_or_short_seconds": dropped, **totals(out)}
++
++
++def totals(segs: list[dict]) -> dict:
++    kept = sum(int(s.get("kept_seconds") or 0) for s in segs)
++    hitch = sum(int(s.get("hitch_seconds") or 0) for s in segs)
++    return {"kept_seconds_total": kept, "hitch_seconds_total": hitch,
++            "hitch_per_10min_total": round(hitch / (kept / 60.0) * 10, 2) if kept else None}
++
++
++def q(vals: list[float], p: float) -> float:
++    s = sorted(vals)
++    return round(s[min(len(s) - 1, int(p * len(s)))], 2)
++
++
++def vblank(intervals_ms: list[float], window: tuple[float, float] | None = None) -> dict:
++    """Dolphin's VI intervals: per second, p50 / p95 / p99, over 34 / 100 ms (in a window of its own seconds)."""
++    t = 0.0
++    vals = []
++    for v in intervals_ms:
++        t += v
++        if window is None or window[0] * 1000 <= t <= window[1] * 1000:
++            vals.append(v)
++    if not vals:
++        return {"n": 0}
++    span = sum(vals) / 1000.0
++    return {"n": len(vals), "span_s": round(span, 1), "per_s": round(len(vals) / span, 2) if span else None,
++            "p50_ms": q(vals, .5), "p95_ms": q(vals, .95), "p99_ms": q(vals, .99), "max_ms": round(max(vals), 1),
++            "gt_34ms": sum(v > 34 for v in vals), "gt_100ms": sum(v > 100 for v in vals)}
++
++
++def numbers(path: Path) -> list[float]:
++    out = []
++    for tok in path.read_text(errors="replace").split():
++        try:
++            out.append(float(tok))
++        except ValueError:
++            pass
++    return out
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
++    ap.add_argument("showinfo", type=Path, nargs="?")
++    ap.add_argument("--render", type=Path, default=None)
++    ap.add_argument("--vblank", type=Path, default=None)
++    ap.add_argument("--window", default=None, help="START:END in Dolphin's seconds (the vblank summary)")
++    ap.add_argument("--min-segment", type=int, default=MIN_SEGMENT_S)
++    ap.add_argument("--json", type=Path, default=None)
++    a = ap.parse_args(argv)
++    if a.showinfo is None and a.render is None:
++        ap.error("a showinfo capture or --render is needed")
++    result: dict = {}
++    if a.showinfo is not None:
++        result["capture"] = capture(_p2.parse(a.showinfo.read_text(errors="replace")), a.min_segment)
++    if a.render is not None:
++        result["dolphin_render"] = render(numbers(a.render), a.min_segment)
++    if a.vblank is not None:
++        w = tuple(float(x) for x in a.window.split(":")) if a.window else None
++        result["dolphin_vblank"] = vblank(numbers(a.vblank), w)
++    text = json.dumps(result, indent=1)
++    if a.json:
++        a.json.write_text(text + "\n")
++    print(text)
++    bad = any(isinstance(v, dict) and "error" in v for v in result.values())
++    return 2 if bad else 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+--- a/tools/trip_log_keeper.py
++++ b/tools/trip_log_keeper.py
+@@ -43,9 +43,12 @@
+ TOP_TAILS = ["wan_sessions.jsonl", "session_audit.jsonl", "impairment.jsonl"]
+ NEWDIRS = ["decoder_sessions", "audio_timing"]
+ # B50: a PS2 session's game log (`<date>-<time>-ps2.log`, no id or title by B49's design) is a game log too
+-GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2)\.log$")
++# B69: a GameCube session's game log (`<date>-<time>-gamecube.log`, no id or title) is one too
++GAME_LOG = re.compile(r"^\d{8}-\d{6}-(?:game_[a-z0-9]+_[0-9a-f]+|ps2|gamecube)\.log$")
+ # B53: PCSX2's own per-launch logs (data/games/ps2/logs/<UTC launch>-pcsx2.log), copied like the game logs
+ PCSX2_LOG = re.compile(r"^\d{8}T\d{6}Z-pcsx2\.log$")
++# B69: Dolphin's own per-launch logs (data/games/gamecube/logs/<UTC launch>-dolphin.log), copied the same way
++DOLPHIN_LOG = re.compile(r"^\d{8}T\d{6}Z-dolphin\.log$")
+ UNIT = "privyhub-companion"
+ STATUS_URL = "http://127.0.0.1:8765/plugins/games/status"
+ QUIET_S = 10.0
+@@ -244,6 +247,7 @@
+         self.games = self.logs / "games"
+         self.arch = self.games / "stream_log_archive"
+         self.ps2logs = self.logs.parent / "data" / "games" / "ps2" / "logs"      # B53
++        self.gclogs = self.logs.parent / "data" / "games" / "gamecube" / "logs"  # B69
+         self.raw, self.samples = self.out / "raw", self.out / "samples"
+         self.redactor = redactor if redactor is not None else Redactor()
+         self._overlay = overlay if overlay is not None else overlay_state
+@@ -315,6 +319,8 @@
+         self.seen["game_logs"] = {f for f in (os.listdir(self.games) if self.games.is_dir() else []) if GAME_LOG.match(f)}
+         self.seen["ps2_logs"] = {f for f in (os.listdir(self.ps2logs) if self.ps2logs.is_dir() else [])
+                                  if PCSX2_LOG.match(f)}
++        self.seen["gc_logs"] = {f for f in (os.listdir(self.gclogs) if self.gclogs.is_dir() else [])
++                                if DOLPHIN_LOG.match(f)}                                  # B69
+         self.jsince = int(self.clock())
+ 
+     def copy(self, final: bool = False) -> dict[str, Any]:
+@@ -334,6 +340,13 @@
+                 if PCSX2_LOG.match(f) and f not in seen:
+                     seen.add(f)
+                     self.tails[f"ps2logs/{f}"] = Tail(self.ps2logs / f, None, from_start=True)
++        # B69: new Dolphin per-launch logs too (kept as raw/gclogs__<name>/)
++        if self.gclogs.is_dir():
++            seen = self.seen.setdefault("gc_logs", set())
++            for f in sorted(os.listdir(self.gclogs)):
++                if DOLPHIN_LOG.match(f) and f not in seen:
++                    seen.add(f)
++                    self.tails[f"gclogs/{f}"] = Tail(self.gclogs / f, None, from_start=True)
+         for key, t in self.tails.items():
+             try:
+                 data, rotated = t.step()

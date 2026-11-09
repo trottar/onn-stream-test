@@ -2565,6 +2565,14 @@ Question:
 > - No PID, audio or keep-awake workaround is needed.
 > - **Next: B69**, the `dolphin` launch kind (the command, the hotkeys, `GCPadNew.ini` for the four virtual pads). Then
 >   the streamed play at the TV (P0d, P7) after HOME-9.
+>
+> **B69 BUILT (2026-11-09, B; `docs/memory/evidence/B69_GAMECUBE_LAUNCH_KIND_2026-11-09.md`):** the `dolphin` launch kind
+> behind `PRIVYHUB_GAMECUBE=1`, applied to the tree uncommitted, not adopted.
+> - The config written whole per launch; `GCPadNew.ini` for the four virtual pads (✕ / □ / ○ / △ = A / B / X / Y,
+>   R1 = Z, L2 / R2 = L / R, the sticks, the D-pad); the F10 pause confirmed by the `CPU thread`'s clock, else SIGSTOP.
+> - SAVE / LOAD by Shift+F<n> / F<n> (the file check, B52's picture check); the hold, the stall and the give-up through
+>   slots 9 / 8; four native ports; the `gamecube` list in place; Dolphin's log per launch; `tools/gc_frames.py`.
+> - **Next: HOME-9+GC** (one sitting): queue X's cells, the `.m3u`, then C34-C36 on the TV; G-A16 on the user's word.
 
 Evaluate bounded representative titles:
 

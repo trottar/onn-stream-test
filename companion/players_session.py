@@ -101,7 +101,8 @@ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, An
         session = getattr(emulator, "_players_session", None)
         # B54: a hold-to-join launch (`join`) and a mid-session relaunch (`relaunch`) are plans too
         # B59: an N64 launch's four ports are a plan too (`n64`; reached only with PRIVYHUB_N64=1)
-        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch", "n64"):
+        # B69: so are a GameCube launch's (`gamecube`; reached only with PRIVYHUB_GAMECUBE=1)
+        if isinstance(session, dict) and session.get("source") in ("launch", "join", "relaunch", "n64", "gamecube"):
             return {"ports_set": {k: session[k] for k in ("players_chosen", "ports", "multitap", "multitap_available",
                                                           "source")} | {"players": int(session["ports"])}
                     | {k: session[k] for k in ("capable", "capped_from") if k in session}}   # B63
