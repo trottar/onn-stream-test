@@ -88,6 +88,15 @@ TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1 
         "9f2b": "PS1 hockey A", "e2cd": "PS1 hockey B"}
 CORES = {"snes": "snes9x", "ps1": "beetle-psx-hw", "n64": "mupen64plus-next"}   # B59: an N64 launch's log
 
+# B66: a hold's resume (the stall owner's and the input hold's), its second and the next two kept apart from the bar
+HOLD_RESUME_VIA = ("stall_end", "stall_quiet", "client_ready_stall", "input_release")
+HOLD_RESUME_S = 3
+
+
+def is_hold_resume(via: Any) -> bool:
+    v = str(via or "")
+    return v in HOLD_RESUME_VIA or v.startswith("hold")
+
 # the log names (as in logs/games/ or logs/) the reader uses
 LOGS = {"rec": "native_stream_recovery.log", "lad": "adaptive_bitrate_shadow.jsonl", "hb": "native_stream_heartbeat.log",
         "gaps": "native_stream_ctrl_gaps.log", "fsz": "native_frame_sizes.jsonl", "host": "host_resource_samples.jsonl",
@@ -506,6 +515,12 @@ class Analysis:
                 self.report_disc.append((t, x.get("type"), s))
                 row[sec(t)]["disc"] = x.get("type")
         self.hitch, self.row = hitch, row
+        # B66: a hold's resume second and the two after it (the user's own pause, not a stream hitch)
+        self.hold_resume: set[str] = set()
+        for r in self.rec:
+            if r.get("event") == "resumed" and is_hold_resume(r.get("via")):
+                t0 = ts(r["at_utc"]).replace(microsecond=0)
+                self.hold_resume.update(sec(t0 + timedelta(seconds=i)) for i in range(HOLD_RESUME_S))
 
     # -- counts for [a, b)
     def summarize(self, a: datetime, b: datetime) -> dict[str, Any]:
@@ -514,6 +529,9 @@ class Analysis:
         hs = [k for k in hitch if a <= ts(k) < b]
         out["hitch_s"] = len(hs)
         out["hitch_by"] = {c: sum(1 for k in hs if c in hitch[k]) for c in "RCGL"}
+        # B66: the hold-resume seconds apart; the bar's number is the rest (hitch_s itself stays today's)
+        out["hold_resume_s"] = sum(1 for k in hs if k in getattr(self, "hold_resume", ()))
+        out["hitch_s_bar"] = out["hitch_s"] - out["hold_resume_s"]
         gs = [g for g in self.gaps if a <= ts(g["start_utc"]) < b]
         out["silences"] = sum(1 for g in gs if not any(ts(g["start_utc"]) - timedelta(seconds=1) <= bt <= ts(g.get("end_utc") or g["start_utc"])
                                                        for bt in self.bye_times))
@@ -606,6 +624,9 @@ class Analysis:
             "end_kind": s["end_kind"], "resets": m["resets"],
             "hitch_s": m["hitch_s"], "hitch_by": m["hitch_by"],
             "hitch_s_per_10min": round(m["hitch_s"] / per10, 1) if per10 else None,
+            # B66: the hold-resume seconds and the bar's number (the pre-registered bars compare the bar's)
+            "hold_resume_s": m["hold_resume_s"], "hitch_s_bar": m["hitch_s_bar"],
+            "hitch_s_bar_per_10min": round(m["hitch_s_bar"] / per10, 1) if per10 else None,
             # B50: a PS2 session says its system (other sessions' rows as before)
             **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
             # B53: PCSX2's own log lines for this session, when its launch's log exists (no key otherwise)
@@ -673,7 +694,8 @@ def seconds_view(an: Analysis, center: datetime, label: str) -> list[str]:
             f = an.fsz.get(k, {})
             if not any(x in v for x in ("rec", "ladder_ev", "ctrl_gap_ms", "fps", "disc", "report_gap_ms", "rung")):
                 continue
-            body.append([hms(kt), "".join(sorted(an.hitch.get(k, ()))), v.get("fps", ""), v.get("lost", ""),
+            body.append([hms(kt), "".join(sorted(an.hitch.get(k, ()))) + ("h" if k in an.hold_resume and an.hitch.get(k)
+                                                                             else ""), v.get("fps", ""), v.get("lost", ""),
                          v.get("out_age", ""), round(v["ctrl_gap_ms"]) if "ctrl_gap_ms" in v else "",
                          "user" if v.get("ctrl_gap_user") else "", v.get("rung", ""), v.get("ogap", ""),
                          v.get("report_gap_ms", ""), v.get("disc", ""), f.get("frames", ""),
@@ -700,11 +722,13 @@ def render(an: Analysis, label: str, around: list[datetime], around_saves: bool)
                      r["lost_post_fec"], f"{r['rendered_fps_med']} ({r['rendered_fps_min']})", r["resyncs"],
                      ", ".join(r["stalls"]) or "—", ", ".join(r["pauses"]) or "—", r["holds"], ", ".join(r["rewinds"]) or "—",
                      f"{r['hitch_s']} ({'/'.join(str(r['hitch_by'][c]) for c in 'RCGL')})", r["hitch_s_per_10min"],
+                     r["hold_resume_s"], r["hitch_s_bar_per_10min"],
                      f"{r['silences']} ({r['silences_user']})", r["silences_per_10min"], r["underruns"], r["starvation"],
                      r["rssi"], f"{r['rtt_p50_ms']}/{r['rtt_p95_ms']}" if r["rtt_p50_ms"] is not None else ""])
     L += md_table(["#", "start", "end", "length", "title", "core", "path", "players", "slot map", "rungs (transitions)",
                    "end", "restarts (trigger)", "loss post-FEC", "fps med (min)", "resyncs", "stalls", "pauses", "holds",
-                   "rewinds (method, why)", "hitch s (R/C/G/L)", "hitch s / 10 min", "silences (user)",
+                   "rewinds (method, why)", "hitch s (R/C/G/L)", "hitch s / 10 min", "hold-resume s",
+                   "bar hitch s / 10 min", "silences (user)",
                    "silences / 10 min", "underruns", "starvation", "RSSI", "RTT p50/p95"], body) if body else ["(no sessions)"]
     L += ["", "## Per 10 min", ""]
     body = []
@@ -716,12 +740,14 @@ def render(an: Analysis, label: str, around: list[datetime], around_saves: bool)
         if m["stream_s"] or started or m["restarts"]:
             body.append([t.strftime("%m-%d %H:%M"), f"~{m['stream_s']}", started, len(m["restarts"]), m["byes"],
                          len(m["transitions"]), len(m["stalls"]), len(m["pauses"]), len(m["rewinds"]),
-                         f"{m['hitch_s']} ({'/'.join(str(m['hitch_by'][c]) for c in 'RCGL')})", m["silences"],
+                         f"{m['hitch_s']} ({'/'.join(str(m['hitch_by'][c]) for c in 'RCGL')})", m["hold_resume_s"],
+                         m["silences"],
                          round(m["max_silence_ms"]), m["lost"], f"{m['fps_med']} ({m['fps_min']})", m["underruns"],
                          m["starvation"], m["rungs"], m["rssi"]])
         t = b
     L += md_table(["10 min from", "stream s", "sessions started", "client restarts", "user exits", "transitions",
-                   "stalls", "pauses", "rewinds", "hitch s (R/C/G/L)", "silences", "max silence ms", "loss",
+                   "stalls", "pauses", "rewinds", "hitch s (R/C/G/L)", "hold-resume s", "silences", "max silence ms",
+                   "loss",
                    "fps med (min)", "underruns", "starvation", "rungs", "RSSI"], body) if body else ["(no stream)"]
     L += ["", "## Every client restart, with its cause", ""]
     body = []

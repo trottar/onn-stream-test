@@ -1,0 +1,571 @@
+diff --git a/tests/b68_library_m3u/_tmp_cleanup.py b/tests/b68_library_m3u/_tmp_cleanup.py
+new file mode 100644
+index 0000000..d18bc76
+--- /dev/null
++++ b/tests/b68_library_m3u/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B53 (test hygiene): every temporary directory a tests/b68_library_m3u run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tests/b68_library_m3u/test_b68.py b/tests/b68_library_m3u/test_b68.py
+new file mode 100644
+index 0000000..eb99d42
+--- /dev/null
++++ b/tests/b68_library_m3u/test_b68.py
+@@ -0,0 +1,220 @@
++#!/usr/bin/env python3
++"""B68 (tool): `tools/library_m3u.py` on fixture libraries -- the sets, the reported cases, apply (the .m3u, the discs
++untouched, the real plugin's list one entry per set), the state / card migration, undo, the flag gate, the log.
++Made-up names in temp dirs (removed at exit); no real library, title or file.
++
++    python3 -m unittest discover -s tests/b68_library_m3u -v
++"""
++
++from __future__ import annotations
++
++import contextlib
++import io
++import json
++import os
++import subprocess
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++sys.path.insert(0, str(ROOT / "tools"))
++
++import library_m3u as lm  # noqa: E402
++import import_usb as iu  # noqa: E402
++
++ON = {"PRIVYHUB_IMPORT": "1"}
++
++
++def cue(name: str) -> str:
++    return f'FILE "{name}.bin" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n'
++
++
++def library(sets: dict[str, list[int]], sub: str = "") -> Path:
++    root = Path(tempfile.mkdtemp(prefix="b68_proj_"))
++    lib = root / "games/ps1" / sub
++    lib.mkdir(parents=True)
++    for title, discs in sets.items():
++        for n in discs:
++            stem = f"{title} (Disc {n})"
++            (lib / f"{stem}.cue").write_text(cue(stem))
++            (lib / f"{stem}.bin").write_bytes(bytes([n]) * 64)
++    (lib / "Single Game.cue").write_text(cue("Single Game"))
++    (lib / "Single Game.bin").write_bytes(b"s" * 64)
++    return root
++
++
++def snap(root: Path) -> list:
++    return sorted((str(p.relative_to(root)), p.stat().st_size, p.stat().st_mtime_ns)
++                  for p in (root / "games").rglob("*") if p.is_file() and p.suffix != ".m3u")
++
++
++def run(root: Path, *args, env=ON):
++    buf = io.StringIO()
++    with contextlib.redirect_stdout(buf):
++        code = lm.main(list(args), root=root, environ=env, game_active=lambda: False)
++    return code, buf.getvalue()
++
++
++SCAN = r'''
++import json, os, sys, threading, importlib.util
++from pathlib import Path
++sys.path.insert(0, "companion")
++spec = importlib.util.spec_from_file_location("g", "companion/plugins/games.py")
++G = importlib.util.module_from_spec(spec); spec.loader.exec_module(G)
++p = object.__new__(G.GamesPlugin)
++proj = Path(os.environ["B68_PROJ"]); p.PROJECT_ROOT = proj; p.GAMES_ROOT = proj / "games"
++p._lock = threading.RLock(); p._cached_at = 0.0; p._cached_games = []
++print(json.dumps(sorted((g["title"], g["format"]) for g in p._scan() if g["system"] == "ps1")))
++'''
++
++
++def scan(root: Path) -> list:
++    r = subprocess.run([sys.executable, "-c", SCAN], cwd=ROOT, env={"PATH": "/usr/bin:/bin", "B68_PROJ": str(root)},
++                       capture_output=True, text=True)
++    if r.returncode:
++        raise AssertionError(r.stderr[-1500:])
++    return [tuple(x) for x in json.loads(r.stdout.strip().splitlines()[-1])]
++
++
++class Plan(unittest.TestCase):
++    def test_sets_and_lines(self):
++        root = library({"Alpha Quest": [1, 2], "Beta Saga": [1, 2, 3, 4]})
++        plan = lm.make_plan(root)
++        got = {s["m3u"]: s["lines"] for s in plan["sets"]}
++        self.assertEqual(got, {"games/ps1/Alpha Quest.m3u": ["Alpha Quest (Disc 1).cue", "Alpha Quest (Disc 2).cue"],
++                               "games/ps1/Beta Saga.m3u": [f"Beta Saga (Disc {n}).cue" for n in range(1, 5)]})
++        self.assertEqual(plan["reported"], [])
++
++    def test_reported_cases(self):
++        root = library({"Gap Game": [1, 3], "Lone Disc": [1], "Same Game": [1, 2], "Other Game": [1, 2],
++                        "Named Game": [1, 2]})
++        lib = root / "games/ps1"
++        (lib / "Same Game.m3u").write_bytes(iu.m3u_bytes(["Same Game (Disc 1).cue", "Same Game (Disc 2).cue"]))
++        (lib / "Other Game.m3u").write_bytes(iu.m3u_bytes(["Other Game (Disc 2).cue"]))
++        (lib / "Elsewhere.m3u").write_bytes(iu.m3u_bytes(["Named Game (Disc 1).cue"]))
++        plan = lm.make_plan(root)
++        codes = sorted((r["code"], r["discs"]) for r in plan["reported"])
++        self.assertEqual(codes, [("already", 2), ("covered", 2), ("disc_gap", 2), ("m3u_differs", 2)])
++        self.assertEqual([s["m3u"] for s in plan["sets"] if not s["m3u_present"]], [])
++
++    def test_a_subfolder_set(self):
++        root = library({"Deep Game": [1, 2]}, sub="sub")
++        self.assertEqual([s["m3u"] for s in lm.make_plan(root)["sets"]], ["games/ps1/sub/Deep Game.m3u"])
++
++
++class Apply(unittest.TestCase):
++    def test_apply_the_list_and_idempotent(self):
++        root = library({"Alpha Quest": [1, 2], "Beta Saga": [1, 2, 3, 4]})
++        before = snap(root)
++        self.assertEqual(len(scan(root)), 7)                                # 6 disc entries + the single
++        code, out = run(root, "apply")
++        self.assertEqual(code, 0)
++        self.assertIn("written 2", out)
++        self.assertEqual((root / "games/ps1/Alpha Quest.m3u").read_text(),
++                         "Alpha Quest (Disc 1).cue\nAlpha Quest (Disc 2).cue\n")
++        self.assertEqual(before, snap(root))                               # every disc untouched
++        self.assertEqual(scan(root), [("Alpha Quest", "m3u"), ("Beta Saga", "m3u"), ("Single Game", "cue")])
++        code, out = run(root, "apply")
++        self.assertIn("written 0, already 2", out)
++
++    def test_the_flag_and_a_running_game(self):
++        root = library({"Alpha Quest": [1, 2]})
++        for env in ({}, {"PRIVYHUB_IMPORT": "0"}, {"PRIVYHUB_IMPORT": "yes"}):
++            for cmd in ("plan", "apply", "undo"):
++                self.assertEqual(run(root, cmd, env=env)[0], 9)
++        self.assertFalse((root / "games/ps1/Alpha Quest.m3u").exists())
++        self.assertFalse((root / "data").exists())
++        buf = io.StringIO()
++        with contextlib.redirect_stdout(buf):
++            self.assertEqual(lm.main(["apply"], root=root, environ=ON, game_active=lambda: True), 6)
++
++
++class Migration(unittest.TestCase):
++    def setUp(self):
++        self.root = library({"Alpha Quest": [1, 2]})
++        saves = self.root / lm.SAVES / "Beetle PSX HW"
++        saves.mkdir(parents=True)
++        (saves / "Alpha Quest (Disc 1).srm").write_bytes(b"1" * 128)
++        time.sleep(0.02)
++        (saves / "Alpha Quest (Disc 2).srm").write_bytes(b"2" * 128)        # newer: the set gets this one
++        states = self.root / lm.STATES / "Beetle PSX HW"
++        states.mkdir(parents=True)
++        (states / "Alpha Quest (Disc 1).state1").write_bytes(b"S" * 64)
++        (states / "Alpha Quest (Disc 1).state1.png").write_bytes(b"P")
++        did = iu.stable_id("ps1", "games/ps1/Alpha Quest (Disc 1).cue")
++        idx = self.root / lm.SLOT_INDEX
++        idx.write_text(json.dumps({"schema": 1, "games": {did: {"slots": {"1": {
++            "state_file": "data/games/retroarch/states/Beetle PSX HW/Alpha Quest (Disc 1).state1",
++            "modified_unix_ms": 1, "size_bytes": 64}}}}}))
++
++    def test_plan_says_it_and_apply_without_migrating(self):
++        code, out = run(self.root, "plan")
++        self.assertIn("would no longer show unless migrated", out)
++        code, out = run(self.root, "apply")
++        self.assertIn("run again with --migrate-states", out)
++        self.assertFalse((self.root / lm.SAVES / "Beetle PSX HW/Alpha Quest.srm").exists())
++
++    def test_migrate_newest_card_states_and_slots(self):
++        run(self.root, "apply")
++        code, out = run(self.root, "apply", "--migrate-states")             # after a plain apply: still migrates
++        card = self.root / lm.SAVES / "Beetle PSX HW/Alpha Quest.srm"
++        self.assertEqual(card.read_bytes(), b"2" * 128)
++        self.assertTrue((self.root / lm.SAVES / "Beetle PSX HW/Alpha Quest (Disc 1).srm").exists())   # kept
++        self.assertTrue((self.root / lm.STATES / "Beetle PSX HW/Alpha Quest.state1").is_file())
++        self.assertTrue((self.root / lm.STATES / "Beetle PSX HW/Alpha Quest.state1.png").is_file())
++        games = json.loads((self.root / lm.SLOT_INDEX).read_text())["games"]
++        new = games[iu.stable_id("ps1", "games/ps1/Alpha Quest.m3u")]
++        self.assertTrue(new["slots"]["1"]["state_file"].endswith("Beetle PSX HW/Alpha Quest.state1"))
++
++    def test_a_present_target_is_never_overwritten(self):
++        card = self.root / lm.SAVES / "Beetle PSX HW/Alpha Quest.srm"
++        card.write_bytes(b"mine")
++        run(self.root, "apply", "--migrate-states")
++        self.assertEqual(card.read_bytes(), b"mine")
++
++    def test_a_target_appearing_after_the_plan_is_not_overwritten(self):
++        plan0 = lm.make_plan(self.root)                                      # the card's target absent then
++        card = self.root / lm.SAVES / "Beetle PSX HW/Alpha Quest.srm"
++        card.write_bytes(b"made meanwhile")
++        orig = lm.make_plan
++        lm.make_plan = lambda root: plan0                                    # apply's re-check sees the old plan
++        try:
++            lm.apply_plan(plan0, self.root, migrate=True)
++        finally:
++            lm.make_plan = orig
++        self.assertEqual(card.read_bytes(), b"made meanwhile")
++
++    def test_undo_only_its_own_and_unchanged(self):
++        run(self.root, "apply", "--migrate-states")
++        m3u = self.root / "games/ps1/Alpha Quest.m3u"
++        card = self.root / lm.SAVES / "Beetle PSX HW/Alpha Quest.srm"
++        card.write_bytes(b"played since")                                   # changed after the apply: kept
++        before = snap(self.root)
++        code, out = run(self.root, "undo")
++        self.assertFalse(m3u.exists())
++        self.assertTrue(card.exists())
++        self.assertIn("left (changed since) 1", out)
++        self.assertTrue((self.root / lm.SAVES / "Beetle PSX HW/Alpha Quest (Disc 2).srm").exists())
++        self.assertNotIn(iu.stable_id("ps1", "games/ps1/Alpha Quest.m3u"),
++                         json.loads((self.root / lm.SLOT_INDEX).read_text())["games"])
++        self.assertEqual([x for x in before if "Disc" in x[0]], [x for x in snap(self.root) if "Disc" in x[0]])
++
++
++class Log(unittest.TestCase):
++    def test_no_name_path_or_id(self):
++        root = library({"Alpha Quest": [1, 2]})
++        run(root, "plan")
++        run(root, "apply")
++        text = "".join(p.read_text() for p in (root / "data/import/logs").glob("library_m3u_*.log"))
++        for bad in ("Alpha", "Quest", "Disc", ".cue", ".m3u", "games/", "game_ps1_", str(root)):
++            self.assertNotIn(bad, text)
++        self.assertIn('"label": "S1"', text)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/library_m3u.py b/tools/library_m3u.py
+new file mode 100644
+index 0000000..4d11693
+--- /dev/null
++++ b/tools/library_m3u.py
+@@ -0,0 +1,308 @@
++#!/usr/bin/env python3
++"""B68: one list entry per multi-disc PS1 title already in the hub's library -- an `.m3u` per set written beside its
++discs (the list already hides what an `.m3u` names, and titles the set from its name). Behind PRIVYHUB_IMPORT=1.
++
++    PRIVYHUB_IMPORT=1 python3 tools/library_m3u.py plan  [--json]
++    PRIVYHUB_IMPORT=1 python3 tools/library_m3u.py apply [--migrate-states]
++    PRIVYHUB_IMPORT=1 python3 tools/library_m3u.py undo
++
++- A set: the library's PS1 `.cue` / `.chd` files of one title (B56's "(Disc N)" rule, the same folder), 2 or more
++  discs numbered 1..n. Reported, never planned: `disc_gap`, `covered` (a disc another `.m3u` names), `already` (the
++  same `.m3u` is there), `m3u_differs` (an `.m3u` of that name with other lines; left alone).
++- **Never moves, renames or deletes a disc.** The `.m3u` is placed with B56's no-overwrite link.
++- **An `.m3u` is a new list entry** (a new id and a new content name): the save states and in-game memory cards made
++  on a disc entry would not show on the set. The plan counts them; `apply --migrate-states` copies them to the set's
++  name (the newest per slot / per card across the set's discs; never over an existing file; the originals kept).
++- `undo` removes only what `apply` recorded, and only while its bytes still match.
++- The log (`data/import/logs/library_m3u_<UTC>.log`) holds counts, labels (S1...) and codes only.
++
++Design: docs/memory/evidence/b68_2026-11-09/design_written_before_code.md (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import argparse
++import hashlib
++import json
++import os
++import shutil
++import sys
++from pathlib import Path
++from typing import Any, Mapping
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import import_usb as iu  # noqa: E402  (B56's disc rule, names, m3u bytes, no-overwrite placement, game check)
++
++REPO = Path(__file__).resolve().parents[1]
++FLAG_ENV = iu.FLAG_ENV
++LIBRARY = "games/ps1"
++STATES = "data/games/retroarch/states"
++SAVES = "data/games/retroarch/saves"
++SLOT_INDEX = "data/games/retroarch/privyhub_state_slots.json"
++PLAN = "data/import/m3u_plan.json"
++APPLIED = "data/import/m3u_applied.json"
++DISC_EXT = (".cue", ".chd")
++CARD_EXT = (".srm", ".mcr")
++SLOTS = (1, 2, 3)
++
++
++def _sha(data: bytes) -> str:
++    return hashlib.sha256(data).hexdigest()
++
++
++def _rel(root: Path, p: Path) -> str:
++    return p.relative_to(root).as_posix()
++
++
++def _covered(lib: Path) -> set[Path]:
++    """Every file an existing `.m3u` names (the list's own rule)."""
++    out: set[Path] = set()
++    for m in lib.rglob("*.m3u"):
++        if m.name.startswith("."):
++            continue
++        for raw in m.read_text(encoding="utf-8", errors="replace").splitlines():
++            line = raw.strip()
++            if line and not line.startswith("#"):
++                out.add((m.parent / line).resolve())
++    return out
++
++
++def _states_of(root: Path, stem: str) -> dict[int, Path]:
++    found: dict[int, Path] = {}
++    base = root / STATES
++    if base.is_dir():
++        for n in SLOTS:
++            for p in base.rglob(f"{stem}.state{n}"):
++                if p.is_file() and (n not in found or p.stat().st_mtime > found[n].stat().st_mtime):
++                    found[n] = p
++    return found
++
++
++def _cards_of(root: Path, stem: str) -> list[Path]:
++    base = root / SAVES
++    return sorted(p for ext in CARD_EXT for p in base.rglob(f"{stem}{ext}") if p.is_file()) if base.is_dir() else []
++
++
++def make_plan(root: Path = REPO) -> dict[str, Any]:
++    root = Path(root)
++    lib = root / LIBRARY
++    covered = _covered(lib) if lib.is_dir() else set()
++    groups: dict[tuple[Path, str], list[Path]] = {}
++    if lib.is_dir():
++        for p in sorted(lib.rglob("*"), key=lambda q: str(q).casefold()):
++            if p.is_file() and not p.name.startswith(".") and p.suffix.casefold() in DISC_EXT \
++                    and iu.disc_number(p) is not None:
++                groups.setdefault((p.parent, iu.title_key(p)), []).append(p)
++    index = _read_json(root / SLOT_INDEX).get("games", {})
++    sets, reported = [], []
++    for (folder, _key), members in sorted(groups.items(), key=lambda kv: str(kv[0][0]).casefold() + kv[0][1]):
++        if len(members) < 2:
++            continue
++        members.sort(key=lambda e: (iu.disc_number(e) or 0, e.suffix.casefold()))
++        label = f"S{len(sets) + len(reported) + 1}"
++        numbers = [iu.disc_number(e) for e in members]
++        title = " ".join(iu.DISC_RE.sub(" ", iu.clean_name(members[0])).split())
++        m3u = folder / f"{title}.m3u"
++        lines = [e.name for e in members]
++        code = None
++        if numbers != list(range(1, len(members) + 1)):
++            code = "disc_gap"
++        elif any(e.resolve() in covered for e in members) and not m3u.exists():
++            code = "covered"
++        elif m3u.exists():
++            code = "already" if m3u.read_bytes() == iu.m3u_bytes(lines) else "m3u_differs"
++        if code:
++            reported.append({"label": label, "code": code, "discs": len(members)})
++            if code != "already":
++                continue                                          # `already`: planned for its migration only
++        m3u_rel = _rel(root, m3u)
++        new_id = iu.stable_id("ps1", m3u_rel)
++        disc_ids = [iu.stable_id("ps1", _rel(root, e)) for e in members]
++        # the migration it would do: per slot the newest state across the discs; the newest card per extension
++        states: dict[int, Path] = {}
++        for e in members:
++            for n, p in _states_of(root, e.stem).items():
++                if n not in states or p.stat().st_mtime > states[n].stat().st_mtime:
++                    states[n] = p
++        cards: dict[str, Path] = {}
++        for e in members:
++            for p in _cards_of(root, e.stem):
++                ext = p.suffix.casefold()
++                if ext not in cards or p.stat().st_mtime > cards[ext].stat().st_mtime:
++                    cards[ext] = p
++        copies = []
++        for n, p in sorted(states.items()):
++            for src in (p, p.with_name(p.name + ".png")):
++                if src.is_file():
++                    dst = src.with_name(src.name.replace(src.name.split(".state")[0], m3u.stem, 1))
++                    copies.append({"kind": "state" if src == p else "thumb", "slot": n, "src": _rel(root, src),
++                                   "dst": _rel(root, dst), "skip": dst.exists()})
++        for ext, p in sorted(cards.items()):
++            dst = p.with_name(m3u.stem + p.suffix)
++            copies.append({"kind": "card", "src": _rel(root, p), "dst": _rel(root, dst), "skip": dst.exists()})
++        slot_src = {}
++        for did in disc_ids:
++            for n, s in (index.get(did, {}).get("slots") or {}).items():
++                if n not in slot_src or (s.get("modified_unix_ms") or 0) > (slot_src[n][1].get("modified_unix_ms") or 0):
++                    slot_src[n] = (did, s)
++        sets.append({"label": label, "m3u": m3u_rel, "lines": lines, "discs": len(members), "id": new_id,
++                     "m3u_present": code == "already",
++                     "disc_ids": disc_ids, "title": title, "copies": copies,
++                     "slot_entries": {n: s for n, (_d, s) in slot_src.items()},
++                     "stores": {"slot_entries": sum(len(index.get(d, {}).get("slots") or {}) for d in disc_ids)}})
++    return {"schema": "privyhub_library_m3u_plan_v1", "created_utc": iu.now_utc(), "sets": sets, "reported": reported}
++
++
++def _read_json(p: Path) -> dict[str, Any]:
++    try:
++        d = json.loads(p.read_text(encoding="utf-8"))
++        return d if isinstance(d, dict) else {}
++    except (OSError, ValueError):
++        return {}
++
++
++def apply_plan(plan: Mapping[str, Any], root: Path = REPO, *, migrate: bool = False) -> dict[str, Any]:
++    root = Path(root)
++    fresh = make_plan(root)                                       # re-checked: only what is still planned
++    still = {s["m3u"]: s for s in fresh["sets"]}
++    done: list[dict[str, Any]] = []
++    out = {"written": 0, "already": len([r for r in fresh["reported"] if r["code"] == "already"]),
++           "copied": 0, "not_migrated": 0, "sets": len(plan.get("sets", []))}
++    for s in plan.get("sets", []):
++        cur = still.get(s["m3u"])
++        if cur is None or cur["lines"] != s["lines"]:
++            continue
++        final = root / s["m3u"]
++        data = iu.m3u_bytes(s["lines"])
++        if not cur.get("m3u_present"):
++            created: list[Path] = []
++            try:
++                iu._place(iu._bytes_writer(data), final, final.parent / f".m3u-{s['label']}.part", _sha(data), created)
++            except FileExistsError:
++                continue
++            done.append({"kind": "m3u", "path": s["m3u"], "sha256": _sha(data)})
++            out["written"] += 1
++        pending = [c for c in cur["copies"] if not c["skip"]]
++        if not migrate:
++            out["not_migrated"] += len(pending) + len(cur["slot_entries"])
++            continue
++        for c in pending:
++            src, dst = root / c["src"], root / c["dst"]
++            if dst.exists():
++                continue
++            shutil.copy2(src, dst)
++            done.append({"kind": c["kind"], "path": c["dst"], "sha256": iu.sha256(dst)})
++            out["copied"] += 1
++        if cur["slot_entries"]:
++            idx = _read_json(root / SLOT_INDEX)
++            games = idx.setdefault("games", {})
++            if cur["id"] not in games:
++                slots = {}
++                for n, e in cur["slot_entries"].items():
++                    e = dict(e)
++                    old = str(e.get("state_file", ""))
++                    if old:
++                        name = Path(old).name
++                        e["state_file"] = str(Path(old).with_name(name.replace(name.split(".state")[0], Path(s["m3u"]).stem, 1)).as_posix())
++                    slots[n] = e
++                games[cur["id"]] = {"game_key": cur["id"], "game_relative_path": s["m3u"], "game_system": "ps1",
++                                    "game_title": cur["title"], "slots": slots}
++                iu.write_json_atomic(root / SLOT_INDEX, idx)
++                done.append({"kind": "slot_index", "id": cur["id"]})
++                out["copied"] += len(slots)
++    rec = _read_json(root / APPLIED)
++    rec.setdefault("applied", []).extend(done)
++    if done:
++        iu.write_json_atomic(root / APPLIED, rec)
++    return out
++
++
++def undo(root: Path = REPO) -> dict[str, Any]:
++    root = Path(root)
++    rec = _read_json(root / APPLIED)
++    kept, out = [], {"removed": 0, "left_changed": 0}
++    for d in rec.get("applied", []):
++        if d["kind"] == "slot_index":
++            idx = _read_json(root / SLOT_INDEX)
++            if idx.get("games", {}).pop(d["id"], None) is not None:
++                iu.write_json_atomic(root / SLOT_INDEX, idx)
++                out["removed"] += 1
++            continue
++        p = root / d["path"]
++        if p.is_file() and iu.sha256(p) == d["sha256"]:
++            p.unlink()
++            out["removed"] += 1
++        elif p.exists():
++            out["left_changed"] += 1
++            kept.append(d)
++    rec["applied"] = kept
++    iu.write_json_atomic(root / APPLIED, rec)
++    return out
++
++
++def log(root: Path, command: str, rows: Mapping[str, Any]) -> Path:
++    d = Path(root) / "data/import/logs"
++    d.mkdir(parents=True, exist_ok=True)
++    p = d / f"library_m3u_{iu.now_utc().replace(':', '').replace('-', '')}.log"
++    with p.open("a", encoding="utf-8") as fh:
++        fh.write(json.dumps({"command": command, **rows}, sort_keys=True) + "\n")
++    return p
++
++
++def _summary(plan: Mapping[str, Any]) -> dict[str, Any]:
++    return {"sets": [{"label": s["label"], "discs": s["discs"], "m3u_present": s.get("m3u_present", False),
++                      "would_copy": {k: sum(1 for c in s["copies"] if c["kind"] == k and not c["skip"])
++                                     for k in ("state", "thumb", "card")},
++                      "slot_entries": len(s["slot_entries"])} for s in plan["sets"]],
++            "reported": [{"label": r["label"], "code": r["code"], "discs": r["discs"]} for r in plan["reported"]]}
++
++
++def main(argv: list[str] | None = None, *, root: Path = REPO, environ: Mapping[str, str] | None = None,
++         game_active=None) -> int:
++    env = os.environ if environ is None else environ
++    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
++    ap.add_argument("command", choices=("plan", "apply", "undo"))
++    ap.add_argument("--json", action="store_true")
++    ap.add_argument("--migrate-states", action="store_true")
++    a = ap.parse_args(argv)
++    if (env.get(FLAG_ENV) or "").strip() != "1":
++        print(f"library_m3u: {FLAG_ENV}=1 is required; nothing done")
++        return 9
++    root = Path(root)
++    active = iu.game_active if game_active is None else game_active
++    if a.command == "plan":
++        plan = make_plan(root)
++        if a.json:
++            iu.write_json_atomic(root / PLAN, plan)
++        s = _summary(plan)
++        for x in s["sets"]:
++            moves = x["would_copy"]["state"] + x["would_copy"]["card"] + x["slot_entries"]
++            if x["m3u_present"] and not moves:
++                continue                                          # reported below as `already`
++            print(f"{x['label']}: " + ("its .m3u is in place" if x["m3u_present"] else f"one entry for {x['discs']} discs") +
++                  (f"; {moves} saved file(s) / slot(s) on its discs would no longer show unless migrated" if moves else ""))
++        for r in s["reported"]:
++            print(f"{r['label']}: {r['code']} ({r['discs']} discs)")
++        print(f"{sum(1 for x in s['sets'] if not x['m3u_present'])} set(s) planned, {len(s['reported'])} reported")
++        log(root, "plan", s)
++        return 0
++    if active():
++        print("library_m3u: a game is running; nothing done")
++        return 6
++    if a.command == "apply":
++        plan = _read_json(root / PLAN) or make_plan(root)
++        out = apply_plan(plan, root, migrate=a.migrate_states)
++        print(f"written {out['written']}, already {out['already']}, copied {out['copied']}")
++        if out["not_migrated"]:
++            print(f"{out['not_migrated']} card / state file(s) or slot(s) would no longer show; "
++                  "run again with --migrate-states")
++        log(root, "apply", {**out, "migrate_states": a.migrate_states})
++        return 0
++    out = undo(root)
++    print(f"removed {out['removed']}, left (changed since) {out['left_changed']}")
++    log(root, "undo", out)
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())

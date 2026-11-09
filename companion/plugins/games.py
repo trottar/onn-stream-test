@@ -4192,6 +4192,28 @@ class GamesPlugin:
             },
         )
 
+    def _log_launch_ports(self, game: dict[str, Any], payload: dict[str, Any], query: dict[str, list[str]]) -> None:
+        """B66: a `launch_ports` recovery row after a launch -- the --device arguments, the ports echo (with B63's
+        capable / capped_from), an N64 launch's layout. Never raises (a launch is never failed by its row)."""
+        try:
+            import players_session as _ps
+            emu = self._emulator
+            n64 = payload.get("n64_session") if isinstance(payload, dict) else None
+            fields: dict[str, Any] = {
+                "system": str(game.get("system", "")),
+                "kind": getattr(emu, "_launch_kind", None) or "retroarch",
+                "device_args": list(getattr(emu, "_last_device_args", []) or []),
+                "ports_set": _ps.ports_set(emu, None).get("ports_set"),
+            }
+            if isinstance(n64, dict):
+                fields.update(layout=n64.get("layout"), remap_binds=n64.get("remap_binds"))
+            for key in ("players_joined", "players_chosen"):
+                if key in query:
+                    fields[key] = self._first(query, key)
+            self._recovery._log("launch_ports", **fields)
+        except Exception:
+            pass
+
     def handle_post(
         self,
         action: str,
@@ -4576,9 +4598,18 @@ class GamesPlugin:
                         replace=self._query_bool(query, "replace", False),
                     )
                 else:
-                    payload = self._emulator.load_state(
-                        slot
-                    )
+                    # B65: an N64 load's row (continue_load / continue_skipped); None for every other system
+                    self._emulator._n64_continue_event = None
+                    try:
+                        payload = self._emulator.load_state(
+                            slot
+                        )
+                    finally:
+                        event = getattr(self._emulator, "_n64_continue_event", None)
+                        if isinstance(event, dict):
+                            self._recovery._log(str(event.get("event")), **{k: v for k, v in event.items()
+                                                                            if k != "event"})
+                            self._emulator._n64_continue_event = None
 
                 return payload
 
@@ -4634,6 +4665,8 @@ class GamesPlugin:
                 # B54: the session's ports came from the joined count
                 if joined_source and isinstance(getattr(self._emulator, "_players_session", None), dict):
                     self._emulator._players_session["source"] = "join"
+                # B66: what the launch set, as one row (a read need not parse the game log)
+                self._log_launch_ports(game, payload, query)
 
                 return payload
 

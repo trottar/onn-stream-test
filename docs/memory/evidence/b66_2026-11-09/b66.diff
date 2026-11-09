@@ -1,0 +1,358 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 9892f1d..eb6f215 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -102,6 +102,8 @@ class EmulatorManager:
+         self._n64_core: str | None = None
+         # B65: the last N64 load's row for the plugin (continue_load / continue_skipped); None otherwise
+         self._n64_continue_event: dict[str, Any] | None = None
++        # B66: the last RetroArch launch's --device arguments (the plugin's launch_ports row); [] for PCSX2
++        self._last_device_args: list[str] = []
+ 
+         # PrivyHub A7.3: optional per-launch deterministic cheat profile.
+         # A non-null session always uses isolated save/state storage, and any
+@@ -5871,6 +5873,7 @@ class EmulatorManager:
+             self._players_session = players_plan
+             # B61: an N64 session (no state save is ever sent into its running core); None for every other launch
+             self._n64_core = core_path.name if n64_launch else None
++            self._last_device_args = [a for a in command if a.startswith("--device=")]   # B66
+             self.started_at = time.monotonic()
+             self._paused = False
+             isolated_session = cheat_session if cheat_session is not None else mod_session
+@@ -7001,6 +7004,7 @@ class EmulatorManager:
+         self._players_session = plan if chosen is not None else None
+         self._hold_rewind_core = None
+         self._launch_kind = "pcsx2"
++        self._last_device_args = []       # B66: PCSX2 takes its ports from its ini
+         # B52: the session reads PCSX2's own log (the ELF line, the TLB check)
+         self._ps2 = _ps2.Session(process.pid, log_line, log_path=pcsx2_log)
+ 
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 7d75ca7..1bcf5e4 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4192,6 +4192,28 @@ class GamesPlugin:
+             },
+         )
+ 
++    def _log_launch_ports(self, game: dict[str, Any], payload: dict[str, Any], query: dict[str, list[str]]) -> None:
++        """B66: a `launch_ports` recovery row after a launch -- the --device arguments, the ports echo (with B63's
++        capable / capped_from), an N64 launch's layout. Never raises (a launch is never failed by its row)."""
++        try:
++            import players_session as _ps
++            emu = self._emulator
++            n64 = payload.get("n64_session") if isinstance(payload, dict) else None
++            fields: dict[str, Any] = {
++                "system": str(game.get("system", "")),
++                "kind": getattr(emu, "_launch_kind", None) or "retroarch",
++                "device_args": list(getattr(emu, "_last_device_args", []) or []),
++                "ports_set": _ps.ports_set(emu, None).get("ports_set"),
++            }
++            if isinstance(n64, dict):
++                fields.update(layout=n64.get("layout"), remap_binds=n64.get("remap_binds"))
++            for key in ("players_joined", "players_chosen"):
++                if key in query:
++                    fields[key] = self._first(query, key)
++            self._recovery._log("launch_ports", **fields)
++        except Exception:
++            pass
++
+     def handle_post(
+         self,
+         action: str,
+@@ -4643,6 +4665,8 @@ class GamesPlugin:
+                 # B54: the session's ports came from the joined count
+                 if joined_source and isinstance(getattr(self._emulator, "_players_session", None), dict):
+                     self._emulator._players_session["source"] = "join"
++                # B66: what the launch set, as one row (a read need not parse the game log)
++                self._log_launch_ports(game, payload, query)
+ 
+                 return payload
+ 
+diff --git a/tests/b66_hitch_split/_tmp_cleanup.py b/tests/b66_hitch_split/_tmp_cleanup.py
+new file mode 100644
+index 0000000..fed89e6
+--- /dev/null
++++ b/tests/b66_hitch_split/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B53 (test hygiene): every temporary directory a tests/b66_hitch_split run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tests/b66_hitch_split/test_b66.py b/tests/b66_hitch_split/test_b66.py
+new file mode 100644
+index 0000000..6819703
+--- /dev/null
++++ b/tests/b66_hitch_split/test_b66.py
+@@ -0,0 +1,133 @@
++#!/usr/bin/env python3
++"""B66 (tools / host row): UX-R3's hold-resume split (a hold's `resumed` second and the next two counted apart; the
++bar's number the rest; `hitch_s` itself today's), diag_check's last-session line for N64 / PS2 with the bar, and the
++`launch_ports` row after a launch. B36's fixture evening, extended; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/b66_hitch_split -v
++"""
++
++from __future__ import annotations
++
++import json
++import sys
++import tempfile
++import types
++import unittest
++from datetime import datetime
++from pathlib import Path
++from zoneinfo import ZoneInfo
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++sys.path.insert(0, str(ROOT / "tools"))
++sys.path.insert(0, str(ROOT / "tests" / "diag_read"))
++
++import diag_read as dr  # noqa: E402
++import diag_check as dc  # noqa: E402
++import diag_fixture as fx  # noqa: E402
++
++NY = ZoneInfo("America/New_York")
++ORIG = fx.logs
++
++
++def analysis(extra_rows):
++    def logs():
++        out = ORIG()
++        out["native_stream_recovery.log"] += "".join(fx.rec(s, e, **kw) + "\n" for s, e, kw in extra_rows)
++        return out
++    fx.logs = logs
++    try:
++        kd = fx.write_keeper_dir(Path(tempfile.mkdtemp(prefix="b66_read_")) / fx.DAY)
++    finally:
++        fx.logs = ORIG
++    lg = dr.Logs()
++    lg.add_keeper_dir(kd)
++    return dr.Analysis(lg, datetime(2026, 10, 30, 9, 0), datetime(2026, 10, 30, 11, 0), NY)
++
++
++class Split(unittest.TestCase):
++    def test_today_without_a_hold_resume(self):
++        r1 = analysis([]).session_row(analysis([]).sessions[0])
++        self.assertEqual((r1["hitch_s"], r1["hitch_s_per_10min"]), (4, 8.0))         # B36's numbers unchanged
++        self.assertEqual((r1["hold_resume_s"], r1["hitch_s_bar"], r1["hitch_s_bar_per_10min"]), (0, 4, 8.0))
++
++    def test_a_hold_resume_second_is_counted_apart(self):
++        # the R hitch is at 10:01:40 (fixture second 100): a hold's resume at 99.6 covers 99, 100, 101
++        an = analysis([(99.6, "resumed", {"via": "stall_end", "from_state": "PAUSED_RECOVERING"})])
++        r1 = an.session_row(an.sessions[0])
++        self.assertEqual((r1["hitch_s"], r1["hold_resume_s"], r1["hitch_s_bar"]), (4, 1, 3))
++        self.assertEqual(r1["hitch_s_bar_per_10min"], 6.0)
++        md = dr.render(an, "t", [datetime(2026, 10, 30, 10, 1, 40)], False)
++        self.assertIn("hold-resume s", md)
++        self.assertIn("bar hitch s / 10 min", md)
++        self.assertRegex(md, r"\| 10:01:40 \| Rh \|")
++
++    def test_not_a_hold_and_the_window(self):
++        an = analysis([(149.6, "resumed", {"via": "client_ready"}),            # a link recovery: not a hold
++                       (96.9, "resumed", {"via": "stall_quiet"})])               # covers 96-98, the R hitch at 100: no
++        r1 = an.session_row(an.sessions[0])
++        self.assertEqual((r1["hold_resume_s"], r1["hitch_s_bar"]), (0, 4))
++        self.assertTrue(dr.is_hold_resume("client_ready_stall"))
++        self.assertTrue(dr.is_hold_resume("hold_return_stall"))
++        self.assertFalse(dr.is_hold_resume("client_ready"))
++
++
++class CheckLine(unittest.TestCase):
++    def line(self, row):
++        p = Path(tempfile.mkdtemp(prefix="b66_chk_")) / "sessions.jsonl"
++        p.write_text(json.dumps(row) + "\n")
++        return dc.line_last_session(p)
++
++    def test_n64_ps2_and_ps1(self):
++        n64 = {"core": "mupen64plus-next", "end_utc": "x", "hitch_s_per_10min": 6.6, "hitch_s_bar_per_10min": 3.3,
++               "hold_resume_s": 1}
++        self.assertEqual(self.line(n64), "last session: n64 (mupen64plus-next) x, hitch s / 10 min 6.6 "
++                                         "(bar 3.3 / 10 min, hold-resume 1 s)")
++        ps2 = {"system": "ps2", "core": "pcsx2", "end_utc": "y", "hitch_s_per_10min": 1.0}
++        self.assertEqual(self.line(ps2), "last session: ps2 (pcsx2) y, hitch s / 10 min 1.0")   # an old row: today
++        self.assertIsNone(self.line({"core": "beetle-psx-hw", "hitch_s_per_10min": 0.0}))
++
++
++class LaunchRow(unittest.TestCase):
++    def plugin(self, payload, raise_exc=False):
++        import importlib.util
++        spec = importlib.util.spec_from_file_location("g66", str(ROOT / "companion/plugins/games.py"))
++        G = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(G)
++        rows = []
++        p = object.__new__(G.GamesPlugin)
++        p._recovery = types.SimpleNamespace(_log=lambda e, **k: rows.append({"event": e, **k}))
++        sess = {"players_chosen": 4, "ports": 4, "multitap": False, "multitap_available": False, "source": "join"}
++
++        def launch(game, **kw):
++            if raise_exc:
++                raise RuntimeError("no")
++            return payload
++        p._emulator = types.SimpleNamespace(launch=launch, _launch_kind=None, _players_session=sess,
++                                            _last_device_args=["--device=1:1", "--device=2:1"],
++                                            active_game={"system": "n64"})
++        p._find_game_by_id = lambda gid: {"id": gid, "system": "n64"}
++        p._parse_cheat_launch_request = lambda q: (None, None)
++        return p, rows
++
++    def test_the_row(self):
++        p, rows = self.plugin({"n64_session": {"layout": "face_c", "remap_binds": 8}})
++        p.handle_post("launch", "id=game_n64_x&players_joined=2")
++        lp = [r for r in rows if r["event"] == "launch_ports"]
++        self.assertEqual(len(lp), 1)
++        r = lp[0]
++        self.assertEqual((r["system"], r["kind"], r["device_args"]), ("n64", "retroarch", ["--device=1:1", "--device=2:1"]))
++        self.assertEqual((r["ports_set"]["players"], r["ports_set"]["source"]), (4, "join"))
++        self.assertEqual((r["layout"], r["remap_binds"], r["players_joined"]), ("face_c", 8, "2"))
++
++    def test_a_failed_launch_writes_none(self):
++        p, rows = self.plugin({}, raise_exc=True)
++        with self.assertRaises(Exception):
++            p.handle_post("launch", "id=game_n64_x")
++        self.assertEqual([r for r in rows if r["event"] == "launch_ports"], [])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/diag_check.py b/tools/diag_check.py
+index c2245ef..5d82771 100644
+--- a/tools/diag_check.py
++++ b/tools/diag_check.py
+@@ -183,9 +183,15 @@ def line_last_session(path: Path) -> str | None:
+         r = json.loads(rows[-1])
+     except ValueError:
+         return None
+-    if r.get("system") != "ps2":
++    # B66: an N64 row too; both with the bar's number and the hold-resume seconds (other systems: no line, today)
++    system = r.get("system") or ("n64" if r.get("core") == "mupen64plus-next" else None)
++    if system not in ("ps2", "n64"):
+         return None
+-    return f"last session: ps2 ({r.get('core')}) {r.get('end_utc') or 'open'}, hitch s / 10 min {r.get('hitch_s_per_10min')}"
++    bar = ""
++    if "hitch_s_bar_per_10min" in r:
++        bar = f" (bar {r.get('hitch_s_bar_per_10min')} / 10 min, hold-resume {r.get('hold_resume_s')} s)"
++    return (f"last session: {system} ({r.get('core')}) {r.get('end_utc') or 'open'}, "
++            f"hitch s / 10 min {r.get('hitch_s_per_10min')}{bar}")
+ 
+ 
+ def main(argv: list[str] | None = None) -> int:
+diff --git a/tools/diag_read.py b/tools/diag_read.py
+index 8930ef0..5c5b472 100644
+--- a/tools/diag_read.py
++++ b/tools/diag_read.py
+@@ -88,6 +88,15 @@ TAGS = {"04ff": "PS1 platformer", "ee3b": "SNES action-adventure", "2ef9": "PS1
+         "9f2b": "PS1 hockey A", "e2cd": "PS1 hockey B"}
+ CORES = {"snes": "snes9x", "ps1": "beetle-psx-hw", "n64": "mupen64plus-next"}   # B59: an N64 launch's log
+ 
++# B66: a hold's resume (the stall owner's and the input hold's), its second and the next two kept apart from the bar
++HOLD_RESUME_VIA = ("stall_end", "stall_quiet", "client_ready_stall", "input_release")
++HOLD_RESUME_S = 3
++
++
++def is_hold_resume(via: Any) -> bool:
++    v = str(via or "")
++    return v in HOLD_RESUME_VIA or v.startswith("hold")
++
+ # the log names (as in logs/games/ or logs/) the reader uses
+ LOGS = {"rec": "native_stream_recovery.log", "lad": "adaptive_bitrate_shadow.jsonl", "hb": "native_stream_heartbeat.log",
+         "gaps": "native_stream_ctrl_gaps.log", "fsz": "native_frame_sizes.jsonl", "host": "host_resource_samples.jsonl",
+@@ -506,6 +515,12 @@ class Analysis:
+                 self.report_disc.append((t, x.get("type"), s))
+                 row[sec(t)]["disc"] = x.get("type")
+         self.hitch, self.row = hitch, row
++        # B66: a hold's resume second and the two after it (the user's own pause, not a stream hitch)
++        self.hold_resume: set[str] = set()
++        for r in self.rec:
++            if r.get("event") == "resumed" and is_hold_resume(r.get("via")):
++                t0 = ts(r["at_utc"]).replace(microsecond=0)
++                self.hold_resume.update(sec(t0 + timedelta(seconds=i)) for i in range(HOLD_RESUME_S))
+ 
+     # -- counts for [a, b)
+     def summarize(self, a: datetime, b: datetime) -> dict[str, Any]:
+@@ -514,6 +529,9 @@ class Analysis:
+         hs = [k for k in hitch if a <= ts(k) < b]
+         out["hitch_s"] = len(hs)
+         out["hitch_by"] = {c: sum(1 for k in hs if c in hitch[k]) for c in "RCGL"}
++        # B66: the hold-resume seconds apart; the bar's number is the rest (hitch_s itself stays today's)
++        out["hold_resume_s"] = sum(1 for k in hs if k in getattr(self, "hold_resume", ()))
++        out["hitch_s_bar"] = out["hitch_s"] - out["hold_resume_s"]
+         gs = [g for g in self.gaps if a <= ts(g["start_utc"]) < b]
+         out["silences"] = sum(1 for g in gs if not any(ts(g["start_utc"]) - timedelta(seconds=1) <= bt <= ts(g.get("end_utc") or g["start_utc"])
+                                                        for bt in self.bye_times))
+@@ -606,6 +624,9 @@ class Analysis:
+             "end_kind": s["end_kind"], "resets": m["resets"],
+             "hitch_s": m["hitch_s"], "hitch_by": m["hitch_by"],
+             "hitch_s_per_10min": round(m["hitch_s"] / per10, 1) if per10 else None,
++            # B66: the hold-resume seconds and the bar's number (the pre-registered bars compare the bar's)
++            "hold_resume_s": m["hold_resume_s"], "hitch_s_bar": m["hitch_s_bar"],
++            "hitch_s_bar_per_10min": round(m["hitch_s_bar"] / per10, 1) if per10 else None,
+             # B50: a PS2 session says its system (other sessions' rows as before)
+             **({"system": "ps2"} if s["core"] == PS2_CORE else {}),
+             # B53: PCSX2's own log lines for this session, when its launch's log exists (no key otherwise)
+@@ -673,7 +694,8 @@ def seconds_view(an: Analysis, center: datetime, label: str) -> list[str]:
+             f = an.fsz.get(k, {})
+             if not any(x in v for x in ("rec", "ladder_ev", "ctrl_gap_ms", "fps", "disc", "report_gap_ms", "rung")):
+                 continue
+-            body.append([hms(kt), "".join(sorted(an.hitch.get(k, ()))), v.get("fps", ""), v.get("lost", ""),
++            body.append([hms(kt), "".join(sorted(an.hitch.get(k, ()))) + ("h" if k in an.hold_resume and an.hitch.get(k)
++                                                                             else ""), v.get("fps", ""), v.get("lost", ""),
+                          v.get("out_age", ""), round(v["ctrl_gap_ms"]) if "ctrl_gap_ms" in v else "",
+                          "user" if v.get("ctrl_gap_user") else "", v.get("rung", ""), v.get("ogap", ""),
+                          v.get("report_gap_ms", ""), v.get("disc", ""), f.get("frames", ""),
+@@ -700,11 +722,13 @@ def render(an: Analysis, label: str, around: list[datetime], around_saves: bool)
+                      r["lost_post_fec"], f"{r['rendered_fps_med']} ({r['rendered_fps_min']})", r["resyncs"],
+                      ", ".join(r["stalls"]) or "—", ", ".join(r["pauses"]) or "—", r["holds"], ", ".join(r["rewinds"]) or "—",
+                      f"{r['hitch_s']} ({'/'.join(str(r['hitch_by'][c]) for c in 'RCGL')})", r["hitch_s_per_10min"],
++                     r["hold_resume_s"], r["hitch_s_bar_per_10min"],
+                      f"{r['silences']} ({r['silences_user']})", r["silences_per_10min"], r["underruns"], r["starvation"],
+                      r["rssi"], f"{r['rtt_p50_ms']}/{r['rtt_p95_ms']}" if r["rtt_p50_ms"] is not None else ""])
+     L += md_table(["#", "start", "end", "length", "title", "core", "path", "players", "slot map", "rungs (transitions)",
+                    "end", "restarts (trigger)", "loss post-FEC", "fps med (min)", "resyncs", "stalls", "pauses", "holds",
+-                   "rewinds (method, why)", "hitch s (R/C/G/L)", "hitch s / 10 min", "silences (user)",
++                   "rewinds (method, why)", "hitch s (R/C/G/L)", "hitch s / 10 min", "hold-resume s",
++                   "bar hitch s / 10 min", "silences (user)",
+                    "silences / 10 min", "underruns", "starvation", "RSSI", "RTT p50/p95"], body) if body else ["(no sessions)"]
+     L += ["", "## Per 10 min", ""]
+     body = []
+@@ -716,12 +740,14 @@ def render(an: Analysis, label: str, around: list[datetime], around_saves: bool)
+         if m["stream_s"] or started or m["restarts"]:
+             body.append([t.strftime("%m-%d %H:%M"), f"~{m['stream_s']}", started, len(m["restarts"]), m["byes"],
+                          len(m["transitions"]), len(m["stalls"]), len(m["pauses"]), len(m["rewinds"]),
+-                         f"{m['hitch_s']} ({'/'.join(str(m['hitch_by'][c]) for c in 'RCGL')})", m["silences"],
++                         f"{m['hitch_s']} ({'/'.join(str(m['hitch_by'][c]) for c in 'RCGL')})", m["hold_resume_s"],
++                         m["silences"],
+                          round(m["max_silence_ms"]), m["lost"], f"{m['fps_med']} ({m['fps_min']})", m["underruns"],
+                          m["starvation"], m["rungs"], m["rssi"]])
+         t = b
+     L += md_table(["10 min from", "stream s", "sessions started", "client restarts", "user exits", "transitions",
+-                   "stalls", "pauses", "rewinds", "hitch s (R/C/G/L)", "silences", "max silence ms", "loss",
++                   "stalls", "pauses", "rewinds", "hitch s (R/C/G/L)", "hold-resume s", "silences", "max silence ms",
++                   "loss",
+                    "fps med (min)", "underruns", "starvation", "rungs", "RSSI"], body) if body else ["(no stream)"]
+     L += ["", "## Every client restart, with its cause", ""]
+     body = []

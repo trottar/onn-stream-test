@@ -49,9 +49,11 @@ class MemoryPlayerChoiceStore : PlayerChoiceStore {
 }
 
 /** B46: the session's ports as the host set them (`ports_set`); an old host's absent key = 2 ports. */
-data class PortsSet(val players: Int, val multitap: Boolean, val multitapAvailable: Boolean, val source: String) {
+data class PortsSet(val players: Int, val multitap: Boolean, val multitapAvailable: Boolean, val source: String,
+                    val capable: Boolean? = null) {
     fun toJson(): JSONObject = JSONObject().put("players", players).put("multitap", multitap)
         .put("multitap_available", multitapAvailable).put("source", source)
+        .apply { capable?.let { put("capable", it) } }      // B67: B63's key, only when the host sent it
 
     companion object {
         val UNKNOWN = PortsSet(2, multitap = false, multitapAvailable = false, source = "absent")
@@ -62,11 +64,14 @@ data class PortsSet(val players: Int, val multitap: Boolean, val multitapAvailab
                 o.optBoolean("multitap", false),
                 o.optBoolean("multitap_available", false),
                 o.optString("source", "host"),
+                // B67: B63's `capable` (an old host: no key, null)
+                if (o.has("capable")) o.optBoolean("capable", true) else null,
             )
 
         /** The echo's fields (the JVM tests' path: org.json is a stub there). */
-        fun of(players: Int, multitap: Boolean, multitapAvailable: Boolean, source: String): PortsSet =
-            PortsSet(players.coerceIn(1, 4), multitap, multitapAvailable, source)
+        fun of(players: Int, multitap: Boolean, multitapAvailable: Boolean, source: String,
+               capable: Boolean? = null): PortsSet =
+            PortsSet(players.coerceIn(1, 4), multitap, multitapAvailable, source, capable)
     }
 }
 
@@ -123,13 +128,19 @@ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceS
     private var relaunchAsk: Int? = null                 // the ports to ask the host for (taken by the activity)
     private var relaunchPad: PadDevice? = null           // the pad waiting for the relaunch
     private var relaunchTarget = MAX_PLAYERS             // the ports asked for (the line's count)
+    private var awaitingStart = false                    // B67: beginStart seen, the start response not yet
 
     /** The joined count (the queries' and the report's `players_joined`). */
     val joined: Int get() = synchronized(lock) { slots.map().size }
 
+    /** B67: the heartbeat's `players_joined` -- none between a start and its response (the map is still the last
+     *  game's then: B64's stale row). */
+    fun joinedForHeartbeat(): Int? = synchronized(lock) { if (awaitingStart) null else slots.map().size }
+
     /** The sender's start: no pre-assignment; the opening waits for the start response. */
     fun beginStart(connected: List<PadDevice>) {
         synchronized(lock) {
+            awaitingStart = true
             holds.clear()
             holdBits.clear()
             holdSince.clear()
@@ -144,9 +155,15 @@ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceS
      */
     fun onStartResponse(selfRestart: Boolean, hostPlayers: Int, portsSet: PortsSet, key: String?, connected: List<PadDevice>) {
         synchronized(lock) {
+            awaitingStart = false
             players = hostPlayers.coerceIn(1, 4)
             ports = portsSet
             gameKey = key
+            // B67: the onn's stored count never above an incapable title's ports (T1's 3 -> 2 at its first start)
+            if (portsSet.capable == false && key != null) {
+                val stored = store.get(key)
+                if (stored != null && stored > portsSet.players) store.put(key, portsSet.players)
+            }
             relaunchAsk = null
             relaunchPad = null
             phase = Phase.JOINING
@@ -333,6 +350,8 @@ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceS
                 relaunches += 1
                 holds.clear()
                 phase = Phase.RELAUNCHING
+            } else if (ports.capable == false) {
+                note("This game supports ${ports.players} players", nowMs)       // B67 (B63's capability)
             } else {
                 note("No multitap on this system — ${ports.players} players", nowMs)
             }

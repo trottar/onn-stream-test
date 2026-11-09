@@ -58,6 +58,33 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
 
+## 2026-11-09 Queue X (B65-B68): the start that never got ready, the hold-resume split, the client items (APK 5f72af4b… pinned), the library .m3u tool — OPEN (A's HOME-9 C29-C33)
+
+(`docs/memory/evidence/B65_N64_CONTINUE_LOAD_2026-11-09.md`, `…/B66_HITCH_HOLD_SPLIT_2026-11-09.md`,
+`…/B67_CLIENT_STRINGS_2026-11-09.md`, `…/B68_LIBRARY_M3U_2026-11-09.md`)
+
+- **B65:**
+  - **The cause is a link drop at the start**, which any system can meet, plus the onn's gate latching. B67's re-arm
+    waits at most 60 s while frames flow; a link that stays bad past that still fails as before.
+  - The queue's "Continue load into a running core" did not happen (the core was paused). The N64 guard is defence
+    only.
+- **B66:**
+  - the bars move to `hitch_s_bar_per_10min`; `hitch_s` keeps today's meaning;
+  - a hold resume is recognised by its `via`, so a new resume path needs adding to the list.
+- **B67:**
+  - **the APK is pinned, not installed** (`queue_x_built/`, `5f72af4b…`); `9aa00ba2…` stays CONFIRMED until HOME-9;
+  - the card's glyphs depend on the onn's font (letters otherwise).
+- **B68:**
+  - **not applied**;
+  - an `.m3u` makes a set a new entry: the one in-game memory card needs `--migrate-states`;
+  - **a disc swap from the onn is not possible yet** (a host `disc-swap` action + a "Change disc" entry in the Back
+    menu: the next APK).
+- **Two of session A's files appeared in the tree during this run** (`_cowork_prompt.txt` modified;
+  `handoffs/H2-P1_GAMECUBE_PROBE_RUN_TASK.md` new). They were not touched.
+- **For the user — leftovers, not deleted:**
+  - `/tmp/b_q16x_*` (~229 MB: the copies, the two APK build trees and the scratch);
+  - `~/.cache/b_q16x_tmp/` (~51 MB: the host suites' and Gradle's temp).
+
 ## 2026-11-08 Queue W (B61-B64): the HOME-7 fixes — the N64 hold freeze, the N64 layout, the PS1 multitap rule, stale pad rows — OPEN (A's HOME-8 C24-C28)
 
 (`docs/memory/evidence/B61_N64_HOLD_FREEZE_2026-11-08.md`, `…/B62_N64_MAPPING_2026-11-08.md`,

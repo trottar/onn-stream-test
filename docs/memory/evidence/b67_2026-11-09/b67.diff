@@ -1,0 +1,456 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/N64LayoutCard.kt b/PrivyHub/app/src/main/java/streaming/N64LayoutCard.kt
+new file mode 100644
+index 0000000..5d57c55
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/N64LayoutCard.kt
+@@ -0,0 +1,21 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B67: the N64 layout, shown once per onn at the first N64 start (the host's `game_session.game.system` = `n64`),
++ * while the player prompt is on. The glyphs only if the font draws all four; else the button names. Dismissed by
++ * the first key-down (not consumed). Remembered in a private preference, written when shown. No prompt = no card.
++ */
++object N64LayoutCard {
++    const val PREFS = "privyhub_n64_layout"
++    const val KEY_SHOWN = "shown"
++    val GLYPHS = listOf("✕", "□", "△", "○")     // ✕ □ △ ○
++    const val TEXT_GLYPHS =
++        "A = ✕, B = □, C-buttons = right stick (also △ = C-up, ○ = C-right), Z = L2"
++    const val TEXT_LETTERS =
++        "A = Cross, B = Square, C-buttons = right stick (also Triangle = C-up, Circle = C-right), Z = L2"
++
++    fun shouldShow(system: String?, promptOn: Boolean, alreadyShown: Boolean): Boolean =
++        promptOn && !alreadyShown && system?.trim()?.lowercase() == "n64"
++
++    fun text(hasGlyph: (String) -> Boolean): String = if (GLYPHS.all(hasGlyph)) TEXT_GLYPHS else TEXT_LETTERS
++}
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 2bbf286..9ecbe77 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -502,6 +502,13 @@ class NativeStreamActivity :
+                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
+                 ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; setMargins(24, 24, 24, 130) })
+             }
++            // B67: the N64 layout card, centred (shown once per onn at the first N64 start)
++            n64CardView = line(20f).also { v ->
++                v.setPadding(36, 24, 36, 24)
++                root.addView(v, FrameLayout.LayoutParams(
++                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
++                ).apply { gravity = Gravity.CENTER; setMargins(48, 48, 48, 48) })
++            }
+         }
+ 
+         setContentView(
+@@ -697,6 +704,7 @@ class NativeStreamActivity :
+             "Launching"
+         stabilizationStartedAtNs =
+             System.nanoTime()
++        startGateRearm.arm(0L)      // B67: a new start's first window
+         stabilizationBaselineSet =
+             false
+         stabilizationCleanTicks =
+@@ -930,6 +938,18 @@ class NativeStreamActivity :
+                     PlayerPrompt.gameKey(json.optJSONObject("game_session")?.optJSONObject("game")?.optString("id")),
+                     AndroidPadDevice.connected()
+                 )
++                // B67: the N64 layout once per onn (only with the prompt on: the card's view exists then)
++                n64CardView?.let { card ->
++                    val prefs = getSharedPreferences(N64LayoutCard.PREFS, MODE_PRIVATE)
++                    val system = json.optJSONObject("game_session")?.optJSONObject("game")?.optString("system")
++                    if (N64LayoutCard.shouldShow(system, playerPrompt != null, prefs.getBoolean(N64LayoutCard.KEY_SHOWN, false))) {
++                        prefs.edit().putBoolean(N64LayoutCard.KEY_SHOWN, true).apply()
++                        runOnUiThread {
++                            card.text = N64LayoutCard.text { g -> card.paint.hasGlyph(g) }
++                            card.visibility = View.VISIBLE
++                        }
++                    }
++                }
+ 
+                 // B16: the host's fast ready, only with PRIVYHUB_STALL_RESUME=1 (absent key = today's gate)
+                 if (json.optJSONObject(FastReadyHint.KEY)?.optBoolean(FastReadyHint.FIELD, false) == true) {
+@@ -2627,6 +2647,9 @@ class NativeStreamActivity :
+         if (PlayerPromptFlag.fromSystem()) padSlots?.let { PlayerPrompt(it, PrefsPlayerChoiceStore(this)) } else null
+     }
+     private var promptView: TextView? = null
++    // B67: the N64 layout card (once per onn; null with the prompt off) and the start gate's re-arm (B65)
++    private var n64CardView: TextView? = null
++    private val startGateRearm = StartGateRearm(StartGateRearm.fromSystem())
+     private var promptBadgeView: TextView? = null
+     private fun promptClaimsQuery(): String =
+         playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
+@@ -2928,7 +2951,8 @@ class NativeStreamActivity :
+                 // B34: the slot map (null = today: nothing)
+                 padSlotsQuery() +
+                 // B41: the prompt's claims (null = today: nothing); B54: the joined count
+-                promptClaimsQuery() + promptJoinedQuery() +
++                // B67: no joined count between a start and its response (the last game's map: B64's stale row)
++                promptClaimsQuery() + promptJoinedQuery(playerPrompt?.joinedForHeartbeat()) +
+                 // D-BASE-T1: the onn's own thermal state travels with the
+                 // heartbeat, so a session that never posts a report still
+                 // leaves a temperature trace on the host.
+@@ -3702,6 +3726,18 @@ class NativeStreamActivity :
+                 return
+             }
+ 
++            // B67 (B65): a start whose frames keep coming gets a new window (at most 3; off: today)
++            if (startGateRearm.onTimeout(decoder?.snapshot()?.renderedFrames ?: 0L)) {
++                stabilizationStartedAtNs =
++                    System.nanoTime()
++                stabilizationBaselineSet =
++                    false
++                stabilizationCleanTicks =
++                    0
++                publishStreamStatus()
++                updateStabilizationOverlay()
++                return
++            }
+             failStabilization(
+                 "Stability timeout — game remains paused"
+             )
+@@ -4530,6 +4566,10 @@ class NativeStreamActivity :
+     override fun dispatchKeyEvent(
+         event: KeyEvent
+     ): Boolean {
++        // B67: the N64 layout card goes at the first key-down (the key is not consumed: it goes on as today)
++        if (event.action == KeyEvent.ACTION_DOWN) {
++            n64CardView?.takeIf { it.visibility == View.VISIBLE }?.visibility = View.GONE
++        }
+         // B32: every key noted; a guide / Home-class key from a pad consumed here (null = today)
+         if (surfaceHold?.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.source) == true) {
+             return true
+diff --git a/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt b/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
+index d3a4b7d..9987b5a 100644
+--- a/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
++++ b/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
+@@ -49,9 +49,11 @@ class MemoryPlayerChoiceStore : PlayerChoiceStore {
+ }
+ 
+ /** B46: the session's ports as the host set them (`ports_set`); an old host's absent key = 2 ports. */
+-data class PortsSet(val players: Int, val multitap: Boolean, val multitapAvailable: Boolean, val source: String) {
++data class PortsSet(val players: Int, val multitap: Boolean, val multitapAvailable: Boolean, val source: String,
++                    val capable: Boolean? = null) {
+     fun toJson(): JSONObject = JSONObject().put("players", players).put("multitap", multitap)
+         .put("multitap_available", multitapAvailable).put("source", source)
++        .apply { capable?.let { put("capable", it) } }      // B67: B63's key, only when the host sent it
+ 
+     companion object {
+         val UNKNOWN = PortsSet(2, multitap = false, multitapAvailable = false, source = "absent")
+@@ -62,11 +64,14 @@ data class PortsSet(val players: Int, val multitap: Boolean, val multitapAvailab
+                 o.optBoolean("multitap", false),
+                 o.optBoolean("multitap_available", false),
+                 o.optString("source", "host"),
++                // B67: B63's `capable` (an old host: no key, null)
++                if (o.has("capable")) o.optBoolean("capable", true) else null,
+             )
+ 
+         /** The echo's fields (the JVM tests' path: org.json is a stub there). */
+-        fun of(players: Int, multitap: Boolean, multitapAvailable: Boolean, source: String): PortsSet =
+-            PortsSet(players.coerceIn(1, 4), multitap, multitapAvailable, source)
++        fun of(players: Int, multitap: Boolean, multitapAvailable: Boolean, source: String,
++               capable: Boolean? = null): PortsSet =
++            PortsSet(players.coerceIn(1, 4), multitap, multitapAvailable, source, capable)
+     }
+ }
+ 
+@@ -123,13 +128,19 @@ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceS
+     private var relaunchAsk: Int? = null                 // the ports to ask the host for (taken by the activity)
+     private var relaunchPad: PadDevice? = null           // the pad waiting for the relaunch
+     private var relaunchTarget = MAX_PLAYERS             // the ports asked for (the line's count)
++    private var awaitingStart = false                    // B67: beginStart seen, the start response not yet
+ 
+     /** The joined count (the queries' and the report's `players_joined`). */
+     val joined: Int get() = synchronized(lock) { slots.map().size }
+ 
++    /** B67: the heartbeat's `players_joined` -- none between a start and its response (the map is still the last
++     *  game's then: B64's stale row). */
++    fun joinedForHeartbeat(): Int? = synchronized(lock) { if (awaitingStart) null else slots.map().size }
++
+     /** The sender's start: no pre-assignment; the opening waits for the start response. */
+     fun beginStart(connected: List<PadDevice>) {
+         synchronized(lock) {
++            awaitingStart = true
+             holds.clear()
+             holdBits.clear()
+             holdSince.clear()
+@@ -144,9 +155,15 @@ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceS
+      */
+     fun onStartResponse(selfRestart: Boolean, hostPlayers: Int, portsSet: PortsSet, key: String?, connected: List<PadDevice>) {
+         synchronized(lock) {
++            awaitingStart = false
+             players = hostPlayers.coerceIn(1, 4)
+             ports = portsSet
+             gameKey = key
++            // B67: the onn's stored count never above an incapable title's ports (T1's 3 -> 2 at its first start)
++            if (portsSet.capable == false && key != null) {
++                val stored = store.get(key)
++                if (stored != null && stored > portsSet.players) store.put(key, portsSet.players)
++            }
+             relaunchAsk = null
+             relaunchPad = null
+             phase = Phase.JOINING
+@@ -333,6 +350,8 @@ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceS
+                 relaunches += 1
+                 holds.clear()
+                 phase = Phase.RELAUNCHING
++            } else if (ports.capable == false) {
++                note("This game supports ${ports.players} players", nowMs)       // B67 (B63's capability)
+             } else {
+                 note("No multitap on this system — ${ports.players} players", nowMs)
+             }
+diff --git a/PrivyHub/app/src/main/java/streaming/StartGateRearm.kt b/PrivyHub/app/src/main/java/streaming/StartGateRearm.kt
+new file mode 100644
+index 0000000..f72bd96
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/StartGateRearm.kt
+@@ -0,0 +1,42 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B67 (B65's evidence): a game *start* whose stabilization window (15 s) ends while the decoder keeps rendering new
++ * frames gets a new window instead of latching "Game stream isn't ready" -- up to [MAX_REARMS] (60 s in all). A
++ * start with no new frames fails at 15 s, as before. `debug.privyhub.start_gate_rearm=0` = before (always fail).
++ * A recovery does not use this (it re-arms on its own, D-BASE-R3).
++ */
++class StartGateRearm(private val enabled: Boolean) {
++    var rearms: Int = 0
++        private set
++    private var renderedAtArm = 0L
++
++    /** A new start's first window. */
++    fun arm(rendered: Long) {
++        rearms = 0
++        renderedAtArm = rendered
++    }
++
++    /** At a window's end: true = re-armed (a new window), false = fail as before. */
++    fun onTimeout(rendered: Long): Boolean {
++        if (!enabled || rearms >= MAX_REARMS || rendered <= renderedAtArm) return false
++        rearms += 1
++        renderedAtArm = rendered
++        return true
++    }
++
++    companion object {
++        const val PROPERTY = "debug.privyhub.start_gate_rearm"
++        const val MAX_REARMS = 3
++
++        fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
++
++        fun fromSystem(): Boolean =
++            try {
++                val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++                parse(get.invoke(null, PROPERTY) as? String)
++            } catch (_: Throwable) {
++                parse(null)
++            }
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/B67ClientTest.kt b/PrivyHub/app/src/test/java/streaming/B67ClientTest.kt
+new file mode 100644
+index 0000000..c96cbd6
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/B67ClientTest.kt
+@@ -0,0 +1,201 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++
++/**
++ * B67: the N64 layout card's rule and text; "This game supports 2 players" (B63's `capable`); the onn's stored
++ * joined count capped at an incapable title's ports; no joined count between a start and its response (B64's
++ * order); the start gate's re-arm (B65). Fake pads as PlayerPromptTest's; a fake clock (ms passed in).
++ */
++class B67ClientTest {
++
++    private data class Dev(
++        override val descriptor: String,
++        override val controllerNumber: Int,
++        override val vendorId: Int,
++        override val productId: Int,
++        override val sources: Int,
++        override val hasGamepadButton: Boolean,
++        override val isVirtual: Boolean,
++        override val hasFaceButton: Boolean,
++        override val hasStickOrHat: Boolean,
++    ) : PadDevice
++
++    private fun pad(n: Int) = Dev("pad-$n-desc", n + 1, 0x054c, 0x09cc, 0x00000401 or 0x01000010 or 0x00000101,
++        hasGamepadButton = true, isVirtual = false, hasFaceButton = true, hasStickOrHat = true)
++    private val padA = pad(1)
++    private val padB = pad(2)
++    private val padC = pad(3)
++    private val onn = listOf(padA, padB, padC)
++    private val a = PlayerPrompt.KEYCODE_BUTTON_A
++    private val game = PlayerPrompt.gameKey("ps1-two-player-title")
++
++    private val incapable = PortsSet.of(2, false, false, "join", capable = false)
++    private val oldHost = PortsSet.of(2, false, false, "metadata")
++    private val capableTwo = PortsSet.of(2, false, true, "join", capable = true)
++
++    @Before
++    fun clear() {
++        PlayerPromptProcess.lastJoined = null
++    }
++
++    private fun start(p: PlayerPrompt, ports: PortsSet) {
++        p.beginStart(onn)
++        p.onStartResponse(false, 2, ports, game, onn)
++    }
++
++    private fun hold(p: PlayerPrompt, d: PadDevice, from: Long): Long {
++        p.onJoinKey(a, true, 0, d, from)
++        var t = from
++        while (t < from + PlayerPrompt.HOLD_MS + 100) { t += 50; p.tick(t, onn) }
++        p.onJoinKey(a, false, 0, d, t)
++        return t + 50
++    }
++
++    // --- 1. the N64 layout card -----------------------------------------------------------------------------------
++
++    @Test
++    fun theCardOnlyOnceForN64WithThePromptOn() {
++        assertTrue(N64LayoutCard.shouldShow("n64", promptOn = true, alreadyShown = false))
++        assertTrue(N64LayoutCard.shouldShow(" N64 ", promptOn = true, alreadyShown = false))
++        assertFalse(N64LayoutCard.shouldShow("n64", promptOn = true, alreadyShown = true))
++        assertFalse(N64LayoutCard.shouldShow("n64", promptOn = false, alreadyShown = false))
++        assertFalse(N64LayoutCard.shouldShow("ps1", promptOn = true, alreadyShown = false))
++        assertFalse(N64LayoutCard.shouldShow(null, promptOn = true, alreadyShown = false))
++    }
++
++    @Test
++    fun theCardsGlyphsOnlyWhenAllDraw() {
++        assertEquals("A = ✕, B = □, C-buttons = right stick (also △ = C-up, ○ = C-right), Z = L2",
++            N64LayoutCard.text { true })
++        assertEquals(N64LayoutCard.TEXT_LETTERS, N64LayoutCard.text { it != "△" })
++        assertEquals("A = Cross, B = Square, C-buttons = right stick (also Triangle = C-up, Circle = C-right), Z = L2",
++            N64LayoutCard.text { false })
++    }
++
++    // --- 2. the note ------------------------------------------------------------------------------------------------
++
++    @Test
++    fun anIncapableTitleSaysThisGameSupportsTwo() {
++        val p = PlayerPrompt(PadSlots(), MemoryPlayerChoiceStore())
++        start(p, incapable)
++        var t = hold(p, padA, 1_000)
++        t = hold(p, padB, t)
++        t = hold(p, padC, t)
++        assertEquals(2, p.joined)
++        assertNull(p.takeRelaunchRequest())
++        assertTrue(p.view(t, onn).prompt!!.contains("This game supports 2 players"))
++    }
++
++    @Test
++    fun anOldHostKeepsTodaysWords() {
++        val p = PlayerPrompt(PadSlots(), MemoryPlayerChoiceStore())
++        start(p, oldHost)
++        var t = hold(p, padA, 1_000)
++        t = hold(p, padB, t)
++        t = hold(p, padC, t)
++        assertTrue(p.view(t, onn).prompt!!.contains("No multitap on this system — 2 players"))
++    }
++
++    @Test
++    fun aCapableTitleStillAsksTheRelaunch() {
++        val p = PlayerPrompt(PadSlots(), MemoryPlayerChoiceStore())
++        start(p, capableTwo)
++        var t = hold(p, padA, 1_000)
++        t = hold(p, padB, t)
++        hold(p, padC, t)
++        assertEquals(4, p.takeRelaunchRequest())
++    }
++
++    // --- 3. the stored count ----------------------------------------------------------------------------------------
++
++    @Test
++    fun aStoredThreeIsCappedAtTheFirstStart() {
++        val store = MemoryPlayerChoiceStore()
++        store.put(game!!, 3)
++        start(PlayerPrompt(PadSlots(), store), incapable)
++        assertEquals(2, store.get(game))
++    }
++
++    @Test
++    fun joinsNeverStoreAboveTheIncapablePorts() {
++        val store = MemoryPlayerChoiceStore()
++        val p = PlayerPrompt(PadSlots(), store)
++        start(p, incapable)
++        var t = hold(p, padA, 1_000)
++        t = hold(p, padB, t)
++        hold(p, padC, t)
++        assertEquals(2, store.get(game!!))
++    }
++
++    @Test
++    fun aCapableTitleKeepsItsThree() {
++        val store = MemoryPlayerChoiceStore()
++        store.put(game!!, 3)
++        start(PlayerPrompt(PadSlots(), store), PortsSet.of(4, true, true, "join", capable = true))
++        assertEquals(3, store.get(game))
++        start(PlayerPrompt(PadSlots(), store), oldHost)
++        assertEquals(3, store.get(game))
++    }
++
++    // --- 4. the order at a new start --------------------------------------------------------------------------------
++
++    @Test
++    fun noJoinedCountBetweenAStartAndItsResponse() {
++        val p = PlayerPrompt(PadSlots(), MemoryPlayerChoiceStore())
++        start(p, incapable)
++        var t = hold(p, padA, 1_000)
++        hold(p, padB, t)
++        assertEquals(2, p.joinedForHeartbeat())
++        p.beginStart(onn)                                        // the next game: the map still the last game's
++        assertEquals(2, p.joined)
++        assertNull(p.joinedForHeartbeat())
++        p.onStartResponse(false, 2, incapable, game, onn)
++        assertEquals(0, p.joinedForHeartbeat())
++        t = hold(p, padA, 10_000)
++        assertEquals(1, p.joinedForHeartbeat())
++    }
++
++    // --- 5. the start gate's re-arm ---------------------------------------------------------------------------------
++
++    @Test
++    fun theGateReArmsWhileFramesFlowAtMostThree() {
++        val g = StartGateRearm(enabled = true)
++        g.arm(0)
++        assertTrue(g.onTimeout(900))
++        assertTrue(g.onTimeout(1800))
++        assertTrue(g.onTimeout(2700))
++        assertFalse(g.onTimeout(3600))                           // 60 s in all, then today's failure
++        assertEquals(3, g.rearms)
++        g.arm(0)
++        assertEquals(0, g.rearms)
++    }
++
++    @Test
++    fun noNewFramesOrOffFailsAsToday() {
++        val g = StartGateRearm(enabled = true)
++        g.arm(0)
++        assertFalse(g.onTimeout(0))
++        val h = StartGateRearm(enabled = true)
++        h.arm(0)
++        assertTrue(h.onTimeout(500))
++        assertFalse(h.onTimeout(500))                            // frames stopped since the last window
++        val off = StartGateRearm(enabled = false)
++        off.arm(0)
++        assertFalse(off.onTimeout(900))
++        assertTrue(StartGateRearm.parse(null))
++        assertFalse(StartGateRearm.parse("0"))
++        assertFalse(StartGateRearm.parse("off"))
++    }
++
++    @Test
++    fun portsSetCarriesCapable() {
++        assertNull(PortsSet.of(2, false, true, "x").capable)
++        assertEquals(false, PortsSet.of(2, false, false, "x", capable = false).capable)
++    }
++}

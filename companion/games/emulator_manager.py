@@ -100,6 +100,10 @@ class EmulatorManager:
         self._ps2: Any = None
         # B61: the N64 core while an N64 session runs (only with PRIVYHUB_N64=1); None = every other session (today)
         self._n64_core: str | None = None
+        # B65: the last N64 load's row for the plugin (continue_load / continue_skipped); None otherwise
+        self._n64_continue_event: dict[str, Any] | None = None
+        # B66: the last RetroArch launch's --device arguments (the plugin's launch_ports row); [] for PCSX2
+        self._last_device_args: list[str] = []
 
         # PrivyHub A7.3: optional per-launch deterministic cheat profile.
         # A non-null session always uses isolated save/state storage, and any
@@ -5869,6 +5873,7 @@ class EmulatorManager:
             self._players_session = players_plan
             # B61: an N64 session (no state save is ever sent into its running core); None for every other launch
             self._n64_core = core_path.name if n64_launch else None
+            self._last_device_args = [a for a in command if a.startswith("--device=")]   # B66
             self.started_at = time.monotonic()
             self._paused = False
             isolated_session = cheat_session if cheat_session is not None else mod_session
@@ -6999,6 +7004,7 @@ class EmulatorManager:
         self._players_session = plan if chosen is not None else None
         self._hold_rewind_core = None
         self._launch_kind = "pcsx2"
+        self._last_device_args = []       # B66: PCSX2 takes its ports from its ini
         # B52: the session reads PCSX2's own log (the ELF line, the TLB check)
         self._ps2 = _ps2.Session(process.pid, log_line, log_path=pcsx2_log)
 
@@ -8142,6 +8148,29 @@ class EmulatorManager:
     # recovery save uses the identical RetroArch command, the identical
     # artifact observation and the identical stability wait. Only the
     # destination differs, and the recovery destination is never a slot.
+    N64_LOAD_PAUSED_BOUND_S = 1.5    # B65
+
+    def _n64_confirm_paused_for_load(self, slot: int) -> int:
+        """B65 (an N64 session only): GET_STATUS must answer PAUSED within the bound before the load; else the load is
+        refused (never sent) with a `continue_skipped` event for the plugin's row. Returns the ms it took."""
+        t0 = time.monotonic()
+        deadline = t0 + self.N64_LOAD_PAUSED_BOUND_S
+        last = None
+        while True:
+            try:
+                last = self._retroarch_network_status()
+                if last == "PAUSED":
+                    return int((time.monotonic() - t0) * 1000.0)
+            except EmulatorError:
+                pass
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.05)
+        reason = f"n64: core not paused {last}" if last else "n64: command port silent"
+        self._n64_continue_event = {"event": "continue_skipped", "slot": slot, "reason": reason}
+        self.record_save_state_probe_event("load_state_failure", slot=slot, reason=reason)
+        raise EmulatorError(f"N64 load refused: {reason}")
+
     def _n64_pause_for_save(self, probe_slot: int) -> bool:
         """B61 (an N64 session only): pause a PLAYING core before its save. True = it was paused here (resume after).
         A core that does not pause refuses the save (never sent into a running N64 core)."""
@@ -8676,6 +8705,12 @@ class EmulatorManager:
                 scratch=scratch_diag,
             )
 
+            # B65: an N64 load only into a core that answers PAUSED right now (B61: never a state into a running core)
+            n64_status_ms = None
+            if getattr(self, "_n64_core", None):
+                n64_status_ms = self._n64_confirm_paused_for_load(normalized)
+            t_load = time.monotonic()
+
             response = (
                 self._retroarch_network_request(
                     "LOAD_STATE_SLOT 0",
@@ -8684,6 +8719,10 @@ class EmulatorManager:
                     retries=1,
                 )
             )
+            if n64_status_ms is not None and response and response.upper().startswith("LOAD_STATE_SLOT 0"):
+                self._n64_continue_event = {"event": "continue_load", "slot": normalized,
+                                            "status_ms": n64_status_ms,
+                                            "load_ms": int((time.monotonic() - t_load) * 1000.0)}
 
             if (
                 not response

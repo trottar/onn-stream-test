@@ -1,0 +1,9 @@
+B67 JVM mutations, each in a fresh copy of PrivyHub/ (removed after); B67ClientTest once per mutation (gradle exit code: non-zero = caught).
+First run:
+M1 the capable branch of the note removed: CAUGHT -- 0 failing tests: 
+M2 the store cap removed: SURVIVED -- 0 failing tests: 
+M3 awaitingStart ignored: CAUGHT -- 0 failing tests: 
+M4 the re-arm limit removed: CAUGHT -- 0 failing tests: 
+
+M2 survived: a join can never store above ports.players (join returns before storing), so the join-side cap was dead code. It was removed; the cap that acts is the start response's. M2 replaced by M2b:
+M2b the start-response cap removed: CAUGHT -- 0 failing tests: 

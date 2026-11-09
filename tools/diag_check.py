@@ -183,9 +183,15 @@ def line_last_session(path: Path) -> str | None:
         r = json.loads(rows[-1])
     except ValueError:
         return None
-    if r.get("system") != "ps2":
+    # B66: an N64 row too; both with the bar's number and the hold-resume seconds (other systems: no line, today)
+    system = r.get("system") or ("n64" if r.get("core") == "mupen64plus-next" else None)
+    if system not in ("ps2", "n64"):
         return None
-    return f"last session: ps2 ({r.get('core')}) {r.get('end_utc') or 'open'}, hitch s / 10 min {r.get('hitch_s_per_10min')}"
+    bar = ""
+    if "hitch_s_bar_per_10min" in r:
+        bar = f" (bar {r.get('hitch_s_bar_per_10min')} / 10 min, hold-resume {r.get('hold_resume_s')} s)"
+    return (f"last session: {system} ({r.get('core')}) {r.get('end_utc') or 'open'}, "
+            f"hitch s / 10 min {r.get('hitch_s_per_10min')}{bar}")
 
 
 def main(argv: list[str] | None = None) -> int:

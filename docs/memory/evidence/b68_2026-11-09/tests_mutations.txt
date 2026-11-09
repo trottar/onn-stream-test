@@ -1,0 +1,14 @@
+B68 mutations, each in a fresh copy (removed after); tests/b68_library_m3u once per mutation.
+First run:
+M1 the gap check removed: CAUGHT -- tests/b68_library_m3u: Ran 10 tests in 0.514s / FAILED (failures=1)
+M2 overwrite allowed (a present target copied over): SURVIVED -- tests/b68_library_m3u: Ran 10 tests in 0.513s / OK
+M3 the disc order reversed: CAUGHT -- tests/b68_library_m3u: Ran 10 tests in 0.368s / FAILED (failures=3)
+M4 the migration ignoring newest: CAUGHT -- tests/b68_library_m3u: Ran 10 tests in 0.510s / FAILED (failures=1)
+M5 undo removing a changed file: CAUGHT -- tests/b68_library_m3u: Ran 10 tests in 0.512s / FAILED (failures=1)
+
+M2 survived (the fresh plan already skips a present target; the copy loop's check guards the window between that plan and the copy). A test for that window added; all five re-run:
+M1 the gap check removed: CAUGHT -- tests/b68_library_m3u: Ran 11 tests in 0.536s / FAILED (failures=1)
+M2 overwrite allowed (a present target copied over): CAUGHT -- tests/b68_library_m3u: Ran 11 tests in 0.545s / FAILED (failures=1)
+M3 the disc order reversed: CAUGHT -- tests/b68_library_m3u: Ran 11 tests in 0.395s / FAILED (failures=3)
+M4 the migration ignoring newest: CAUGHT -- tests/b68_library_m3u: Ran 11 tests in 0.534s / FAILED (failures=1)
+M5 undo removing a changed file: CAUGHT -- tests/b68_library_m3u: Ran 11 tests in 0.538s / FAILED (failures=1)

@@ -2473,6 +2473,15 @@ rather than create a second game-library path.
 >
 > **The multi-disc reading (HOME-7 C19):** without the import flag the list reads "PlayStation (80)"; the library's
 > multi-disc PS1 sets show one entry per disc (no `.m3u` in the library) — one entry per game waits on the user's word.
+>
+> **B68 (2026-11-09, B, on the user's "go m3u"; `docs/memory/evidence/B68_LIBRARY_M3U_2026-11-09.md`):**
+> - **built, not applied:** `tools/library_m3u.py` `plan | apply | undo` behind `PRIVYHUB_IMPORT=1`. One `.m3u` per
+>   multi-disc set beside its discs; never moves or deletes a disc; the list (today's `.m3u` rule) shows one entry per
+>   set.
+> - **The hub:** 6 sets (14 disc entries); no PrivyHub save states on them; one in-game memory card to copy
+>   (`--migrate-states`).
+> - **Disc swap from the onn:** listed for the next APK.
+> - **A applies at HOME-9 only on the user's "apply m3u".**
 
 ## H1 — N64
 
@@ -2518,6 +2527,21 @@ Question:
 >   - **built:** a verified core remap at every N64 launch (○ = C-right, △ = C-up; the right stick keeps all four), a
 >     per-title `n64_layout`, and the layout on the game's details line.
 > - **Next:** A's HOME-8 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-08W.md`).
+>
+> **B65-B67 (2026-11-09, B) — after HOME-8 (every fix met):**
+> - **B65** (`evidence/B65_N64_CONTINUE_LOAD_2026-11-09.md`):
+>   - the first start that never got ready was 14 s of link loss right after the stream began; the onn's 15-s start
+>     gate latched "Game stream isn't ready", though the link was clean afterwards;
+>   - the Continue load went into a paused core (not B61's hazard);
+>   - **built:** the start gate re-arms while frames flow (B67's APK), and an N64 load only into a core answering
+>     `PAUSED` (inside `PRIVYHUB_N64=1`).
+> - **B66** (`evidence/B66_HITCH_HOLD_SPLIT_2026-11-09.md`): UX-R3 counts a hold's resume seconds apart. **The bars
+>   compare `hitch_s_bar_per_10min`.** C28's 6.6 reads bar 3.3. The hub logs a `launch_ports` row.
+> - **B67** (`evidence/B67_CLIENT_STRINGS_2026-11-09.md`):
+>   - the N64 layout card, "This game supports 2 players", the onn's stored count capped, the pad-row order, the
+>     re-arm;
+>   - APK `5f72af4b…` pinned, not installed.
+> - **Next:** A's HOME-9 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-09X.md`).
 
 ## H2 — GameCube
 

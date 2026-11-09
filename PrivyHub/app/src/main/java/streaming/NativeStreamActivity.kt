@@ -502,6 +502,13 @@ class NativeStreamActivity :
                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
                 ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; setMargins(24, 24, 24, 130) })
             }
+            // B67: the N64 layout card, centred (shown once per onn at the first N64 start)
+            n64CardView = line(20f).also { v ->
+                v.setPadding(36, 24, 36, 24)
+                root.addView(v, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.CENTER; setMargins(48, 48, 48, 48) })
+            }
         }
 
         setContentView(
@@ -697,6 +704,7 @@ class NativeStreamActivity :
             "Launching"
         stabilizationStartedAtNs =
             System.nanoTime()
+        startGateRearm.arm(0L)      // B67: a new start's first window
         stabilizationBaselineSet =
             false
         stabilizationCleanTicks =
@@ -930,6 +938,18 @@ class NativeStreamActivity :
                     PlayerPrompt.gameKey(json.optJSONObject("game_session")?.optJSONObject("game")?.optString("id")),
                     AndroidPadDevice.connected()
                 )
+                // B67: the N64 layout once per onn (only with the prompt on: the card's view exists then)
+                n64CardView?.let { card ->
+                    val prefs = getSharedPreferences(N64LayoutCard.PREFS, MODE_PRIVATE)
+                    val system = json.optJSONObject("game_session")?.optJSONObject("game")?.optString("system")
+                    if (N64LayoutCard.shouldShow(system, playerPrompt != null, prefs.getBoolean(N64LayoutCard.KEY_SHOWN, false))) {
+                        prefs.edit().putBoolean(N64LayoutCard.KEY_SHOWN, true).apply()
+                        runOnUiThread {
+                            card.text = N64LayoutCard.text { g -> card.paint.hasGlyph(g) }
+                            card.visibility = View.VISIBLE
+                        }
+                    }
+                }
 
                 // B16: the host's fast ready, only with PRIVYHUB_STALL_RESUME=1 (absent key = today's gate)
                 if (json.optJSONObject(FastReadyHint.KEY)?.optBoolean(FastReadyHint.FIELD, false) == true) {
@@ -2627,6 +2647,9 @@ class NativeStreamActivity :
         if (PlayerPromptFlag.fromSystem()) padSlots?.let { PlayerPrompt(it, PrefsPlayerChoiceStore(this)) } else null
     }
     private var promptView: TextView? = null
+    // B67: the N64 layout card (once per onn; null with the prompt off) and the start gate's re-arm (B65)
+    private var n64CardView: TextView? = null
+    private val startGateRearm = StartGateRearm(StartGateRearm.fromSystem())
     private var promptBadgeView: TextView? = null
     private fun promptClaimsQuery(): String =
         playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
@@ -2928,7 +2951,8 @@ class NativeStreamActivity :
                 // B34: the slot map (null = today: nothing)
                 padSlotsQuery() +
                 // B41: the prompt's claims (null = today: nothing); B54: the joined count
-                promptClaimsQuery() + promptJoinedQuery() +
+                // B67: no joined count between a start and its response (the last game's map: B64's stale row)
+                promptClaimsQuery() + promptJoinedQuery(playerPrompt?.joinedForHeartbeat()) +
                 // D-BASE-T1: the onn's own thermal state travels with the
                 // heartbeat, so a session that never posts a report still
                 // leaves a temperature trace on the host.
@@ -3702,6 +3726,18 @@ class NativeStreamActivity :
                 return
             }
 
+            // B67 (B65): a start whose frames keep coming gets a new window (at most 3; off: today)
+            if (startGateRearm.onTimeout(decoder?.snapshot()?.renderedFrames ?: 0L)) {
+                stabilizationStartedAtNs =
+                    System.nanoTime()
+                stabilizationBaselineSet =
+                    false
+                stabilizationCleanTicks =
+                    0
+                publishStreamStatus()
+                updateStabilizationOverlay()
+                return
+            }
             failStabilization(
                 "Stability timeout — game remains paused"
             )
@@ -4530,6 +4566,10 @@ class NativeStreamActivity :
     override fun dispatchKeyEvent(
         event: KeyEvent
     ): Boolean {
+        // B67: the N64 layout card goes at the first key-down (the key is not consumed: it goes on as today)
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            n64CardView?.takeIf { it.visibility == View.VISIBLE }?.visibility = View.GONE
+        }
         // B32: every key noted; a guide / Home-class key from a pad consumed here (null = today)
         if (surfaceHold?.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.source) == true) {
             return true
