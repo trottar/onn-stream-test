@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-11-08
-baseline_commit: 3c705130 (queue W; HOME-8 uncommitted beside it; the user commits)
+as_of: 2026-11-09
+baseline_commit: 7d0056b4 (queue X; H2-P1 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -19,8 +19,10 @@ APK `9aa00ba2…` CONFIRMED (HOME-7).
 
 ## Current Work Item
 
-- **HOME-8 done, uncommitted** (`evidence/HOME_8_N64_FIXES_2026-11-08.md`): queue W checked — C24-C27 met (N64 buttons,
-  the Home hold without a freeze, PS1 multitap only for capable titles); C28's hitch bar not met by the number.
+- **H2-P1 done, uncommitted** (`evidence/H2_P1_GAMECUBE_PROBE_2026-11-09.md`): Dolphin 2609b (the upstream AppImage),
+  Vulkan on RADV, 1x, each title twice, unattended.
+  - T1: all rows met (60 / 30 fps held, CPU thread max 38 %, state 0.21 s, no spin-up).
+  - T2: all met except P2's minimum on run 1 (50 vs 55, capture-side; run 2 59).
 
 ## Verified State
 
@@ -85,12 +87,11 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of HOME-8 (`logs/home8_git_status.txt`), and (if not answered) one entry per multi-disc PS1
-   game (yes / no) and Dolphin for the GameCube probe (yes / no).
-2. **B: queue X** — the next APK with the four client items (the N64 layout shown once; "This game supports 2
-   players"; the stored count capped on the onn; the pad-slot order) + the multi-disc `.m3u` if the user says yes; the
-   N64 first-start ready miss; C28's hitch bar.
-3. **A: H2-P1** (Dolphin) on the user's go, then B's GameCube launch kind. **Open:** the drive read-ahead; G-A8.
+1. **The user's commit** of H2-P1 (`logs/h2_p1_git_status.txt`).
+2. **B69:** the GameCube launch kind (`-b -u <user dir> -e <title>`; the F10 pause checked by `CPU thread`'s time; the
+   state hotkeys; `GCPadNew.ini` for the four virtual pads; no PID / audio / keep-awake item).
+3. **A: HOME-9** (queue X's APK `5f72af4b…` and cells C29-C33), then the GameCube streamed play (P0d / P7) after B69.
+   **Open:** the drive read-ahead; G-A8.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over
@@ -143,7 +144,7 @@ CONFIRMED only by its pre-registered rule (CL-B7 §6); otherwise the previous CO
 
 - G adoptions: `evidence/G_A1_…`, `G_A2_…`, `G_A3_…`, `G_A4_…`, `G_A5_…`, `G_A7_…`, `TRIP_PREP_2026-10-29.md` (G-A9),
   `G_A10_…_2026-11-02.md`, `G_A13_…_2026-11-07.md`, `G9_CHECKPOINT_2026-11-07.md`; `docs/REMOTE_TRUST.md`. Client / trip: `CL_B14_…` (`fcd924c2…`), `CL_B16_…`, `TRIP_R2_…`,
-  `HOME_1_…`, `HOME_2_…`, `HOME_3_…`, `HOME_4_PLUS_…`, `HOME_5_…`, `HOME_6_…`, `IMPORT_1_…`, `HOME_7_…`, `HOME_8_…`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
+  `HOME_1_…` … `HOME_8_…`, `IMPORT_1_…`, `H2_P1_…_2026-11-09`, queue N's `B41_…` / `B42_…` / `B43_…` and `handoffs/SESSION_B_DONE_2026-11-06N.md`.
 - Closers: `evidence/E4_CLOSEOUT_2026-10-15.md`, `E2_S1_…`, `E1_S1_…`, `C5_CLOSE_2026-10-05.md`,
   `D_BASE_CLOSEOUT_2026-09-23.md`; `architecture/E1_WORKLOAD_SUITE.md`.
 - Indexes: `handoffs/README.md`, `patches/PATCH_INDEX.md`, `archive/INDEX.md`; `docs/ROADMAP.md`, `docs/KNOWN_ISSUES.md`,

@@ -1,0 +1,342 @@
+{
+ "m1_n64_frames": {
+  "frames": 3600,
+  "seconds": 59,
+  "kept_seconds": 59,
+  "excluded_static_or_black_seconds": 0,
+  "internal_fps": 60,
+  "internal_fps_source": "mode",
+  "distinct_mode": 60,
+  "median_distinct_fps": 60,
+  "min_distinct_fps": 59,
+  "hitch_bar_lt": 50.0,
+  "hitch_seconds": 0,
+  "hitch_at_s": [],
+  "hitch_per_10min": 0.0
+ },
+ "m1_raw": {
+  "captured_frames": 3600,
+  "seconds": 59,
+  "distinct": 3596,
+  "median_fps": 60,
+  "min_fps": 59,
+  "black_frames": 0
+ },
+ "m4": {
+  "p50_ms": 16.67,
+  "p95_ms": 16.84,
+  "p99_ms": 17.09,
+  "max_ms": 33.35,
+  "gaps_gt_100ms": 0
+ },
+ "m4_first_span": {
+  "span_s": 175.0,
+  "distinct": 10059,
+  "gaps_gt_100ms": 6,
+  "gaps_gt_50ms": 15,
+  "max_gap_ms": 1800.0
+ },
+ "dolphin_render_times": {
+  "n": 15085,
+  "total_s": 257.2,
+  "mean_per_s": 58.64,
+  "p50_ms": 16.69,
+  "p95_ms": 17.27,
+  "p99_ms": 17.67,
+  "max_ms": 1801.0,
+  "gt_20ms": 41,
+  "gt_34ms": 18,
+  "gt_100ms": 5,
+  "first_span_gt_100ms": 5,
+  "first_span_gt_34ms": 16
+ },
+ "dolphin_vblank_times": {
+  "n": 15679,
+  "total_s": 262.9,
+  "mean_per_s": 59.63,
+  "p50_ms": 16.68,
+  "p95_ms": 16.69,
+  "p99_ms": 16.91,
+  "max_ms": 146.9,
+  "gt_20ms": 24,
+  "gt_34ms": 18,
+  "gt_100ms": 15,
+  "first_span_gt_100ms": 14,
+  "first_span_gt_34ms": 17
+ },
+ "m2": {
+  "cores": 12,
+  "per_core_median": {
+   "0": 19.1,
+   "1": 15.7,
+   "2": 14.7,
+   "3": 13.1,
+   "4": 14.0,
+   "5": 11.0,
+   "6": 14.3,
+   "7": 10.1,
+   "8": 12.8,
+   "9": 11.1,
+   "10": 12.9,
+   "11": 10.0
+  },
+  "per_core_max": {
+   "0": 49.1,
+   "1": 52.9,
+   "2": 54.8,
+   "3": 45.5,
+   "4": 46.5,
+   "5": 45.1,
+   "6": 59.0,
+   "7": 54.3,
+   "8": 48.5,
+   "9": 40.0,
+   "10": 48.0,
+   "11": 64.7
+  },
+  "longest_run_ge90_s": 0,
+  "busiest_core": 0,
+  "max_core_pct": 64.65,
+  "threads_top": [
+   {
+    "thread": "Video thread",
+    "mean": 39.1,
+    "max": 47.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "CPU thread",
+    "mean": 32.7,
+    "max": 45.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "threaded-ml",
+    "mean": 3.2,
+    "max": 5.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "SDL Hotplug Thr",
+    "mean": 1.4,
+    "max": 3.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "HotkeyScheduler",
+    "mean": 0.9,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "VK submission t",
+    "mean": 0.8,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "WSI swapchain q",
+    "mean": 0.2,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "WSI swapchain e",
+    "mean": 0.1,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "QXcbEventQueue",
+    "mean": 0.1,
+    "max": 1.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "Emuthread - Sta",
+    "mean": 0.1,
+    "max": 1.0,
+    "longest_ge90_s": 0
+   }
+  ]
+ },
+ "m3": {
+  "samples": 267,
+  "median": 19.0,
+  "p95": 20.0,
+  "max": 20.0
+ },
+ "m6": {
+  "samples": 267,
+  "median": 59.375,
+  "max": 61.5
+ },
+ "m5": {
+  "iostat_seconds": 275,
+  "stall_seconds": 0,
+  "stall_seconds_after_60s": 0,
+  "stall_at_s": [],
+  "max_r_await_ms": 0.0,
+  "max_r_await_after_60s_ms": 0.0,
+  "busy_read_seconds": 0,
+  "reads_total": 0,
+  "writes_total": 0
+ },
+ "events": [
+  {
+   "at_utc": "2026-11-09T01:51:37.286Z",
+   "event": "launch",
+   "run": "2"
+  },
+  {
+   "at_utc": "2026-11-09T01:51:38.287Z",
+   "event": "started_pid",
+   "comm": "AppRun",
+   "tree": [
+    "AppRun"
+   ]
+  },
+  {
+   "at_utc": "2026-11-09T01:51:43.468Z",
+   "event": "capture_source",
+   "fullscreen": true
+  },
+  {
+   "at_utc": "2026-11-09T01:51:43.469Z",
+   "event": "first_span_start",
+   "at_s": 6.2
+  },
+  {
+   "at_utc": "2026-11-09T01:53:46.145Z",
+   "event": "p0b",
+   "hit": true,
+   "pid_is": "started",
+   "comm": "AppRun",
+   "visible_windows": 1,
+   "at_s": 4.0
+  },
+  {
+   "at_utc": "2026-11-09T01:53:46.145Z",
+   "event": "p0c",
+   "started_pid_inputs": 1,
+   "child_inputs": 0,
+   "at_s": 12.4
+  },
+  {
+   "at_utc": "2026-11-09T01:53:46.145Z",
+   "event": "tree",
+   "comms": [
+    "AppRun"
+   ]
+  },
+  {
+   "at_utc": "2026-11-09T01:53:46.146Z",
+   "event": "threads",
+   "n": 39,
+   "names": [
+    "Analytics",
+    "AppRun",
+    "Asset Loader 0",
+    "Asset Loader 1",
+    "AsyncShaderComp",
+    "CPU thread",
+    "DVD thread",
+    "DiscordHandler",
+    "Emuthread - Sta",
+    "GameList Tracke",
+    "HotkeyScheduler",
+    "Memcard Slot A",
+    "Play Time Track",
+    "QDBusConnection",
+    "QXcbEventQueue",
+    "SDL Hotplug Thr",
+    "Savestate Worke",
+    "VK submission t",
+    "Video thread",
+    "WSI swapchain e",
+    "WSI swapchain q",
+    "Wiimote Pool Th",
+    "Wiimote Scannin",
+    "dolphin:disk$0",
+    "dolphin:disk$1",
+    "dolphin:disk$2",
+    "dolphin:disk$3",
+    "evdev Hotplug T",
+    "evdev cleanup",
+    "libusb",
+    "libusb thread",
+    "libusb_event",
+    "resource-worker",
+    "threaded-ml"
+   ],
+   "llvmpipe": 0
+  },
+  {
+   "at_utc": "2026-11-09T01:53:46.147Z",
+   "event": "cpu_thread",
+   "name": "CPU thread"
+  },
+  {
+   "at_utc": "2026-11-09T01:54:40.444Z",
+   "event": "idle1_done",
+   "alive": true,
+   "since_launch_s": 183.2
+  },
+  {
+   "at_utc": "2026-11-09T01:54:40.607Z",
+   "event": "first_span_end",
+   "at_s": 183.3
+  },
+  {
+   "at_utc": "2026-11-09T01:54:46.812Z",
+   "event": "p0e",
+   "cpu_thread": "CPU thread",
+   "running_ticks_per_s": 29,
+   "hotkey_pause_stand_s": 0.0,
+   "paused_picture_same": true,
+   "hotkey_resume_grow_s": 0.5,
+   "method": "hotkey",
+   "after_ticks_per_s": 35
+  },
+  {
+   "at_utc": "2026-11-09T01:54:59.417Z",
+   "event": "p0f",
+   "save_file_seen_s": 0.21,
+   "save_stable_s": 0.21,
+   "save_mib": 18.3,
+   "save_ok": true,
+   "slot_existed_before": true,
+   "load_picture": {
+    "frames": 51,
+    "distinct_nonblack": 51,
+    "third_distinct_at_s": 0.2,
+    "black_frames": 0
+   },
+   "load_ok": true,
+   "load_check_from_press_s": 5.56
+  },
+  {
+   "at_utc": "2026-11-09T01:55:04.584Z",
+   "event": "capture_start"
+  },
+  {
+   "at_utc": "2026-11-09T01:56:04.857Z",
+   "event": "capture_done"
+  },
+  {
+   "at_utc": "2026-11-09T01:56:10.209Z",
+   "event": "exit",
+   "how": "sigterm",
+   "rc": 0,
+   "exit_s": 0.31,
+   "left": 1,
+   "left_5s": 1
+  }
+ ],
+ "watch": {
+  "checks": 1,
+  "max_windows": 1,
+  "distinct_window_names": 1,
+  "alive_through": true
+ }
+}

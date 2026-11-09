@@ -1,0 +1,34 @@
+H2-P1 the fetch (2026-11-09, session A; the user's "Yes to dolphin")
+
+way (a), checked first: the official download page https://dolphin-emu.org/download/ (Releases). OFFERED.
+  - the page is behind a JavaScript proof-of-work shield (curl: 403); rendered with the hub's Firefox (headless
+    screenshot, kept gitignored at data/games/gamecube/probe/download_page.png). The Releases table's newest stable is
+    2609b ("Second hotfix for 2609", 23 hours old), with "Linux x64 (AppImage)" and "Linux arm64 (AppImage)" beside
+    Windows / macOS / Android / Flatpak. 2609a / 2609 / 2606a / 2606 list no AppImage (Flatpak only): the AppImage is
+    new with 2609b.
+  - the asset fetched from the project's download host at the release's path:
+    https://dl.dolphin-emu.org/releases/2609b/dolphin-2609b-x64.AppImage (nginx; Last-Modified 2026-11-08 01:41:26Z;
+    Content-Length 100022776 = the bytes received). The page's href itself was not machine-read (the shield; not
+    bypassed); three other spellings of the name at that path returned 404, this one 200.
+  - no third-party build; no GitHub release assets exist (the API's latest release: none); no published digest found.
+way (b) (Debian 13's 2503 packages): not needed, not fetched.
+No Flatpak. Nothing as root. Nothing installed system-wide.
+
+file: runtime/emulators/dolphin/dolphin-2609b-x64.AppImage (gitignored), 100,022,776 bytes
+sha256 0552108226dd2cdb912973cafc6d94bb68b1a7495756e2d3024fce69ff376c4d
+type: ELF x86-64 static-pie (the type-2 AppImage runtime) + squashfs; FUSE mount (no extraction)
+version: `--version` -> "Dolphin 2609b"
+inside (appimage_files.sha256: every file's sha256, 3,005 files):
+  usr/bin/dolphin-emu  916d4c9984795c9ddadc7d27d45ed3ad51aac4015b7d5271b872f97c1d0c87df  (the Qt build; AppRun is a
+                       symlink to it, so the runtime execs the emulator: no wrapper process)
+  usr/bin/dolphin-tool ba9e2944c3d764d275e311b770da05d388025f9858d9c75091dd4c06d1bab586
+  no dolphin-emu-nogui in this AppImage (the design's first launch form is not available; the second is used)
+ldd usr/bin/dolphin-emu: 164 libraries, 0 "not found" (134 from the AppImage's usr/lib by RUNPATH $ORIGIN/../lib)
+
+--help (help.txt) vs the design's recalled flags:
+  -u USER / --user        CONFIRMED (the user folder)
+  -e <file> / --exec      CONFIRMED
+  -b / --batch            CONFIRMED ("Run Dolphin without the user interface (Requires --exec or --nand-title)")
+  --config                CORRECTED: the form is -C <System>.<Section>.<Key>=<Value> (--config=...), per key
+  also: -v VIDEO_BACKEND, -s <file> (load an initial save state), -a AUDIO_EMULATION, -c (confirm on stop)
+  the launch used: dolphin-2609b-x64.AppImage -b -u <hub user dir> -e <title>

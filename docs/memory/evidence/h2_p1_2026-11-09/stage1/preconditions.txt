@@ -1,0 +1,13 @@
+at_utc 2026-11-09T01:07:51Z
+head 7d0056b4 (queue X committed: B65-B68); git status --short empty
+drop_ins 17 (the seventeen adopted lines); e3_flag.conf / e4_constraint.conf absent (preflight)
+check: ok True, apk CONFIRMED (9aa00ba2...), 17 lines, game False, retroarch 0, encoder 0, MainPID serves 8765 (check_before.json)
+the eleven client properties: empty (no debug.privyhub.* property set on the onn; read-only getprop)
+units: privyhub-companion (active since 2026-11-08 23:36:51Z), privyhub-diag (active since 2026-11-08 17:27:05Z); no other privyhub-* unit
+no game, no movie: no RetroArch / PCSX2 / Dolphin / ffmpeg process; 0 established connections on the control API or the range server
+free space: /tmp 6.3 GB (>= 1 GB), home 137 GB (>= 3 GB)
+the movies drive: mounted read-only (exFAT, systemd automount), block device sda (USB, rotational, 1.8 TB)
+paths file: runtime/h3_p1_paths.txt (gitignored), one line added: GAMECUBE_DIR= (the sibling of the PS2 folder); nothing else changed
+the GameCube folder: 28 files = 27 .rvz (17.99 GB; 158 MB to 1,177 MB, median 647 MB) + 1 small .bin (in a subfolder; not a title; not read); not writable by the hub's user
+T1 = the smallest .rvz (158 MB), T2 = the largest .rvz (1,177 MB), by file size (the rule in the design §4's "else"); labels only
+the folder's listing (relative names, sizes, mtimes; kept gitignored in data/games/gamecube/probe/) sha256 a51c1f215e35fbe59988666a03360ea2c24524b11246098583f0b08f7f1a1146 (before)

@@ -2554,6 +2554,17 @@ Question:
 >   states by hotkey, read back by the file's mtime and B52's picture check.
 > - **The run:** pre-registered pass rows as H3-P1's. A runs it unattended to the menu, then the streamed play at the
 >   TV once B61 builds the launch kind.
+>
+> **H2-P1 RUN (2026-11-09, A, unattended; `docs/memory/evidence/H2_P1_GAMECUBE_PROBE_2026-11-09.md`):** Dolphin
+> **2609b**, the upstream Linux x64 AppImage from the official download page (way (a); the user's "Yes to dolphin").
+> - Both titles (T1 the smallest `.rvz`, T2 the largest) ran twice at full speed in Vulkan on RADV at 1x, with wide
+>   margins: `CPU thread` max 47 %, GPU ≤ 19 %, Tctl ≤ 61.5 °C.
+> - P0a-P0c, P0e (the F10 hotkey), P0f (a state in ≤ 0.21 s), P1, P3, P4 and P5 were met on every run. P2's minimum
+>   was not met on T2 run 1 (50 vs 55, capture-side; Dolphin's frames were clean).
+> - The shader cache took T1's boot gaps 3 → 0. No drive stall and no spin-up.
+> - No PID, audio or keep-awake workaround is needed.
+> - **Next: B69**, the `dolphin` launch kind (the command, the hotkeys, `GCPadNew.ini` for the four virtual pads). Then
+>   the streamed play at the TV (P0d, P7) after HOME-9.
 
 Evaluate bounded representative titles:
 

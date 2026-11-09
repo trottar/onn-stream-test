@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-09 — H2-P1, the GameCube probe (Dolphin 2609b, the upstream AppImage, Vulkan on RADV, 1x): both titles at full speed with wide margins; P0a-P0c, P0e (hotkey), P0f (state 0.21 s), P1, P3, P4, P5 met on all four runs; P2's minimum NOT MET on T2 run 1 (50 vs 55, capture-side repeats; Dolphin's frames clean); no spin-up; P0d / P7 not this run — OPEN (to B69, then the streamed play) — `## 2026-11-09 H2-P1` below; `docs/memory/evidence/H2_P1_GAMECUBE_PROBE_2026-11-09.md`
 - 2026-11-09 — HOME-8: queue W checked — the N64 Home-hold freeze CLOSED (B61; reproduced on the title unattended, gone on the TV), the N64 title's buttons CLOSED (B62), PS1 player 2 under the multitap CLOSED (B63: incapable titles stay at 2 ports; capable keep 4), stale pad rows marked (B64); open: C28's hitch bar (6.6 vs ≤ 2, a Home-return and a link-loss second), a first N64 start whose stream never got ready — OPEN (to B, queue X) — `## 2026-11-09 HOME-8` below; `docs/memory/evidence/HOME_8_N64_FIXES_2026-11-08.md`
 - 2026-11-08 — HOME-7+N64: `9aa00ba2…` CONFIRMED (hold-to-join C15-C17 met); PS2 hold through PINE (C18) and the PS2 multitap relaunch (C20) met; **G-A15 ADOPTED, `PRIVYHUB_N64=1` the seventeenth line**; open: the N64 Home hold freezes (C23), an N64 title's buttons, PS1 player 2 under the multitap (C17), the multi-disc `.m3u`; the import bench flag CLOSED (removed) — OPEN (to B61) — `## 2026-11-08 HOME-7+N64` below; `docs/memory/evidence/HOME_7_HOLD_TO_JOIN_N64_2026-11-08.md`
 - 2026-11-08 — IMPORT-1: the first real import, from the external drive (a symlinked `PrivyHub-Import/` root): 72 PS1 titles, all DUPLICATE, 0 placed, 1 stray file rejected; no PS1 BIOS on the drive; the drive untouched; the bench drop-in `b56-import.conf` on at the user's decision until HOME-7's C19 — OPEN (HOME-7 C19; slice 1b) — `## 2026-11-08 IMPORT-1` below; `docs/memory/evidence/IMPORT_1_2026-11-08.md`
@@ -57,6 +58,25 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-09 H2-P1: the GameCube probe — OPEN (to B69)
+
+(`docs/memory/evidence/H2_P1_GAMECUBE_PROBE_2026-11-09.md`)
+
+- Dolphin **2609b**: the upstream Linux x64 AppImage, offered on the official download page; `ldd` clean; the user dir
+  on the hub; nothing written to the drive.
+- T1 / T2 ran twice each at full speed in Vulkan on RADV at 1x:
+  - `CPU thread` max 47 %, GPU median ≤ 19 %, Tctl max 61.5 °C;
+  - P0a-P0c met on the started PID (`AppRun`);
+  - P0e by the F10 hotkey (SIGSTOP never needed); P0f save ≤ 0.21 s, load picture by 0.2 s;
+  - P1, P3, P4, P5 met.
+- **Not met as measured:** P2's minimum on T2 run 1 (50 vs 55): single repeated frames in two seconds, while Dolphin's
+  own render times show no frame over 21 ms across the capture. T2 was measured at its first screen (the game's
+  memory-card notice), not a title menu or attract loop.
+- **To B69:** the `dolphin` launch kind (`-b -u <user dir> -e <title>`; `-C` is the per-key config form; SIGTERM exit
+  0.3-0.5 s, then the AppImage helper's few seconds), the pause hotkey with the CPU-thread check, the state hotkeys,
+  `GCPadNew.ini` for the four virtual pads. Not needed on this evidence: the PID and audio workarounds, the keep-awake.
+- **P0d / P7** (the pads, the streamed hitch rate): after B69, at the TV.
 
 ## 2026-11-09 Queue X (B65-B68): the start that never got ready, the hold-resume split, the client items (APK 5f72af4b… pinned), the library .m3u tool — OPEN (A's HOME-9 C29-C33)
 

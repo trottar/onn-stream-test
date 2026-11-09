@@ -1,0 +1,359 @@
+{
+ "m1_n64_frames": {
+  "frames": 3600,
+  "seconds": 59,
+  "kept_seconds": 56,
+  "excluded_static_or_black_seconds": 3,
+  "internal_fps": 30,
+  "internal_fps_source": "mode",
+  "distinct_mode": 30,
+  "median_distinct_fps": 50.0,
+  "min_distinct_fps": 28,
+  "hitch_bar_lt": 25.0,
+  "hitch_seconds": 0,
+  "hitch_at_s": [],
+  "hitch_per_10min": 0.0
+ },
+ "m1_raw": {
+  "captured_frames": 3600,
+  "seconds": 59,
+  "distinct": 2702,
+  "median_fps": 56,
+  "min_fps": 28,
+  "black_frames": 236
+ },
+ "m4": {
+  "p50_ms": 16.67,
+  "p95_ms": 33.46,
+  "p99_ms": 33.66,
+  "max_ms": 83.35,
+  "gaps_gt_100ms": 0
+ },
+ "m4_first_span": {
+  "span_s": 290.0,
+  "distinct": 12309,
+  "gaps_gt_100ms": 3,
+  "gaps_gt_50ms": 56,
+  "max_gap_ms": 300.0
+ },
+ "dolphin_render_times": {
+  "n": 42209,
+  "total_s": 1018.3,
+  "mean_per_s": 41.45,
+  "p50_ms": 16.69,
+  "p95_ms": 33.37,
+  "p99_ms": 33.39,
+  "max_ms": 294.9,
+  "gt_20ms": 18523,
+  "gt_34ms": 137,
+  "gt_100ms": 6,
+  "first_span_gt_100ms": 3,
+  "first_span_gt_34ms": 49
+ },
+ "dolphin_vblank_times": {
+  "n": 61007,
+  "total_s": 1018.5,
+  "mean_per_s": 59.9,
+  "p50_ms": 16.68,
+  "p95_ms": 16.68,
+  "p99_ms": 16.69,
+  "max_ms": 295.7,
+  "gt_20ms": 14,
+  "gt_34ms": 10,
+  "gt_100ms": 5,
+  "first_span_gt_100ms": 3,
+  "first_span_gt_34ms": 4
+ },
+ "m2": {
+  "cores": 12,
+  "per_core_median": {
+   "0": 11.9,
+   "1": 4.8,
+   "2": 4.1,
+   "3": 4.9,
+   "4": 3.0,
+   "5": 2.0,
+   "6": 7.1,
+   "7": 4.0,
+   "8": 6.6,
+   "9": 7.8,
+   "10": 5.9,
+   "11": 6.1
+  },
+  "per_core_max": {
+   "0": 100.0,
+   "1": 100.0,
+   "2": 100.0,
+   "3": 100.0,
+   "4": 96.0,
+   "5": 69.1,
+   "6": 100.0,
+   "7": 100.0,
+   "8": 100.0,
+   "9": 100.0,
+   "10": 100.0,
+   "11": 100.0
+  },
+  "longest_run_ge90_s": 4,
+  "busiest_core": 0,
+  "max_core_pct": 100.0,
+  "threads_top": [
+   {
+    "thread": "CPU thread",
+    "mean": 13.9,
+    "max": 38.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "Video thread",
+    "mean": 7.8,
+    "max": 18.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "threaded-ml",
+    "mean": 3.5,
+    "max": 5.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "SDL Hotplug Thr",
+    "mean": 1.8,
+    "max": 3.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "HotkeyScheduler",
+    "mean": 1.0,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "VK submission t",
+    "mean": 0.5,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "WSI swapchain e",
+    "mean": 0.1,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "QXcbEventQueue",
+    "mean": 0.1,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "Emuthread - Sta",
+    "mean": 0.1,
+    "max": 2.0,
+    "longest_ge90_s": 0
+   },
+   {
+    "thread": "WSI swapchain q",
+    "mean": 0.1,
+    "max": 1.0,
+    "longest_ge90_s": 0
+   }
+  ]
+ },
+ "m3": {
+  "samples": 1028,
+  "median": 10.0,
+  "p95": 17.0,
+  "max": 17.0
+ },
+ "m6": {
+  "samples": 1028,
+  "median": 44.1875,
+  "max": 52.875
+ },
+ "m5": {
+  "iostat_seconds": 1036,
+  "stall_seconds": 0,
+  "stall_seconds_after_60s": 0,
+  "stall_at_s": [],
+  "max_r_await_ms": 144.5,
+  "max_r_await_after_60s_ms": 51.57,
+  "busy_read_seconds": 11,
+  "reads_total": 250,
+  "writes_total": 0
+ },
+ "events": [
+  {
+   "at_utc": "2026-11-09T01:17:00.389Z",
+   "event": "launch",
+   "run": "1"
+  },
+  {
+   "at_utc": "2026-11-09T01:17:01.389Z",
+   "event": "started_pid",
+   "comm": "AppRun",
+   "tree": [
+    "AppRun"
+   ]
+  },
+  {
+   "at_utc": "2026-11-09T01:17:06.792Z",
+   "event": "capture_source",
+   "fullscreen": true
+  },
+  {
+   "at_utc": "2026-11-09T01:17:06.793Z",
+   "event": "first_span_start",
+   "at_s": 6.4
+  },
+  {
+   "at_utc": "2026-11-09T01:19:10.395Z",
+   "event": "p0b",
+   "hit": true,
+   "pid_is": "started",
+   "comm": "AppRun",
+   "visible_windows": 1,
+   "at_s": 4.0
+  },
+  {
+   "at_utc": "2026-11-09T01:19:10.395Z",
+   "event": "p0c",
+   "started_pid_inputs": 1,
+   "child_inputs": 0,
+   "at_s": 12.6
+  },
+  {
+   "at_utc": "2026-11-09T01:19:10.395Z",
+   "event": "tree",
+   "comms": [
+    "AppRun"
+   ]
+  },
+  {
+   "at_utc": "2026-11-09T01:19:10.397Z",
+   "event": "threads",
+   "n": 40,
+   "names": [
+    "Analytics",
+    "AppRun",
+    "Asset Loader 0",
+    "Asset Loader 1",
+    "AsyncShaderComp",
+    "CPU thread",
+    "DVD thread",
+    "DiscordHandler",
+    "Emuthread - Sta",
+    "GameList Tracke",
+    "HotkeyScheduler",
+    "Memcard Slot A",
+    "Play Time Track",
+    "QDBusConnection",
+    "QXcbEventQueue",
+    "SDL Hotplug Thr",
+    "Savestate Worke",
+    "VK submission t",
+    "Video thread",
+    "WSI swapchain e",
+    "WSI swapchain q",
+    "Wiimote Pool Th",
+    "Wiimote Scannin",
+    "dolphin:disk$0",
+    "dolphin:disk$1",
+    "dolphin:disk$2",
+    "dolphin:disk$3",
+    "evdev Hotplug T",
+    "evdev cleanup",
+    "libusb",
+    "libusb thread",
+    "libusb_event",
+    "resource-worker",
+    "threaded-ml"
+   ],
+   "llvmpipe": 0
+  },
+  {
+   "at_utc": "2026-11-09T01:19:10.397Z",
+   "event": "cpu_thread",
+   "name": "CPU thread"
+  },
+  {
+   "at_utc": "2026-11-09T01:22:03.577Z",
+   "event": "idle1_done",
+   "alive": true,
+   "since_launch_s": 303.2
+  },
+  {
+   "at_utc": "2026-11-09T01:22:03.992Z",
+   "event": "first_span_end",
+   "at_s": 303.6
+  },
+  {
+   "at_utc": "2026-11-09T01:22:10.315Z",
+   "event": "p0e",
+   "cpu_thread": "CPU thread",
+   "running_ticks_per_s": 13,
+   "hotkey_pause_stand_s": 0.0,
+   "paused_picture_same": true,
+   "hotkey_resume_grow_s": 0.5,
+   "method": "hotkey",
+   "after_ticks_per_s": 16
+  },
+  {
+   "at_utc": "2026-11-09T01:22:23.001Z",
+   "event": "p0f",
+   "save_file_seen_s": 0.21,
+   "save_stable_s": 0.21,
+   "save_mib": 30.6,
+   "save_ok": true,
+   "slot_existed_before": false,
+   "load_picture": {
+    "frames": 51,
+    "distinct_nonblack": 51,
+    "third_distinct_at_s": 0.2,
+    "black_frames": 0
+   },
+   "load_ok": true,
+   "load_check_from_press_s": 5.55
+  },
+  {
+   "at_utc": "2026-11-09T01:22:28.191Z",
+   "event": "capture_start"
+  },
+  {
+   "at_utc": "2026-11-09T01:23:28.510Z",
+   "event": "capture_done"
+  },
+  {
+   "at_utc": "2026-11-09T01:33:28.692Z",
+   "event": "idle2_done",
+   "alive": true,
+   "reads_in_idle": 0
+  },
+  {
+   "at_utc": "2026-11-09T01:33:28.692Z",
+   "event": "provoke",
+   "keys": "Return (Start), then x (A) twice"
+  },
+  {
+   "at_utc": "2026-11-09T01:34:08.718Z",
+   "event": "provoke_result",
+   "first_read_done_s": 3.86,
+   "reads": 11,
+   "read_ms": 420
+  },
+  {
+   "at_utc": "2026-11-09T01:34:11.369Z",
+   "event": "exit",
+   "how": "sigterm",
+   "rc": 0,
+   "exit_s": 0.47,
+   "left": 2
+  }
+ ],
+ "watch": {
+  "checks": 13,
+  "max_windows": 1,
+  "distinct_window_names": 1,
+  "alive_through": true
+ }
+}
