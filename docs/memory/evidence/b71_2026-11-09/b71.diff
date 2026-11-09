@@ -1,0 +1,1355 @@
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+index 63d8e7d..79fd52f 100644
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -12,6 +12,7 @@ import android.graphics.drawable.BitmapDrawable
+ 
+ import com.safeiot.privyhub.streaming.NativeStreamActivity
+ import com.safeiot.privyhub.streaming.GameStreamStatusUi
++import com.safeiot.privyhub.streaming.DiscChange
+ import com.safeiot.privyhub.diagnostics.DiagnosticsActivity
+ 
+ import android.os.Bundle
+@@ -93,6 +94,10 @@ class MainActivity : AppCompatActivity() {
+     private lateinit var gameSaveButton: Button
+     private lateinit var gameLoadButton: Button
+     private lateinit var gameEndButton: Button
++    // B71: "Change disc" on a multi-disc session (debug.privyhub.disc_change=0 = today: never shown)
++    private lateinit var gameDiscButton: Button
++    private var gameSessionDiscs: DiscChange.State? = null
++    private val discChangeOn: Boolean by lazy { DiscChange.fromSystem() }
+     private lateinit var gameSessionPreview: ImageView
+     private lateinit var gameSessionPreviewLabel: TextView
+     private var gameSessionPreviewBitmap: Bitmap? = null
+@@ -593,6 +598,14 @@ class MainActivity : AppCompatActivity() {
+                 "END"
+             )
+ 
++        // B71: hidden unless the session has more than one disc
++        gameDiscButton =
++            createGameSessionActionButton(
++                DiscChange.LABEL
++            ).apply {
++                layoutParams.width = dp(150)
++            }
++
+         nowPlayingBar.addView(
+             gameSaveButton
+         )
+@@ -601,6 +614,10 @@ class MainActivity : AppCompatActivity() {
+             gameLoadButton
+         )
+ 
++        nowPlayingBar.addView(
++            gameDiscButton
++        )
++
+         nowPlayingBar.addView(
+             gameEndButton
+         )
+@@ -716,6 +733,12 @@ class MainActivity : AppCompatActivity() {
+         }
+ 
+ 
++        gameDiscButton.setOnClickListener {
++
++            showDiscChooser()
++        }
++
++
+         onBackPressedDispatcher.addCallback(
+             this,
+             object : OnBackPressedCallback(true) {
+@@ -6854,7 +6877,8 @@ class MainActivity : AppCompatActivity() {
+                     if (active) {
+                         showGameSessionBanner(
+                             title,
+-                            paused
++                            paused,
++                            discs = readDiscState(json)
+                         )
+                         openNativeGameStream()
+                     } else {
+@@ -7114,7 +7138,8 @@ class MainActivity : AppCompatActivity() {
+ 
+                                 showGameSessionBanner(
+                                     activeTitle,
+-                                    paused
++                                    paused,
++                                    discs = readDiscState(json)
+                                 )
+                             }
+                         }
+@@ -12390,7 +12415,8 @@ class MainActivity : AppCompatActivity() {
+ 
+                         showGameSessionBanner(
+                             title,
+-                            paused = true
++                            paused = true,
++                            discs = readDiscState(json)
+                         )
+ 
+                         if (loadSaveAfterLaunch) {
+@@ -12854,9 +12880,14 @@ class MainActivity : AppCompatActivity() {
+ 
+     private fun showGameSessionBanner(
+         title: String,
+-        paused: Boolean
++        paused: Boolean,
++        discs: DiscChange.State? = null
+     ) {
+ 
++        // B71: the session's discs (null on a one-disc game, an old host, or the property off)
++        gameSessionDiscs =
++            discs
++
+         gameSessionActive =
+             true
+ 
+@@ -12887,6 +12918,9 @@ class MainActivity : AppCompatActivity() {
+         gameSessionTitle =
+             null
+ 
++        gameSessionDiscs =
++            null
++
+         updateNowPlayingUi()
+     }
+ 
+@@ -12967,7 +13001,8 @@ class MainActivity : AppCompatActivity() {
+ 
+                         showGameSessionBanner(
+                             title,
+-                            paused
++                            paused,
++                            discs = readDiscState(json)
+                         )
+ 
+                         if (
+@@ -13694,6 +13729,144 @@ private fun requestGameStateAction(
+     }
+ 
+ 
++    // B71: the host's `discs` / `disc` (absent keys or the property off -> null -> today's bar)
++    private fun readDiscState(
++        json: JSONObject?
++    ): DiscChange.State? {
++
++        if (!discChangeOn || json == null || !json.has("discs")) {
++            return null
++        }
++
++        return DiscChange.fromValues(
++            json.optInt("discs", 0),
++            if (json.has("disc") && !json.isNull("disc")) json.optInt("disc", 0) else null
++        )
++    }
++
++
++    private fun showDiscChooser() {
++
++        val state =
++            gameSessionDiscs
++                ?: return
++
++        if (!gameSessionPaused) {
++            return
++        }
++
++        AlertDialog.Builder(this)
++            .setTitle(
++                "Change disc"
++            )
++            .setItems(
++                DiscChange.choices(state).toTypedArray()
++            ) { _, which ->
++
++                requestDiscSwap(
++                    DiscChange.discForChoice(which)
++                )
++            }
++            .setNegativeButton(
++                "Cancel",
++                null
++            )
++            .show()
++    }
++
++
++    private fun requestDiscSwap(
++        disc: Int
++    ) {
++
++        val host =
++            getCompanionHost()
++
++        if (host.isBlank()) {
++            showCompanionSettings()
++            return
++        }
++
++        statusText.text =
++            DiscChange.progressLine(disc)
++
++        gameDiscButton.isEnabled =
++            false
++
++        networkExecutor.execute {
++
++            try {
++
++                val result =
++                    JSONObject(
++                        httpPost(
++                            "http://$host:$CONTROL_PORT" +
++                                "/plugins/games/${DiscChange.ENDPOINT}" +
++                                "?${DiscChange.query(disc)}"
++                        )
++                    )
++
++                val state =
++                    readDiscState(
++                        result
++                    )
++
++                runOnUiThread {
++
++                    if (state != null) {
++                        gameSessionDiscs =
++                            state
++                    }
++
++                    gameDiscButton.isEnabled =
++                        gameSessionPaused
++
++                    statusText.text =
++                        (state ?: gameSessionDiscs)
++                            ?.let { DiscChange.statusLine(it) }
++                            ?: "Disc $disc"
++
++                    nowPlayingProgress.text =
++                        gameSessionStreamStatusText()
++                }
++
++            } catch (error: Exception) {
++
++                Log.e(
++                    TAG,
++                    "Disc change failed",
++                    error
++                )
++
++                runOnUiThread {
++
++                    gameDiscButton.isEnabled =
++                        gameSessionPaused
++
++                    statusText.text =
++                        "Disc change failed"
++
++                    AlertDialog.Builder(this)
++                        .setTitle(
++                            "Change disc"
++                        )
++                        .setMessage(
++                            sanitizeGameNetworkError(
++                                error,
++                                host
++                            )
++                        )
++                        .setPositiveButton(
++                            "OK",
++                            null
++                        )
++                        .show()
++                }
++            }
++        }
++    }
++
++
+     private fun stopGameOnCompanion() {
+ 
+         val host =
+@@ -13715,6 +13888,9 @@ private fun requestGameStateAction(
+         gameEndButton.isEnabled =
+             false
+ 
++        gameDiscButton.isEnabled =
++            false
++
+         networkExecutor.execute {
+ 
+             try {
+@@ -13782,6 +13958,9 @@ private fun requestGameStateAction(
+                     gameEndButton.isEnabled =
+                         true
+ 
++                    gameDiscButton.isEnabled =
++                        gameSessionPaused
++
+                     statusText.text =
+                         "Game end failed"
+ 
+@@ -14793,6 +14972,9 @@ private fun requestGameStateAction(
+ 
+         gameEndButton.visibility =
+             View.GONE
++
++        gameDiscButton.visibility =
++            View.GONE
+     }
+ 
+ 
+@@ -14906,13 +15088,20 @@ private fun requestGameStateAction(
+                 "RUNNING"
+             }
+ 
++        // B71: a multi-disc session's disc under the phase ("Disc 2 of 4")
++        val discLine =
++            gameSessionDiscs
++                ?.let { "\n" + DiscChange.statusLine(it) }
++                .orEmpty()
++
+         val snapshot =
+             GameStreamStatusUi.latestFor(
+                 gameSessionTitle
+             )
+-                ?: return sessionPhase
++                ?: return sessionPhase + discLine
+ 
+         return sessionPhase +
++            discLine +
+             "\n" +
+             GameStreamStatusUi.compactMetadata(
+                 snapshot
+@@ -14980,6 +15169,17 @@ private fun requestGameStateAction(
+ 
+         gameEndButton.isEnabled =
+             gameSessionActive
++
++        // B71: only on a multi-disc session; paused only, as SAVE / LOAD
++        gameDiscButton.visibility =
++            if (DiscChange.showEntry(discChangeOn, gameSessionDiscs)) {
++                View.VISIBLE
++            } else {
++                View.GONE
++            }
++
++        gameDiscButton.isEnabled =
++            gameSessionPaused
+     }
+ 
+ 
+@@ -15007,6 +15207,9 @@ private fun requestGameStateAction(
+ 
+         gameEndButton.visibility =
+             View.GONE
++
++        gameDiscButton.visibility =
++            View.GONE
+     }
+ 
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/DiscChange.kt b/PrivyHub/app/src/main/java/streaming/DiscChange.kt
+new file mode 100644
+index 0000000..dfe7ac0
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/DiscChange.kt
+@@ -0,0 +1,47 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B71: "Change disc" in the paused game's bar, only on a multi-disc session (the host's `discs` > 1, from the launch
++ * response and the `status` poll). The chooser lists the discs with the current one marked; the pick goes to the
++ * host's `disc-swap` action and the bar says "Disc 2 of 4". `debug.privyhub.disc_change=0` = today (no entry).
++ */
++object DiscChange {
++    const val PROPERTY = "debug.privyhub.disc_change"
++    const val LABEL = "CHANGE DISC"
++    const val ENDPOINT = "disc-swap"
++
++    /** A session's discs: `disc` null = not known (after a LOAD the host cannot tell). */
++    data class State(val discs: Int, val disc: Int?)
++
++    /** Null unless the host said `discs` > 1 (absent, 0 or 1 = a one-disc game: today). */
++    fun fromValues(discs: Int?, disc: Int?): State? {
++        if (discs == null || discs <= 1) return null
++        return State(discs, disc?.takeIf { it in 1..discs })
++    }
++
++    fun showEntry(enabled: Boolean, state: State?): Boolean = enabled && state != null
++
++    /** "Disc 1" … "Disc n", " (in the tray)" beside the known current one. */
++    fun choices(state: State): List<String> =
++        (1..state.discs).map { i -> "Disc $i" + if (i == state.disc) " (in the tray)" else "" }
++
++    /** The chooser's row -> the disc asked for. */
++    fun discForChoice(index: Int): Int = index + 1
++
++    fun statusLine(state: State): String =
++        state.disc?.let { "Disc $it of ${state.discs}" } ?: "${state.discs} discs"
++
++    fun query(disc: Int): String = "disc=$disc"
++
++    fun progressLine(disc: Int): String = "Changing to disc $disc…"
++
++    fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
++
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            parse(null)
++        }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/B71DiscChangeTest.kt b/PrivyHub/app/src/test/java/streaming/B71DiscChangeTest.kt
+new file mode 100644
+index 0000000..210c186
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/B71DiscChangeTest.kt
+@@ -0,0 +1,55 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** B71: the "Change disc" entry only on a multi-disc session; the chooser's labels; "Disc 2 of 4"; the property. */
++class B71DiscChangeTest {
++
++    @Test
++    fun entryOnlyWithMoreThanOneDisc() {
++        assertFalse(DiscChange.showEntry(true, DiscChange.fromValues(null, null)))   // an old host / a one-disc game
++        assertFalse(DiscChange.showEntry(true, DiscChange.fromValues(0, null)))
++        assertFalse(DiscChange.showEntry(true, DiscChange.fromValues(1, 1)))
++        assertTrue(DiscChange.showEntry(true, DiscChange.fromValues(2, 1)))
++        assertTrue(DiscChange.showEntry(true, DiscChange.fromValues(4, null)))
++        assertFalse(DiscChange.showEntry(false, DiscChange.fromValues(4, 2)))      // the property off: today
++    }
++
++    @Test
++    fun choicesMarkTheCurrentDisc() {
++        assertEquals(listOf("Disc 1", "Disc 2 (in the tray)", "Disc 3", "Disc 4"),
++            DiscChange.choices(DiscChange.State(4, 2)))
++        assertEquals(listOf("Disc 1", "Disc 2"), DiscChange.choices(DiscChange.State(2, null)))   // unknown: none
++        assertEquals(2, DiscChange.discForChoice(1))
++        assertEquals("disc=2", DiscChange.query(2))
++    }
++
++    @Test
++    fun theStatusLine() {
++        assertEquals("Disc 2 of 4", DiscChange.statusLine(DiscChange.State(4, 2)))
++        assertEquals("4 discs", DiscChange.statusLine(DiscChange.State(4, null)))
++        assertEquals("Changing to disc 3…", DiscChange.progressLine(3))
++    }
++
++    @Test
++    fun theReplyParse() {
++        // the host's reply after a swap: discs 4, disc 3
++        assertEquals(DiscChange.State(4, 3), DiscChange.fromValues(4, 3))
++        // a disc out of range is treated as unknown, never shown as current
++        assertNull(DiscChange.fromValues(4, 7)?.disc)
++        assertNull(DiscChange.fromValues(2, 0)?.disc)
++    }
++
++    @Test
++    fun theProperty() {
++        assertTrue(DiscChange.parse(null))
++        assertTrue(DiscChange.parse(""))
++        assertFalse(DiscChange.parse("0"))
++        assertFalse(DiscChange.parse("off"))
++        assertEquals("debug.privyhub.disc_change", DiscChange.PROPERTY)
++    }
++}
+diff --git a/companion/disc_swap.py b/companion/disc_swap.py
+new file mode 100644
+index 0000000..18d7f2f
+--- /dev/null
++++ b/companion/disc_swap.py
+@@ -0,0 +1,173 @@
++"""B71: "Change disc" on a multi-disc PS1 session (an `.m3u` with more than one disc), over RetroArch's network
++command port.
++
++RetroArch 1.22.2 has `DISK_EJECT_TOGGLE`, `DISK_NEXT` and `DISK_PREV` over the port (no argument, no reply, no
++set-index, no index query), so the index is read from RetroArch's own log lines in the game log:
++`[Disc] Setting disc in tray: k/n[ - <label>]`, `[Disc] Removed disk from tray.`, `[Disc] Ejected virtual disc tray.`,
++`[Disc] Closed virtual disc tray.` and the `Failed to ...` forms. Only the two numbers are ever read; the label is
++never kept or logged.
++
++The sequence is the Quick Menu's, with the game left paused: open the tray, step the selected disc to the target
++(each step confirmed by its line), close the tray; 0.4 s between commands. `PRIVYHUB_DISC_SWAP=0` = today (no
++multi-disc session is ever recognised, the action unknown). Design: docs/memory/evidence/b71_2026-11-09/.
++"""
++
++from __future__ import annotations
++
++import os
++import re
++import time
++from pathlib import Path
++from typing import Any, Callable
++
++ENV = "PRIVYHUB_DISC_SWAP"
++EJECT = "DISK_EJECT_TOGGLE"
++NEXT = "DISK_NEXT"
++PREV = "DISK_PREV"
++GAP_S = 0.4                 # between commands: each in its own pass of RetroArch's loop
++LINE_BOUND_S = 1.5          # each command's own log line
++POLL_S = 0.05
++CONTROL = "retroarch_network_disk_control"
++
++SET_RE = re.compile(r"\[Disc\] Setting disc in tray: (\d+)/(\d+)")
++REMOVED_RE = re.compile(r"\[Disc\] Removed dis[ck] from tray")
++EJECTED_RE = re.compile(r"\[Disc\] Ejected virtual disc tray")
++CLOSED_RE = re.compile(r"\[Disc\] Closed virtual disc tray")
++FAILED_RE = re.compile(r"\[Disc\] Failed to (?:set disc|remove dis[ck]|eject virtual disc tray|close virtual disc tray)")
++
++
++class DiscSwapError(Exception):
++    disc: int | None = None          # the disc RetroArch last reported (None = unknown)
++
++
++def enabled(environ: Any = None) -> bool:
++    env = os.environ if environ is None else environ
++    return (env.get(ENV) or "").strip() != "0"
++
++
++def m3u_discs(path: Path) -> int:
++    """The disc lines of an `.m3u` (non-empty, not `#`); 0 when unreadable."""
++    try:
++        text = Path(path).read_text(encoding="utf-8-sig", errors="replace")
++    except OSError:
++        return 0
++    return sum(1 for line in text.splitlines() if line.strip() and not line.strip().startswith("#"))
++
++
++def session_for(content_path: Any, system: str, environ: Any = None) -> dict[str, Any] | None:
++    """`{"discs": n, "disc": 1}` for a PS1 `.m3u` launch with n > 1 (the knob on); else None (= today)."""
++    if not enabled(environ) or str(system or "").strip().lower() != "ps1":
++        return None
++    p = Path(str(content_path or ""))
++    if p.suffix.lower() != ".m3u":
++        return None
++    n = m3u_discs(p)
++    return {"discs": n, "disc": 1} if n > 1 else None
++
++
++def last_index(text: str, discs: int) -> int | None:
++    """The newest `Setting disc in tray: k/n` with this n (1-based); None when there is none."""
++    found = None
++    for m in SET_RE.finditer(text or ""):
++        if int(m.group(2)) == int(discs):
++            found = int(m.group(1))
++    return found
++
++
++class LogTail:
++    """Reads the game log from an offset (the only reader of RetroArch's disc lines)."""
++
++    def __init__(self, path: Any, offset: int = 0):
++        self.path = Path(str(path)) if path else None
++        self.offset = int(offset)
++
++    def read(self) -> str:
++        if self.path is None:
++            return ""
++        try:
++            with self.path.open("rb") as h:
++                h.seek(self.offset)
++                data = h.read(256 * 1024)
++        except OSError:
++            return ""
++        self.offset += len(data)
++        return data.decode("utf-8", errors="replace")
++
++
++class Swapper:
++    """One swap: `send(cmd)` puts a command on the port; `tail` reads the log; `clock` / `sleep` injectable."""
++
++    def __init__(self, send: Callable[[str], Any], tail: LogTail, discs: int,
++                 clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep):
++        self.send, self.tail, self.discs = send, tail, int(discs)
++        self.clock, self.sleep = clock, sleep
++        self.sent: list[str] = []
++        self.buf = ""
++
++    def _cmd(self, cmd: str) -> None:
++        self.sent.append(cmd)
++        self.send(cmd)
++
++    def _await(self, *patterns: re.Pattern) -> re.Match | None:
++        """The first line matching any pattern (or a failure line) within the bound; None at the bound."""
++        deadline = self.clock() + LINE_BOUND_S
++        while True:
++            self.buf += self.tail.read()
++            best = None
++            for p in (*patterns, FAILED_RE):
++                m = p.search(self.buf)
++                if m and (best is None or m.start() < best.start()):
++                    best = m
++            if best is not None:
++                self.buf = self.buf[best.end():]
++                return best
++            if self.clock() >= deadline:
++                return None
++            self.sleep(POLL_S)
++
++    def run(self, current: int | None, target: int) -> dict[str, Any]:
++        n = self.discs
++        steps = 0
++        self.buf += self.tail.read()          # anything before the first command is not ours
++        self.buf = ""
++        self._cmd(EJECT)
++        m = self._await(EJECTED_RE)
++        if m is None or m.re is FAILED_RE:
++            err = DiscSwapError("the tray did not open" if m is None else "RetroArch could not open the tray")
++            err.disc = current
++            raise err
++        cur = current
++        try:
++            while cur != target:
++                if steps >= 2 * n:
++                    raise DiscSwapError(f"disc {target} not reached in {steps} steps")
++                self.sleep(GAP_S)
++                self._cmd(NEXT if (cur is None or cur < target) else PREV)
++                steps += 1
++                m = self._await(SET_RE, REMOVED_RE)
++                if m is None:
++                    raise DiscSwapError("no disc line from RetroArch")
++                if m.re is FAILED_RE:
++                    raise DiscSwapError("RetroArch could not set the disc")
++                if m.re is REMOVED_RE:
++                    cur = n + 1                # past the end: no disc selected
++                else:
++                    if int(m.group(2)) != n:
++                        raise DiscSwapError("the disc count RetroArch reports differs")
++                    cur = int(m.group(1))
++        except DiscSwapError as exc:
++            self._close()
++            err = DiscSwapError(str(exc))
++            err.disc = cur if cur is None or 1 <= cur <= n else None
++            raise err from exc
++        self.sleep(GAP_S)
++        if not self._close():
++            err = DiscSwapError("the tray did not close")
++            err.disc = cur
++            raise err
++        return {"disc": cur, "steps": steps}
++
++    def _close(self) -> bool:
++        self._cmd(EJECT)
++        m = self._await(CLOSED_RE)
++        return m is not None and m.re is CLOSED_RE
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 7fdf35d..fa2d886 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -48,6 +48,9 @@ _gc = None
+ if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
+     import gamecube_session as _gc
+ 
++# B71: "Change disc" on a multi-disc PS1 (.m3u) session; PRIVYHUB_DISC_SWAP=0 (read at each launch) = today
++import disc_swap as _disc_swap  # noqa: E402
++
+ 
+ class EmulatorError(RuntimeError):
+     pass
+@@ -206,6 +209,7 @@ class EmulatorManager:
+         self._paused = False
+         self._host_window_policy = None
+         self._network_cmd_port = None
++        self._disc_session = None   # B71
+         self._active_cheat_session = None
+         self._players_session = None
+         self._launch_kind = None
+@@ -428,7 +432,7 @@ class EmulatorManager:
+                 and not missing_cores
+             )
+ 
+-            return {
++            payload = {
+                 "ok": True,
+                 "kind": "game_session",
+                 "title": "Game Session",
+@@ -519,6 +523,12 @@ class EmulatorManager:
+                     )
+                 ),
+             }
++            # B71: a multi-disc session's discs / disc (absent on every other session: today's payload)
++            if active and self._disc_session is not None:
++                self._disc_refresh()
++                payload["discs"] = int(self._disc_session["discs"])
++                payload["disc"] = self._disc_session.get("disc")
++            return payload
+ 
+     def _resolve_game(
+         self,
+@@ -2193,6 +2203,10 @@ class EmulatorManager:
+     # B69
+     _gc: Any = None
+     _gc_helper_sid: int | None = None
++    # B71: {"discs": n, "disc": i | None} on a multi-disc PS1 session, else None (= today)
++    _disc_session: dict[str, Any] | None = None
++    _disc_tail: Any = None
++    _disc_event: dict[str, Any] | None = None
+ 
+     # PRIVYHUB_PHASE_A_PS1_MULTITAP_GAME_OPTIONS
+     PS1_MULTITAP_CORE_LIBRARY = "Beetle PSX HW"
+@@ -5570,6 +5584,10 @@ class EmulatorManager:
+                     "A PrivyHub game session is already running"
+                 )
+ 
++            # B71: no disc session until a multi-disc .m3u launch below sets one
++            self._disc_session = None
++            self._disc_tail = None
++
+             # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
+             if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
+                 return self._launch_pcsx2(game, players_chosen)
+@@ -5892,6 +5910,9 @@ class EmulatorManager:
+             self.process = process
+             self.log_handle = log_handle
+             self.active_game = dict(game)
++            # B71: a PS1 .m3u with more than one disc (None for every other launch, or PRIVYHUB_DISC_SWAP=0)
++            self._disc_session = _disc_swap.session_for(content_path, str(game.get("system", "")))
++            self._disc_tail = _disc_swap.LogTail(log_path) if self._disc_session is not None else None
+             # B46: the session's ports from the pick (None = today)
+             self._players_session = players_plan
+             # B61: an N64 session (no state save is ever sent into its running core); None for every other launch
+@@ -7023,6 +7044,7 @@ class EmulatorManager:
+         self._paused = False
+         self._host_window_policy = None
+         self._network_cmd_port = None
++        self._disc_session = None   # B71
+         self._active_cheat_session = None
+         self._players_session = plan if chosen is not None else None
+         self._hold_rewind_core = None
+@@ -7365,6 +7387,7 @@ class EmulatorManager:
+         self._paused = False
+         self._host_window_policy = None
+         self._network_cmd_port = None
++        self._disc_session = None   # B71
+         self._active_cheat_session = None
+         self._players_session = None
+         self._launch_kind = None
+@@ -7461,6 +7484,7 @@ class EmulatorManager:
+         self._paused = False
+         self._host_window_policy = None
+         self._network_cmd_port = None
++        self._disc_session = None   # B71
+         self._active_cheat_session = None
+         self._players_session = plan
+         self._hold_rewind_core = None
+@@ -7741,6 +7765,7 @@ class EmulatorManager:
+         self._paused = False
+         self._host_window_policy = None
+         self._network_cmd_port = None
++        self._disc_session = None   # B71
+         self._active_cheat_session = None
+         self._players_session = None
+         self._launch_kind = None
+@@ -8944,6 +8969,94 @@ class EmulatorManager:
+             ).replace("\\", "/")
+             return payload
+ 
++    # --- B71: "Change disc" (a multi-disc PS1 session only; every other session never reaches these) ----------------
++
++    def _disc_refresh(self) -> None:
++        """RetroArch's own `Setting disc in tray: k/n` lines since the last read (the launch's, a swap's)."""
++        sess, tail = self._disc_session, self._disc_tail
++        if sess is None or tail is None:
++            return
++        k = _disc_swap.last_index(tail.read(), int(sess["discs"]))
++        if k is not None:
++            sess["disc"] = k
++
++    def _disc_game_log(self, line: str) -> None:
++        try:
++            if self.log_handle is not None:
++                self.log_handle.write(line + "\n")
++                self.log_handle.flush()
++        except (OSError, ValueError):
++            pass
++
++    def disc_swap(self, disc: Any) -> dict[str, Any]:
++        """Open the tray, step to `disc`, close the tray; the game left paused. The PS1-shaped reply."""
++        with self.lock:
++            self._refresh_process()
++            sess = self._disc_session
++            if self.process is None or self.process.poll() is not None or sess is None:
++                raise EmulatorError("This game has one disc")
++            if self._launch_kind not in (None, "retroarch"):
++                raise EmulatorError("Change disc is only for a PlayStation game")
++            n = int(sess["discs"])
++            try:
++                target = int(str(disc).strip())
++            except (TypeError, ValueError) as exc:
++                raise EmulatorError(f"disc must be 1 to {n}") from exc
++            if not 1 <= target <= n:
++                raise EmulatorError(f"disc must be 1 to {n}")
++            if not self._paused:
++                raise EmulatorError("Pause the game to change disc")
++            self._disc_refresh()
++            start = sess.get("disc")
++            t0 = time.monotonic()
++            if start == target:
++                result = {"disc": target, "steps": 0}
++                changed = False
++            else:
++                swapper = _disc_swap.Swapper(
++                    lambda cmd: self._retroarch_network_request(cmd, expect_response=False),
++                    self._disc_tail, n)
++                try:
++                    result = swapper.run(start, target)
++                except _disc_swap.DiscSwapError as exc:
++                    sess["disc"] = exc.disc
++                    ms = round((time.monotonic() - t0) * 1000.0)
++                    self._disc_game_log(f"PS1 disc swap failed: {start if start is not None else '?'} -> {target} ({exc})")
++                    self._disc_event = {"event": "disc_swap", "ok": False, "from_disc": start, "disc": exc.disc,
++                                        "target": target, "discs": n, "steps": len(swapper.sent), "ms": ms,
++                                        "reason": str(exc)}
++                    raise EmulatorError("PrivyHub could not change the disc") from exc
++                changed = True
++                sess["disc"] = result["disc"]
++            ms = round((time.monotonic() - t0) * 1000.0)
++            # the pause is never toggled; it must still hold
++            state = self._retroarch_network_status()
++            if state != "PAUSED":
++                raise EmulatorError("The game is no longer paused after the disc change")
++            if changed:
++                self._disc_game_log(f"PS1 disc swap: {start if start is not None else '?'} -> {target}")
++            self._disc_event = {"event": "disc_swap", "ok": True, "from_disc": start, "disc": target, "discs": n,
++                                "changed": changed, "steps": int(result["steps"]), "ms": ms}
++            payload = self.status()
++            payload["action"] = "disc_swap"
++            payload["accepted"] = True
++            payload["confirmed"] = True
++            payload["control"] = _disc_swap.CONTROL
++            payload["from_disc"] = start
++            payload["disc"] = target
++            payload["discs"] = n
++            payload["changed"] = changed
++            payload["steps"] = int(result["steps"])
++            return payload
++
++    def disc_after_load(self, payload: Any) -> Any:
++        """A LOAD on a multi-disc session: the state may carry another disc (no log line says which) -> unknown."""
++        if self._disc_session is not None:
++            self._disc_session["disc"] = None
++            if isinstance(payload, dict) and "discs" in payload:
++                payload["disc"] = None
++        return payload
++
+     # PrivyHub A2/A3 patch 07: nightly live-state load
+     def load_state(
+         self,
+@@ -9917,6 +10030,7 @@ class EmulatorManager:
+             self.started_at = None
+             self._paused = False
+             self._network_cmd_port = None
++            self._disc_session = None   # B71
+             self._active_cheat_session = None
+             self._players_session = None
+             self._launch_kind = None
+diff --git a/companion/games/native_stream_heartbeat.py b/companion/games/native_stream_heartbeat.py
+index d3382f0..030f345 100644
+--- a/companion/games/native_stream_heartbeat.py
++++ b/companion/games/native_stream_heartbeat.py
+@@ -197,8 +197,9 @@ def append_native_stream_heartbeat(
+     # B49: a PS2 session's heartbeats carry ps2_mode (only set with PRIVYHUB_PS2=1)
+     # B54: hold-to-join's count and mode (only a hold-to-join client sends them)
+     # B69: a GameCube session's heartbeats carry gc_mode (only set with PRIVYHUB_GAMECUBE=1)
++    # B71: a multi-disc PS1 session's carry discs / disc (only set on such a session)
+     for field in ("pad_slots", "updates_by_player", "packets_by_player", "pad_slots_bad", "players_chosen",
+-                  "ps2_mode", "join", "players_joined", "gc_mode"):
++                  "ps2_mode", "join", "players_joined", "gc_mode", "discs", "disc"):
+         if field in values:
+             record[field] = values[field]
+ 
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 0ed4397..59fba7f 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -137,6 +137,9 @@ _gc_session = None
+ if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
+     import gamecube_session as _gc_session
+ 
++# B71: "Change disc" (a multi-disc PS1 session's action; PRIVYHUB_DISC_SWAP=0 = today's unknown action)
++import disc_swap as _disc_swap  # noqa: E402
++
+ # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
+ # Absent = today: nothing imported.
+ _import_marks = None
+@@ -3901,6 +3904,11 @@ class GamesPlugin:
+             # B69: and of a GameCube session (absent: never set)
+             if _gc_session is not None and _gc_session.active(self._emulator):
+                 values["gc_mode"] = True
++            # B71: and a multi-disc session's discs / disc (absent on every other session)
++            disc_session = getattr(self._emulator, "_disc_session", None)
++            if isinstance(disc_session, dict):
++                values["discs"] = disc_session.get("discs")
++                values["disc"] = disc_session.get("disc")
+ 
+             result = append_native_stream_heartbeat(
+                 self.PROJECT_ROOT,
+@@ -4241,6 +4249,9 @@ class GamesPlugin:
+             }
+             if isinstance(n64, dict):
+                 fields.update(layout=n64.get("layout"), remap_binds=n64.get("remap_binds"))
++            # B71: a multi-disc session's discs / disc (absent on every other launch)
++            if isinstance(payload, dict) and "discs" in payload:
++                fields.update(discs=payload.get("discs"), disc=payload.get("disc"))
+             for key in ("players_joined", "players_chosen"):
+                 if key in query:
+                     fields[key] = self._first(query, key)
+@@ -4607,6 +4618,17 @@ class GamesPlugin:
+                     **multitap,
+                 }
+ 
++            # B71: "Change disc" on a multi-disc PS1 session (PRIVYHUB_DISC_SWAP=0: today's unknown action)
++            if action == "disc-swap" and _disc_swap.enabled():
++                self._emulator._disc_event = None
++                try:
++                    return self._emulator.disc_swap(self._first(query, "disc"))
++                finally:
++                    event = getattr(self._emulator, "_disc_event", None)
++                    if isinstance(event, dict):
++                        self._recovery._log("disc_swap", **{k: v for k, v in event.items() if k != "event"})
++                        self._emulator._disc_event = None
++
+             # PrivyHub Phase A2 save-state actions
+             if action in {
+                 "save-state",
+@@ -4638,6 +4660,8 @@ class GamesPlugin:
+                         payload = self._emulator.load_state(
+                             slot
+                         )
++                        # B71: after a LOAD a multi-disc session's disc is unknown (a no-op on every other session)
++                        payload = self._emulator.disc_after_load(payload)
+                     finally:
+                         event = getattr(self._emulator, "_n64_continue_event", None)
+                         if isinstance(event, dict):
+diff --git a/tests/b71_disc_swap/_tmp_cleanup.py b/tests/b71_disc_swap/_tmp_cleanup.py
+new file mode 100644
+index 0000000..3c65b6f
+--- /dev/null
++++ b/tests/b71_disc_swap/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B71 (B53's test hygiene): every temporary directory a tests/b71_disc_swap run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tests/b71_disc_swap/test_b71.py b/tests/b71_disc_swap/test_b71.py
+new file mode 100644
+index 0000000..fe074d4
+--- /dev/null
++++ b/tests/b71_disc_swap/test_b71.py
+@@ -0,0 +1,383 @@
++#!/usr/bin/env python3
++"""B71 (host): "Change disc" on a multi-disc PS1 (.m3u) session over RetroArch's command port.
++
++    python3 -m unittest discover -s tests/b71_disc_swap -v
++
++A fake RetroArch: a UDP socket on 127.0.0.1 in a thread that answers GET_STATUS and, for each disk command, appends
++RetroArch 1.22.2's own log line to the session's game log (the label included, so the tests can show it is never
++copied). A real EmulatorManager on a temp project (its real `_retroarch_network_request`); temp dirs removed at exit.
++"""
++
++from __future__ import annotations
++
++import ast
++import atexit
++import json
++import socket
++import sys
++import tempfile
++import threading
++import time
++import types
++import unittest
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++import disc_swap as ds  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++from games import native_stream_heartbeat as hb  # noqa: E402
++
++LABEL = "Fake Label Disc"          # what a core names a disc: must never reach PrivyHub's lines / rows
++_OPEN: list = []                   # the managers' game-log handles, closed at exit (before the temp dirs go)
++atexit.register(lambda: [h.close() for h in _OPEN])
++
++
++class FakeRetroArch:
++    """`mode`: "ok" (RetroArch's behaviour: NEXT at the last disc stays there), "removed" (NEXT past the end removes
++    the disc), "silent_steps" (no line for NEXT / PREV), "silent_eject" (no line for the eject)."""
++
++    def __init__(self, log_path: Path, discs: int, index: int = 0, mode: str = "ok", paused: bool = True):
++        self.log_path, self.n, self.index, self.mode, self.paused = log_path, discs, index, mode, paused
++        self.tray_open = False
++        self.commands: list[tuple[float, str]] = []
++        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        self.sock.bind(("127.0.0.1", 0))
++        self.sock.settimeout(0.1)
++        self.port = self.sock.getsockname()[1]
++        self.stop = False
++        self.t = threading.Thread(target=self.run, daemon=True)
++        self.t.start()
++
++    def line(self, text: str) -> None:
++        with self.log_path.open("a", encoding="utf-8") as h:
++            h.write(f"[INFO] [Disc] {text}\n")
++
++    def set_line(self) -> None:
++        if self.index >= self.n:
++            self.line("Removed disk from tray.")
++        else:
++            self.line(f"Setting disc in tray: {self.index + 1}/{self.n} - {LABEL} {self.index + 1}")
++
++    def run(self) -> None:
++        while not self.stop:
++            try:
++                data, addr = self.sock.recvfrom(4096)
++            except (socket.timeout, OSError):
++                continue
++            cmd = data.decode().strip()
++            self.commands.append((time.monotonic(), cmd))
++            if cmd == "GET_STATUS":
++                state = "PAUSED" if self.paused else "PLAYING"
++                self.sock.sendto(f"GET_STATUS {state} playstation,Fake Title,crc32=0".encode(), addr)
++            elif cmd == "PAUSE_TOGGLE":
++                self.paused = not self.paused
++            elif cmd == "DISK_EJECT_TOGGLE":
++                self.tray_open = not self.tray_open
++                if self.mode != "silent_eject":
++                    self.line("Ejected virtual disc tray." if self.tray_open else "Closed virtual disc tray.")
++            elif cmd in ("DISK_NEXT", "DISK_PREV"):
++                if cmd == "DISK_NEXT":
++                    self.index = min(self.index + 1, self.n if self.mode == "removed" else self.n - 1)
++                else:
++                    self.index = max(self.index - 1, 0)
++                if self.mode != "silent_steps":
++                    self.set_line()
++
++    def close(self) -> None:
++        self.stop = True
++        self.t.join(1)
++        self.sock.close()
++
++    def disk_commands(self) -> list[str]:
++        return [c for _, c in self.commands if c.startswith("DISK_")]
++
++
++def project():
++    return Path(tempfile.mkdtemp(prefix="b71_proj_"))
++
++
++def m3u(folder: Path, n: int, extra: str = "") -> Path:
++    p = folder / "games/ps1/Set.m3u"
++    p.parent.mkdir(parents=True, exist_ok=True)
++    p.write_text(extra + "".join(f"Set (Disc {i}).cue\n" for i in range(1, n + 1)))
++    return p
++
++
++def manager(discs: int = 4, index: int = 0, mode: str = "ok", paused: bool = True, launch_line: bool = True):
++    proj = project()
++    log_path = proj / "logs/games/x-game_ps1_0123.log"
++    log_path.parent.mkdir(parents=True)
++    log_path.write_text("PrivyHub game session\n")
++    fake = FakeRetroArch(log_path, discs, index, mode, paused)
++    if launch_line:
++        fake.set_line()                                   # RetroArch's own line at the launch
++    m = em.EmulatorManager(proj)
++    m.process = types.SimpleNamespace(pid=1, poll=lambda: None, stdin=None)
++    m._refresh_process = lambda: None
++    m.active_game = {"id": "game_ps1_0123", "system": "ps1", "relative_path": "games/ps1/Set.m3u"}
++    m._paused = paused
++    m._network_cmd_port = fake.port
++    m.log_handle = log_path.open("a", encoding="utf-8")
++    _OPEN.append(m.log_handle)
++    m.record_save_state_probe_event = lambda *a, **k: None
++    m._disc_session = ds.session_for(m3u(proj, discs), "ps1")
++    m._disc_tail = ds.LogTail(log_path) if m._disc_session else None
++    return m, fake, log_path
++
++
++class Detection(unittest.TestCase):
++    def test_m3u_count(self):
++        d = project()
++        self.assertEqual(ds.m3u_discs(m3u(d, 2, extra="#EXTM3U\n\n# a comment\n")), 2)
++        self.assertEqual(ds.session_for(m3u(d, 4), "ps1"), {"discs": 4, "disc": 1})
++
++    def test_not_a_multi_disc_session(self):
++        d = project()
++        one = m3u(d, 1)
++        self.assertIsNone(ds.session_for(one, "ps1"))                       # one disc
++        cue = d / "games/ps1/Single.cue"
++        cue.write_text("FILE x\n")
++        self.assertIsNone(ds.session_for(cue, "ps1"))                       # a .cue
++        self.assertIsNone(ds.session_for(m3u(d, 2), "n64"))                 # another system
++        self.assertIsNone(ds.session_for(d / "missing.m3u", "ps1"))         # unreadable
++        self.assertIsNone(ds.session_for(m3u(d, 2), "ps1", environ={"PRIVYHUB_DISC_SWAP": "0"}))   # the knob
++        self.assertIsNotNone(ds.session_for(m3u(d, 2), "ps1", environ={"PRIVYHUB_DISC_SWAP": "1"}))
++
++    def test_starting_disc_from_the_launch_line(self):
++        m, fake, _ = manager(discs=4, index=1)          # RetroArch restored disc 2 at the launch
++        try:
++            self.assertEqual(m.status()["disc"], 2)
++            self.assertEqual(m.status()["discs"], 4)
++        finally:
++            fake.close()
++        m, fake, _ = manager(discs=2, launch_line=False)
++        try:
++            self.assertEqual(m.status()["disc"], 1)     # no line: disc 1
++        finally:
++            fake.close()
++
++    def test_last_index_reads_only_the_numbers(self):
++        text = "[INFO] [Disc] Setting disc in tray: 1/4 - A\n[INFO] [Disc] Setting disc in tray: 3/4\nother 2/4\n"
++        self.assertEqual(ds.last_index(text, 4), 3)
++        self.assertIsNone(ds.last_index(text, 2))       # another count: not this set
++
++
++class Swap(unittest.TestCase):
++    def swap(self, start_index, target, discs=4, **kw):
++        m, fake, log_path = manager(discs=discs, index=start_index, **kw)
++        try:
++            reply = m.disc_swap(target)
++            return m, fake, log_path, reply, None
++        except em.EmulatorError as exc:
++            return m, fake, log_path, None, exc
++        finally:
++            fake.close()
++
++    def test_one_to_two(self):
++        m, fake, log_path, reply, err = self.swap(0, 2, discs=2)
++        self.assertIsNone(err)
++        self.assertEqual(fake.disk_commands(), ["DISK_EJECT_TOGGLE", "DISK_NEXT", "DISK_EJECT_TOGGLE"])
++        self.assertFalse(fake.tray_open)
++        self.assertEqual(fake.index, 1)
++        self.assertEqual((reply["from_disc"], reply["disc"], reply["discs"], reply["changed"], reply["steps"]),
++                         (1, 2, 2, True, 1))
++        self.assertTrue(fake.paused)                                       # left paused as it was
++        self.assertNotIn("PAUSE_TOGGLE", [c for _, c in fake.commands])
++        m.log_handle.flush()
++        text = log_path.read_text()
++        self.assertIn("PS1 disc swap: 1 -> 2\n", text)
++        ours = [l for l in text.splitlines() if l.startswith("PS1 disc")]
++        self.assertTrue(all(LABEL not in l and "Fake Title" not in l and "/" not in l for l in ours))
++
++    def test_spacing_between_commands(self):
++        m, fake, _, reply, err = self.swap(0, 3)
++        self.assertIsNone(err)
++        times = [t for t, c in fake.commands if c.startswith("DISK_")]
++        self.assertEqual(fake.disk_commands(), ["DISK_EJECT_TOGGLE", "DISK_NEXT", "DISK_NEXT", "DISK_EJECT_TOGGLE"])
++        self.assertTrue(all(b - a >= ds.GAP_S - 0.02 for a, b in zip(times, times[1:])), times)
++
++    def test_down_and_up(self):
++        m, fake, _, reply, err = self.swap(3, 1)
++        self.assertIsNone(err)
++        self.assertEqual(fake.disk_commands(), ["DISK_EJECT_TOGGLE"] + ["DISK_PREV"] * 3 + ["DISK_EJECT_TOGGLE"])
++        self.assertEqual((fake.index, reply["disc"], reply["steps"]), (0, 1, 3))
++        m, fake, _, reply, err = self.swap(1, 4)
++        self.assertEqual(fake.disk_commands(), ["DISK_EJECT_TOGGLE"] + ["DISK_NEXT"] * 2 + ["DISK_EJECT_TOGGLE"])
++        self.assertEqual(m._disc_session["disc"], 4)
++
++    def test_unknown_start_found_by_its_first_step(self):
++        m, fake, _ = manager(discs=4, index=3)
++        try:
++            m._disc_session["disc"] = None            # after a LOAD
++            m._disc_tail.read()                       # the launch line already read
++            reply = m.disc_swap(3)
++        finally:
++            fake.close()
++        # NEXT from disc 4 stays at 4 (RetroArch's own rule), then PREV to 3
++        self.assertEqual(fake.disk_commands(), ["DISK_EJECT_TOGGLE", "DISK_NEXT", "DISK_PREV", "DISK_EJECT_TOGGLE"])
++        self.assertEqual((reply["from_disc"], reply["disc"]), (None, 3))
++
++    def test_removed_past_the_end_then_prev(self):
++        m, fake, _ = manager(discs=2, index=1, mode="removed")
++        try:
++            m._disc_session["disc"] = None
++            m._disc_tail.read()
++            reply = m.disc_swap(2)
++        finally:
++            fake.close()
++        self.assertEqual(fake.disk_commands(), ["DISK_EJECT_TOGGLE", "DISK_NEXT", "DISK_PREV", "DISK_EJECT_TOGGLE"])
++        self.assertEqual((reply["disc"], fake.index, fake.tray_open), (2, 1, False))
++
++    def test_same_disc_no_command(self):
++        m, fake, _, reply, err = self.swap(1, 2)
++        self.assertIsNone(err)
++        self.assertEqual(fake.disk_commands(), [])
++        self.assertEqual((reply["changed"], reply["steps"], reply["disc"]), (False, 0, 2))
++
++    def test_refusals(self):
++        for kw, target, words in (({"paused": False}, 2, "Pause the game"), ({}, 5, "disc must be 1 to 4"),
++                                  ({}, "x", "disc must be 1 to 4"), ({}, 0, "disc must be 1 to 4")):
++            m, fake, _, reply, err = self.swap(0, target, **kw)
++            self.assertIsNotNone(err, (kw, target))
++            self.assertIn(words, str(err))
++            self.assertEqual(fake.disk_commands(), [])
++        m, fake, _ = manager(discs=2)
++        fake.close()
++        m._disc_session = None
++        with self.assertRaises(em.EmulatorError) as cm:
++            m.disc_swap(2)
++        self.assertIn("one disc", str(cm.exception))
++        m._disc_session = {"discs": 2, "disc": 1}
++        m._launch_kind = "dolphin"
++        with self.assertRaises(em.EmulatorError):
++            m.disc_swap(2)
++
++    def test_no_step_line_closes_the_tray_again(self):
++        with mock.patch.object(ds, "LINE_BOUND_S", 0.3):
++            m, fake, _, reply, err = self.swap(0, 2, mode="silent_steps")
++        self.assertIsNotNone(err)
++        self.assertIn("could not change the disc", str(err))
++        self.assertEqual(fake.disk_commands(), ["DISK_EJECT_TOGGLE", "DISK_NEXT", "DISK_EJECT_TOGGLE"])
++        self.assertFalse(fake.tray_open)                                    # closed again
++        self.assertEqual(m._disc_event["ok"], False)
++        self.assertEqual(m._disc_event["reason"], "no disc line from RetroArch")
++
++    def test_no_eject_line(self):
++        with mock.patch.object(ds, "LINE_BOUND_S", 0.3):
++            m, fake, _, reply, err = self.swap(0, 2, mode="silent_eject")
++        self.assertIsNotNone(err)
++        self.assertEqual(fake.disk_commands(), ["DISK_EJECT_TOGGLE"])     # nothing stepped blind
++        self.assertEqual(m._disc_event["reason"], "the tray did not open")
++
++    def test_reply_has_the_ps1_shape(self):
++        m, fake, _, reply, err = self.swap(0, 2)
++        for key in ("ok", "kind", "active", "paused", "game", "save_state_slots", "action", "accepted", "confirmed",
++                    "control"):
++            self.assertIn(key, reply)
++        self.assertEqual((reply["action"], reply["control"], reply["accepted"], reply["confirmed"]),
++                         ("disc_swap", "retroarch_network_disk_control", True, True))
++        ev = m._disc_event
++        self.assertEqual((ev["from_disc"], ev["disc"], ev["discs"], ev["ok"], ev["steps"]), (1, 2, 4, True, 1))
++        self.assertNotIn(LABEL, json.dumps(ev))
++
++
++class Rows(unittest.TestCase):
++    def test_status_keys_only_on_a_multi_disc_session(self):
++        m, fake, _ = manager(discs=2)
++        try:
++            st = m.status()
++            self.assertEqual((st["discs"], st["disc"]), (2, 1))
++            m._disc_session = None
++            st = m.status()
++            self.assertNotIn("discs", st)
++            self.assertNotIn("disc", st)
++            m._disc_session = {"discs": 2, "disc": 1}
++            m.process = None                                   # not active: no keys
++            self.assertNotIn("discs", m.status())
++        finally:
++            fake.close()
++
++    def test_load_makes_the_disc_unknown(self):
++        m, fake, _ = manager(discs=2)
++        fake.close()
++        payload = m.disc_after_load({"discs": 2, "disc": 1, "action": "load_state"})
++        self.assertIsNone(payload["disc"])
++        self.assertIsNone(m._disc_session["disc"])
++        m._disc_session = None
++        self.assertEqual(m.disc_after_load({"action": "load_state"}), {"action": "load_state"})   # today
++
++    def test_heartbeat_copies_only_when_present(self):
++        d = project()
++        hb.append_native_stream_heartbeat(d, {"elapsed_ms": 1, "rendered_frames": 2})
++        hb.append_native_stream_heartbeat(d, {"elapsed_ms": 3, "rendered_frames": 4, "discs": 4, "disc": 2})
++        rows = [json.loads(l) for l in hb.heartbeat_log_path(d).read_text().splitlines()]
++        self.assertNotIn("discs", rows[0])
++        self.assertNotIn("disc", rows[0])
++        self.assertEqual((rows[1]["discs"], rows[1]["disc"]), (4, 2))
++
++    def plugin(self, payload):
++        import importlib.util
++        spec = importlib.util.spec_from_file_location("g71", str(ROOT / "companion/plugins/games.py"))
++        G = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(G)
++        rows = []
++        p = object.__new__(G.GamesPlugin)
++        p._recovery = types.SimpleNamespace(_log=lambda e, **k: rows.append({"event": e, **k}))
++        sess = {"players_chosen": 2, "ports": 2, "multitap": False, "multitap_available": False, "source": "join"}
++        p._emulator = types.SimpleNamespace(launch=lambda game, **kw: payload, _launch_kind=None, _players_session=sess,
++                                            _last_device_args=[], active_game={"system": "ps1"})
++        p._find_game_by_id = lambda gid: {"id": gid, "system": "ps1"}
++        p._parse_cheat_launch_request = lambda q: (None, None)
++        return p, rows
++
++    def test_launch_ports_row(self):
++        p, rows = self.plugin({"discs": 4, "disc": 1})
++        p.handle_post("launch", "id=game_ps1_x")
++        r = [r for r in rows if r["event"] == "launch_ports"][0]
++        self.assertEqual((r["discs"], r["disc"]), (4, 1))
++        p, rows = self.plugin({})
++        p.handle_post("launch", "id=game_ps1_x")
++        r = [r for r in rows if r["event"] == "launch_ports"][0]
++        self.assertNotIn("discs", r)                                       # today's row
++        self.assertNotIn("disc", r)
++
++    def test_the_action_and_its_row(self):
++        p, rows = self.plugin({})
++
++        def swap(disc):
++            p._emulator._disc_event = {"event": "disc_swap", "ok": True, "from_disc": 1, "disc": int(disc), "discs": 2,
++                                       "changed": True, "steps": 1, "ms": 900}
++            return {"action": "disc_swap", "disc": int(disc)}
++        p._emulator.disc_swap = swap
++        self.assertEqual(p.handle_post("disc-swap", "disc=2")["disc"], 2)
++        r = [r for r in rows if r["event"] == "disc_swap"]
++        self.assertEqual(len(r), 1)
++        self.assertEqual((r[0]["from_disc"], r[0]["disc"], r[0]["ok"]), (1, 2, True))
++        with mock.patch.dict("os.environ", {"PRIVYHUB_DISC_SWAP": "0"}):
++            with self.assertRaises(ValueError) as cm:                    # the knob: today's unknown action
++                p.handle_post("disc-swap", "disc=2")
++            self.assertIn("Unknown Games plugin POST action", str(cm.exception))
++
++    def test_the_heartbeat_hook_reads_the_session(self):
++        src = (ROOT / "companion/plugins/games.py").read_text()
++        i = src.index("# B71: and a multi-disc session's discs / disc")
++        block = src[i:i + 400]
++        self.assertIn('getattr(self._emulator, "_disc_session", None)', block)
++        self.assertIn('values["discs"]', block)
++
++    def test_every_session_end_clears_it(self):
++        src = (ROOT / "companion/games/emulator_manager.py").read_text()
++        self.assertEqual(src.count("self._network_cmd_port = None\n"), src.count("self._disc_session = None   # B71\n"))
++        tree = ast.parse(src)
++        launch = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "launch")
++        first = ast.unparse(launch)
++        self.assertLess(first.index("self._disc_session = None"), first.index("_launch_pcsx2"))
++
++
++if __name__ == "__main__":
++    unittest.main()

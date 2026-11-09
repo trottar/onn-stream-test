@@ -137,6 +137,9 @@ _gc_session = None
 if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
     import gamecube_session as _gc_session
 
+# B71: "Change disc" (a multi-disc PS1 session's action; PRIVYHUB_DISC_SWAP=0 = today's unknown action)
+import disc_swap as _disc_swap  # noqa: E402
+
 # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
 # Absent = today: nothing imported.
 _import_marks = None
@@ -3901,6 +3904,11 @@ class GamesPlugin:
             # B69: and of a GameCube session (absent: never set)
             if _gc_session is not None and _gc_session.active(self._emulator):
                 values["gc_mode"] = True
+            # B71: and a multi-disc session's discs / disc (absent on every other session)
+            disc_session = getattr(self._emulator, "_disc_session", None)
+            if isinstance(disc_session, dict):
+                values["discs"] = disc_session.get("discs")
+                values["disc"] = disc_session.get("disc")
 
             result = append_native_stream_heartbeat(
                 self.PROJECT_ROOT,
@@ -4226,6 +4234,29 @@ class GamesPlugin:
             },
         )
 
+    # B72 (g): what SAVE / LOAD answered, as one recovery row -- a fixed list of the reply's scalar keys, never its
+    # state file, slot detail, game, title or a path. PRIVYHUB_STATE_REPLY_ROWS=0 = today (no row).
+    STATE_REPLY_KEYS = ("accepted", "confirmed", "control", "verification", "replaced_existing",
+                        "overwrite_requires_confirmation", "paused", "hotkey", "gc_states", "disc", "discs")
+
+    def _state_reply_row(self, action: str, slot: Any, payload: Any = None, error: BaseException | None = None) -> None:
+        try:
+            if (os.environ.get("PRIVYHUB_STATE_REPLY_ROWS") or "").strip() == "0":
+                return
+            import re as _re
+            fields: dict[str, Any] = {"action": action, "slot": slot, "ok": error is None}
+            if error is None and isinstance(payload, dict):
+                for key in self.STATE_REPLY_KEYS:
+                    value = payload.get(key)
+                    if key in payload and (value is None or isinstance(value, (bool, int, float, str))):
+                        fields[key] = value
+            if error is not None:
+                text = _re.sub(r"(?:[A-Za-z]:)?[\\/]?(?:[\w.-]+[\\/])+[\w.-]*", "<path>", str(error))
+                fields["error"] = text[:160]
+            self._recovery._log("state_reply", **fields)
+        except Exception:
+            pass
+
     def _log_launch_ports(self, game: dict[str, Any], payload: dict[str, Any], query: dict[str, list[str]]) -> None:
         """B66: a `launch_ports` recovery row after a launch -- the --device arguments, the ports echo (with B63's
         capable / capped_from), an N64 launch's layout. Never raises (a launch is never failed by its row)."""
@@ -4241,6 +4272,9 @@ class GamesPlugin:
             }
             if isinstance(n64, dict):
                 fields.update(layout=n64.get("layout"), remap_binds=n64.get("remap_binds"))
+            # B71: a multi-disc session's discs / disc (absent on every other launch)
+            if isinstance(payload, dict) and "discs" in payload:
+                fields.update(discs=payload.get("discs"), disc=payload.get("disc"))
             for key in ("players_joined", "players_chosen"):
                 if key in query:
                     fields[key] = self._first(query, key)
@@ -4607,6 +4641,17 @@ class GamesPlugin:
                     **multitap,
                 }
 
+            # B71: "Change disc" on a multi-disc PS1 session (PRIVYHUB_DISC_SWAP=0: today's unknown action)
+            if action == "disc-swap" and _disc_swap.enabled():
+                self._emulator._disc_event = None
+                try:
+                    return self._emulator.disc_swap(self._first(query, "disc"))
+                finally:
+                    event = getattr(self._emulator, "_disc_event", None)
+                    if isinstance(event, dict):
+                        self._recovery._log("disc_swap", **{k: v for k, v in event.items() if k != "event"})
+                        self._emulator._disc_event = None
+
             # PrivyHub Phase A2 save-state actions
             if action in {
                 "save-state",
@@ -4627,10 +4672,15 @@ class GamesPlugin:
                 )
 
                 if action == "save-state":
-                    payload = self._emulator.save_state(
-                        slot,
-                        replace=self._query_bool(query, "replace", False),
-                    )
+                    try:
+                        payload = self._emulator.save_state(
+                            slot,
+                            replace=self._query_bool(query, "replace", False),
+                        )
+                    except Exception as exc:
+                        self._state_reply_row(action, slot, error=exc)   # B72 (g)
+                        raise
+                    self._state_reply_row(action, slot, payload)
                 else:
                     # B65: an N64 load's row (continue_load / continue_skipped); None for every other system
                     self._emulator._n64_continue_event = None
@@ -4638,6 +4688,13 @@ class GamesPlugin:
                         payload = self._emulator.load_state(
                             slot
                         )
+                        # B71: after a LOAD a multi-disc session's disc is unknown (a no-op on every other session)
+                        payload = self._emulator.disc_after_load(payload)
+                    except Exception as exc:
+                        self._state_reply_row(action, slot, error=exc)   # B72 (g)
+                        raise
+                    else:
+                        self._state_reply_row(action, slot, payload)
                     finally:
                         event = getattr(self._emulator, "_n64_continue_event", None)
                         if isinstance(event, dict):

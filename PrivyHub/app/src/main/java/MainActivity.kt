@@ -12,6 +12,7 @@ import android.graphics.drawable.BitmapDrawable
 
 import com.safeiot.privyhub.streaming.NativeStreamActivity
 import com.safeiot.privyhub.streaming.GameStreamStatusUi
+import com.safeiot.privyhub.streaming.DiscChange
 import com.safeiot.privyhub.diagnostics.DiagnosticsActivity
 
 import android.os.Bundle
@@ -93,6 +94,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var gameSaveButton: Button
     private lateinit var gameLoadButton: Button
     private lateinit var gameEndButton: Button
+    // B71: "Change disc" on a multi-disc session (debug.privyhub.disc_change=0 = today: never shown)
+    private lateinit var gameDiscButton: Button
+    private var gameSessionDiscs: DiscChange.State? = null
+    private val discChangeOn: Boolean by lazy { DiscChange.fromSystem() }
     private lateinit var gameSessionPreview: ImageView
     private lateinit var gameSessionPreviewLabel: TextView
     private var gameSessionPreviewBitmap: Bitmap? = null
@@ -593,12 +598,24 @@ class MainActivity : AppCompatActivity() {
                 "END"
             )
 
+        // B71: hidden unless the session has more than one disc
+        gameDiscButton =
+            createGameSessionActionButton(
+                DiscChange.LABEL
+            ).apply {
+                layoutParams.width = dp(150)
+            }
+
         nowPlayingBar.addView(
             gameSaveButton
         )
 
         nowPlayingBar.addView(
             gameLoadButton
+        )
+
+        nowPlayingBar.addView(
+            gameDiscButton
         )
 
         nowPlayingBar.addView(
@@ -713,6 +730,12 @@ class MainActivity : AppCompatActivity() {
         gameEndButton.setOnClickListener {
 
             showGameEndDialog()
+        }
+
+
+        gameDiscButton.setOnClickListener {
+
+            showDiscChooser()
         }
 
 
@@ -6854,7 +6877,8 @@ class MainActivity : AppCompatActivity() {
                     if (active) {
                         showGameSessionBanner(
                             title,
-                            paused
+                            paused,
+                            discs = readDiscState(json)
                         )
                         openNativeGameStream()
                     } else {
@@ -7114,7 +7138,8 @@ class MainActivity : AppCompatActivity() {
 
                                 showGameSessionBanner(
                                     activeTitle,
-                                    paused
+                                    paused,
+                                    discs = readDiscState(json)
                                 )
                             }
                         }
@@ -12390,7 +12415,8 @@ class MainActivity : AppCompatActivity() {
 
                         showGameSessionBanner(
                             title,
-                            paused = true
+                            paused = true,
+                            discs = readDiscState(json)
                         )
 
                         if (loadSaveAfterLaunch) {
@@ -12854,8 +12880,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun showGameSessionBanner(
         title: String,
-        paused: Boolean
+        paused: Boolean,
+        discs: DiscChange.State? = null
     ) {
+
+        // B71: the session's discs (null on a one-disc game, an old host, or the property off)
+        gameSessionDiscs =
+            discs
 
         gameSessionActive =
             true
@@ -12885,6 +12916,9 @@ class MainActivity : AppCompatActivity() {
             false
 
         gameSessionTitle =
+            null
+
+        gameSessionDiscs =
             null
 
         updateNowPlayingUi()
@@ -12967,7 +13001,8 @@ class MainActivity : AppCompatActivity() {
 
                         showGameSessionBanner(
                             title,
-                            paused
+                            paused,
+                            discs = readDiscState(json)
                         )
 
                         if (
@@ -13694,6 +13729,144 @@ private fun requestGameStateAction(
     }
 
 
+    // B71: the host's `discs` / `disc` (absent keys or the property off -> null -> today's bar)
+    private fun readDiscState(
+        json: JSONObject?
+    ): DiscChange.State? {
+
+        if (!discChangeOn || json == null || !json.has("discs")) {
+            return null
+        }
+
+        return DiscChange.fromValues(
+            json.optInt("discs", 0),
+            if (json.has("disc") && !json.isNull("disc")) json.optInt("disc", 0) else null
+        )
+    }
+
+
+    private fun showDiscChooser() {
+
+        val state =
+            gameSessionDiscs
+                ?: return
+
+        if (!gameSessionPaused) {
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(
+                "Change disc"
+            )
+            .setItems(
+                DiscChange.choices(state).toTypedArray()
+            ) { _, which ->
+
+                requestDiscSwap(
+                    DiscChange.discForChoice(which)
+                )
+            }
+            .setNegativeButton(
+                "Cancel",
+                null
+            )
+            .show()
+    }
+
+
+    private fun requestDiscSwap(
+        disc: Int
+    ) {
+
+        val host =
+            getCompanionHost()
+
+        if (host.isBlank()) {
+            showCompanionSettings()
+            return
+        }
+
+        statusText.text =
+            DiscChange.progressLine(disc)
+
+        gameDiscButton.isEnabled =
+            false
+
+        networkExecutor.execute {
+
+            try {
+
+                val result =
+                    JSONObject(
+                        httpPost(
+                            "http://$host:$CONTROL_PORT" +
+                                "/plugins/games/${DiscChange.ENDPOINT}" +
+                                "?${DiscChange.query(disc)}"
+                        )
+                    )
+
+                val state =
+                    readDiscState(
+                        result
+                    )
+
+                runOnUiThread {
+
+                    if (state != null) {
+                        gameSessionDiscs =
+                            state
+                    }
+
+                    gameDiscButton.isEnabled =
+                        gameSessionPaused
+
+                    statusText.text =
+                        (state ?: gameSessionDiscs)
+                            ?.let { DiscChange.statusLine(it) }
+                            ?: "Disc $disc"
+
+                    nowPlayingProgress.text =
+                        gameSessionStreamStatusText()
+                }
+
+            } catch (error: Exception) {
+
+                Log.e(
+                    TAG,
+                    "Disc change failed",
+                    error
+                )
+
+                runOnUiThread {
+
+                    gameDiscButton.isEnabled =
+                        gameSessionPaused
+
+                    statusText.text =
+                        "Disc change failed"
+
+                    AlertDialog.Builder(this)
+                        .setTitle(
+                            "Change disc"
+                        )
+                        .setMessage(
+                            sanitizeGameNetworkError(
+                                error,
+                                host
+                            )
+                        )
+                        .setPositiveButton(
+                            "OK",
+                            null
+                        )
+                        .show()
+                }
+            }
+        }
+    }
+
+
     private fun stopGameOnCompanion() {
 
         val host =
@@ -13713,6 +13886,9 @@ private fun requestGameStateAction(
             false
 
         gameEndButton.isEnabled =
+            false
+
+        gameDiscButton.isEnabled =
             false
 
         networkExecutor.execute {
@@ -13781,6 +13957,9 @@ private fun requestGameStateAction(
 
                     gameEndButton.isEnabled =
                         true
+
+                    gameDiscButton.isEnabled =
+                        gameSessionPaused
 
                     statusText.text =
                         "Game end failed"
@@ -14793,6 +14972,9 @@ private fun requestGameStateAction(
 
         gameEndButton.visibility =
             View.GONE
+
+        gameDiscButton.visibility =
+            View.GONE
     }
 
 
@@ -14906,13 +15088,20 @@ private fun requestGameStateAction(
                 "RUNNING"
             }
 
+        // B71: a multi-disc session's disc under the phase ("Disc 2 of 4")
+        val discLine =
+            gameSessionDiscs
+                ?.let { "\n" + DiscChange.statusLine(it) }
+                .orEmpty()
+
         val snapshot =
             GameStreamStatusUi.latestFor(
                 gameSessionTitle
             )
-                ?: return sessionPhase
+                ?: return sessionPhase + discLine
 
         return sessionPhase +
+            discLine +
             "\n" +
             GameStreamStatusUi.compactMetadata(
                 snapshot
@@ -14980,6 +15169,17 @@ private fun requestGameStateAction(
 
         gameEndButton.isEnabled =
             gameSessionActive
+
+        // B71: only on a multi-disc session; paused only, as SAVE / LOAD
+        gameDiscButton.visibility =
+            if (DiscChange.showEntry(discChangeOn, gameSessionDiscs)) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
+
+        gameDiscButton.isEnabled =
+            gameSessionPaused
     }
 
 
@@ -15006,6 +15206,9 @@ private fun requestGameStateAction(
             View.GONE
 
         gameEndButton.visibility =
+            View.GONE
+
+        gameDiscButton.visibility =
             View.GONE
     }
 

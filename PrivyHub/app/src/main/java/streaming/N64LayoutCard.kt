@@ -18,4 +18,34 @@ object N64LayoutCard {
         promptOn && !alreadyShown && system?.trim()?.lowercase() == "n64"
 
     fun text(hasGlyph: (String) -> Boolean): String = if (GLYPHS.all(hasGlyph)) TEXT_GLYPHS else TEXT_LETTERS
+
+    // B72 (a): the card above the "Stabilizing game..." text, not over its details line.
+    // `debug.privyhub.n64_card_top=0` = B67's centred card (the overlay untouched).
+    const val PROPERTY_TOP = "debug.privyhub.n64_card_top"
+    const val GAP_PX = 24
+    const val OVERLAY_BASE_TOP_PX = 32
+
+    /** The overlay's top padding while the card shows: its text centred in the space under the card. */
+    fun overlayTopPadding(cardBottomPx: Int, basePx: Int = OVERLAY_BASE_TOP_PX): Int =
+        maxOf(basePx, cardBottomPx + GAP_PX)
+
+    /** The card's gravity: top and centred across (on), or B67's centre (off). */
+    fun gravity(top: Boolean): Int =
+        if (top) android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL else android.view.Gravity.CENTER
+
+    /** The card's own "shown" key: the top layout is shown once more on an onn that saw B67's centred card
+     *  (`shown_top`); with the property off, B67's key. */
+    const val KEY_SHOWN_TOP = "shown_top"
+
+    fun shownKey(top: Boolean): String = if (top) KEY_SHOWN_TOP else KEY_SHOWN
+
+    fun parseTop(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
+
+    fun topFromSystem(): Boolean =
+        try {
+            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
+            parseTop(get.invoke(null, PROPERTY_TOP) as? String)
+        } catch (_: Throwable) {
+            parseTop(null)
+        }
 }

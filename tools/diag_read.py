@@ -534,6 +534,7 @@ class Analysis:
     def _seconds(self) -> None:
         hitch: dict[str, set[str]] = defaultdict(set)
         row: dict[str, dict[str, Any]] = defaultdict(dict)
+        self.fps_reset: set[str] = set()   # B72 (b): seconds whose rendered_frames delta was negative
         for g in self.segs:
             prev = None
             for r in g:
@@ -544,6 +545,8 @@ class Analysis:
                         def d(f: str) -> int:
                             return (r.get(f) or 0) - (prev.get(f) or 0)
                         fps = d("rendered_frames") / dt
+                        if fps < 0:                 # B72 (b): the client's counters restarted (a hold's gap)
+                            self.fps_reset.add(k)
                         lost = d("lost_packets")
                         row[k].update(fps=round(fps, 1), lost=lost, rssi=r.get("link_rssi_dbm"),
                                       underruns=d("audio_underruns"), starv=d("audio_prolonged_starvation_events"),
@@ -604,6 +607,21 @@ class Analysis:
             if r.get("event") == "resumed" and is_hold_resume(r.get("via")):
                 t0 = ts(r["at_utc"]).replace(microsecond=0)
                 self.hold_resume.update(sec(t0 + timedelta(seconds=i)) for i in range(HOLD_RESUME_S))
+                # B72 (c): a Dolphin hold's stream returns before its `resumed` row (the F9 load runs first): its
+                # window starts at the hold's own onset, the latest desync_pause within 60 s before
+                onset = self.gc_hold_onset(ts(r["at_utc"]))
+                if onset is not None:
+                    o = onset.replace(microsecond=0)
+                    self.hold_resume.update(sec(o + timedelta(seconds=i)) for i in range(int((t0 - o).total_seconds())))
+
+    def gc_hold_onset(self, t: datetime) -> datetime | None:
+        """B72 (c): for a `resumed` inside a dolphin session, its hold's `desync_pause` (None: today's window)."""
+        sess = next((s for s in self.sessions if s["start"] <= t and (s["end"] is None or t <= s["end"])), None)
+        if sess is None or sess.get("core") != GC_CORE:
+            return None
+        pauses = [ts(x["at_utc"]) for x in self.rec if x.get("event") == "desync_pause"
+                  and timedelta(0) <= t - ts(x["at_utc"]) <= timedelta(seconds=60)]
+        return max(pauses) if pauses else None
 
     # -- counts for [a, b)
     def summarize(self, a: datetime, b: datetime) -> dict[str, Any]:
@@ -622,16 +640,20 @@ class Analysis:
         out["max_silence_ms"] = max([g.get("gap_ms") or 0 for g in gs], default=0)
         lost = und = starv = res = 0
         fpsl: list[float] = []
+        fps_for_min: list[float] = []      # B72 (b): no counter-reset second, no hold-resume second
         rssi: list[int] = []
         for k, v in row.items():
             if a <= ts(k) < b and "fps" in v:
                 lost += v["lost"]; und += v["underruns"]; starv += v["starv"]; res += v["resync"]
                 fpsl.append(v["fps"])
+                if k not in getattr(self, "fps_reset", ()) and k not in getattr(self, "hold_resume", ()):
+                    fps_for_min.append(v["fps"])
                 if v.get("rssi") is not None:
                     rssi.append(v["rssi"])
+        fps_min_from = fps_for_min or fpsl
         out.update(lost=lost, underruns=und, starvation=starv, resyncs=res,
                    fps_med=round(statistics.median(fpsl), 1) if fpsl else None,
-                   fps_min=round(min(fpsl), 1) if fpsl else None,
+                   fps_min=round(max(0.0, min(fps_min_from)), 1) if fps_min_from else None,
                    rssi=f"{min(rssi)}..{max(rssi)}" if rssi else "")
         out["stream_s"] = len({k for k, v in row.items() if a <= ts(k) < b and "fps" in v}) * 2
         trs = [r for r in self.transitions if a <= ts(r["at_utc"]) < b]

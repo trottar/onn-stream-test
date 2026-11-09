@@ -35,6 +35,7 @@ FILE_SLACK_S = 1.0
 PAUSE_CONFIRM_LAG_FRAMES = 4   # B4's
 N64_SKIP = "n64: no save into a running core"          # B61 (only an N64 session, PRIVYHUB_N64=1)
 N64_RELEASE = "n64: plain resume (no state)"           # B61
+GC_CHECK_SKIP = "gamecube: the last load's picture check was running"   # B72 (f)
 RELEASE_SETTLE_GC_S = 0.2    # B69: F9 then this, so Dolphin's hotkey thread has run the load before the resume key
 
 
@@ -198,6 +199,9 @@ class Cores:
         self.last_save: dict[str, Any] | None = None
         self.saves = 0
         self.saves_skipped_paused = 0
+        # B72 (f): set = no GameCube picture check running (cleared while one runs)
+        self.gc_check_idle = threading.Event()
+        self.gc_check_idle.set()
         self.saves_skipped_n64 = 0             # B61
         self.nci_factory: Callable[[int], Any] | None = None
         if threaded and mode_value == "state":
@@ -445,10 +449,30 @@ class Cores:
 
     # --- B69: the GameCube branches (reached only in a Dolphin session, i.e. with PRIVYHUB_GAMECUBE=1) ----------------
 
+    def _gc_idle(self) -> threading.Event:
+        idle = getattr(self, "gc_check_idle", None)
+        if idle is None:                                  # a Cores made without __init__ (a test's)
+            idle = self.gc_check_idle = threading.Event()
+            idle.set()
+        return idle
+
     def _save_gc(self, silence_start: float, mark_at: float, kind: str) -> None:
         import gamecube_session as _gc
         sess = getattr(self.emulator, "_gc", None)
         if sess is None:
+            return
+        # B72 (f): a stall while the last load's picture check runs: its result awaited, then no Shift+F9 (one save
+        # per stall, none into a game whose load is still being verified); this stall's release resumes in place
+        idle = self._gc_idle()
+        if not idle.is_set():
+            idle.wait(_gc.VERIFY_RUNNING_S + _gc.PICTURE_BOUND_S + 1.0)
+            self.recovery._log("state_save_skipped", reason=GC_CHECK_SKIP, core="dolphin", kind=kind,
+                               slot=_gc.SCRATCH_SLOT, gc_states="hotkey",
+                               silence_ms=round((mark_at - silence_start) * 1000.0, 1))
+            try:
+                sess.log(f"GC state save: slot {_gc.SCRATCH_SLOT} skipped ({kind}; the last load's check was running)")
+            except Exception:
+                pass
             return
         lock = getattr(self.emulator, "lock", None) or threading.RLock()
         wall = self._wall()
@@ -513,11 +537,18 @@ class Cores:
             pass
         row = rw._row(recovery, "input_release", fields)
         verify_fields = dict(fields)
+        self._gc_idle().clear()                                # B72 (f): a check runs until its row is written
         self._spawn(lambda: self._verify_gc(rw, recovery, sess, pre, verify_fields))
         return row
 
     def _verify_gc(self, rw: Any, recovery: Any, sess: Any, pre: Any, fields: dict[str, Any]) -> None:
         """After the recovery's resume: B52's picture check; static -> the PS1-shaped `rewind_failed` row."""
+        try:
+            self._verify_gc_check(rw, recovery, sess, pre, fields)
+        finally:
+            self._gc_idle().set()                              # B72 (f): the check is over (its rows written)
+
+    def _verify_gc_check(self, rw: Any, recovery: Any, sess: Any, pre: Any, fields: dict[str, Any]) -> None:
         import gamecube_session as _gc
         try:
             t0 = sess.clock()

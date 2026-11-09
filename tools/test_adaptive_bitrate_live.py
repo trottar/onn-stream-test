@@ -1699,9 +1699,13 @@ class C5M5Actuator(unittest.TestCase):
 
         def golden(name):
             return [x for x in (ev / name).read_text().splitlines() if x.startswith("argv:")][0]
-        self.assertEqual(line(bitrate_kbps=12600, max_bitrate_kbps=12600, width=1920, height=1080),
-                         golden("golden_after_native_game_1080p60_c3_80pct_cap90.txt"))
-        self.assertEqual(line(), golden("golden_after_unset.txt"))
+        import os
+        from unittest import mock
+        # B70: these goldens are the pre-B70 argv (x11grab's default pointer); PRIVYHUB_CAPTURE_POINTER=1 is that argv
+        with mock.patch.dict(os.environ, {"PRIVYHUB_CAPTURE_POINTER": "1"}):
+            self.assertEqual(line(bitrate_kbps=12600, max_bitrate_kbps=12600, width=1920, height=1080),
+                             golden("golden_after_native_game_1080p60_c3_80pct_cap90.txt"))
+            self.assertEqual(line(), golden("golden_after_unset.txt"))
 
 if __name__ == "__main__":
     unittest.main()

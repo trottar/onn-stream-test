@@ -1,0 +1,914 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/N64LayoutCard.kt b/PrivyHub/app/src/main/java/streaming/N64LayoutCard.kt
+index 5d57c55..1f6f4ef 100644
+--- a/PrivyHub/app/src/main/java/streaming/N64LayoutCard.kt
++++ b/PrivyHub/app/src/main/java/streaming/N64LayoutCard.kt
+@@ -18,4 +18,34 @@ object N64LayoutCard {
+         promptOn && !alreadyShown && system?.trim()?.lowercase() == "n64"
+ 
+     fun text(hasGlyph: (String) -> Boolean): String = if (GLYPHS.all(hasGlyph)) TEXT_GLYPHS else TEXT_LETTERS
++
++    // B72 (a): the card above the "Stabilizing game..." text, not over its details line.
++    // `debug.privyhub.n64_card_top=0` = B67's centred card (the overlay untouched).
++    const val PROPERTY_TOP = "debug.privyhub.n64_card_top"
++    const val GAP_PX = 24
++    const val OVERLAY_BASE_TOP_PX = 32
++
++    /** The overlay's top padding while the card shows: its text centred in the space under the card. */
++    fun overlayTopPadding(cardBottomPx: Int, basePx: Int = OVERLAY_BASE_TOP_PX): Int =
++        maxOf(basePx, cardBottomPx + GAP_PX)
++
++    /** The card's gravity: top and centred across (on), or B67's centre (off). */
++    fun gravity(top: Boolean): Int =
++        if (top) android.view.Gravity.TOP or android.view.Gravity.CENTER_HORIZONTAL else android.view.Gravity.CENTER
++
++    /** The card's own "shown" key: the top layout is shown once more on an onn that saw B67's centred card
++     *  (`shown_top`); with the property off, B67's key. */
++    const val KEY_SHOWN_TOP = "shown_top"
++
++    fun shownKey(top: Boolean): String = if (top) KEY_SHOWN_TOP else KEY_SHOWN
++
++    fun parseTop(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
++
++    fun topFromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parseTop(get.invoke(null, PROPERTY_TOP) as? String)
++        } catch (_: Throwable) {
++            parseTop(null)
++        }
+ }
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 283de8f..74e5707 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -503,12 +503,28 @@ class NativeStreamActivity :
+                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
+                 ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; setMargins(24, 24, 24, 130) })
+             }
+-            // B67: the N64 layout card, centred (shown once per onn at the first N64 start)
++            // B67: the N64 layout card (shown once per onn at the first N64 start)
++            // B72 (a): at the top, the overlay's text pushed under it while it shows (n64_card_top=0: B67's centre)
++            val cardTop = N64LayoutCard.topFromSystem()
++            n64CardTop = cardTop
+             n64CardView = line(20f).also { v ->
+                 v.setPadding(36, 24, 36, 24)
+                 root.addView(v, FrameLayout.LayoutParams(
+                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
+-                ).apply { gravity = Gravity.CENTER; setMargins(48, 48, 48, 48) })
++                ).apply { gravity = N64LayoutCard.gravity(cardTop); setMargins(48, 48, 48, 48) })
++                if (cardTop) {
++                    v.addOnLayoutChangeListener { card, _, _, _, _, _, _, _, _ ->
++                        val o = stabilizationOverlay
++                        val want = if (card.visibility == View.VISIBLE) {
++                            N64LayoutCard.overlayTopPadding(card.bottom)
++                        } else {
++                            N64LayoutCard.OVERLAY_BASE_TOP_PX
++                        }
++                        if (o.paddingTop != want) {
++                            o.setPadding(o.paddingLeft, want, o.paddingRight, o.paddingBottom)
++                        }
++                    }
++                }
+             }
+         }
+ 
+@@ -947,8 +963,10 @@ class NativeStreamActivity :
+                 n64CardView?.let { card ->
+                     val prefs = getSharedPreferences(N64LayoutCard.PREFS, MODE_PRIVATE)
+                     val system = json.optJSONObject("game_session")?.optJSONObject("game")?.optString("system")
+-                    if (N64LayoutCard.shouldShow(system, playerPrompt != null, prefs.getBoolean(N64LayoutCard.KEY_SHOWN, false))) {
+-                        prefs.edit().putBoolean(N64LayoutCard.KEY_SHOWN, true).apply()
++                    // B72 (a): the top layout's own key (shown once more after B67's centred card); off: B67's key
++                    val shownKey = N64LayoutCard.shownKey(n64CardTop)
++                    if (N64LayoutCard.shouldShow(system, playerPrompt != null, prefs.getBoolean(shownKey, false))) {
++                        prefs.edit().putBoolean(shownKey, true).apply()
+                         runOnUiThread {
+                             card.text = N64LayoutCard.text { g -> card.paint.hasGlyph(g) }
+                             card.visibility = View.VISIBLE
+@@ -2654,6 +2672,7 @@ class NativeStreamActivity :
+     private var promptView: TextView? = null
+     // B67: the N64 layout card (once per onn; null with the prompt off) and the start gate's re-arm (B65)
+     private var n64CardView: TextView? = null
++    private var n64CardTop = false     // B72 (a)
+     private val startGateRearm = StartGateRearm(StartGateRearm.fromSystem())
+     // B70: the touchpad / mouse consumed and the onn's pointer hidden in a game (pointer_hide=0 = today)
+     private val pointerGuard = PointerGuard(PointerGuard.fromSystem())
+@@ -4605,7 +4624,14 @@ class NativeStreamActivity :
+         }
+         // B67: the N64 layout card goes at the first key-down (the key is not consumed: it goes on as today)
+         if (event.action == KeyEvent.ACTION_DOWN) {
+-            n64CardView?.takeIf { it.visibility == View.VISIBLE }?.visibility = View.GONE
++            n64CardView?.takeIf { it.visibility == View.VISIBLE }?.let { card ->
++                card.visibility = View.GONE
++                // B72 (a): the overlay's own padding back (a GONE card is not laid out again)
++                if (n64CardTop) {
++                    val o = stabilizationOverlay
++                    o.setPadding(o.paddingLeft, N64LayoutCard.OVERLAY_BASE_TOP_PX, o.paddingRight, o.paddingBottom)
++                }
++            }
+         }
+         // B32: every key noted; a guide / Home-class key from a pad consumed here (null = today)
+         if (surfaceHold?.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.source) == true) {
+diff --git a/PrivyHub/app/src/test/java/streaming/B72ClientTest.kt b/PrivyHub/app/src/test/java/streaming/B72ClientTest.kt
+new file mode 100644
+index 0000000..ce76463
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/B72ClientTest.kt
+@@ -0,0 +1,51 @@
++package com.safeiot.privyhub.streaming
++
++import android.view.Gravity
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** B72 (a): the N64 layout card at the top, the overlay's text pushed under it; `n64_card_top=0` = B67's centre. */
++class B72ClientTest {
++
++    @Test
++    fun overlayPaddingUnderTheCard() {
++        // a card laid out from 48 to 210 px: the overlay's text starts 24 px under it
++        assertEquals(234, N64LayoutCard.overlayTopPadding(210))
++        // never less than the overlay's own padding
++        assertEquals(32, N64LayoutCard.overlayTopPadding(0))
++        assertEquals(40, N64LayoutCard.overlayTopPadding(0, 40))
++    }
++
++    @Test
++    fun gravityTopOrB67sCentre() {
++        assertEquals(Gravity.TOP or Gravity.CENTER_HORIZONTAL, N64LayoutCard.gravity(true))
++        assertEquals(Gravity.CENTER, N64LayoutCard.gravity(false))
++        assertEquals(Gravity.TOP, N64LayoutCard.gravity(true) and Gravity.VERTICAL_GRAVITY_MASK)   // not centred down
++    }
++
++    @Test
++    fun theProperty() {
++        assertTrue(N64LayoutCard.parseTop(null))
++        assertTrue(N64LayoutCard.parseTop(""))
++        assertFalse(N64LayoutCard.parseTop("0"))
++        assertFalse(N64LayoutCard.parseTop("off"))
++        assertEquals("debug.privyhub.n64_card_top", N64LayoutCard.PROPERTY_TOP)
++    }
++
++    @Test
++    fun theTopLayoutIsShownOnceMore() {
++        // an onn that saw B67's centred card (`shown` true) sees the top card once: its own key
++        assertEquals("shown_top", N64LayoutCard.shownKey(true))
++        assertEquals(N64LayoutCard.KEY_SHOWN, N64LayoutCard.shownKey(false))     // the property off: B67's key
++        assertTrue(N64LayoutCard.shouldShow("n64", true, false))
++    }
++
++    @Test
++    fun b67sRuleUnchanged() {
++        assertTrue(N64LayoutCard.shouldShow("n64", true, false))
++        assertFalse(N64LayoutCard.shouldShow("ps1", true, false))
++        assertFalse(N64LayoutCard.shouldShow("n64", false, false))
++    }
++}
+diff --git a/companion/gamecube_session.py b/companion/gamecube_session.py
+index 6873811..400e4ea 100644
+--- a/companion/gamecube_session.py
++++ b/companion/gamecube_session.py
+@@ -111,6 +111,26 @@ LOG_TYPES = (
+ )
+ LOG_ON = ("BOOT", "CORE", "VIDEO", "AUDIO", "COMMON", "CI")
+ 
++# B72 (e): Dolphin's linked-in SDL also opens the companion's uinput pads (C34: `SDL/0-3`, all named P1, unbound by
++# GCPadNew.ini). SDL's own hints, from the launch's environment, keep it off them, so only the evdev four are seen.
++# The ids are the virtual pad's (native_session_io's LINUX_VENDOR_ID / LINUX_PRODUCT_ID; a test checks them).
++PAD_USB_ID = "0x1209/0x5048"
++SDL_HINTS = ("SDL_JOYSTICK_BLACKLIST_DEVICES", "SDL_GAMECONTROLLER_IGNORE_DEVICES")
++SDL_PADS_ENV = "PRIVYHUB_GC_SDL_PADS"      # =1: today's environment (SDL sees the virtual pads)
++
++
++def launch_env(environ: Mapping[str, str] | None = None) -> dict[str, str]:
++    """The Dolphin launch's environment: the companion's, with the SDL hints (a value already there kept, ours added)."""
++    env = dict(os.environ if environ is None else environ)
++    if (env.get(SDL_PADS_ENV) or "").strip() == "1":
++        return env
++    for hint in SDL_HINTS:
++        have = [x for x in (env.get(hint) or "").split(",") if x.strip()]
++        if PAD_USB_ID not in have:
++            have.append(PAD_USB_ID)
++        env[hint] = ",".join(have)
++    return env
++
+ 
+ class GCError(Exception):
+     pass
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index fa2d886..1c9ae9e 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -7463,7 +7463,7 @@ class EmulatorManager:
+                 stdin=subprocess.DEVNULL,
+                 stdout=log_handle,
+                 stderr=subprocess.STDOUT,
+-                env=dict(os.environ),
++                env=_gc.launch_env(os.environ),   # B72 (e): SDL kept off the virtual pads (=1 knob: today's)
+                 start_new_session=True,
+             )
+         except Exception as exc:
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 59fba7f..f70fea7 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4234,6 +4234,29 @@ class GamesPlugin:
+             },
+         )
+ 
++    # B72 (g): what SAVE / LOAD answered, as one recovery row -- a fixed list of the reply's scalar keys, never its
++    # state file, slot detail, game, title or a path. PRIVYHUB_STATE_REPLY_ROWS=0 = today (no row).
++    STATE_REPLY_KEYS = ("accepted", "confirmed", "control", "verification", "replaced_existing",
++                        "overwrite_requires_confirmation", "paused", "hotkey", "gc_states", "disc", "discs")
++
++    def _state_reply_row(self, action: str, slot: Any, payload: Any = None, error: BaseException | None = None) -> None:
++        try:
++            if (os.environ.get("PRIVYHUB_STATE_REPLY_ROWS") or "").strip() == "0":
++                return
++            import re as _re
++            fields: dict[str, Any] = {"action": action, "slot": slot, "ok": error is None}
++            if error is None and isinstance(payload, dict):
++                for key in self.STATE_REPLY_KEYS:
++                    value = payload.get(key)
++                    if key in payload and (value is None or isinstance(value, (bool, int, float, str))):
++                        fields[key] = value
++            if error is not None:
++                text = _re.sub(r"(?:[A-Za-z]:)?[\\/]?(?:[\w.-]+[\\/])+[\w.-]*", "<path>", str(error))
++                fields["error"] = text[:160]
++            self._recovery._log("state_reply", **fields)
++        except Exception:
++            pass
++
+     def _log_launch_ports(self, game: dict[str, Any], payload: dict[str, Any], query: dict[str, list[str]]) -> None:
+         """B66: a `launch_ports` recovery row after a launch -- the --device arguments, the ports echo (with B63's
+         capable / capped_from), an N64 launch's layout. Never raises (a launch is never failed by its row)."""
+@@ -4649,10 +4672,15 @@ class GamesPlugin:
+                 )
+ 
+                 if action == "save-state":
+-                    payload = self._emulator.save_state(
+-                        slot,
+-                        replace=self._query_bool(query, "replace", False),
+-                    )
++                    try:
++                        payload = self._emulator.save_state(
++                            slot,
++                            replace=self._query_bool(query, "replace", False),
++                        )
++                    except Exception as exc:
++                        self._state_reply_row(action, slot, error=exc)   # B72 (g)
++                        raise
++                    self._state_reply_row(action, slot, payload)
+                 else:
+                     # B65: an N64 load's row (continue_load / continue_skipped); None for every other system
+                     self._emulator._n64_continue_event = None
+@@ -4662,6 +4690,11 @@ class GamesPlugin:
+                         )
+                         # B71: after a LOAD a multi-disc session's disc is unknown (a no-op on every other session)
+                         payload = self._emulator.disc_after_load(payload)
++                    except Exception as exc:
++                        self._state_reply_row(action, slot, error=exc)   # B72 (g)
++                        raise
++                    else:
++                        self._state_reply_row(action, slot, payload)
+                     finally:
+                         event = getattr(self._emulator, "_n64_continue_event", None)
+                         if isinstance(event, dict):
+diff --git a/companion/rewind_cores.py b/companion/rewind_cores.py
+index 36415e2..eea02ea 100644
+--- a/companion/rewind_cores.py
++++ b/companion/rewind_cores.py
+@@ -35,6 +35,7 @@ FILE_SLACK_S = 1.0
+ PAUSE_CONFIRM_LAG_FRAMES = 4   # B4's
+ N64_SKIP = "n64: no save into a running core"          # B61 (only an N64 session, PRIVYHUB_N64=1)
+ N64_RELEASE = "n64: plain resume (no state)"           # B61
++GC_CHECK_SKIP = "gamecube: the last load's picture check was running"   # B72 (f)
+ RELEASE_SETTLE_GC_S = 0.2    # B69: F9 then this, so Dolphin's hotkey thread has run the load before the resume key
+ 
+ 
+@@ -198,6 +199,9 @@ class Cores:
+         self.last_save: dict[str, Any] | None = None
+         self.saves = 0
+         self.saves_skipped_paused = 0
++        # B72 (f): set = no GameCube picture check running (cleared while one runs)
++        self.gc_check_idle = threading.Event()
++        self.gc_check_idle.set()
+         self.saves_skipped_n64 = 0             # B61
+         self.nci_factory: Callable[[int], Any] | None = None
+         if threaded and mode_value == "state":
+@@ -445,11 +449,31 @@ class Cores:
+ 
+     # --- B69: the GameCube branches (reached only in a Dolphin session, i.e. with PRIVYHUB_GAMECUBE=1) ----------------
+ 
++    def _gc_idle(self) -> threading.Event:
++        idle = getattr(self, "gc_check_idle", None)
++        if idle is None:                                  # a Cores made without __init__ (a test's)
++            idle = self.gc_check_idle = threading.Event()
++            idle.set()
++        return idle
++
+     def _save_gc(self, silence_start: float, mark_at: float, kind: str) -> None:
+         import gamecube_session as _gc
+         sess = getattr(self.emulator, "_gc", None)
+         if sess is None:
+             return
++        # B72 (f): a stall while the last load's picture check runs: its result awaited, then no Shift+F9 (one save
++        # per stall, none into a game whose load is still being verified); this stall's release resumes in place
++        idle = self._gc_idle()
++        if not idle.is_set():
++            idle.wait(_gc.VERIFY_RUNNING_S + _gc.PICTURE_BOUND_S + 1.0)
++            self.recovery._log("state_save_skipped", reason=GC_CHECK_SKIP, core="dolphin", kind=kind,
++                               slot=_gc.SCRATCH_SLOT, gc_states="hotkey",
++                               silence_ms=round((mark_at - silence_start) * 1000.0, 1))
++            try:
++                sess.log(f"GC state save: slot {_gc.SCRATCH_SLOT} skipped ({kind}; the last load's check was running)")
++            except Exception:
++                pass
++            return
+         lock = getattr(self.emulator, "lock", None) or threading.RLock()
+         wall = self._wall()
+         with lock:
+@@ -513,11 +537,18 @@ class Cores:
+             pass
+         row = rw._row(recovery, "input_release", fields)
+         verify_fields = dict(fields)
++        self._gc_idle().clear()                                # B72 (f): a check runs until its row is written
+         self._spawn(lambda: self._verify_gc(rw, recovery, sess, pre, verify_fields))
+         return row
+ 
+     def _verify_gc(self, rw: Any, recovery: Any, sess: Any, pre: Any, fields: dict[str, Any]) -> None:
+         """After the recovery's resume: B52's picture check; static -> the PS1-shaped `rewind_failed` row."""
++        try:
++            self._verify_gc_check(rw, recovery, sess, pre, fields)
++        finally:
++            self._gc_idle().set()                              # B72 (f): the check is over (its rows written)
++
++    def _verify_gc_check(self, rw: Any, recovery: Any, sess: Any, pre: Any, fields: dict[str, Any]) -> None:
+         import gamecube_session as _gc
+         try:
+             t0 = sess.clock()
+diff --git a/tests/b65_n64_continue/test_b65.py b/tests/b65_n64_continue/test_b65.py
+index 85f4d7d..80295ef 100644
+--- a/tests/b65_n64_continue/test_b65.py
++++ b/tests/b65_n64_continue/test_b65.py
+@@ -147,6 +147,7 @@ class PluginRow(unittest.TestCase):
+                                             _n64_continue_event=None)
+         with self.assertRaises(Exception):
+             p.handle_post("load-state", "slot=1")
++        rows = [r for r in rows if r["event"] != "state_reply"]   # B72 (g): the reply's own row beside it
+         self.assertEqual(rows, [{"event": "continue_skipped", "slot": 1, "reason": "r"}])
+         self.assertIsNone(p._emulator._n64_continue_event)
+ 
+diff --git a/tests/b72_small_readings/_tmp_cleanup.py b/tests/b72_small_readings/_tmp_cleanup.py
+new file mode 100644
+index 0000000..b4a2828
+--- /dev/null
++++ b/tests/b72_small_readings/_tmp_cleanup.py
+@@ -0,0 +1,25 @@
++"""B72 (B53's test hygiene): every temporary directory a tests/b72_small_readings run creates is removed when that run ends.
++
++HOME-6 prep found ~6.9 GiB of these suites' fixture trees (formatted 8-MB cards, fake game trees) left in the hub's /tmp
++tmpfs by B49-B52's runs, which never removed their mkdtemp() dirs. Imported by each test module; it tracks only the
++dirs made in this process and removes them at exit (never anything else)."""
++
++from __future__ import annotations
++
++import atexit
++import shutil
++import tempfile
++
++_made: list[str] = []
++_mkdtemp = tempfile.mkdtemp
++
++
++def _tracked(*args, **kwargs):
++    d = _mkdtemp(*args, **kwargs)
++    _made.append(d)
++    return d
++
++
++if getattr(tempfile.mkdtemp, "__name__", "") != "_tracked":
++    tempfile.mkdtemp = _tracked
++    atexit.register(lambda: [shutil.rmtree(d, ignore_errors=True) for d in _made])
+diff --git a/tests/b72_small_readings/test_b72.py b/tests/b72_small_readings/test_b72.py
+new file mode 100644
+index 0000000..e74c640
+--- /dev/null
++++ b/tests/b72_small_readings/test_b72.py
+@@ -0,0 +1,348 @@
++#!/usr/bin/env python3
++"""B72 (host / tools): the small readings after HOME-9+GC.
++
++(b) diag_read's `fps (min)` clamped at 0, a counter-reset second and a hold-resume second excluded from the min;
++(c) B66's hold-resume split on a dolphin session starting at the hold's own desync_pause;
++(d) gc_frames.py's 20-fps class, a segment classed by its own median, the VIs beside a render segment;
++(e) the Dolphin launch's environment keeps SDL off the virtual pads (only the evdev four);
++(f) a stall during the last load's picture check is not re-saved into slot 9 (the check awaited);
++(g) the SAVE / LOAD reply bodies as `state_reply` rows (fixed keys, no path / title / state file).
++
++    python3 -m unittest discover -s tests/b72_small_readings -v
++
++Fakes only (B36's diag fixture, B69's fake Dolphin); temp dirs removed at exit.
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import sys
++import tempfile
++import threading
++import time
++import types
++import unittest
++from datetime import datetime
++from pathlib import Path
++from unittest import mock
++from zoneinfo import ZoneInfo
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++sys.path.insert(0, str(ROOT / "tools"))
++sys.path.insert(0, str(ROOT / "tests" / "diag_read"))
++sys.path.insert(0, str(ROOT / "tests" / "gamecube_session"))
++
++import diag_fixture as fx  # noqa: E402
++import diag_read as dr  # noqa: E402
++import gc_frames as gf  # noqa: E402
++import gamecube_session as gc  # noqa: E402
++import rewind_cores  # noqa: E402
++import test_gamecube_session as tg  # noqa: E402  (B69's rig and fakes; its own tests are not collected here)
++from games import emulator_manager as em  # noqa: E402
++
++NY = ZoneInfo("America/New_York")
++ORIG = fx.logs
++
++
++# --- (b) / (c): diag_read ------------------------------------------------------------------------------------------
++
++def analysis(extra_rows=(), hb_edit=None):
++    """B36's fixture evening (session 1: 0-300 s, an R hitch at 100), with rows added in time order and an optional
++    edit of the heartbeat rows."""
++    def logs():
++        out = ORIG()
++        rows = out["native_stream_recovery.log"].splitlines() + [fx.rec(s, e, **kw) for s, e, kw in extra_rows]
++        rows.sort(key=lambda l: json.loads(l)["at_utc"])
++        out["native_stream_recovery.log"] = "\n".join(rows) + "\n"
++        if hb_edit is not None:
++            hb = [json.loads(l) for l in out["native_stream_heartbeat.log"].splitlines()]
++            out["native_stream_heartbeat.log"] = "\n".join(json.dumps(hb_edit(r)) for r in hb) + "\n"
++        return out
++    fx.logs = logs
++    try:
++        kd = fx.write_keeper_dir(Path(tempfile.mkdtemp(prefix="b72_read_")) / fx.DAY)
++    finally:
++        fx.logs = ORIG
++    lg = dr.Logs()
++    lg.add_keeper_dir(kd)
++    return dr.Analysis(lg, datetime(2026, 10, 30, 9, 0), datetime(2026, 10, 30, 11, 0), NY)
++
++
++def first_row(an):
++    return an.session_row(an.sessions[0])
++
++
++def counter_reset_at(second: int):
++    """The client's counters restart at `second` of session 1 (a Home hold's new activity): a negative delta there."""
++    def edit(r):
++        t = dr.ts(r["received_at_utc"])
++        s = (t - fx.T).total_seconds()
++        if 0 <= s < 300 and s >= second:
++            r = dict(r)
++            r["rendered_frames"] = max(0, r["rendered_frames"] - 5000)
++        return r
++    return edit
++
++
++class FpsMin(unittest.TestCase):
++    def test_today_without_a_reset(self):
++        self.assertEqual(first_row(analysis())["rendered_fps_min"], 40.0)    # the fixture's R second: today's
++
++    def test_a_counter_reset_second_is_not_the_min(self):
++        an = analysis(hb_edit=counter_reset_at(200))
++        raw = an.row[dr.sec(fx.at(200))]["fps"]
++        self.assertLess(raw, 0)                                               # the hold's gap, as C36's -1659.0
++        r = first_row(an)
++        self.assertEqual(r["rendered_fps_min"], 40.0)                         # the real lowest second
++        self.assertGreaterEqual(r["rendered_fps_min"], 0)
++
++    def test_a_hold_resume_second_is_not_the_min(self):
++        an = analysis([(99.6, "resumed", {"via": "stall_end", "from_state": "PAUSED_RECOVERING"})])
++        self.assertGreater(first_row(an)["rendered_fps_min"], 40.0)          # the R second (100) is a hold's
++
++    def test_never_negative(self):
++        an = analysis(hb_edit=lambda r: {**r, "rendered_frames": -r["elapsed_ms"]})
++        for s in an.sessions:
++            v = an.session_row(s)["rendered_fps_min"]
++            self.assertTrue(v is None or v >= 0, v)
++
++
++C35 = [(-1, "gc_session", {"gc_mode": True, "gc_states": "hotkey"}),
++       (94, "client_stall", {"age_ms": 519}), (94.0, "desync_pause", {"trigger": "client_stall"}),
++       (101, "input_release", {"via": "stall_end", "method": "state", "why": "long"}),
++       (102.2, "resumed", {"via": "stall_end", "from_state": "PAUSED_RECOVERING"})]
++
++
++class DolphinSplit(unittest.TestCase):
++    def test_c35_shaped_hold_is_split(self):
++        an = analysis(C35)
++        self.assertEqual(an.sessions[0]["core"], "dolphin")
++        r = first_row(an)
++        self.assertEqual((r["hitch_s"], r["hold_resume_s"], r["hitch_s_bar"]), (4, 1, 3))   # the R at 100 apart
++
++    def test_the_same_rows_on_another_core_are_today(self):
++        an = analysis(C35[1:])                                                # no gc_session row: the fixture's PS1
++        self.assertNotEqual(an.sessions[0]["core"], "dolphin")
++        r = first_row(an)
++        self.assertEqual((r["hitch_s"], r["hold_resume_s"], r["hitch_s_bar"]), (4, 0, 4))   # B66's window only
++
++    def test_dolphin_without_a_desync_pause_is_today(self):
++        an = analysis([C35[0], C35[4]])
++        r = first_row(an)
++        self.assertEqual(r["hold_resume_s"], 0)
++
++
++# --- (d): gc_frames ------------------------------------------------------------------------------------------------
++
++def presents(per_second: list[int]) -> list[float]:
++    """Render intervals giving `n` presents in each second."""
++    out = []
++    for n in per_second:
++        out += [1000.0 / n] * n if n else [1000.0]
++    return out
++
++
++class Frames(unittest.TestCase):
++    def test_twenty_is_a_class(self):
++        r = gf.render(presents([60] * 12 + [19, 21, 20, 19, 21, 20, 21, 19, 20, 21, 20, 19] + [60] * 12))
++        rates = [s["rate"] for s in r["segments"]]
++        self.assertEqual(rates, [60, 20, 60])
++        mid = r["segments"][1]
++        self.assertEqual((mid["hitch_bar_lt"], mid["hitch_seconds"]), (round(20 * gf.HITCH_SHARE, 2), 0))
++        self.assertEqual(r["hitch_seconds_total"], 0)
++
++    def test_a_hitch_second_stays_in_its_run(self):
++        # a 30-fps run with one 23-present second: still one 30 segment and that second a hitch (the cut is 30 / 60)
++        r = gf.render(presents([30] * 12 + [23] + [30] * 12))
++        self.assertEqual([(s["rate"], s["hitch_seconds"]) for s in r["segments"]], [(30, 1)])
++
++    def test_a_segment_by_its_own_median(self):
++        self.assertEqual(gf.own_rate([24, 26, 21, 21, 22], 30), 20)          # seconds near 25 / median 22 -> 20
++        self.assertEqual(gf.own_rate([], 30), 30)
++
++    def test_vis_beside_a_render_segment(self):
++        vb = [16.68] * (60 * 30)
++        r = gf.render(presents([60] * 10 + [20] * 10 + [60] * 10), vblank_ms=vb)
++        for s in r["segments"]:
++            self.assertAlmostEqual(s["vi_per_s"], 60.0, delta=0.5)
++            self.assertEqual(s["vi_p99_ms"], 16.68)
++        self.assertNotIn("vi_per_s", gf.render(presents([60] * 10))["segments"][0])   # no --vblank: today's keys
++
++    def test_sixty_only_is_today(self):
++        r = gf.render(presents([60] * 20))
++        self.assertEqual([(s["rate"], s["hitch_seconds"]) for s in r["segments"]], [(60, 0)])
++
++
++# --- (e): SDL off the virtual pads -----------------------------------------------------------------------------------
++
++class SdlPads(unittest.TestCase):
++    def test_the_hints(self):
++        env = gc.launch_env({"PATH": "/usr/bin"})
++        for hint in gc.SDL_HINTS:
++            self.assertEqual(env[hint], "0x1209/0x5048")
++        self.assertEqual(env["PATH"], "/usr/bin")
++
++    def test_an_existing_value_kept(self):
++        env = gc.launch_env({"SDL_JOYSTICK_BLACKLIST_DEVICES": "0x0001/0x0002"})
++        self.assertEqual(env["SDL_JOYSTICK_BLACKLIST_DEVICES"], "0x0001/0x0002,0x1209/0x5048")
++        env = gc.launch_env({"SDL_JOYSTICK_BLACKLIST_DEVICES": "0x1209/0x5048"})
++        self.assertEqual(env["SDL_JOYSTICK_BLACKLIST_DEVICES"], "0x1209/0x5048")   # not twice
++
++    def test_the_knob_is_today(self):
++        base = {"PATH": "/usr/bin", "PRIVYHUB_GC_SDL_PADS": "1"}
++        self.assertEqual(gc.launch_env(base), base)
++
++    def test_the_ids_are_the_virtual_pads(self):
++        import native_session_io as nsi
++        cls = next(v for v in vars(nsi).values() if isinstance(v, type) and hasattr(v, "LINUX_VENDOR_ID"))
++        self.assertEqual(gc.PAD_USB_ID, f"0x{cls.LINUX_VENDOR_ID:04x}/0x{cls.LINUX_PRODUCT_ID:04x}")
++
++    def test_the_launch_passes_it(self):
++        src = (ROOT / "companion/games/emulator_manager.py").read_text()
++        i = src.index("def _launch_dolphin(")
++        self.assertIn("env=_gc.launch_env(os.environ)", src[i:i + 6000])
++        self.assertNotIn("env=dict(os.environ)", src[i:i + 6000])
++        self.assertIn('Device = evdev/0/PrivyHub Virtual Gamepad P1', gc.gcpad_ini())      # the ini unchanged
++
++
++class SdlLaunch(tg.Rig):
++    def test_a_launch_builds_the_env(self):
++        seen = []
++        real = gc.launch_env
++        with mock.patch.object(gc, "launch_env", side_effect=lambda e=None: (seen.append(True), real(e))[1]):
++            self.launch()
++        self.assertEqual(seen, [True])
++
++
++# --- (f): one save per stall, none during a check --------------------------------------------------------------------
++
++class CheckWindow(tg.Rig):
++    def cores(self, **kw):
++        m, r = self.launch(**kw)
++        rec = tg.Rec()
++        c = rewind_cores.Cores("state", m, rec, clock=self.fake.clock, wall=lambda: 1000.0 + self.fake.t,
++                               threaded=False)
++        spawned = []
++        c._spawn = spawned.append
++        return m, rec, c, spawned
++
++    def first_hold(self):
++        m, rec, c, spawned = self.cores()
++        c.save(10.0, 10.4, "stall")
++        m.pause()
++        c.release(tg.rw(), rec, {"via": "client_ready_stall"}, {"onset": 10.0, "paused_at": 11.0})
++        self.assertEqual(self.fake.loaded, [9])
++        self.assertFalse(c.gc_check_idle.is_set())                           # the check is pending
++        m.resume()
++        return m, rec, c, spawned
++
++    def test_a_stall_during_the_check_is_not_re_saved(self):
++        m, rec, c, spawned = self.first_hold()
++        keys_before = list(self.fake.keys)
++        saves_before = len(rec.of("state_saved"))
++        t = threading.Thread(target=lambda: c.save(12.0, 12.2, "stall"))   # the second stall, 0.23 s after
++        t.start()
++        time.sleep(0.2)
++        self.assertTrue(t.is_alive())                                         # awaiting the check's result
++        spawned[0]()                                                          # the check runs and ends
++        t.join(5)
++        self.assertFalse(t.is_alive())
++        self.assertEqual(self.fake.keys, keys_before)                         # no Shift+F9
++        self.assertEqual(len(rec.of("state_saved")), saves_before)
++        skip = rec.of("state_save_skipped")[-1]
++        self.assertEqual((skip["reason"], skip["core"], skip["slot"], skip["kind"]),
++                         (rewind_cores.GC_CHECK_SKIP, "dolphin", 9, "stall"))
++        events = [r["event"] for r in rec.rows]
++        self.assertLess(events.index("gc_states"), events.index("state_save_skipped"))   # the verdict first
++        # that stall's release: no scratch state -> a resume in place, no second load
++        m.pause()
++        c.release(tg.rw(), rec, {"via": "client_ready_stall"}, {"onset": 12.0, "paused_at": 13.0})
++        self.assertEqual(rec.of("rewind_skipped")[-1]["reason"], "no scratch state for this pause")
++        self.assertEqual(self.fake.loaded, [9])
++
++    def test_after_the_check_a_stall_saves_as_today(self):
++        m, rec, c, spawned = self.first_hold()
++        spawned[0]()
++        self.assertTrue(c.gc_check_idle.is_set())
++        c.save(20.0, 20.4, "stall")
++        self.assertEqual(self.fake.keys[-1], "Shift_L+F9")
++        self.assertEqual(rec.of("state_saved")[-1]["slot"], 9)
++
++    def test_a_check_that_raises_still_ends(self):
++        m, rec, c, spawned = self.first_hold()
++        with mock.patch.object(c, "_verify_gc_check", side_effect=RuntimeError("boom")):
++            with self.assertRaises(RuntimeError):
++                spawned[0]()
++        self.assertTrue(c.gc_check_idle.is_set())
++
++
++# --- (g): state_reply rows -------------------------------------------------------------------------------------------
++
++def plugin(save=None, load=None):
++    import importlib.util
++    spec = importlib.util.spec_from_file_location("g72", str(ROOT / "companion/plugins/games.py"))
++    G = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(G)
++    rows = []
++    p = object.__new__(G.GamesPlugin)
++    p._recovery = types.SimpleNamespace(_log=lambda e, **k: rows.append({"event": e, **k}))
++    p._emulator = types.SimpleNamespace(save_state=save, load_state=load, record_save_state_probe_event=lambda *a, **k: None,
++                                        disc_after_load=lambda payload: payload, _n64_continue_event=None)
++    return p, rows
++
++
++SAVE_REPLY = {"ok": True, "kind": "game_session", "action": "save_state", "slot": 1, "accepted": True, "confirmed": True,
++              "replaced_existing": False, "overwrite_requires_confirmation": False,
++              "control": "retroarch_nightly_save_state_slot", "retroarch_response": "SAVE_STATE_SLOT 1",
++              "slot_detail": {"label": "Slot 1", "state_file": "data/games/retroarch/states/Made Up Title.state1"},
++              "state_file": "data/games/retroarch/states/Made Up Title.state1", "paused": True,
++              "game": {"id": "game_ps1_x", "title": "Made Up Title"}}
++
++
++class StateReply(unittest.TestCase):
++    def test_a_save_reply_row(self):
++        p, rows = plugin(save=lambda slot, replace=False: dict(SAVE_REPLY))
++        with mock.patch.dict(os.environ, {}, clear=False):
++            os.environ.pop("PRIVYHUB_STATE_REPLY_ROWS", None)
++            p.handle_post("save-state", "slot=1")
++        r = [r for r in rows if r["event"] == "state_reply"]
++        self.assertEqual(len(r), 1)
++        r = r[0]
++        self.assertEqual((r["action"], r["slot"], r["ok"], r["accepted"], r["confirmed"], r["control"], r["paused"]),
++                         ("save-state", 1, True, True, True, "retroarch_nightly_save_state_slot", True))
++        text = json.dumps(r)
++        for leak in ("Made Up Title", "state_file", "slot_detail", "data/games", "game_ps1_x", "retroarch_response"):
++            self.assertNotIn(leak, text)
++
++    def test_a_load_failure_row(self):
++        def load(slot):
++            raise em.EmulatorError("RetroArch exited during startup (code 1). See logs/games/x-game_ps1_y.log")
++        p, rows = plugin(load=load)
++        with self.assertRaises(RuntimeError):
++            p.handle_post("load-state", "slot=2")
++        r = [r for r in rows if r["event"] == "state_reply"][0]
++        self.assertEqual((r["action"], r["slot"], r["ok"]), ("load-state", 2, False))
++        self.assertIn("<path>", r["error"])
++        self.assertNotIn("logs/games", r["error"])
++
++    def test_the_knob_is_today(self):
++        p, rows = plugin(save=lambda slot, replace=False: dict(SAVE_REPLY))
++        with mock.patch.dict(os.environ, {"PRIVYHUB_STATE_REPLY_ROWS": "0"}):
++            p.handle_post("save-state", "slot=1")
++        self.assertEqual([r for r in rows if r["event"] == "state_reply"], [])
++
++    def test_a_gamecube_load_reply(self):
++        p, rows = plugin(load=lambda slot: {"action": "load_state", "slot": slot, "accepted": True, "confirmed": True,
++                                            "verification": "picture", "paused": True, "control": "dolphin_hotkey_load_state",
++                                            "hotkey": "F1"})
++        p.handle_post("load-state", "slot=1")
++        r = [r for r in rows if r["event"] == "state_reply"][0]
++        self.assertEqual((r["verification"], r["hotkey"], r["control"]), ("picture", "F1", "dolphin_hotkey_load_state"))
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/diag_read.py b/tools/diag_read.py
+index 9fda581..7b875b4 100644
+--- a/tools/diag_read.py
++++ b/tools/diag_read.py
+@@ -534,6 +534,7 @@ class Analysis:
+     def _seconds(self) -> None:
+         hitch: dict[str, set[str]] = defaultdict(set)
+         row: dict[str, dict[str, Any]] = defaultdict(dict)
++        self.fps_reset: set[str] = set()   # B72 (b): seconds whose rendered_frames delta was negative
+         for g in self.segs:
+             prev = None
+             for r in g:
+@@ -544,6 +545,8 @@ class Analysis:
+                         def d(f: str) -> int:
+                             return (r.get(f) or 0) - (prev.get(f) or 0)
+                         fps = d("rendered_frames") / dt
++                        if fps < 0:                 # B72 (b): the client's counters restarted (a hold's gap)
++                            self.fps_reset.add(k)
+                         lost = d("lost_packets")
+                         row[k].update(fps=round(fps, 1), lost=lost, rssi=r.get("link_rssi_dbm"),
+                                       underruns=d("audio_underruns"), starv=d("audio_prolonged_starvation_events"),
+@@ -604,6 +607,21 @@ class Analysis:
+             if r.get("event") == "resumed" and is_hold_resume(r.get("via")):
+                 t0 = ts(r["at_utc"]).replace(microsecond=0)
+                 self.hold_resume.update(sec(t0 + timedelta(seconds=i)) for i in range(HOLD_RESUME_S))
++                # B72 (c): a Dolphin hold's stream returns before its `resumed` row (the F9 load runs first): its
++                # window starts at the hold's own onset, the latest desync_pause within 60 s before
++                onset = self.gc_hold_onset(ts(r["at_utc"]))
++                if onset is not None:
++                    o = onset.replace(microsecond=0)
++                    self.hold_resume.update(sec(o + timedelta(seconds=i)) for i in range(int((t0 - o).total_seconds())))
++
++    def gc_hold_onset(self, t: datetime) -> datetime | None:
++        """B72 (c): for a `resumed` inside a dolphin session, its hold's `desync_pause` (None: today's window)."""
++        sess = next((s for s in self.sessions if s["start"] <= t and (s["end"] is None or t <= s["end"])), None)
++        if sess is None or sess.get("core") != GC_CORE:
++            return None
++        pauses = [ts(x["at_utc"]) for x in self.rec if x.get("event") == "desync_pause"
++                  and timedelta(0) <= t - ts(x["at_utc"]) <= timedelta(seconds=60)]
++        return max(pauses) if pauses else None
+ 
+     # -- counts for [a, b)
+     def summarize(self, a: datetime, b: datetime) -> dict[str, Any]:
+@@ -622,16 +640,20 @@ class Analysis:
+         out["max_silence_ms"] = max([g.get("gap_ms") or 0 for g in gs], default=0)
+         lost = und = starv = res = 0
+         fpsl: list[float] = []
++        fps_for_min: list[float] = []      # B72 (b): no counter-reset second, no hold-resume second
+         rssi: list[int] = []
+         for k, v in row.items():
+             if a <= ts(k) < b and "fps" in v:
+                 lost += v["lost"]; und += v["underruns"]; starv += v["starv"]; res += v["resync"]
+                 fpsl.append(v["fps"])
++                if k not in getattr(self, "fps_reset", ()) and k not in getattr(self, "hold_resume", ()):
++                    fps_for_min.append(v["fps"])
+                 if v.get("rssi") is not None:
+                     rssi.append(v["rssi"])
++        fps_min_from = fps_for_min or fpsl
+         out.update(lost=lost, underruns=und, starvation=starv, resyncs=res,
+                    fps_med=round(statistics.median(fpsl), 1) if fpsl else None,
+-                   fps_min=round(min(fpsl), 1) if fpsl else None,
++                   fps_min=round(max(0.0, min(fps_min_from)), 1) if fps_min_from else None,
+                    rssi=f"{min(rssi)}..{max(rssi)}" if rssi else "")
+         out["stream_s"] = len({k for k, v in row.items() if a <= ts(k) < b and "fps" in v}) * 2
+         trs = [r for r in self.transitions if a <= ts(r["at_utc"]) < b]
+diff --git a/tools/gc_frames.py b/tools/gc_frames.py
+index c0352bc..f54573a 100644
+--- a/tools/gc_frames.py
++++ b/tools/gc_frames.py
+@@ -13,7 +13,12 @@ screen, a 30-fps attract demo), so one rate over a whole capture misreads both p
+ 
+     python3 tools/gc_frames.py [showinfo.txt] [--render render_times.txt] [--vblank vblank_times.txt] [--json out]
+ 
+-Prints numbers only (no path, no title). Design: docs/memory/evidence/b69_2026-11-09/design_written_before_code.md.
++B72 (d): **a segment's rate is its own median snapped to 20 / 30 / 60** (the runs are still cut on today's
++per-second 30 / 60 classes, so a hitch second stays inside its run and is still a hitch), and with `--render` and `--vblank` (one clock, Dolphin's) each render segment carries its
++own VIs (`vi_per_s`, `vi_p99_ms`) beside its presented frames.
++
++Prints numbers only (no path, no title). Design: docs/memory/evidence/b69_2026-11-09/design_written_before_code.md,
++docs/memory/evidence/b72_2026-11-09/design_written_before_code.md (d).
+ """
+ 
+ from __future__ import annotations
+@@ -28,13 +33,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
+ import n64_frames as _n64  # noqa: E402  (the per-segment reading)
+ import ps2_p2_frames as _p2  # noqa: E402  (the showinfo parser, the static / black rule)
+ 
+-RATES = (30, 60)
++RATES = (30, 60)           # the per-second classes that cut the runs (today's: a hitch second stays in its run)
++SEGMENT_RATES = (20, 30, 60)   # B72 (d): a segment's class from its own median -- a title's ~20-fps scenes a class
+ MIN_SEGMENT_S = 5
+ HITCH_SHARE = _n64.HITCH_SHARE
+ 
+ 
+-def snap(n: float) -> int:
+-    return min(RATES, key=lambda r: (abs(r - n), -r))
++def snap(n: float, rates: tuple[int, ...] = RATES) -> int:
++    return min(rates, key=lambda r: (abs(r - n), -r))
+ 
+ 
+ def segments(rates: dict[int, int | None], min_len: int = MIN_SEGMENT_S) -> tuple[list[tuple[int, int, int]], int]:
+@@ -86,6 +92,7 @@ def capture(frames: list[tuple[float, str, float]], min_len: int = MIN_SEGMENT_S
+     segs, dropped = segments(rates, min_len)
+     out = []
+     for a, b, r in segs:
++        r = own_rate([secs[k]["distinct"] for k in range(a, b) if rates.get(k) is not None], r)   # B72 (d)
+         # the frames of seconds a..b inclusive: n64_frames drops the last (partial) second, so a..b-1 are read
+         sub = [f for f in frames if a <= int(f[0] - t0) <= b]
+         res = _n64.analyze(sub, internal_fps=r)
+@@ -96,7 +103,22 @@ def capture(frames: list[tuple[float, str, float]], min_len: int = MIN_SEGMENT_S
+             **totals(out)}
+ 
+ 
+-def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S) -> dict:
++def own_rate(values: list[float], fallback: int) -> int:
++    """B72 (d): a segment's class from its own median (the per-second classes only cut the runs)."""
++    return snap(statistics.median(values), SEGMENT_RATES) if values else fallback
++
++
++def vi_seconds(intervals_ms: list[float]) -> dict[int, list[float]]:
++    """Dolphin's VI intervals by the second (its own clock) they end in."""
++    out: dict[int, list[float]] = {}
++    t = 0.0
++    for v in intervals_ms:
++        t += v
++        out.setdefault(int(t // 1000), []).append(v)
++    return out
++
++
++def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S, vblank_ms: list[float] | None = None) -> dict:
+     """Dolphin's presented frames per second (cumulative intervals), segmented and barred as a capture."""
+     if not intervals_ms:
+         return {"presents": 0, "error": "no render times"}
+@@ -111,9 +133,11 @@ def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S) -> dict:
+         n = counts.get(k, 0)
+         rates[k] = None if n <= _p2.STATIC_UNIQUE else snap(n)
+     segs, dropped = segments(rates, min_len)
++    vis = vi_seconds(vblank_ms) if vblank_ms else None
+     out = []
+     for a, b, r in segs:
+         vals = [counts.get(k, 0) for k in range(a, b)]
++        r = own_rate(vals, r)                                   # B72 (d)
+         bar = r * HITCH_SHARE
+         hitches = [k for k in range(a, b) if counts.get(k, 0) < bar]
+         minutes = len(vals) / 60.0
+@@ -121,6 +145,10 @@ def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S) -> dict:
+                     "median_distinct_fps": statistics.median(vals), "min_distinct_fps": min(vals),
+                     "hitch_bar_lt": round(bar, 2), "hitch_seconds": len(hitches),
+                     "hitch_per_10min": round(len(hitches) / minutes * 10, 2) if minutes else None})
++        if vis is not None:                                     # B72 (d): the segment's own VIs beside
++            seg_vi = [v for k in range(a, b) for v in vis.get(k, [])]
++            out[-1].update(vi_per_s=round(len(seg_vi) / (b - a), 2) if b > a else None,
++                           vi_p99_ms=q(seg_vi, .99) if seg_vi else None)
+     return {"presents": len(intervals_ms), "seconds": len(rates), "segments": out,
+             "transition_or_short_seconds": dropped, **totals(out)}
+ 
+@@ -178,7 +206,8 @@ def main(argv: list[str] | None = None) -> int:
+     if a.showinfo is not None:
+         result["capture"] = capture(_p2.parse(a.showinfo.read_text(errors="replace")), a.min_segment)
+     if a.render is not None:
+-        result["dolphin_render"] = render(numbers(a.render), a.min_segment)
++        result["dolphin_render"] = render(numbers(a.render), a.min_segment,
++                                          numbers(a.vblank) if a.vblank is not None else None)
+     if a.vblank is not None:
+         w = tuple(float(x) for x in a.window.split(":")) if a.window else None
+         result["dolphin_vblank"] = vblank(numbers(a.vblank), w)

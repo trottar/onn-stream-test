@@ -13,7 +13,12 @@ screen, a 30-fps attract demo), so one rate over a whole capture misreads both p
 
     python3 tools/gc_frames.py [showinfo.txt] [--render render_times.txt] [--vblank vblank_times.txt] [--json out]
 
-Prints numbers only (no path, no title). Design: docs/memory/evidence/b69_2026-11-09/design_written_before_code.md.
+B72 (d): **a segment's rate is its own median snapped to 20 / 30 / 60** (the runs are still cut on today's
+per-second 30 / 60 classes, so a hitch second stays inside its run and is still a hitch), and with `--render` and `--vblank` (one clock, Dolphin's) each render segment carries its
+own VIs (`vi_per_s`, `vi_p99_ms`) beside its presented frames.
+
+Prints numbers only (no path, no title). Design: docs/memory/evidence/b69_2026-11-09/design_written_before_code.md,
+docs/memory/evidence/b72_2026-11-09/design_written_before_code.md (d).
 """
 
 from __future__ import annotations
@@ -28,13 +33,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import n64_frames as _n64  # noqa: E402  (the per-segment reading)
 import ps2_p2_frames as _p2  # noqa: E402  (the showinfo parser, the static / black rule)
 
-RATES = (30, 60)
+RATES = (30, 60)           # the per-second classes that cut the runs (today's: a hitch second stays in its run)
+SEGMENT_RATES = (20, 30, 60)   # B72 (d): a segment's class from its own median -- a title's ~20-fps scenes a class
 MIN_SEGMENT_S = 5
 HITCH_SHARE = _n64.HITCH_SHARE
 
 
-def snap(n: float) -> int:
-    return min(RATES, key=lambda r: (abs(r - n), -r))
+def snap(n: float, rates: tuple[int, ...] = RATES) -> int:
+    return min(rates, key=lambda r: (abs(r - n), -r))
 
 
 def segments(rates: dict[int, int | None], min_len: int = MIN_SEGMENT_S) -> tuple[list[tuple[int, int, int]], int]:
@@ -86,6 +92,7 @@ def capture(frames: list[tuple[float, str, float]], min_len: int = MIN_SEGMENT_S
     segs, dropped = segments(rates, min_len)
     out = []
     for a, b, r in segs:
+        r = own_rate([secs[k]["distinct"] for k in range(a, b) if rates.get(k) is not None], r)   # B72 (d)
         # the frames of seconds a..b inclusive: n64_frames drops the last (partial) second, so a..b-1 are read
         sub = [f for f in frames if a <= int(f[0] - t0) <= b]
         res = _n64.analyze(sub, internal_fps=r)
@@ -96,7 +103,22 @@ def capture(frames: list[tuple[float, str, float]], min_len: int = MIN_SEGMENT_S
             **totals(out)}
 
 
-def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S) -> dict:
+def own_rate(values: list[float], fallback: int) -> int:
+    """B72 (d): a segment's class from its own median (the per-second classes only cut the runs)."""
+    return snap(statistics.median(values), SEGMENT_RATES) if values else fallback
+
+
+def vi_seconds(intervals_ms: list[float]) -> dict[int, list[float]]:
+    """Dolphin's VI intervals by the second (its own clock) they end in."""
+    out: dict[int, list[float]] = {}
+    t = 0.0
+    for v in intervals_ms:
+        t += v
+        out.setdefault(int(t // 1000), []).append(v)
+    return out
+
+
+def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S, vblank_ms: list[float] | None = None) -> dict:
     """Dolphin's presented frames per second (cumulative intervals), segmented and barred as a capture."""
     if not intervals_ms:
         return {"presents": 0, "error": "no render times"}
@@ -111,9 +133,11 @@ def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S) -> dict:
         n = counts.get(k, 0)
         rates[k] = None if n <= _p2.STATIC_UNIQUE else snap(n)
     segs, dropped = segments(rates, min_len)
+    vis = vi_seconds(vblank_ms) if vblank_ms else None
     out = []
     for a, b, r in segs:
         vals = [counts.get(k, 0) for k in range(a, b)]
+        r = own_rate(vals, r)                                   # B72 (d)
         bar = r * HITCH_SHARE
         hitches = [k for k in range(a, b) if counts.get(k, 0) < bar]
         minutes = len(vals) / 60.0
@@ -121,6 +145,10 @@ def render(intervals_ms: list[float], min_len: int = MIN_SEGMENT_S) -> dict:
                     "median_distinct_fps": statistics.median(vals), "min_distinct_fps": min(vals),
                     "hitch_bar_lt": round(bar, 2), "hitch_seconds": len(hitches),
                     "hitch_per_10min": round(len(hitches) / minutes * 10, 2) if minutes else None})
+        if vis is not None:                                     # B72 (d): the segment's own VIs beside
+            seg_vi = [v for k in range(a, b) for v in vis.get(k, [])]
+            out[-1].update(vi_per_s=round(len(seg_vi) / (b - a), 2) if b > a else None,
+                           vi_p99_ms=q(seg_vi, .99) if seg_vi else None)
     return {"presents": len(intervals_ms), "seconds": len(rates), "segments": out,
             "transition_or_short_seconds": dropped, **totals(out)}
 
@@ -178,7 +206,8 @@ def main(argv: list[str] | None = None) -> int:
     if a.showinfo is not None:
         result["capture"] = capture(_p2.parse(a.showinfo.read_text(errors="replace")), a.min_segment)
     if a.render is not None:
-        result["dolphin_render"] = render(numbers(a.render), a.min_segment)
+        result["dolphin_render"] = render(numbers(a.render), a.min_segment,
+                                          numbers(a.vblank) if a.vblank is not None else None)
     if a.vblank is not None:
         w = tuple(float(x) for x in a.window.split(":")) if a.window else None
         result["dolphin_vblank"] = vblank(numbers(a.vblank), w)

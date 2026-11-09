@@ -111,6 +111,26 @@ LOG_TYPES = (
 )
 LOG_ON = ("BOOT", "CORE", "VIDEO", "AUDIO", "COMMON", "CI")
 
+# B72 (e): Dolphin's linked-in SDL also opens the companion's uinput pads (C34: `SDL/0-3`, all named P1, unbound by
+# GCPadNew.ini). SDL's own hints, from the launch's environment, keep it off them, so only the evdev four are seen.
+# The ids are the virtual pad's (native_session_io's LINUX_VENDOR_ID / LINUX_PRODUCT_ID; a test checks them).
+PAD_USB_ID = "0x1209/0x5048"
+SDL_HINTS = ("SDL_JOYSTICK_BLACKLIST_DEVICES", "SDL_GAMECONTROLLER_IGNORE_DEVICES")
+SDL_PADS_ENV = "PRIVYHUB_GC_SDL_PADS"      # =1: today's environment (SDL sees the virtual pads)
+
+
+def launch_env(environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """The Dolphin launch's environment: the companion's, with the SDL hints (a value already there kept, ours added)."""
+    env = dict(os.environ if environ is None else environ)
+    if (env.get(SDL_PADS_ENV) or "").strip() == "1":
+        return env
+    for hint in SDL_HINTS:
+        have = [x for x in (env.get(hint) or "").split(",") if x.strip()]
+        if PAD_USB_ID not in have:
+            have.append(PAD_USB_ID)
+        env[hint] = ",".join(have)
+    return env
+
 
 class GCError(Exception):
     pass

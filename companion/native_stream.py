@@ -31,6 +31,17 @@ from native_fec_relay import FEC_SCHEME_ENV, NativeVideoFecRelay
 #     was NOT adopted: 3x the loss of the cap).
 ENC_MAX_FRAME_SIZE_ENV = "PRIVYHUB_ENC_MAX_FRAME_SIZE"
 ENC_BUFSIZE_K_ENV = "PRIVYHUB_ENC_BUFSIZE_K"
+# B70: the hub's X pointer is not drawn into the capture (x11grab -draw_mouse 0); =1 keeps today's argv
+CAPTURE_POINTER_ENV = "PRIVYHUB_CAPTURE_POINTER"
+
+
+def _capture_pointer_args() -> list[str]:
+    """B70: `-draw_mouse 0` unless PRIVYHUB_CAPTURE_POINTER=1 (then nothing: the command byte for byte today's)."""
+    if (os.environ.get(CAPTURE_POINTER_ENV) or "").strip() == "1":
+        return []
+    return ["-draw_mouse", "0"]
+
+
 # D-BASE-P9: per-session override of the profile's audio cushion (5 ms
 # packets). Both must be set, and 1 <= target <= capacity <= 32, or both
 # are ignored and the profile decides. Read at every stream start.
@@ -1482,6 +1493,7 @@ class NativeStreamManager:
             "x11grab",
             "-framerate",
             str(self.FPS),
+            *_capture_pointer_args(),   # B70
             "-window_id",
             str(window_id),
             "-i",

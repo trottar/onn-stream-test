@@ -2494,6 +2494,13 @@ rather than create a second game-library path.
 > from "(80)"; one entry per set, starting on disc 1 (C33 met). The way back: `PRIVYHUB_IMPORT=1 python3
 > tools/library_m3u.py undo`. The disc swap from the onn: the next APK ("Change disc").
 
+> **B71 BUILT (2026-11-09, B; `docs/memory/evidence/B71_CHANGE_DISC_2026-11-09.md`):** "Change disc" for the `.m3u`
+> sets. The host's `disc-swap` action uses RetroArch 1.22.2's `DISK_EJECT_TOGGLE` / `DISK_NEXT` / `DISK_PREV` (there is
+> no set-index command). The index is read from RetroArch's own `Setting disc in tray: k/n` lines. The game stays
+> paused; `discs` / `disc` are on the start response, the status and the rows. The paused bar gains **CHANGE DISC**
+> (only when `discs` > 1) with a chooser and "Disc 2 of 4". Applied to the tree, uncommitted. The client part is in the
+> APK `64d02f31…` (pinned, not installed). **Next: HOME-10 C38.**
+
 ## H1 — N64
 
 Evaluate representative N64 emulation, controllers, saves, local rendering,
@@ -2598,6 +2605,20 @@ Question:
 > PS1 0.0; Dolphin's counters 60 / 60 / 60, VIs 60.11 / s) met; P0d / P7 read here. **G-A16 ADOPTED:**
 > `PRIVYHUB_GAMECUBE=1` the eighteenth line (`gamecube.conf`). To B: `gc_frames.py`'s 20-fps class, B66's split on
 > the dolphin kind, the readings in the record.
+
+> **B70 / B72 BUILT (2026-11-09, B; `docs/memory/evidence/B70_POINTERS_2026-11-09.md`, `…/B72_SMALL_READINGS_2026-11-09.md`):**
+> - **B70, the two pointers:** the capture gets `x11grab -draw_mouse 0` (`PRIVYHUB_CAPTURE_POINTER=1` = before). The
+>   stream activity swallows the pads' touchpad and any mouse, and hides and captures the onn's pointer
+>   (`debug.privyhub.pointer_hide=0` = before).
+> - **B72, the readings:**
+>   - the N64 card sits above the details line;
+>   - `diag_read`'s `fps (min)` is clamped, and B66's split now covers the dolphin kind (C35's bar 4.5 → 0.0);
+>   - `gc_frames.py` classes a segment by its own median, with 20 a class and the VIs beside (C34's 224 → 39 hitches /
+>     10 min);
+>   - Dolphin's SDL is kept off the virtual pads (only `evdev/0/…P1-P4`);
+>   - a stall during a picture check is not re-saved;
+>   - the SAVE / LOAD replies become `state_reply` rows.
+> - Applied to the tree, uncommitted. **Next: HOME-10 C37 / C39.**
 
 Evaluate bounded representative titles:
 
@@ -2727,6 +2748,21 @@ ENHANCED
 ```
 
 The actual boundaries come from runtime evidence.
+
+> **For the user's decision (2026-11-09, B): what "selected PS2 / GameCube" means now.** Both run at full speed on
+> their probe titles (H2-P1: both GameCube titles; H3-P1: PS2 T1 light, T2 heavy menu only). Both are adopted
+> (G-A14, G-A16) and play, pause, save and load from the onn like PS1, with stream hitch bars at PS1's (0.0). So
+> "selected" can no longer mean "the few that run"; four readings are open:
+> - (a) **every title on the drive is offered** (today's listing), and "selected" is dropped: ENHANCED = PS2 + GameCube;
+> - (b) **"selected" = titles read at the TV**: each title is played once from the onn and kept or hidden by the user,
+>   with a per-title tag;
+> - (c) **"selected" = a measured bar**: a title is listed only after its own hub probe (full speed, the hitch bar,
+>   the drive's reads) — the P-runs per title, heavier work;
+> - (d) **"selected" = PS2 heavy titles held back** (H3's T2 is unread in long play, the drive read-ahead open) while
+>   GameCube is offered whole.
+>
+> B's suggestion: (a), with (d)'s caveat written beside PS2 until a heavy title's long play is read. The user's word
+> decides.
 
 ## H5 — Extended-emulation checkpoint
 

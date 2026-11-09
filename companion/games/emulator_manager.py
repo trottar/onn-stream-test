@@ -48,6 +48,9 @@ _gc = None
 if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
     import gamecube_session as _gc
 
+# B71: "Change disc" on a multi-disc PS1 (.m3u) session; PRIVYHUB_DISC_SWAP=0 (read at each launch) = today
+import disc_swap as _disc_swap  # noqa: E402
+
 
 class EmulatorError(RuntimeError):
     pass
@@ -206,6 +209,7 @@ class EmulatorManager:
         self._paused = False
         self._host_window_policy = None
         self._network_cmd_port = None
+        self._disc_session = None   # B71
         self._active_cheat_session = None
         self._players_session = None
         self._launch_kind = None
@@ -428,7 +432,7 @@ class EmulatorManager:
                 and not missing_cores
             )
 
-            return {
+            payload = {
                 "ok": True,
                 "kind": "game_session",
                 "title": "Game Session",
@@ -519,6 +523,12 @@ class EmulatorManager:
                     )
                 ),
             }
+            # B71: a multi-disc session's discs / disc (absent on every other session: today's payload)
+            if active and self._disc_session is not None:
+                self._disc_refresh()
+                payload["discs"] = int(self._disc_session["discs"])
+                payload["disc"] = self._disc_session.get("disc")
+            return payload
 
     def _resolve_game(
         self,
@@ -2193,6 +2203,10 @@ class EmulatorManager:
     # B69
     _gc: Any = None
     _gc_helper_sid: int | None = None
+    # B71: {"discs": n, "disc": i | None} on a multi-disc PS1 session, else None (= today)
+    _disc_session: dict[str, Any] | None = None
+    _disc_tail: Any = None
+    _disc_event: dict[str, Any] | None = None
 
     # PRIVYHUB_PHASE_A_PS1_MULTITAP_GAME_OPTIONS
     PS1_MULTITAP_CORE_LIBRARY = "Beetle PSX HW"
@@ -5570,6 +5584,10 @@ class EmulatorManager:
                     "A PrivyHub game session is already running"
                 )
 
+            # B71: no disc session until a multi-disc .m3u launch below sets one
+            self._disc_session = None
+            self._disc_tail = None
+
             # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
             if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
                 return self._launch_pcsx2(game, players_chosen)
@@ -5892,6 +5910,9 @@ class EmulatorManager:
             self.process = process
             self.log_handle = log_handle
             self.active_game = dict(game)
+            # B71: a PS1 .m3u with more than one disc (None for every other launch, or PRIVYHUB_DISC_SWAP=0)
+            self._disc_session = _disc_swap.session_for(content_path, str(game.get("system", "")))
+            self._disc_tail = _disc_swap.LogTail(log_path) if self._disc_session is not None else None
             # B46: the session's ports from the pick (None = today)
             self._players_session = players_plan
             # B61: an N64 session (no state save is ever sent into its running core); None for every other launch
@@ -7023,6 +7044,7 @@ class EmulatorManager:
         self._paused = False
         self._host_window_policy = None
         self._network_cmd_port = None
+        self._disc_session = None   # B71
         self._active_cheat_session = None
         self._players_session = plan if chosen is not None else None
         self._hold_rewind_core = None
@@ -7365,6 +7387,7 @@ class EmulatorManager:
         self._paused = False
         self._host_window_policy = None
         self._network_cmd_port = None
+        self._disc_session = None   # B71
         self._active_cheat_session = None
         self._players_session = None
         self._launch_kind = None
@@ -7440,7 +7463,7 @@ class EmulatorManager:
                 stdin=subprocess.DEVNULL,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
-                env=dict(os.environ),
+                env=_gc.launch_env(os.environ),   # B72 (e): SDL kept off the virtual pads (=1 knob: today's)
                 start_new_session=True,
             )
         except Exception as exc:
@@ -7461,6 +7484,7 @@ class EmulatorManager:
         self._paused = False
         self._host_window_policy = None
         self._network_cmd_port = None
+        self._disc_session = None   # B71
         self._active_cheat_session = None
         self._players_session = plan
         self._hold_rewind_core = None
@@ -7741,6 +7765,7 @@ class EmulatorManager:
         self._paused = False
         self._host_window_policy = None
         self._network_cmd_port = None
+        self._disc_session = None   # B71
         self._active_cheat_session = None
         self._players_session = None
         self._launch_kind = None
@@ -8944,6 +8969,94 @@ class EmulatorManager:
             ).replace("\\", "/")
             return payload
 
+    # --- B71: "Change disc" (a multi-disc PS1 session only; every other session never reaches these) ----------------
+
+    def _disc_refresh(self) -> None:
+        """RetroArch's own `Setting disc in tray: k/n` lines since the last read (the launch's, a swap's)."""
+        sess, tail = self._disc_session, self._disc_tail
+        if sess is None or tail is None:
+            return
+        k = _disc_swap.last_index(tail.read(), int(sess["discs"]))
+        if k is not None:
+            sess["disc"] = k
+
+    def _disc_game_log(self, line: str) -> None:
+        try:
+            if self.log_handle is not None:
+                self.log_handle.write(line + "\n")
+                self.log_handle.flush()
+        except (OSError, ValueError):
+            pass
+
+    def disc_swap(self, disc: Any) -> dict[str, Any]:
+        """Open the tray, step to `disc`, close the tray; the game left paused. The PS1-shaped reply."""
+        with self.lock:
+            self._refresh_process()
+            sess = self._disc_session
+            if self.process is None or self.process.poll() is not None or sess is None:
+                raise EmulatorError("This game has one disc")
+            if self._launch_kind not in (None, "retroarch"):
+                raise EmulatorError("Change disc is only for a PlayStation game")
+            n = int(sess["discs"])
+            try:
+                target = int(str(disc).strip())
+            except (TypeError, ValueError) as exc:
+                raise EmulatorError(f"disc must be 1 to {n}") from exc
+            if not 1 <= target <= n:
+                raise EmulatorError(f"disc must be 1 to {n}")
+            if not self._paused:
+                raise EmulatorError("Pause the game to change disc")
+            self._disc_refresh()
+            start = sess.get("disc")
+            t0 = time.monotonic()
+            if start == target:
+                result = {"disc": target, "steps": 0}
+                changed = False
+            else:
+                swapper = _disc_swap.Swapper(
+                    lambda cmd: self._retroarch_network_request(cmd, expect_response=False),
+                    self._disc_tail, n)
+                try:
+                    result = swapper.run(start, target)
+                except _disc_swap.DiscSwapError as exc:
+                    sess["disc"] = exc.disc
+                    ms = round((time.monotonic() - t0) * 1000.0)
+                    self._disc_game_log(f"PS1 disc swap failed: {start if start is not None else '?'} -> {target} ({exc})")
+                    self._disc_event = {"event": "disc_swap", "ok": False, "from_disc": start, "disc": exc.disc,
+                                        "target": target, "discs": n, "steps": len(swapper.sent), "ms": ms,
+                                        "reason": str(exc)}
+                    raise EmulatorError("PrivyHub could not change the disc") from exc
+                changed = True
+                sess["disc"] = result["disc"]
+            ms = round((time.monotonic() - t0) * 1000.0)
+            # the pause is never toggled; it must still hold
+            state = self._retroarch_network_status()
+            if state != "PAUSED":
+                raise EmulatorError("The game is no longer paused after the disc change")
+            if changed:
+                self._disc_game_log(f"PS1 disc swap: {start if start is not None else '?'} -> {target}")
+            self._disc_event = {"event": "disc_swap", "ok": True, "from_disc": start, "disc": target, "discs": n,
+                                "changed": changed, "steps": int(result["steps"]), "ms": ms}
+            payload = self.status()
+            payload["action"] = "disc_swap"
+            payload["accepted"] = True
+            payload["confirmed"] = True
+            payload["control"] = _disc_swap.CONTROL
+            payload["from_disc"] = start
+            payload["disc"] = target
+            payload["discs"] = n
+            payload["changed"] = changed
+            payload["steps"] = int(result["steps"])
+            return payload
+
+    def disc_after_load(self, payload: Any) -> Any:
+        """A LOAD on a multi-disc session: the state may carry another disc (no log line says which) -> unknown."""
+        if self._disc_session is not None:
+            self._disc_session["disc"] = None
+            if isinstance(payload, dict) and "discs" in payload:
+                payload["disc"] = None
+        return payload
+
     # PrivyHub A2/A3 patch 07: nightly live-state load
     def load_state(
         self,
@@ -9917,6 +10030,7 @@ class EmulatorManager:
             self.started_at = None
             self._paused = False
             self._network_cmd_port = None
+            self._disc_session = None   # B71
             self._active_cheat_session = None
             self._players_session = None
             self._launch_kind = None

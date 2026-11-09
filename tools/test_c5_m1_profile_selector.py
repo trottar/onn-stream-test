@@ -46,6 +46,7 @@ ADOPTED_ARGV = (
 
 def clean_env(**extra):
     env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
+    env["PRIVYHUB_CAPTURE_POINTER"] = "1"   # B70: this suite's pinned argv is the pre-B70 one (B70's suite reads the default)
     env.update(extra)
     return mock.patch.dict(os.environ, env, clear=True)
 

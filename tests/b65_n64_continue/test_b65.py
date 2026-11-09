@@ -147,6 +147,7 @@ class PluginRow(unittest.TestCase):
                                             _n64_continue_event=None)
         with self.assertRaises(Exception):
             p.handle_post("load-state", "slot=1")
+        rows = [r for r in rows if r["event"] != "state_reply"]   # B72 (g): the reply's own row beside it
         self.assertEqual(rows, [{"event": "continue_skipped", "slot": 1, "reason": "r"}])
         self.assertIsNone(p._emulator._n64_continue_event)
 

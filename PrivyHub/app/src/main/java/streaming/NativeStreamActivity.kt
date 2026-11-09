@@ -12,6 +12,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.PointerIcon
 import android.view.PixelCopy
 import android.view.Surface
 import android.view.SurfaceHolder
@@ -502,18 +503,38 @@ class NativeStreamActivity :
                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
                 ).apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; setMargins(24, 24, 24, 130) })
             }
-            // B67: the N64 layout card, centred (shown once per onn at the first N64 start)
+            // B67: the N64 layout card (shown once per onn at the first N64 start)
+            // B72 (a): at the top, the overlay's text pushed under it while it shows (n64_card_top=0: B67's centre)
+            val cardTop = N64LayoutCard.topFromSystem()
+            n64CardTop = cardTop
             n64CardView = line(20f).also { v ->
                 v.setPadding(36, 24, 36, 24)
                 root.addView(v, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT
-                ).apply { gravity = Gravity.CENTER; setMargins(48, 48, 48, 48) })
+                ).apply { gravity = N64LayoutCard.gravity(cardTop); setMargins(48, 48, 48, 48) })
+                if (cardTop) {
+                    v.addOnLayoutChangeListener { card, _, _, _, _, _, _, _, _ ->
+                        val o = stabilizationOverlay
+                        val want = if (card.visibility == View.VISIBLE) {
+                            N64LayoutCard.overlayTopPadding(card.bottom)
+                        } else {
+                            N64LayoutCard.OVERLAY_BASE_TOP_PX
+                        }
+                        if (o.paddingTop != want) {
+                            o.setPadding(o.paddingLeft, want, o.paddingRight, o.paddingBottom)
+                        }
+                    }
+                }
             }
         }
 
         setContentView(
             root
         )
+
+        // B70: every view's pointer icon the null icon (guard on only)
+        pointerRoot = root
+        pointerGuard.onAttach(pointerHost)
 
         surfaceView.holder.addCallback(
             this
@@ -942,8 +963,10 @@ class NativeStreamActivity :
                 n64CardView?.let { card ->
                     val prefs = getSharedPreferences(N64LayoutCard.PREFS, MODE_PRIVATE)
                     val system = json.optJSONObject("game_session")?.optJSONObject("game")?.optString("system")
-                    if (N64LayoutCard.shouldShow(system, playerPrompt != null, prefs.getBoolean(N64LayoutCard.KEY_SHOWN, false))) {
-                        prefs.edit().putBoolean(N64LayoutCard.KEY_SHOWN, true).apply()
+                    // B72 (a): the top layout's own key (shown once more after B67's centred card); off: B67's key
+                    val shownKey = N64LayoutCard.shownKey(n64CardTop)
+                    if (N64LayoutCard.shouldShow(system, playerPrompt != null, prefs.getBoolean(shownKey, false))) {
+                        prefs.edit().putBoolean(shownKey, true).apply()
                         runOnUiThread {
                             card.text = N64LayoutCard.text { g -> card.paint.hasGlyph(g) }
                             card.visibility = View.VISIBLE
@@ -2649,7 +2672,34 @@ class NativeStreamActivity :
     private var promptView: TextView? = null
     // B67: the N64 layout card (once per onn; null with the prompt off) and the start gate's re-arm (B65)
     private var n64CardView: TextView? = null
+    private var n64CardTop = false     // B72 (a)
     private val startGateRearm = StartGateRearm(StartGateRearm.fromSystem())
+    // B70: the touchpad / mouse consumed and the onn's pointer hidden in a game (pointer_hide=0 = today)
+    private val pointerGuard = PointerGuard(PointerGuard.fromSystem())
+    private var pointerRoot: View? = null
+    private val pointerHost = object : PointerGuard.Host {
+        override fun hideIcon() {
+            val icon = PointerIcon.getSystemIcon(this@NativeStreamActivity, PointerIcon.TYPE_NULL)
+            fun walk(v: View) {
+                v.pointerIcon = icon
+                if (v is android.view.ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
+            }
+            pointerRoot?.let { walk(it) }
+            window.decorView.pointerIcon = icon
+        }
+        override fun requestCapture() {
+            if (android.os.Build.VERSION.SDK_INT < 26) return
+            pointerRoot?.let { r ->
+                r.setOnCapturedPointerListener { _, _ -> true }
+                window.decorView.setOnCapturedPointerListener { _, _ -> true }
+                r.requestPointerCapture()
+            }
+        }
+        override fun releaseCapture() {
+            if (android.os.Build.VERSION.SDK_INT < 26) return
+            pointerRoot?.releasePointerCapture()
+        }
+    }
     private var promptBadgeView: TextView? = null
     private fun promptClaimsQuery(): String =
         playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
@@ -4551,6 +4601,8 @@ class NativeStreamActivity :
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         surfaceHold?.onFocus(hasFocus)
+        // B70: the pointer captured while the game has the focus (guard on only)
+        pointerGuard.onFocus(pointerHost, hasFocus)
     }
 
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
@@ -4566,9 +4618,20 @@ class NativeStreamActivity :
     override fun dispatchKeyEvent(
         event: KeyEvent
     ): Boolean {
+        // B70: a touchpad / mouse key (e.g. a secondary click's Back) does nothing, before the Back handling
+        if (pointerGuard.consumeKey(event.source)) {
+            return true
+        }
         // B67: the N64 layout card goes at the first key-down (the key is not consumed: it goes on as today)
         if (event.action == KeyEvent.ACTION_DOWN) {
-            n64CardView?.takeIf { it.visibility == View.VISIBLE }?.visibility = View.GONE
+            n64CardView?.takeIf { it.visibility == View.VISIBLE }?.let { card ->
+                card.visibility = View.GONE
+                // B72 (a): the overlay's own padding back (a GONE card is not laid out again)
+                if (n64CardTop) {
+                    val o = stabilizationOverlay
+                    o.setPadding(o.paddingLeft, N64LayoutCard.OVERLAY_BASE_TOP_PX, o.paddingRight, o.paddingBottom)
+                }
+            }
         }
         // B32: every key noted; a guide / Home-class key from a pad consumed here (null = today)
         if (surfaceHold?.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.source) == true) {
@@ -4620,6 +4683,10 @@ class NativeStreamActivity :
     override fun dispatchGenericMotionEvent(
         event: MotionEvent
     ): Boolean {
+        // B70: a touchpad / mouse motion (hover, scroll, a swipe) does nothing
+        if (pointerGuard.consumeMotion(event.source)) {
+            return true
+        }
         if (
             !gameplayReleased
         ) {
@@ -4640,6 +4707,21 @@ class NativeStreamActivity :
         )
     }
 
+
+    // B70: a touchpad / mouse press or click reaches no view
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (pointerGuard.consumeTouch(event.source)) {
+            return true
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun dispatchTrackballEvent(event: MotionEvent): Boolean {
+        if (pointerGuard.consumeTrackball()) {
+            return true
+        }
+        return super.dispatchTrackballEvent(event)
+    }
 
     private fun httpPostJson(
         address: String,

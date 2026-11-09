@@ -1,0 +1,507 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 9ecbe77..283de8f 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -12,6 +12,7 @@ import android.os.Looper
+ import android.view.Gravity
+ import android.view.KeyEvent
+ import android.view.MotionEvent
++import android.view.PointerIcon
+ import android.view.PixelCopy
+ import android.view.Surface
+ import android.view.SurfaceHolder
+@@ -515,6 +516,10 @@ class NativeStreamActivity :
+             root
+         )
+ 
++        // B70: every view's pointer icon the null icon (guard on only)
++        pointerRoot = root
++        pointerGuard.onAttach(pointerHost)
++
+         surfaceView.holder.addCallback(
+             this
+         )
+@@ -2650,6 +2655,32 @@ class NativeStreamActivity :
+     // B67: the N64 layout card (once per onn; null with the prompt off) and the start gate's re-arm (B65)
+     private var n64CardView: TextView? = null
+     private val startGateRearm = StartGateRearm(StartGateRearm.fromSystem())
++    // B70: the touchpad / mouse consumed and the onn's pointer hidden in a game (pointer_hide=0 = today)
++    private val pointerGuard = PointerGuard(PointerGuard.fromSystem())
++    private var pointerRoot: View? = null
++    private val pointerHost = object : PointerGuard.Host {
++        override fun hideIcon() {
++            val icon = PointerIcon.getSystemIcon(this@NativeStreamActivity, PointerIcon.TYPE_NULL)
++            fun walk(v: View) {
++                v.pointerIcon = icon
++                if (v is android.view.ViewGroup) for (i in 0 until v.childCount) walk(v.getChildAt(i))
++            }
++            pointerRoot?.let { walk(it) }
++            window.decorView.pointerIcon = icon
++        }
++        override fun requestCapture() {
++            if (android.os.Build.VERSION.SDK_INT < 26) return
++            pointerRoot?.let { r ->
++                r.setOnCapturedPointerListener { _, _ -> true }
++                window.decorView.setOnCapturedPointerListener { _, _ -> true }
++                r.requestPointerCapture()
++            }
++        }
++        override fun releaseCapture() {
++            if (android.os.Build.VERSION.SDK_INT < 26) return
++            pointerRoot?.releasePointerCapture()
++        }
++    }
+     private var promptBadgeView: TextView? = null
+     private fun promptClaimsQuery(): String =
+         playerPrompt?.let { "&pad_claims=" + URLEncoder.encode(it.claimsString(), "UTF-8") } ?: ""
+@@ -4551,6 +4582,8 @@ class NativeStreamActivity :
+     override fun onWindowFocusChanged(hasFocus: Boolean) {
+         super.onWindowFocusChanged(hasFocus)
+         surfaceHold?.onFocus(hasFocus)
++        // B70: the pointer captured while the game has the focus (guard on only)
++        pointerGuard.onFocus(pointerHost, hasFocus)
+     }
+ 
+     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+@@ -4566,6 +4599,10 @@ class NativeStreamActivity :
+     override fun dispatchKeyEvent(
+         event: KeyEvent
+     ): Boolean {
++        // B70: a touchpad / mouse key (e.g. a secondary click's Back) does nothing, before the Back handling
++        if (pointerGuard.consumeKey(event.source)) {
++            return true
++        }
+         // B67: the N64 layout card goes at the first key-down (the key is not consumed: it goes on as today)
+         if (event.action == KeyEvent.ACTION_DOWN) {
+             n64CardView?.takeIf { it.visibility == View.VISIBLE }?.visibility = View.GONE
+@@ -4620,6 +4657,10 @@ class NativeStreamActivity :
+     override fun dispatchGenericMotionEvent(
+         event: MotionEvent
+     ): Boolean {
++        // B70: a touchpad / mouse motion (hover, scroll, a swipe) does nothing
++        if (pointerGuard.consumeMotion(event.source)) {
++            return true
++        }
+         if (
+             !gameplayReleased
+         ) {
+@@ -4641,6 +4682,21 @@ class NativeStreamActivity :
+     }
+ 
+ 
++    // B70: a touchpad / mouse press or click reaches no view
++    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
++        if (pointerGuard.consumeTouch(event.source)) {
++            return true
++        }
++        return super.dispatchTouchEvent(event)
++    }
++
++    override fun dispatchTrackballEvent(event: MotionEvent): Boolean {
++        if (pointerGuard.consumeTrackball()) {
++            return true
++        }
++        return super.dispatchTrackballEvent(event)
++    }
++
+     private fun httpPostJson(
+         address: String,
+         payload: JSONObject,
+diff --git a/PrivyHub/app/src/main/java/streaming/PointerGuard.kt b/PrivyHub/app/src/main/java/streaming/PointerGuard.kt
+new file mode 100644
+index 0000000..c468d34
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/PointerGuard.kt
+@@ -0,0 +1,80 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B70: in a game the pads' touchpads (a pointer device to Android) and any mouse do nothing: their events are consumed,
++ * the onn's pointer is hidden (the null pointer icon) and captured at focus (so Android draws neither its arrow nor the
++ * touchpad's own touch spots). The remote's D-pad / OK and the pads' buttons and sticks are never touched: their
++ * sources carry no pointer bit. `debug.privyhub.pointer_hide=0` = today (nothing consumed, no icon, no capture).
++ *
++ * The DualShock / DualSense touchpad press arrives from the touchpad's own device as a pointer click, not as a pad
++ * button, so it is swallowed with the rest (listed; no PrivyHub layout uses it).
++ */
++class PointerGuard(val enabled: Boolean) {
++
++    /** What the activity does for the guard (a fake in the tests). */
++    interface Host {
++        fun hideIcon()
++        fun requestCapture()
++        fun releaseCapture()
++    }
++
++    var consumed: Int = 0
++        private set
++    var captureRequests: Int = 0
++        private set
++
++    fun consumeMotion(source: Int): Boolean = take(source)
++    fun consumeTouch(source: Int): Boolean = take(source)
++    fun consumeKey(source: Int): Boolean = take(source)
++    fun consumeTrackball(): Boolean = enabled.also { if (it) consumed += 1 }
++
++    private fun take(source: Int): Boolean {
++        if (!enabled || !isPointerSource(source)) return false
++        consumed += 1
++        return true
++    }
++
++    /** After the views exist: every view's icon is the null icon (guard on only). */
++    fun onAttach(host: Host) {
++        if (enabled) host.hideIcon()
++    }
++
++    /** Capture needs a focused window; Android drops it when the focus goes. */
++    fun onFocus(host: Host, hasFocus: Boolean) {
++        if (!enabled) return
++        if (hasFocus) {
++            captureRequests += 1
++            host.requestCapture()
++        } else {
++            host.releaseCapture()
++        }
++    }
++
++    companion object {
++        const val PROPERTY = "debug.privyhub.pointer_hide"
++
++        // android.view.InputDevice's values (the test checks them against the SDK's)
++        const val SOURCE_CLASS_POINTER = 0x00000002
++        const val SOURCE_MOUSE = 0x00002002
++        const val SOURCE_TOUCHPAD = 0x00100008
++        const val SOURCE_MOUSE_RELATIVE = 0x00020004
++        const val SOURCE_TOUCH_NAVIGATION = 0x00200000
++
++        private val FULL = intArrayOf(SOURCE_MOUSE, SOURCE_TOUCHPAD, SOURCE_MOUSE_RELATIVE, SOURCE_TOUCH_NAVIGATION)
++
++        /** A pointer source: the pointer class bit (mouse, touchscreen, stylus, a touchpad as a pointer), or one of the
++         *  touchpad / mouse sources by its full pattern (never a keyboard, D-pad, gamepad or joystick source). */
++        fun isPointerSource(source: Int): Boolean =
++            (source and SOURCE_CLASS_POINTER) != 0 || FULL.any { (source and it) == it }
++
++        fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
++
++        fun fromSystem(): Boolean =
++            try {
++                val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++                parse(get.invoke(null, PROPERTY) as? String)
++            } catch (_: Throwable) {
++                parse(null)
++            }
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/B70PointerTest.kt b/PrivyHub/app/src/test/java/streaming/B70PointerTest.kt
+new file mode 100644
+index 0000000..20767ca
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/B70PointerTest.kt
+@@ -0,0 +1,138 @@
++package com.safeiot.privyhub.streaming
++
++import android.view.InputDevice
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * B70: the pads' touchpad and any mouse consumed in a game, the pointer hidden and captured; the remote's D-pad / OK
++ * and the pads' buttons and sticks passed. Fake events (a source and a kind) and a fake host.
++ */
++class B70PointerTest {
++
++    private class FakeHost : PointerGuard.Host {
++        var hidden = 0
++        var captures = 0
++        var releases = 0
++        override fun hideIcon() { hidden += 1 }
++        override fun requestCapture() { captures += 1 }
++        override fun releaseCapture() { releases += 1 }
++    }
++
++    private enum class Kind { MOTION, TOUCH, KEY }
++    private data class FakeEvent(val source: Int, val kind: Kind)
++
++    private fun consumed(g: PointerGuard, e: FakeEvent): Boolean = when (e.kind) {
++        Kind.MOTION -> g.consumeMotion(e.source)
++        Kind.TOUCH -> g.consumeTouch(e.source)
++        Kind.KEY -> g.consumeKey(e.source)
++    }
++
++    // the sources as Android stamps them on these events
++    private val touchpadMotion = FakeEvent(InputDevice.SOURCE_TOUCHPAD, Kind.MOTION)
++    private val touchpadAsPointer = FakeEvent(InputDevice.SOURCE_MOUSE, Kind.MOTION)          // the pointer's presentation
++    private val touchpadClick = FakeEvent(InputDevice.SOURCE_MOUSE, Kind.TOUCH)
++    private val mouseBackKey = FakeEvent(InputDevice.SOURCE_MOUSE, Kind.KEY)                  // a secondary click's Back
++    private val capturedMouse = FakeEvent(InputDevice.SOURCE_MOUSE_RELATIVE, Kind.MOTION)
++    private val touchscreen = FakeEvent(InputDevice.SOURCE_TOUCHSCREEN, Kind.TOUCH)
++    private val remoteDpad = FakeEvent(InputDevice.SOURCE_DPAD or InputDevice.SOURCE_KEYBOARD, Kind.KEY)
++    private val padButton = FakeEvent(InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_KEYBOARD, Kind.KEY)
++    private val padButtonDpad =
++        FakeEvent(InputDevice.SOURCE_GAMEPAD or InputDevice.SOURCE_KEYBOARD or InputDevice.SOURCE_DPAD, Kind.KEY)
++    private val padStick = FakeEvent(InputDevice.SOURCE_JOYSTICK, Kind.MOTION)
++    private val padStickAndGamepad = FakeEvent(InputDevice.SOURCE_JOYSTICK or InputDevice.SOURCE_GAMEPAD, Kind.MOTION)
++
++    @Test
++    fun touchpadMotionConsumedNoPointer() {
++        val g = PointerGuard(true)
++        val host = FakeHost()
++        g.onAttach(host)
++        g.onFocus(host, true)
++        assertTrue(consumed(g, touchpadMotion))
++        assertEquals(1, host.hidden)          // the null icon
++        assertEquals(1, host.captures)        // the capture: no arrow, no touch spots
++        assertEquals(1, g.consumed)
++    }
++
++    @Test
++    fun everyPointerEventConsumed() {
++        val g = PointerGuard(true)
++        for (e in listOf(touchpadMotion, touchpadAsPointer, touchpadClick, mouseBackKey, capturedMouse, touchscreen)) {
++            assertTrue(e.toString(), consumed(g, e))
++        }
++        assertTrue(g.consumeTrackball())
++        assertEquals(7, g.consumed)
++    }
++
++    @Test
++    fun dpadPassed() {
++        val g = PointerGuard(true)
++        assertFalse(consumed(g, remoteDpad))
++        assertEquals(0, g.consumed)
++    }
++
++    @Test
++    fun padButtonPassed() {
++        val g = PointerGuard(true)
++        assertFalse(consumed(g, padButton))
++        assertFalse(consumed(g, padButtonDpad))
++        assertEquals(0, g.consumed)
++    }
++
++    @Test
++    fun padSticksPassed() {
++        val g = PointerGuard(true)
++        assertFalse(consumed(g, padStick))
++        assertFalse(consumed(g, padStickAndGamepad))
++    }
++
++    @Test
++    fun offIsToday() {
++        val g = PointerGuard(false)
++        val host = FakeHost()
++        g.onAttach(host)
++        g.onFocus(host, true)
++        g.onFocus(host, false)
++        for (e in listOf(touchpadMotion, touchpadClick, mouseBackKey, remoteDpad, padButton, padStick)) {
++            assertFalse(e.toString(), consumed(g, e))
++        }
++        assertFalse(g.consumeTrackball())
++        assertEquals(0, host.hidden)
++        assertEquals(0, host.captures)
++        assertEquals(0, host.releases)
++        assertEquals(0, g.consumed)
++    }
++
++    @Test
++    fun captureOnlyWithFocus() {
++        val g = PointerGuard(true)
++        val host = FakeHost()
++        g.onFocus(host, false)
++        assertEquals(0, host.captures)
++        assertEquals(1, host.releases)
++        g.onFocus(host, true)
++        assertEquals(1, host.captures)
++        assertEquals(1, g.captureRequests)
++    }
++
++    @Test
++    fun constantsAreTheSdks() {
++        assertEquals(InputDevice.SOURCE_CLASS_POINTER, PointerGuard.SOURCE_CLASS_POINTER)
++        assertEquals(InputDevice.SOURCE_MOUSE, PointerGuard.SOURCE_MOUSE)
++        assertEquals(InputDevice.SOURCE_TOUCHPAD, PointerGuard.SOURCE_TOUCHPAD)
++        assertEquals(InputDevice.SOURCE_MOUSE_RELATIVE, PointerGuard.SOURCE_MOUSE_RELATIVE)
++        assertEquals(InputDevice.SOURCE_TOUCH_NAVIGATION, PointerGuard.SOURCE_TOUCH_NAVIGATION)
++    }
++
++    @Test
++    fun propertyParse() {
++        assertTrue(PointerGuard.parse(null))
++        assertTrue(PointerGuard.parse(""))
++        assertTrue(PointerGuard.parse("1"))
++        assertFalse(PointerGuard.parse("0"))
++        assertFalse(PointerGuard.parse(" off "))
++        assertEquals("debug.privyhub.pointer_hide", PointerGuard.PROPERTY)
++    }
++}
+diff --git a/companion/native_stream.py b/companion/native_stream.py
+index ca249f1..40b73a8 100644
+--- a/companion/native_stream.py
++++ b/companion/native_stream.py
+@@ -31,6 +31,17 @@ from native_fec_relay import FEC_SCHEME_ENV, NativeVideoFecRelay
+ #     was NOT adopted: 3x the loss of the cap).
+ ENC_MAX_FRAME_SIZE_ENV = "PRIVYHUB_ENC_MAX_FRAME_SIZE"
+ ENC_BUFSIZE_K_ENV = "PRIVYHUB_ENC_BUFSIZE_K"
++# B70: the hub's X pointer is not drawn into the capture (x11grab -draw_mouse 0); =1 keeps today's argv
++CAPTURE_POINTER_ENV = "PRIVYHUB_CAPTURE_POINTER"
++
++
++def _capture_pointer_args() -> list[str]:
++    """B70: `-draw_mouse 0` unless PRIVYHUB_CAPTURE_POINTER=1 (then nothing: the command byte for byte today's)."""
++    if (os.environ.get(CAPTURE_POINTER_ENV) or "").strip() == "1":
++        return []
++    return ["-draw_mouse", "0"]
++
++
+ # D-BASE-P9: per-session override of the profile's audio cushion (5 ms
+ # packets). Both must be set, and 1 <= target <= capacity <= 32, or both
+ # are ignored and the profile decides. Read at every stream start.
+@@ -1482,6 +1493,7 @@ class NativeStreamManager:
+             "x11grab",
+             "-framerate",
+             str(self.FPS),
++            *_capture_pointer_args(),   # B70
+             "-window_id",
+             str(window_id),
+             "-i",
+diff --git a/tests/b70_capture_pointer/test_b70_capture_pointer.py b/tests/b70_capture_pointer/test_b70_capture_pointer.py
+new file mode 100644
+index 0000000..d185972
+--- /dev/null
++++ b/tests/b70_capture_pointer/test_b70_capture_pointer.py
+@@ -0,0 +1,99 @@
++#!/usr/bin/env python3
++"""B70 (host): the hub's X pointer is not drawn into the capture -- x11grab gets `-draw_mouse 0` by default;
++PRIVYHUB_CAPTURE_POINTER=1 keeps today's argv byte for byte.
++
++    python3 -m unittest discover -s tests/b70_capture_pointer -v
++
++The real `_build_linux_ffmpeg_command` on an instance made with object.__new__ (nothing spawned); the display, the
++VAAPI node and the window id are fixed stand-ins (as C5-M1's suite). No temp dir is made.
++"""
++
++from __future__ import annotations
++
++import ast
++import os
++import sys
++import unittest
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++
++import native_stream as ns  # noqa: E402
++
++ENV = "PRIVYHUB_CAPTURE_POINTER"
++# today's argv (C5-M1's golden, the adopted 720p60 profile): what =1 must give back byte for byte
++TODAY = (
++    "/usr/bin/ffmpeg -hide_banner -loglevel info -nostdin -vaapi_device "
++    "/dev/dri/renderD128 -f x11grab -framerate 60 -window_id 12345 -i :0 -vf "
++    "scale=1280:720:force_original_aspect_ratio=decrease:flags=fast_bilinear,"
++    "pad=1280:720:(ow-iw)/2:(oh-ih)/2:black,format=nv12,hwupload -an -c:v "
++    "h264_vaapi -profile:v high -b:v 7000k -maxrate 7000k -bufsize 7000k "
++    "-max_frame_size 90000 -g 15 -bf 0 -payload_type 96 -f rtp "
++    "rtp://127.0.0.1:48110?pkt_size=1200"
++)
++
++
++def env(value=None):
++    e = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    if value is not None:
++        e[ENV] = value
++    return mock.patch.dict(os.environ, e, clear=True)
++
++
++def manager():
++    m = object.__new__(ns.NativeStreamManager)
++    m._apply_profile_selection()
++    return m
++
++
++def argv(**kw):
++    with mock.patch.object(ns.NativeStreamManager, "_linux_display", staticmethod(lambda: ":0")), \
++         mock.patch.object(ns.NativeStreamManager, "_linux_vaapi_device",
++                           staticmethod(lambda: Path("/dev/dri/renderD128"))):
++        return manager()._build_linux_ffmpeg_command(Path("/usr/bin/ffmpeg"), {"_window_id": 12345}, **kw)
++
++
++class CapturePointer(unittest.TestCase):
++    def test_default_draws_no_pointer(self):
++        for value in (None, "0", "", "yes", "2", " 0 "):
++            with self.subTest(value=value), env(value):
++                a = argv()
++                self.assertEqual(a.count("-draw_mouse"), 1)
++                i = a.index("-draw_mouse")
++                self.assertEqual(a[i + 1], "0")
++                self.assertLess(a.index("-f"), i)                      # an x11grab input option ...
++                self.assertLess(i, a.index("-window_id"))              # ... before the window and the input
++                self.assertLess(i, a.index("-i"))
++                # nothing else moved: removing the pair gives today's argv
++                self.assertEqual(" ".join(a[:i] + a[i + 2:]), TODAY)
++
++    def test_one_keeps_today_byte_for_byte(self):
++        for value in ("1", " 1 "):
++            with self.subTest(value=value), env(value):
++                self.assertEqual(" ".join(argv()), TODAY)
++                self.assertNotIn("-draw_mouse", argv())
++
++    def test_sized_and_rate_paths_carry_it(self):
++        with env():
++            a = argv(width=1920, height=1080, bitrate_kbps=9000, max_bitrate_kbps=9000)
++            self.assertEqual(a[a.index("-draw_mouse") + 1], "0")
++        with env("1"):
++            self.assertNotIn("-draw_mouse", argv(width=1920, height=1080, bitrate_kbps=9000, max_bitrate_kbps=9000))
++
++    def test_the_helper_is_the_only_reader(self):
++        src = (ROOT / "companion" / "native_stream.py").read_text()
++        self.assertEqual(src.count('"PRIVYHUB_CAPTURE_POINTER"'), 1)
++        tree = ast.parse(src)
++        users = [n for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == "CAPTURE_POINTER_ENV"]
++        self.assertEqual(len(users), 2)                                 # its assignment, the helper's read
++        calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "id", "") == "_capture_pointer_args"]
++        self.assertEqual(len(calls), 1)                                 # one call: the Linux builder's
++        fn = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_build_linux_ffmpeg_command")
++        self.assertTrue(any(isinstance(n, ast.Call) and getattr(n.func, "id", "") == "_capture_pointer_args"
++                            for n in ast.walk(fn)))
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/test_adaptive_bitrate_live.py b/tools/test_adaptive_bitrate_live.py
+index 1b1a245..f9fb53b 100644
+--- a/tools/test_adaptive_bitrate_live.py
++++ b/tools/test_adaptive_bitrate_live.py
+@@ -1699,9 +1699,13 @@ class C5M5Actuator(unittest.TestCase):
+ 
+         def golden(name):
+             return [x for x in (ev / name).read_text().splitlines() if x.startswith("argv:")][0]
+-        self.assertEqual(line(bitrate_kbps=12600, max_bitrate_kbps=12600, width=1920, height=1080),
+-                         golden("golden_after_native_game_1080p60_c3_80pct_cap90.txt"))
+-        self.assertEqual(line(), golden("golden_after_unset.txt"))
++        import os
++        from unittest import mock
++        # B70: these goldens are the pre-B70 argv (x11grab's default pointer); PRIVYHUB_CAPTURE_POINTER=1 is that argv
++        with mock.patch.dict(os.environ, {"PRIVYHUB_CAPTURE_POINTER": "1"}):
++            self.assertEqual(line(bitrate_kbps=12600, max_bitrate_kbps=12600, width=1920, height=1080),
++                             golden("golden_after_native_game_1080p60_c3_80pct_cap90.txt"))
++            self.assertEqual(line(), golden("golden_after_unset.txt"))
+ 
+ if __name__ == "__main__":
+     unittest.main()
+diff --git a/tools/test_c5_m1_profile_selector.py b/tools/test_c5_m1_profile_selector.py
+index 59f1fb8..6886f71 100644
+--- a/tools/test_c5_m1_profile_selector.py
++++ b/tools/test_c5_m1_profile_selector.py
+@@ -46,6 +46,7 @@ ADOPTED_ARGV = (
+ 
+ def clean_env(**extra):
+     env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    env["PRIVYHUB_CAPTURE_POINTER"] = "1"   # B70: this suite's pinned argv is the pre-B70 one (B70's suite reads the default)
+     env.update(extra)
+     return mock.patch.dict(os.environ, env, clear=True)
+ 

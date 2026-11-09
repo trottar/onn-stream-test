@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-09 — Queue Z (B70-B72): the two pointers (the hub's in the capture → `-draw_mouse 0`; the pads' touchpad swallowed and the onn's pointer hidden and captured in a game), "Change disc" on a multi-disc PS1 session (the host's `disc-swap` over RetroArch's disk commands; CHANGE DISC in the paused bar), the small readings (the N64 card above the details line, `fps (min)`, B66 on dolphin, `gc_frames`' 20 class, SDL off the virtual pads, one slot-9 save per stall, `state_reply` rows): built and tested, applied to the tree uncommitted; APK `64d02f31…` pinned NOT installed — OPEN (A's HOME-10 C37-C39) — `## 2026-11-09 Queue Z` below; `docs/memory/evidence/B70_POINTERS_2026-11-09.md`, `…/B71_CHANGE_DISC_2026-11-09.md`, `…/B72_SMALL_READINGS_2026-11-09.md`
 - 2026-11-09 — HOME-9+GC: APK `5f72af4b…` CONFIRMED (C29 / C31) and pinned; the `.m3u` applied ("PlayStation (72)"); C29-C36 all MET — queue X's B65 guard / B66 bar / B67 client items / B68 and B69 through the stream (GameCube plays, pauses, saves and loads from the onn); **G-A16 ADOPTED, `PRIVYHUB_GAMECUBE=1` the eighteenth line**; open: the "Change disc" entry, the two pointers on the TV (the hub's in the capture, the onn's from the pads' touchpads), the N64 card's overlap, diag_read / gc_frames / B66-on-dolphin readings — OPEN (to B, the next queue) — `## 2026-11-09 HOME-9+GC` below; `docs/memory/evidence/HOME_9_GC_2026-11-09.md`
 - 2026-11-09 — B69, the GameCube launch kind (Dolphin) behind `PRIVYHUB_GAMECUBE=1`: built and tested on fakes (54 ×3, 5 mutations caught, every host suite as the baseline), applied to the tree uncommitted, NOT adopted; the pad names, the layout, the paused save / load and the first boot's pre-compile through the stream are unread until the TV — OPEN (HOME-9+GC C34-C36; G-A16 on the user's word) — `## 2026-11-09 B69` below; `docs/memory/evidence/B69_GAMECUBE_LAUNCH_KIND_2026-11-09.md`
 - 2026-11-09 — H2-P1, the GameCube probe (Dolphin 2609b, the upstream AppImage, Vulkan on RADV, 1x): both titles at full speed with wide margins; P0a-P0c, P0e (hotkey), P0f (state 0.21 s), P1, P3, P4, P5 met on all four runs; P2's minimum NOT MET on T2 run 1 (50 vs 55, capture-side repeats; Dolphin's frames clean); no spin-up; P0d / P7 not this run — OPEN (to B69, then the streamed play) — `## 2026-11-09 H2-P1` below; `docs/memory/evidence/H2_P1_GAMECUBE_PROBE_2026-11-09.md`
@@ -60,6 +61,32 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-09 Queue Z (B70-B72): the two pointers, "Change disc", the small readings — OPEN (A's HOME-10 C37-C39)
+
+(`docs/memory/evidence/B70_POINTERS_2026-11-09.md`, `…/B71_CHANGE_DISC_2026-11-09.md`, `…/B72_SMALL_READINGS_2026-11-09.md`;
+patches `docs/memory/patches/B70_POINTERS.md`, `…/B71_CHANGE_DISC.md`, `…/B72_SMALL_READINGS.md`)
+
+- **Built, applied to the tree uncommitted, nothing adopted.**
+  - The host items go live at the companion's next restart (default on, no drop-in). Their off switches:
+    `PRIVYHUB_CAPTURE_POINTER=1`, `PRIVYHUB_DISC_SWAP=0`, `PRIVYHUB_GC_SDL_PADS=1`, `PRIVYHUB_STATE_REPLY_ROWS=0`.
+  - The client items come with the APK `64d02f31…85dd` (pinned in `queue_z_built/`, **NOT installed**). Their
+    properties: `debug.privyhub.pointer_hide`, `debug.privyhub.disc_change`, `debug.privyhub.n64_card_top` (`0` = before).
+  - `5f72af4b…` stays CONFIRMED until HOME-10's rule.
+- **Open, at the TV (HOME-10):**
+  - **C37** no pointer in a PS1, an N64 and a GameCube game, the touchpad swiped on purpose;
+  - **C38** CHANGE DISC on a multi-disc PS1 title (and absent on a one-disc title);
+  - **C39** the N64 card above the details line. It is shown once more on the new APK (its own `shown_top` key).
+- **Listed, not built:**
+  - **The DualShock / DualSense touchpad press** is a pointer click from the touchpad's own device, not a pad button. It
+    is swallowed with the touchpad; ask if it is ever wanted as a button.
+  - **RetroArch's own notice** ("Setting disc in tray …", with the core's disc label) may show over the picture briefly
+    after a disc change. RetroArch's notifications are left as they are for every session.
+  - **After a LOAD on a multi-disc session the disc reads unknown** ("4 discs") until the next change. A state can carry
+    another disc, and no line says which.
+  - **The audio underruns per session** (121 N64 / 4:21; 76-82 GameCube / ~2 min; HOME-9) — not one of B72's seven.
+  - Two host suites fail on HEAD's own full export, before and after B70-B72 alike: `tools/test_c3_f1_recovery_restart.py`
+    (a source probe for `restart_encoder=(`) and `tools/test_fec_xor8_2.py`. Unchanged by this queue.
 
 ## 2026-11-09 HOME-9+GC: queue X confirmed, the `.m3u` applied, GameCube from the onn met, G-A16 adopted — OPEN (to B, the next queue)
 
