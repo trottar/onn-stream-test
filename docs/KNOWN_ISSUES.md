@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-09 — HOME-11: APK `85220f99…` installed with every property empty (seventeen); C40 the four-button bar MET, C41 a set starts on disc 1 MET, C42 the warning once and a change MET, C43 no pointer on this APK MET → **`85220f99…` CONFIRMED** and pinned; queue AA CLOSED; HOME-10's C38 items closed (the bar, the restored disc; the black screen settled as the game's and warned); the user's "Close H" → Phase H CLOSED at its checkpoint; open: a real "insert disc" prompt, the H6 parity ranking — CLOSED (the open items listed in it) — `## 2026-11-09 HOME-11: …`
 - 2026-11-09 — Queue AA (B73 / B74): the paused bar fits (SAVE · LOAD · DISC · END, END at 880 of 960 dp); the disc change made safe (the HOME-10 black screens settled as the game's reaction, the sequence unchanged; a set starts on disc 1 by RetroArch's record; the warning once; Extras → "Start on disc…"); APK `85220f99…` built, NOT installed — OPEN (A's HOME-11 C40-C43) — `## 2026-11-09 Queue AA` below
 - 2026-11-09 — HOME-10: APK `64d02f31…` installed with every property empty; C37 no pointer MET (N64, PS1, GameCube; the host's `-draw_mouse 0` live), C39 the N64 card MET, B72 (e) only the evdev four MET, the one-disc bar without CHANGE DISC MET; **C38 NOT MET** (five disc changes `ok` true, but the change back left the game black twice; END ~95 % off the screen with CHANGE DISC) → **`64d02f31…` NOT CONFIRMED, `5f72af4b…` reinstalled**; H4: the user's "Keep all games" (every title offered) — OPEN (to B: the bar's width, the black screen after a change) — `## 2026-11-09 HOME-10` below; `docs/memory/evidence/HOME_10_POINTERS_DISC_2026-11-09.md`
 - 2026-11-09 — Queue Z (B70-B72): the two pointers (the hub's in the capture → `-draw_mouse 0`; the pads' touchpad swallowed and the onn's pointer hidden and captured in a game), "Change disc" on a multi-disc PS1 session (the host's `disc-swap` over RetroArch's disk commands; CHANGE DISC in the paused bar), the small readings (the N64 card above the details line, `fps (min)`, B66 on dolphin, `gc_frames`' 20 class, SDL off the virtual pads, one slot-9 save per stall, `state_reply` rows): built and tested, applied to the tree uncommitted; APK `64d02f31…` pinned NOT installed — OPEN (A's HOME-10 C37-C39) — `## 2026-11-09 Queue Z` below; `docs/memory/evidence/B70_POINTERS_2026-11-09.md`, `…/B71_CHANGE_DISC_2026-11-09.md`, `…/B72_SMALL_READINGS_2026-11-09.md`
@@ -63,6 +64,29 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-09 HOME-11: the bar fits, discs start on 1, the warning — 85220f99… CONFIRMED; queue AA CLOSED; Phase H CLOSED
+
+(`docs/memory/evidence/HOME_11_DISC_SAFE_2026-11-09.md`, `docs/memory/evidence/H5_CHECKPOINT_2026-11-09.md`; patch
+`docs/memory/patches/HOME-11_APK_PIN.md`)
+
+- **Met at the TV (2026-11-09, every property empty, seventeen):**
+  - **C43** no arrow, no dots, the touchpad inert, the one-disc bar SAVE · LOAD · END on `85220f99…` → B70's client half;
+  - **C40** SAVE · LOAD · DISC · END all on the screen, END whole, on the set started on disc 4 → B73;
+  - **C41** the set left on disc 4 starts on disc 1 (`PS1 start disc: 1 of 4 (record set)`, RetroArch's 1/4) → B74;
+  - **C42** the warning once, "I understand", the chooser, the change `ok` (1 → 2, paused until RESUME), no message
+    the second time; the game carried on → B74.
+- **The rule:** **`85220f99…` CONFIRMED**, pinned in the three places (tests green); `5f72af4b…` kept in
+  `home11_previous/`.
+- **Closed here:** the queue AA section below (its HOME-11 cells met); HOME-10's C38 items — the bar's width, RetroArch
+  restoring the last disc, the black screen after an unprompted change (settled by B74 as the game's reaction; the
+  warning now says so). The HOME-10 section's "To B" items are answered by B73 / B74.
+- **Disclosed:** C43 was started with LOAD, not Start Fresh (the readings do not depend on it); C42's pop-up text was
+  read from the installed APK, not quoted back by the user; after C40's END the record's mtime was the host's launch
+  write (RetroArch did not rewrite it at that close).
+- **Phase H:** the user's "Close H" → CLOSED at its checkpoint (`H5_CHECKPOINT_2026-11-09.md`).
+- **Still open:** a real "insert disc N" prompt (no save near one); the H6 parity matrix waits for the user's ranking
+  (`docs/memory/architecture/H6_PARITY_MATRIX_2026-11-09.md`); the H5 checkpoint's open items.
 
 ## 2026-11-09 Queue AA (B73 / B74): the paused bar fits; the disc change made safe — OPEN (A's HOME-11 C40-C43)
 

@@ -2524,6 +2524,13 @@ rather than create a second game-library path.
 >   - `launched_disc` on the rows.
 > - Applied to the tree, uncommitted. The client part is in the APK `85220f99…` (pinned, not installed). **Next:
 >   HOME-11 C40-C43.** A real disc prompt stays untested.
+>
+> **HOME-11 MET (2026-11-09, A, the user at the TV; `docs/memory/evidence/HOME_11_DISC_SAFE_2026-11-09.md`):**
+> - [x] **B73:** SAVE · LOAD · DISC · END all on the screen, END whole, on the 4-disc set (C40).
+> - [x] **B74:** the set left on disc 4 starts on disc 1 (`PS1 start disc: 1 of 4`, RetroArch's 1/4; C41); "Start on
+>   disc…" → disc 4 (4/4); the warning once, the change `ok`, no message the second time (C42).
+> - [x] B70's client half on this APK (C43).
+> - **`85220f99…` CONFIRMED** and pinned. A real "insert disc N" prompt stays untested.
 
 ## H1 — N64
 
@@ -2826,6 +2833,16 @@ Acceptance:
 - base Core hardware remains independent unless evidence strongly justifies a
   change;
 - clean checkpoint/push.
+
+> **CLOSED (2026-11-09, the user's "Close H" at HOME-11; `docs/memory/evidence/H5_CHECKPOINT_2026-11-09.md`).** Each
+> acceptance line is read from its own record there, with what stays open. The clean checkpoint / push is the user's
+> commit.
+
+## H6 — Feature parity across systems
+
+**Status: OPEN (2026-11-09), waiting for the user's ranking.** The matrix is B75's:
+`docs/memory/architecture/H6_PARITY_MATRIX_2026-11-09.md` (artwork, controls, cheats and the other gaps per system).
+The user ranks the gaps; the first ranked item is the next parity work.
 
 ---
 

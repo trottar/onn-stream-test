@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-09
-baseline_commit: aafbd811 (queue Z; HOME-10 uncommitted beside it; the user commits)
+baseline_commit: 2b5826ea (queue AB; HOME-11 uncommitted beside it; the user commits)
 ---
 
 # Current State
@@ -11,18 +11,16 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 
 ## Active Objective
 
-**Phase H OPEN — H3 (PS2) first** by the user's decision (2026-11-07), then H0 (import), then H1 / H2. **The G track
-CLOSED at its checkpoint 2026-11-07** (ROADMAP §G9: 9 met, 3 deferred, 2 open; `evidence/G9_CHECKPOINT_2026-11-07.md`).
-Phase E stays ACTIVE (E1 FROZEN, E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**; the
-eighteenth is G-A16, `PRIVYHUB_GAMECUBE=1` (`evidence/HOME_9_GC_2026-11-09.md`); H3 and H2 feasibility CLOSED.
-APK `5f72af4b…` CONFIRMED (HOME-9; back on after HOME-10).
+**Phase H CLOSED at its checkpoint 2026-11-09** on the user's "Close H" (`evidence/H5_CHECKPOINT_2026-11-09.md`).
+**H6 (feature parity) OPEN**, waiting for the user's ranking of B75's gaps
+(`architecture/H6_PARITY_MATRIX_2026-11-09.md`). The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
+E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED** (HOME-11).
 
 ## Current Work Item
 
-- **HOME-10 done, uncommitted** (`evidence/HOME_10_POINTERS_DISC_2026-11-09.md`, `logs/home10_git_status.txt`):
-  C37 no pointer MET (N64 / PS1 / GameCube; `-draw_mouse 0` live on the hub), C39 the N64 card MET, B72 (e) MET;
-  **C38 NOT MET** (every disc change `ok`, but the change back left the game black twice; END ~95 % off the screen) →
-  `64d02f31…` NOT CONFIRMED, **`5f72af4b…` reinstalled**. H4: "Keep all games" (every title offered).
+- **HOME-11 done, uncommitted** (`evidence/HOME_11_DISC_SAFE_2026-11-09.md`, `logs/home11_git_status.txt`): C40 the
+  four-button bar, C41 a set starts on disc 1, C42 the warning once, C43 no pointer — all MET → **`85220f99…`
+  CONFIRMED**, pinned (`patches/HOME-11_APK_PIN.md`); the H5 checkpoint written on "Close H".
 
 ## Verified State
 
@@ -59,9 +57,9 @@ line 15 writes one redacted row per movie range request and a retrying client's 
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`5f72af4b…` is CONFIRMED** on the onn (HOME-9; reinstalled at HOME-10's close from `home10_previous/`),
-  pinned in the three places. `64d02f31…` (queue Z) NOT CONFIRMED (HOME-10 C38), kept in `home10_installed/`.
-- The fifteen client properties are empty. One device is paired, with `identity_v2` on.
+- APK **`85220f99…` is CONFIRMED** on the onn (HOME-11: queue AA, B73 + B74 on queue Z's), pinned in the three
+  places; `5f72af4b…` kept in `home11_previous/`.
+- The seventeen client properties are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
 `tools/diag_keeper.py`, read with `tools/diag_read.py` and `tools/diag_check.py`. The nightly watch
@@ -87,13 +85,11 @@ redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at
 
 ## Next Action
 
-1. **The user's commit** of HOME-10 (`logs/home10_git_status.txt`).
-2. **B's next APK** (`evidence/home10_2026-11-09/to_b.md`): the paused bar must fit SAVE · LOAD · CHANGE DISC · END;
-   the black screen after an unprompted disc change and the change back; B70's client half and B72 (a) carried.
-   Then A's C38 again.
-3. **Then what the user names next:** H4's tiers per "Keep all games" (every PS2 / GameCube title offered); the
-   deferred NES / Genesis import, the travel router, a handheld, Steam; the H5 checkpoint when the user wants Phase H
-   closed. **Open:** G-A8.
+1. **The user's commit** of HOME-11 and the H5 checkpoint (`logs/home11_git_status.txt`).
+2. **The user's ranking of the parity gaps** (B75's matrix §4-§6: artwork, custom controls, cheats, then mods / disc
+   change / "NEW") → **the first ranked parity item** to B, with the user's word on that gap's §6 question.
+3. Then what the user names next (the deferred NES / Genesis import, the travel router, a handheld, Steam). **Open:**
+   G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

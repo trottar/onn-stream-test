@@ -94,7 +94,10 @@ PKG = "com.safeiot.privyhub"
 # HOME-9 (installed 2026-11-09, CONFIRMED 2026-11-09): queue X's APK (queue T + B67: the N64 layout card, "This game
 # supports 2 players", the stored count capped, the start gate's re-arm); C29 / C31 met with every property empty (twelve);
 # the previous CONFIRMED APK was 9aa00ba2... (HOME-7), kept at home9_previous/
-EXPECT_APK = "5f72af4b65ebf4bf434668f4ef26c52885be02fb8f5400d63e7b4e548bcdca32"
+# HOME-11 (installed 2026-11-09, CONFIRMED 2026-11-09): queue AA's APK (B5 ... + B70 + B71 + B72 (a) + B73 the paused bar
+# fits, B74 the disc change made safe); C40 / C41 / C42 / C43 met with every property empty (seventeen); the previous
+# CONFIRMED APK was 5f72af4b... (HOME-9), kept at home11_previous/
+EXPECT_APK = "85220f99f92f893968647c185ed98e17456fe9e9bc9cc7bdb550c7c735c04864"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown
