@@ -2500,6 +2500,14 @@ rather than create a second game-library path.
 > paused; `discs` / `disc` are on the start response, the status and the rows. The paused bar gains **CHANGE DISC**
 > (only when `discs` > 1) with a chooser and "Disc 2 of 4". Applied to the tree, uncommitted. The client part is in the
 > APK `64d02f31…` (pinned, not installed). **Next: HOME-10 C38.**
+>
+> **HOME-10 C38 NOT MET (2026-11-09, A, the user at the TV; `docs/memory/evidence/HOME_10_POINTERS_DISC_2026-11-09.md`):**
+> - [x] CHANGE DISC on the 4-disc set, absent on a one-disc title; five changes from the paused bar, every `disc_swap`
+>   `ok` true, the game paused until RESUME (B71's host side right).
+> - [ ] The change back with the game carrying on: 2→4 during the intro → black, 4→1 → still black; 4→1 at disc 4's
+>   title screen → black (1→2 / 1→4 during the intro carried on). END ~95 % off the screen with CHANGE DISC.
+> - `64d02f31…` NOT CONFIRMED; `5f72af4b…` reinstalled. To B: the bar's width; the black screen after an unprompted
+>   change (the game's reaction vs the swap's sequence).
 
 ## H1 — N64
 
@@ -2619,6 +2627,12 @@ Question:
 >   - a stall during a picture check is not re-saved;
 >   - the SAVE / LOAD replies become `state_reply` rows.
 > - Applied to the tree, uncommitted. **Next: HOME-10 C37 / C39.**
+>
+> **HOME-10 (2026-11-09, A; `docs/memory/evidence/HOME_10_POINTERS_DISC_2026-11-09.md`):**
+> - [x] **B70** no pointer in N64, PS1 and GameCube (C37; the host's `-draw_mouse 0` live, the touchpad inert on
+>   `64d02f31…`).
+> - [x] **B72** (a) the N64 card above the details line (C39); (e) Dolphin sees only the evdev four, no `SDL/` device.
+> - The client halves return with the next APK: `64d02f31…` was not confirmed (C38, §H0) and `5f72af4b…` is back.
 
 Evaluate bounded representative titles:
 
@@ -2763,6 +2777,9 @@ The actual boundaries come from runtime evidence.
 >
 > B's suggestion: (a), with (d)'s caveat written beside PS2 until a heavy title's long play is read. The user's word
 > decides.
+>
+> **The user's answer (HOME-10, 2026-11-09): "Keep all games"** — reading (a): every title on the drive is offered,
+> "selected" dropped; ENHANCED = PS2 + GameCube.
 
 ## H5 — Extended-emulation checkpoint
 

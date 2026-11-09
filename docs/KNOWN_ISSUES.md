@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-09 — HOME-10: APK `64d02f31…` installed with every property empty; C37 no pointer MET (N64, PS1, GameCube; the host's `-draw_mouse 0` live), C39 the N64 card MET, B72 (e) only the evdev four MET, the one-disc bar without CHANGE DISC MET; **C38 NOT MET** (five disc changes `ok` true, but the change back left the game black twice; END ~95 % off the screen with CHANGE DISC) → **`64d02f31…` NOT CONFIRMED, `5f72af4b…` reinstalled**; H4: the user's "Keep all games" (every title offered) — OPEN (to B: the bar's width, the black screen after a change) — `## 2026-11-09 HOME-10` below; `docs/memory/evidence/HOME_10_POINTERS_DISC_2026-11-09.md`
 - 2026-11-09 — Queue Z (B70-B72): the two pointers (the hub's in the capture → `-draw_mouse 0`; the pads' touchpad swallowed and the onn's pointer hidden and captured in a game), "Change disc" on a multi-disc PS1 session (the host's `disc-swap` over RetroArch's disk commands; CHANGE DISC in the paused bar), the small readings (the N64 card above the details line, `fps (min)`, B66 on dolphin, `gc_frames`' 20 class, SDL off the virtual pads, one slot-9 save per stall, `state_reply` rows): built and tested, applied to the tree uncommitted; APK `64d02f31…` pinned NOT installed — OPEN (A's HOME-10 C37-C39) — `## 2026-11-09 Queue Z` below; `docs/memory/evidence/B70_POINTERS_2026-11-09.md`, `…/B71_CHANGE_DISC_2026-11-09.md`, `…/B72_SMALL_READINGS_2026-11-09.md`
 - 2026-11-09 — HOME-9+GC: APK `5f72af4b…` CONFIRMED (C29 / C31) and pinned; the `.m3u` applied ("PlayStation (72)"); C29-C36 all MET — queue X's B65 guard / B66 bar / B67 client items / B68 and B69 through the stream (GameCube plays, pauses, saves and loads from the onn); **G-A16 ADOPTED, `PRIVYHUB_GAMECUBE=1` the eighteenth line**; open: the "Change disc" entry, the two pointers on the TV (the hub's in the capture, the onn's from the pads' touchpads), the N64 card's overlap, diag_read / gc_frames / B66-on-dolphin readings — OPEN (to B, the next queue) — `## 2026-11-09 HOME-9+GC` below; `docs/memory/evidence/HOME_9_GC_2026-11-09.md`
 - 2026-11-09 — B69, the GameCube launch kind (Dolphin) behind `PRIVYHUB_GAMECUBE=1`: built and tested on fakes (54 ×3, 5 mutations caught, every host suite as the baseline), applied to the tree uncommitted, NOT adopted; the pad names, the layout, the paused save / load and the first boot's pre-compile through the stream are unread until the TV — OPEN (HOME-9+GC C34-C36; G-A16 on the user's word) — `## 2026-11-09 B69` below; `docs/memory/evidence/B69_GAMECUBE_LAUNCH_KIND_2026-11-09.md`
@@ -61,6 +62,28 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-09 HOME-10: no pointers and the N64 card met; "Change disc" not met; 64d02f31… not confirmed — OPEN (to B, the next APK)
+
+(`docs/memory/evidence/HOME_10_POINTERS_DISC_2026-11-09.md`, `docs/memory/evidence/home10_2026-11-09/to_b.md`)
+
+- **Met at the TV (2026-11-09, every property empty):**
+  - **C37** no arrow and no dots in an N64, two PS1 and a GameCube game, the touchpad swiped and pressed on purpose; the
+    host's `-draw_mouse 0` read in the encoder's argv with the hub's pointer inside the game window → B70 both halves.
+  - **C39** the N64 card above the "Stabilizing" text ("Buttons at the top") → B72 (a).
+  - **B72 (e)** Dolphin's log: the four `evdev/0/PrivyHub Virtual Gamepad P1-P4`, no `SDL/` device.
+  - The one-disc PS1 bar without CHANGE DISC; no `discs` in its rows.
+- **Not met — C38 (B71):** five changes from the paused bar, every `disc_swap` `ok` true (1-3 steps, 0.95-1.86 s),
+  the game paused until RESUME. But **2→4 during the intro → black; the change back 4→1 → still black; 4→1 at disc 4's
+  title screen → black** (1→2 and 1→4 during the intro carried on). **END ~95 % off the screen** when CHANGE DISC shows.
+- **The rule:** `64d02f31…` NOT CONFIRMED; **`5f72af4b…` reinstalled** from `home10_previous/`, read back, paired; the
+  pin unchanged. Until the next APK the onn's touchpad pointer is back (the hub's arrow stays out).
+- **HOME-9's "To B" items closed here:** the two pointers (item 2: the host half live, the client half met on
+  `64d02f31…`, back with the next APK), the N64 card's overlap (item 3, met on `64d02f31…`), Dolphin's `SDL/0-3` (item
+  7's first reading). Item 1, "Change disc", stays open (C38).
+- **To B:** the bar must fit four buttons; the black screen after an unprompted change and the change back (the game's
+  own reaction vs the swap's sequence on Beetle — open); RetroArch restores the last disc at the next launch.
+- **H4:** the user's "Keep all games" — every title on the drive offered (B's (a)).
 
 ## 2026-11-09 Queue Z (B70-B72): the two pointers, "Change disc", the small readings — OPEN (A's HOME-10 C37-C39)
 
