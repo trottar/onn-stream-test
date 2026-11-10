@@ -4024,6 +4024,16 @@ class EmulatorManager:
         "ps1": "Beetle PSX HW",
     }
 
+    # B78: N64's core library name (the cheat runtime folder), only with PRIVYHUB_N64=1 and PRIVYHUB_N64_CHEATS not "0"
+    N64_CHEAT_CORE_LIBRARY_NAME = "Mupen64Plus-Next"
+
+    def _cheat_core_library_name(self, system_id: str) -> str | None:
+        name = self.CHEAT_CORE_LIBRARY_NAMES.get(system_id)
+        if (name is None and _n64 is not None and system_id == _n64.SYSTEM_ID
+                and (os.environ.get("PRIVYHUB_N64_CHEATS") or "").strip() != "0"):
+            return self.N64_CHEAT_CORE_LIBRARY_NAME
+        return name
+
     # PrivyHub A7.3: NCI cheat hotkeys are one-frame virtual input pulses.
     # Patch 03f runtime-validated a quiet interval on both sides of CHEAT_TOGGLE.
     CHEAT_TOGGLE_SETTLE_SECONDS = 0.25
@@ -4152,6 +4162,44 @@ class EmulatorManager:
         self,
         game: dict[str, Any],
     ) -> dict[str, Any]:
+        """B81: today's catalog, then the user's own `.cht` files for a PS1 / SNES title (none: today's dict)."""
+        import cheat_dropins as _dropins
+        if not _dropins.enabled():
+            return self._cheat_catalog_base_unlocked(game)
+        files = _dropins.user_cht_files(self.project_root, game)
+        if not files:
+            return self._cheat_catalog_base_unlocked(game)
+        manifest = self.project_root / self.CHEAT_MANIFEST_RELATIVE
+        if manifest.is_file():
+            base = self._cheat_catalog_base_unlocked(game)
+        else:   # today's "no record" shape: the user's files need no fetched manifest
+            base = {"game_id": str(game.get("id", "")).strip(), "system": str(game.get("system", "")).strip(),
+                    "status": "no_manifest_record", "activation_available": False,
+                    "activation_locked_reason": "isolated_cheat_profile_launch_required", "sources": []}
+        sources = list(base.get("sources") or [])
+        skipped = 0
+        for f in files:
+            rel = f.relative_to(self.project_root).as_posix()
+            try:
+                digest = hashlib.sha256(f.read_bytes()).hexdigest().upper()
+                parsed = self._read_cheat_source(rel, digest)
+            except (OSError, EmulatorError):
+                skipped += 1
+                continue
+            sources.append({"source_index": len(sources), "provider": _dropins.USER_PROVIDER, "filename": f.name,
+                            "local_path": rel, "sha256": parsed["sha256"], "cheat_count": parsed["cheat_count"],
+                            "entries": parsed["entries"]})
+        out = dict(base)
+        out["sources"] = sources
+        if sources:
+            out["status"] = "cached"
+        out["user_files_skipped"] = skipped
+        return out
+
+    def _cheat_catalog_base_unlocked(
+        self,
+        game: dict[str, Any],
+    ) -> dict[str, Any]:
         game_id = str(game.get("id", "")).strip()
         relative_path = str(
             game.get("relative_path", "")
@@ -4260,7 +4308,133 @@ class EmulatorManager:
         game: dict[str, Any],
     ) -> dict[str, Any]:
         with self.lock:
+            self._dropin_folders_once()   # B81
+            ext = self._ext_cheat_catalog(game)   # B79 / B81: None = today's code
+            if ext is not None:
+                return {k: v for k, v in ext.items() if not k.startswith("_")}   # the disc id stays on the hub
             return self._cheat_catalog_unlocked(game)
+
+    # --- B79: GameCube's codes from Dolphin's bundled files (no download) ------------------------------------------
+
+    def _ext_cheat_catalog(self, game: dict[str, Any]) -> dict[str, Any] | None:
+        """The onn's Cheats list for a title whose cheats are not RetroArch's (None = today's code path)."""
+        system_id = str(game.get("system", "")).strip().casefold()
+        if _gc is not None and system_id == _gc.SYSTEM_ID:
+            import gc_cheats as _gc_cheats
+            if _gc_cheats.enabled():
+                return self._gc_cheat_catalog(game)
+        if _ps2 is not None and system_id == _ps2.SYSTEM_ID and self._ps2_dropins_on():
+            return self._ps2_cheat_catalog(game)
+        return None
+
+    # --- B81: the user's PS2 .pnach files (no download) -----------------------------------------------------------
+
+    def _dropin_folders_once(self) -> None:
+        """B81: the empty drop-in folders, made at the first Cheats list this process serves (knob 0: never)."""
+        if getattr(self, "_dropin_folders_done", False):
+            return
+        self._dropin_folders_done = True
+        import cheat_dropins as _dropins
+        if _dropins.enabled():
+            _dropins.ensure_folders(self.project_root, _ps2 is not None)
+
+    @staticmethod
+    def _ps2_dropins_on() -> bool:
+        import cheat_dropins as _dropins
+        import ps2_patches as _patches
+        return _dropins.enabled() and _patches.enabled()
+
+    def _ps2_cheat_catalog(self, game: dict[str, Any]) -> dict[str, Any]:
+        import cheat_dropins as _dropins
+        import ps2_patches as _patches
+        result: dict[str, Any] = {"game_id": str(game.get("id", "")).strip(), "system": _ps2.SYSTEM_ID,
+                                  "status": "unavailable", "provider": _dropins.PNACH_PROVIDER,
+                                  "activation_available": False,
+                                  "activation_locked_reason": "isolated_cheat_profile_launch_required", "sources": []}
+        ids = _patches.title_ids(self.project_root, game, Path(self.project_root) / _ps2.DATA_DIR / "logs")
+        if ids is None:   # PCSX2 has not shown this title's serial yet (its first PrivyHub launch)
+            return result
+        files = _dropins.pnach_files(self.project_root, ids[0])
+        result["status"] = "cached" if files else "no_files"
+        if files:
+            result["sources"] = [{"source_index": 0, "provider": _dropins.PNACH_PROVIDER,
+                                  "filename": _dropins.PNACH_SOURCE_NAME, "cheat_count": len(files),
+                                  "entries": [{"index": i, "description": f.name, "kind": "pnach"}
+                                              for i, f in enumerate(files)]}]
+        result["_ids"] = ids
+        result["_files"] = files
+        return result
+
+    def _ps2_cheat_pick(self, game: dict[str, Any], source_index: Any,
+                        indexes: list[int] | tuple[int, ...] | None) -> dict[str, Any]:
+        catalog = self._ps2_cheat_catalog(game)
+        try:
+            src = int(source_index)
+        except (TypeError, ValueError) as exc:
+            raise EmulatorError("Cheat source index must be an integer") from exc
+        files = catalog.get("_files") or []
+        if src != 0 or not files:
+            raise EmulatorError("No PS2 cheat files are available for this game")
+        picked = sorted({int(i) for i in (indexes or [])})
+        if not picked:
+            raise EmulatorError("Select at least one cheat")
+        if any(i < 0 or i >= len(files) for i in picked):
+            raise EmulatorError("Cheat index is out of range")
+        return {"ids": catalog["_ids"], "files": [files[i] for i in picked]}
+
+    def _gc_cheat_catalog(self, game: dict[str, Any]) -> dict[str, Any]:
+        import gc_cheats as _gc_cheats
+        game_id = str(game.get("id", "")).strip()
+        result: dict[str, Any] = {"game_id": game_id, "system": _gc.SYSTEM_ID, "status": "no_codes",
+                                  "provider": _gc_cheats.PROVIDER, "activation_available": False,
+                                  "activation_locked_reason": "isolated_cheat_profile_launch_required",
+                                  "sources": []}
+        root = self.project_root
+        try:
+            content = _gc.resolve_title(_gc.read_dir(root), str(game.get("relative_path", "")))
+            appimage = _gc.find_appimage(root)
+            st, ast = content.stat(), appimage.stat()
+        except (_gc.GCError, OSError):
+            result["status"] = "unavailable"
+            return result
+        key = (game_id, st.st_size, st.st_mtime_ns, str(appimage), ast.st_mtime_ns)
+        cache = getattr(self, "_gc_cheat_cache", None)
+        if cache is None:
+            cache = self._gc_cheat_cache = {}
+        if key not in cache:
+            gid = _gc_cheats.disc_id(content)
+            codes = (_gc_cheats.codes_for(gid, lambda name: _gc_cheats.read_bundled(appimage, name))
+                     if gid else [])
+            cache[key] = (gid, codes)
+        gid, codes = cache[key]
+        result["game_id_known"] = gid is not None
+        if codes:
+            result["status"] = "cached"
+            result["sources"] = [{"source_index": 0, "provider": _gc_cheats.PROVIDER,
+                                  "filename": _gc_cheats.SOURCE_NAME, "cheat_count": len(codes),
+                                  "entries": [dict(c) for c in codes]}]
+        result["_gid"] = gid
+        return result
+
+    def _gc_cheat_pick(self, game: dict[str, Any], source_index: Any,
+                       indexes: list[int] | tuple[int, ...] | None) -> dict[str, Any]:
+        catalog = self._gc_cheat_catalog(game)
+        sources = catalog.get("sources") or []
+        try:
+            src = int(source_index)
+        except (TypeError, ValueError) as exc:
+            raise EmulatorError("Cheat source index must be an integer") from exc
+        if src != 0 or not sources:
+            raise EmulatorError("No Dolphin codes are available for this game")
+        entries = sources[0]["entries"]
+        picked = sorted({int(i) for i in (indexes or [])})
+        if not picked:
+            raise EmulatorError("Select at least one cheat")
+        if any(i < 0 or i >= len(entries) for i in picked):
+            raise EmulatorError("Cheat index is out of range")
+        ar = [entries[i]["description"] for i in picked if entries[i]["kind"] == "ar"]
+        gecko = [entries[i]["description"] for i in picked if entries[i]["kind"] == "gecko"]
+        return {"gid": catalog["_gid"], "ar": ar, "gecko": gecko, "count": len(picked)}
 
     def _cheat_profile_slot_summaries(
         self,
@@ -4359,6 +4533,12 @@ class EmulatorManager:
         game: dict[str, Any],
     ) -> dict[str, Any]:
         with self.lock:
+            self._dropin_folders_once()   # B81
+            ext = self._ext_cheat_catalog(game)   # B79 / B81: no saved cheat profiles for these (None = today)
+            if ext is not None:
+                return {"game_id": ext["game_id"], "system": ext["system"], "status": ext["status"],
+                        "profile_schema": self.CHEAT_PROFILE_SCHEMA, "profiles": [], "legacy_profiles_ignored": 0,
+                        "invalid_profiles": []}
             catalog = self._cheat_catalog_unlocked(game)
             game_id = str(game.get("id", "")).strip()
             system = str(game.get("system", "")).strip()
@@ -4709,7 +4889,7 @@ class EmulatorManager:
             raise EmulatorError("Cheat source index is out of range")
 
         system_id = str(game.get("system", "")).strip()
-        core_library_name = self.CHEAT_CORE_LIBRARY_NAMES.get(system_id)
+        core_library_name = self._cheat_core_library_name(system_id)   # B78
         if not core_library_name:
             raise EmulatorError(
                 f"No validated RetroArch cheat library name for system: {system_id}"
@@ -5591,9 +5771,16 @@ class EmulatorManager:
 
             # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
             if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
+                # B81: the ticked .pnach files reach PCSX2 (PRIVYHUB_CHEAT_DROPINS=0: today's call, the arguments dropped)
+                if self._ps2_dropins_on() and cheat_source_index is not None:
+                    return self._launch_pcsx2(game, players_chosen, cheat_source_index, cheat_enabled_indexes)
                 return self._launch_pcsx2(game, players_chosen)
             # B69: a GameCube title launches Dolphin (only with PRIVYHUB_GAMECUBE=1; absent = today's refusal below)
             if _gc is not None and str(game.get("system", "")).strip().casefold() == _gc.SYSTEM_ID:
+                # B79: the ticked codes reach Dolphin (PRIVYHUB_GC_CHEATS=0: today's call, the arguments dropped)
+                import gc_cheats as _gc_cheats
+                if _gc_cheats.enabled() and cheat_source_index is not None:
+                    return self._launch_dolphin(game, players_chosen, cheat_source_index, cheat_enabled_indexes)
                 return self._launch_dolphin(game, players_chosen)
 
             # B46: the chooser's pick for this launch (None = today: the metadata alone)
@@ -6967,12 +7154,106 @@ class EmulatorManager:
     # B49: the PS2 launch kind (PCSX2), reached only with PRIVYHUB_PS2=1
     # ------------------------------------------------------------------
 
+    def _ext_profile_layouts(self, game: dict[str, Any], kind: str) -> tuple[list | None, str]:
+        """B77: the assigned Input Profile as PCSX2's (kind "ps2") / Dolphin's (kind "gamecube") four pad tables, and
+        the game log's line. None = today's tables: the knob 0, the Default profile (or one equal to the identity),
+        or a profile that fails the RetroArch path's own checks (logged; the launch goes on)."""
+        import profile_layouts as _layouts
+        what = "PS2" if kind == "ps2" else "GC"
+        if not _layouts.enabled():
+            return None, ""
+        try:
+            effective = self.input_profile_for_game(game)
+            profile = effective.get("profile") if isinstance(effective, dict) else None
+            if not isinstance(profile, dict):
+                raise EmulatorError("Effective input profile is invalid")
+            mapping = self._normalize_input_mapping(profile.get("mapping"))
+            self._a8_validate_runtime_mapping(mapping)
+        except Exception as exc:
+            return None, f"{what} input profile: unusable ({type(exc).__name__}); today's layout"
+        source = "assigned" if str(effective.get("source", "")) == "game_assignment" else "default"
+        if _layouts.is_default(mapping):
+            return None, f"{what} input profile: {source} overrides=0"
+        if kind == "ps2":
+            tables = _layouts.per_player(mapping, "ps2", _ps2.DS2_BINDINGS)
+        else:
+            tables = _layouts.per_player(mapping, "gamecube", _gc.PAD_LAYOUT)
+        return tables, f"{what} input profile: {source} overrides={_layouts.overridden_players(mapping)}"
+
+    def _ps2_patch_offer(self, game: dict[str, Any]) -> dict[str, Any] | None:
+        """B80: the patches PCSX2's bundle has for this PS2 title and the user's toggles; None = nothing to offer
+        (the knob 0, the title's serial / CRC not yet seen in PCSX2's log, or no patch in the bundle)."""
+        import ps2_patches as _patches
+        if _ps2 is None or not _patches.enabled():
+            return None
+        root = self.project_root
+        ids = _patches.title_ids(root, game, Path(root) / _ps2.DATA_DIR / "logs")
+        if ids is None:
+            return None
+        try:
+            appimage = _ps2.find_appimage(root)
+        except (_ps2.PS2Error, OSError):
+            return None
+        offered = _patches.available(_patches.bundle_groups(appimage, ids[0], ids[1]))
+        if not offered:
+            return None
+        toggles = _patches.get_toggles(root, str(game.get("id", "")))
+        return {"ids": ids, "available": offered, "toggles": toggles}
+
+    def ps2_patches(self, game: dict[str, Any]) -> dict[str, Any] | None:
+        """B80: the details' `ps2_patches` (no id, no serial: the available keys and the ones on)."""
+        offer = self._ps2_patch_offer(game)
+        if offer is None:
+            return None
+        on = [k for k in offer["available"] if (offer["toggles"] or {}).get(k)]
+        return {"available": list(offer["available"]), "on": on}
+
+    def set_ps2_patches(self, game: dict[str, Any], wanted: dict[str, bool]) -> dict[str, Any]:
+        import ps2_patches as _patches
+        offer = self._ps2_patch_offer(game)
+        if offer is None:
+            raise EmulatorError("No PCSX2 patch is available for this title")
+        try:
+            rec = _patches.set_toggles(self.project_root, str(game.get("id", "")), wanted, offer["available"])
+        except ValueError as exc:
+            raise EmulatorError(str(exc)) from exc
+        return {"available": list(offer["available"]), "on": [k for k in offer["available"] if rec.get(k)]}
+
+    def _ps2_game_settings(self, game: dict[str, Any], cheat_extra: dict[str, Any] | None = None) -> list[str]:
+        """B80 (+ B81's cheats): the game's settings file before PCSX2 starts; the game log's lines. Nothing is
+        written for a title without a toggle record and without a cheat pick (today)."""
+        import ps2_patches as _patches
+        if not _patches.enabled():
+            return []
+        root = self.project_root
+        ids = _patches.title_ids(root, game, Path(root) / _ps2.DATA_DIR / "logs")
+        toggles = _patches.get_toggles(root, str(game.get("id", "")))
+        if ids is None:
+            return []
+        gamesettings = _ps2.ini_path(root).parent.parent / "gamesettings"
+        if toggles is None and cheat_extra is None:
+            # B81: a file this writer made before (a cheat launch's switch) is rewritten with cheats off; else today
+            import cheat_dropins as _dropins
+            if not (_dropins.enabled() and _patches.wrote_before(gamesettings, ids[0], ids[1])):
+                return []
+            cheat_extra = {"cheats": False}
+        text = _patches.game_ini_text(toggles, cheat_extra)
+        _patches.write_game_ini(gamesettings, ids[0], ids[1], text)
+        return [_patches.log_line(toggles or {})]
+
     def _launch_pcsx2(
         self,
         game: dict[str, Any],
         players_chosen: int | None,
+        cheat_source_index: int | None = None,
+        cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
     ) -> dict[str, Any]:
         import players_session as _players_session
+
+        # B81: a cheat launch's files, checked before anything is written (None = today)
+        ps2_cheat_pick = None
+        if cheat_source_index is not None:
+            ps2_cheat_pick = self._ps2_cheat_pick(game, cheat_source_index, cheat_enabled_indexes)
 
         root = self.project_root
         try:
@@ -6994,14 +7275,32 @@ class EmulatorManager:
         chosen = _players_session.parse(players_chosen) if players_chosen is not None else None
         plan = _players_session.plan(_ps2.SYSTEM_ID, chosen or 2, None)
         adapter = _ps2.pick_adapter(_ps2.ini_get(text, "EmuCore/GS", "Adapter"), _ps2.default_runner)
+        # B77: the assigned Input Profile onto the DualShock 2 bindings (None = today's)
+        profile_tables, profile_line = self._ext_profile_layouts(game, "ps2")
         merged = _ps2.ini_merge(
             text,
-            _ps2.settings_for(root, bios, adapter, int(plan["ports"]), bool(plan["multitap"])),
+            _ps2.settings_for(root, bios, adapter, int(plan["ports"]), bool(plan["multitap"]),
+                              profile_tables),
         )
         ini.parent.mkdir(parents=True, exist_ok=True)
         temporary = ini.with_name(ini.name + ".privyhub.tmp")
         temporary.write_text(merged, encoding="utf-8")
         temporary.replace(ini)
+        # B80: the title's patch toggles in its game settings file (no record: nothing written, as today)
+        # B81: a cheat launch stages the ticked files as PCSX2's cheats file and switches cheats on for this title
+        try:
+            cheat_extra = None
+            if ps2_cheat_pick is not None:
+                import cheat_dropins as _dropins
+                serial, crc = ps2_cheat_pick["ids"]
+                _staged, groups = _dropins.stage_pnach(ini.parent.parent / "cheats", serial, crc,
+                                                       ps2_cheat_pick["files"])
+                cheat_extra = {"cheats": True, "cheat_groups": groups}
+            patch_lines = self._ps2_game_settings(game, cheat_extra)
+            if ps2_cheat_pick is not None:
+                patch_lines.append(f"PS2 cheats: {len(ps2_cheat_pick['files'])} files enabled")
+        except (OSError, ValueError) as exc:
+            raise EmulatorError(f"PS2 launch refused: {exc}") from exc
 
         logs_dir = self._project_path("logs/games")
         logs_dir.mkdir(parents=True, exist_ok=True)
@@ -7020,6 +7319,10 @@ class EmulatorManager:
         log_handle.write(
             f"{utc_ms()} PS2 memcards: " + " ".join(f"{k}={v}" for k, v in sorted(memcards.items())) + "\n"
         )
+        if profile_line:   # B77 (empty with the knob 0: today's log)
+            log_handle.write(f"{utc_ms()} {profile_line}\n")
+        for line in patch_lines:   # B80 (none without a record: today's log)
+            log_handle.write(f"{utc_ms()} {line}\n")
         log_handle.flush()
 
         # B53: PCSX2's own log for this launch, kept 30 days (the name: the UTC launch time only)
@@ -7422,6 +7725,8 @@ class EmulatorManager:
         self,
         game: dict[str, Any],
         players_chosen: int | None,
+        cheat_source_index: int | None = None,
+        cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
     ) -> dict[str, Any]:
         root = self.project_root
         try:
@@ -7429,6 +7734,10 @@ class EmulatorManager:
             appimage = _gc.find_appimage(root)
         except (_gc.GCError, OSError) as exc:
             raise EmulatorError(f"GameCube launch refused: {exc}") from exc
+        # B79: a cheat launch's codes, checked against the title's list before anything is written (None = today)
+        gc_cheat_pick = None
+        if cheat_source_index is not None:
+            gc_cheat_pick = self._gc_cheat_pick(game, cheat_source_index, cheat_enabled_indexes)
 
         # four native ports on every launch, whatever the pick or the join (no multitap, no relaunch)
         plan = _gc.plan()
@@ -7438,8 +7747,17 @@ class EmulatorManager:
             # the previous Dolphin's AppImage helper (<= 10 s, then SIGKILL) before the next Popen
             helper = _gc.wait_helpers(self._gc_helper_sid)
             self._gc_helper_sid = None
+        # B77: the assigned Input Profile onto the GameCube layout (None = today's GCPadNew.ini)
+        profile_tables, profile_line = self._ext_profile_layouts(game, "gamecube")
         try:
-            _gc.write_config(user)
+            if gc_cheat_pick is not None:   # B79
+                import gc_cheats as _gc_cheats
+                _gc_cheats.write_enabled(user, gc_cheat_pick["gid"], gc_cheat_pick["ar"], gc_cheat_pick["gecko"])
+                _gc.write_config(user, profile_tables, cheats=True)
+            elif profile_tables is not None:
+                _gc.write_config(user, profile_tables)
+            else:
+                _gc.write_config(user)
         except OSError as exc:
             raise EmulatorError(f"GameCube launch refused: {exc}") from exc
 
@@ -7456,6 +7774,10 @@ class EmulatorManager:
         log_handle.write(f"{utc_ms()} GC launch: dolphin ports={plan['ports']} backend=vulkan adapter=0 config=whole\n")
         if helper is not None:
             log_handle.write(f"{utc_ms()} GC helper: {helper}\n")
+        if profile_line:   # B77 (empty with the knob 0: today's log)
+            log_handle.write(f"{utc_ms()} {profile_line}\n")
+        if gc_cheat_pick is not None:   # B79: the count only (no code name, no id)
+            log_handle.write(f"{utc_ms()} GC cheats: {gc_cheat_pick['count']} enabled\n")
         # Dolphin's own log for this launch, kept 30 days (the name: the UTC launch time only)
         launched_at = time.time()
         dolphin_log = _gc.log_for_launch(root, launched_at)
@@ -7529,6 +7851,8 @@ class EmulatorManager:
         payload["launch_kind"] = "dolphin"
         payload["gc_mode"] = True
         payload["players_session"] = dict(plan)
+        if gc_cheat_pick is not None:   # B79
+            payload["gc_cheats"] = gc_cheat_pick["count"]
         return payload
 
     def _dolphin_ended(self, pid: int) -> None:

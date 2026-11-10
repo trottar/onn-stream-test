@@ -1,0 +1,832 @@
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+index 2c4294d..aef901c 100644
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -15,6 +15,7 @@ import com.safeiot.privyhub.streaming.GameStreamStatusUi
+ import com.safeiot.privyhub.streaming.DiscChange
+ import com.safeiot.privyhub.streaming.DiscSafe
+ import com.safeiot.privyhub.streaming.PausedBar
++import com.safeiot.privyhub.streaming.Ps2Patches
+ import com.safeiot.privyhub.diagnostics.DiagnosticsActivity
+ 
+ import android.os.Bundle
+@@ -104,6 +105,8 @@ class MainActivity : AppCompatActivity() {
+     private val pausedBarFitOn: Boolean by lazy { PausedBar.fromSystem() }
+     // B74: the disc change made safe (debug.privyhub.disc_safe=0 = B71's flow)
+     private val discSafeOn: Boolean by lazy { DiscSafe.fromSystem() }
++    // B80: a PS2 title's PCSX2 patches in Extras (debug.privyhub.ps2_patches=0 = today's Extras)
++    private val ps2PatchesOn: Boolean by lazy { Ps2Patches.fromSystem() }
+     private var pausedBarSaved: IntArray? = null
+     private var pausedBarSavedDiscText: CharSequence? = null
+     private var pausedBarApplied = false
+@@ -7281,7 +7284,10 @@ class MainActivity : AppCompatActivity() {
+                                             node.id,
+                                             title,
+                                             // B74: a set's disc count ("Start on disc…"); 0 for every other game
+-                                            json.optInt("discs", 0)
++                                            json.optInt("discs", 0),
++                                            // B80: the PCSX2 patches the hub offers for a PS2 title (none: today)
++                                            jsonStrings(json.optJSONObject("ps2_patches")?.optJSONArray("available")),
++                                            jsonStrings(json.optJSONObject("ps2_patches")?.optJSONArray("on"))
+                                         )
+                                     }
+                                 }
+@@ -9265,22 +9271,63 @@ class MainActivity : AppCompatActivity() {
+     private fun showGameExtrasMenu(
+         gameId: String,
+         title: String,
+-        discs: Int = 0
++        discs: Int = 0,
++        ps2PatchesAvailable: List<String> = emptyList(),
++        ps2PatchesEnabled: List<String> = emptyList()
+     ) {
+-        // B74: a set (discs > 1) also offers "Start on disc…"; every other game: today's two items
+-        val items =
+-            if (DiscSafe.showStartOnDisc(discSafeOn, discs)) {
+-                arrayOf("Cheats", "Mods", DiscSafe.START_LABEL)
+-            } else {
+-                arrayOf("Cheats", "Mods")
+-            }
++        // B74: a set (discs > 1) also offers "Start on disc…"; B80: a PS2 title with a PCSX2 patch offers "Patches…";
++        // every other game: today's two items
++        val items = Ps2Patches.extrasItems(
++            startOnDisc = DiscSafe.showStartOnDisc(discSafeOn, discs),
++            patches = Ps2Patches.showEntry(ps2PatchesOn, ps2PatchesAvailable)
++        )
+         AlertDialog.Builder(this)
+             .setTitle("Extras — $title")
+-            .setItems(items) { _, which ->
+-                when (which) {
+-                    0 -> showGameCheatSelector(gameId, title)
+-                    1 -> showGameModSelector(gameId, title)
+-                    2 -> showStartDiscChooser(gameId, title, discs)
++            .setItems(items.toTypedArray()) { _, which ->
++                when (items[which]) {
++                    "Cheats" -> showGameCheatSelector(gameId, title)
++                    "Mods" -> showGameModSelector(gameId, title)
++                    DiscSafe.START_LABEL -> showStartDiscChooser(gameId, title, discs)
++                    Ps2Patches.ENTRY_LABEL ->
++                        showPs2PatchesDialog(gameId, title, ps2PatchesAvailable, ps2PatchesEnabled)
++                }
++            }
++            .setNegativeButton("Cancel", null)
++            .show()
++    }
++
++    // B80: tick the PCSX2 patches for this title; the hub remembers them for its next launch
++    private fun showPs2PatchesDialog(
++        gameId: String,
++        title: String,
++        available: List<String>,
++        enabled: List<String>
++    ) {
++        val keys = Ps2Patches.known(available)
++        val labels = keys.map { Ps2Patches.label(it) }.toTypedArray()
++        val checked = BooleanArray(keys.size) { keys[it] in enabled }
++        AlertDialog.Builder(this)
++            .setTitle("${Ps2Patches.TITLE} — $title")
++            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
++            .setPositiveButton(Ps2Patches.SAVE) { _, _ ->
++                val host = getCompanionHost()
++                if (host.isBlank()) {
++                    showCompanionSettings()
++                    return@setPositiveButton
++                }
++                val picked = keys.filterIndexed { index, _ -> checked[index] }.toSet()
++                networkExecutor.execute {
++                    val message = try {
++                        httpPost(
++                            "http://$host:$CONTROL_PORT/plugins/games/ps2-patches?" +
++                                Ps2Patches.query(gameId, keys, picked)
++                        )
++                        Ps2Patches.SAVED
++                    } catch (error: Exception) {
++                        Log.e(TAG, "Failed to save PS2 patches", error)
++                        "Patches not saved: ${error.message ?: "unknown error"}"
++                    }
++                    runOnUiThread { statusText.text = message }
+                 }
+             }
+             .setNegativeButton("Cancel", null)
+@@ -12265,10 +12312,16 @@ class MainActivity : AppCompatActivity() {
+     }
+ 
+ 
++    // B80: a JSON array of strings (none -> an empty list)
++    private fun jsonStrings(array: JSONArray?): List<String> =
++        if (array == null) emptyList() else (0 until array.length()).mapNotNull { array.optString(it, null) }
++
+     private fun showGameLaunchModeDialog(
+         gameId: String,
+         title: String,
+-        discs: Int = 0
++        discs: Int = 0,
++        ps2PatchesAvailable: List<String> = emptyList(),
++        ps2PatchesEnabled: List<String> = emptyList()
+     ) {
+ 
+         AlertDialog.Builder(this)
+@@ -12305,7 +12358,9 @@ class MainActivity : AppCompatActivity() {
+                 showGameExtrasMenu(
+                     gameId,
+                     title,
+-                    discs
++                    discs,
++                    ps2PatchesAvailable,
++                    ps2PatchesEnabled
+                 )
+             }
+             .show()
+diff --git a/PrivyHub/app/src/main/java/streaming/Ps2Patches.kt b/PrivyHub/app/src/main/java/streaming/Ps2Patches.kt
+new file mode 100644
+index 0000000..671b2bc
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/Ps2Patches.kt
+@@ -0,0 +1,46 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B80: a PS2 title's PCSX2 patches (widescreen, no interlacing, 60 fps) offered in the launch's Extras when the hub's
++ * details say its bundle has one for the title (`ps2_patches.available`). The ticks are remembered on the hub
++ * (`/plugins/games/ps2-patches`) and read at the title's next launch; the launch itself is unchanged.
++ * `debug.privyhub.ps2_patches=0` = today's Extras (no entry).
++ */
++object Ps2Patches {
++    const val PROPERTY = "debug.privyhub.ps2_patches"
++    const val ENTRY_LABEL = "Patches…"
++    const val TITLE = "Patches"
++    const val SAVE = "Save"
++    const val SAVED = "Saved — used the next time this game starts"
++
++    /** The host's keys in the order shown, and their words on the TV. */
++    val KEYS = listOf("ws", "ni", "60")
++    private val LABELS = mapOf("ws" to "Widescreen", "ni" to "No interlacing", "60" to "60 fps")
++    private val QUERY_NAMES = mapOf("ws" to "ws", "ni" to "ni", "60" to "fps60")
++
++    fun label(key: String): String = LABELS[key] ?: key
++
++    /** Only the keys the app knows, in the app's order (an unknown key from a newer hub is not shown). */
++    fun known(keys: List<String>): List<String> = KEYS.filter { it in keys }
++
++    fun showEntry(on: Boolean, available: List<String>): Boolean = on && known(available).isNotEmpty()
++
++    /** The Extras list: today's items, then "Start on disc…" for a set (B74), then "Patches…" when offered. */
++    fun extrasItems(startOnDisc: Boolean, patches: Boolean): List<String> =
++        listOf("Cheats", "Mods") + (if (startOnDisc) listOf(DiscSafe.START_LABEL) else emptyList()) +
++            (if (patches) listOf(ENTRY_LABEL) else emptyList())
++
++    /** The save's query: every offered key as 0 / 1 (a key not offered is not sent). */
++    fun query(gameId: String, available: List<String>, checked: Set<String>): String =
++        "id=$gameId" + known(available).joinToString("") { "&${QUERY_NAMES.getValue(it)}=${if (it in checked) 1 else 0}" }
++
++    fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
++
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as? String)
++        } catch (_: Throwable) {
++            parse(null)
++        }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/B80Ps2PatchesTest.kt b/PrivyHub/app/src/test/java/streaming/B80Ps2PatchesTest.kt
+new file mode 100644
+index 0000000..e999c45
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/B80Ps2PatchesTest.kt
+@@ -0,0 +1,46 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** B80: "Patches…" only when the hub offers one; the labels; the save's query; today's Extras without patches. */
++class B80Ps2PatchesTest {
++
++    @Test
++    fun entryOnlyWhenOffered() {
++        assertTrue(Ps2Patches.showEntry(true, listOf("ws")))
++        assertFalse(Ps2Patches.showEntry(true, emptyList()))
++        assertFalse(Ps2Patches.showEntry(false, listOf("ws", "60")))          // the property off: today's Extras
++        assertFalse(Ps2Patches.showEntry(true, listOf("something_new")))      // an unknown key is not shown
++    }
++
++    @Test
++    fun theWordsOnTheTv() {
++        assertEquals(listOf("Widescreen", "No interlacing", "60 fps"), Ps2Patches.KEYS.map { Ps2Patches.label(it) })
++        assertEquals("Patches…", Ps2Patches.ENTRY_LABEL)
++        assertEquals(listOf("ws", "60"), Ps2Patches.known(listOf("60", "x", "ws")))
++    }
++
++    @Test
++    fun theQuery() {
++        assertEquals("id=g1&ws=1&fps60=0", Ps2Patches.query("g1", listOf("ws", "60"), setOf("ws")))
++        assertEquals("id=g1&ni=1", Ps2Patches.query("g1", listOf("ni"), setOf("ni", "ws")))
++    }
++
++    @Test
++    fun extrasListIsTodaysWithoutPatches() {
++        assertEquals(listOf("Cheats", "Mods"), Ps2Patches.extrasItems(startOnDisc = false, patches = false))
++        assertEquals(listOf("Cheats", "Mods", DiscSafe.START_LABEL), Ps2Patches.extrasItems(true, false))
++        assertEquals(listOf("Cheats", "Mods", "Patches…"), Ps2Patches.extrasItems(false, true))
++    }
++
++    @Test
++    fun theProperty() {
++        assertTrue(Ps2Patches.parse(null))
++        assertTrue(Ps2Patches.parse(""))
++        assertFalse(Ps2Patches.parse("0"))
++        assertFalse(Ps2Patches.parse("off"))
++    }
++}
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 14b50ce..184f6c0 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -7080,6 +7080,60 @@ class EmulatorManager:
+             tables = _layouts.per_player(mapping, "gamecube", _gc.PAD_LAYOUT)
+         return tables, f"{what} input profile: {source} overrides={_layouts.overridden_players(mapping)}"
+ 
++    def _ps2_patch_offer(self, game: dict[str, Any]) -> dict[str, Any] | None:
++        """B80: the patches PCSX2's bundle has for this PS2 title and the user's toggles; None = nothing to offer
++        (the knob 0, the title's serial / CRC not yet seen in PCSX2's log, or no patch in the bundle)."""
++        import ps2_patches as _patches
++        if _ps2 is None or not _patches.enabled():
++            return None
++        root = self.project_root
++        ids = _patches.title_ids(root, game, Path(root) / _ps2.DATA_DIR / "logs")
++        if ids is None:
++            return None
++        try:
++            appimage = _ps2.find_appimage(root)
++        except (_ps2.PS2Error, OSError):
++            return None
++        offered = _patches.available(_patches.bundle_groups(appimage, ids[0], ids[1]))
++        if not offered:
++            return None
++        toggles = _patches.get_toggles(root, str(game.get("id", "")))
++        return {"ids": ids, "available": offered, "toggles": toggles}
++
++    def ps2_patches(self, game: dict[str, Any]) -> dict[str, Any] | None:
++        """B80: the details' `ps2_patches` (no id, no serial: the available keys and the ones on)."""
++        offer = self._ps2_patch_offer(game)
++        if offer is None:
++            return None
++        on = [k for k in offer["available"] if (offer["toggles"] or {}).get(k)]
++        return {"available": list(offer["available"]), "on": on}
++
++    def set_ps2_patches(self, game: dict[str, Any], wanted: dict[str, bool]) -> dict[str, Any]:
++        import ps2_patches as _patches
++        offer = self._ps2_patch_offer(game)
++        if offer is None:
++            raise EmulatorError("No PCSX2 patch is available for this title")
++        try:
++            rec = _patches.set_toggles(self.project_root, str(game.get("id", "")), wanted, offer["available"])
++        except ValueError as exc:
++            raise EmulatorError(str(exc)) from exc
++        return {"available": list(offer["available"]), "on": [k for k in offer["available"] if rec.get(k)]}
++
++    def _ps2_game_settings(self, game: dict[str, Any], cheat_extra: dict[str, Any] | None = None) -> list[str]:
++        """B80 (+ B81's cheats): the game's settings file before PCSX2 starts; the game log's lines. Nothing is
++        written for a title without a toggle record and without a cheat pick (today)."""
++        import ps2_patches as _patches
++        if not _patches.enabled():
++            return []
++        root = self.project_root
++        ids = _patches.title_ids(root, game, Path(root) / _ps2.DATA_DIR / "logs")
++        toggles = _patches.get_toggles(root, str(game.get("id", "")))
++        if ids is None or (toggles is None and cheat_extra is None):
++            return []
++        text = _patches.game_ini_text(toggles, cheat_extra)
++        _patches.write_game_ini(_ps2.ini_path(root).parent.parent / "gamesettings", ids[0], ids[1], text)
++        return [_patches.log_line(toggles or {})]
++
+     def _launch_pcsx2(
+         self,
+         game: dict[str, Any],
+@@ -7118,6 +7172,11 @@ class EmulatorManager:
+         temporary = ini.with_name(ini.name + ".privyhub.tmp")
+         temporary.write_text(merged, encoding="utf-8")
+         temporary.replace(ini)
++        # B80: the title's patch toggles in its game settings file (no record: nothing written, as today)
++        try:
++            patch_lines = self._ps2_game_settings(game)
++        except OSError as exc:
++            raise EmulatorError(f"PS2 launch refused: {exc}") from exc
+ 
+         logs_dir = self._project_path("logs/games")
+         logs_dir.mkdir(parents=True, exist_ok=True)
+@@ -7138,6 +7197,8 @@ class EmulatorManager:
+         )
+         if profile_line:   # B77 (empty with the knob 0: today's log)
+             log_handle.write(f"{utc_ms()} {profile_line}\n")
++        for line in patch_lines:   # B80 (none without a record: today's log)
++            log_handle.write(f"{utc_ms()} {line}\n")
+         log_handle.flush()
+ 
+         # B53: PCSX2's own log for this launch, kept 30 days (the name: the UTC launch time only)
+diff --git a/companion/gc_cheats.py b/companion/gc_cheats.py
+index 6e0b232..22dfdd2 100644
+--- a/companion/gc_cheats.py
++++ b/companion/gc_cheats.py
+@@ -52,12 +52,12 @@ def disc_id(path: Path) -> str | None:
+     return gid.decode("ascii")
+ 
+ 
+-def read_bundled(appimage: Path, name: str, run: Callable[..., Any] = subprocess.run) -> str | None:
++def read_bundled(appimage: Path, name: str, run: Callable[..., Any] | None = None) -> str | None:
+     """One bundled GameSettings file's text from the AppImage (read into memory only), or None."""
+     if not re.fullmatch(r"[A-Z0-9]{3,6}\.ini", name):
+         return None
+     try:
+-        r = run(["7z", "x", "-so", str(appimage), f"{BUNDLED_DIR}/{name}"], capture_output=True, timeout=10)
++        r = (run or subprocess.run)(["7z", "x", "-so", str(appimage), f"{BUNDLED_DIR}/{name}"], capture_output=True, timeout=10)
+     except Exception:
+         return None
+     if getattr(r, "returncode", 1) != 0 or not r.stdout:
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 69fe5fe..58520c5 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -3314,8 +3314,27 @@ class GamesPlugin:
+                 discs = self._set_discs(str(payload.get("id", "")))
+                 if discs > 1:
+                     payload["discs"] = discs
++            # B80: a PS2 title's PCSX2 patches (absent unless the bundle has one for it; PRIVYHUB_PS2_PATCHES=0: never)
++            if _ps2_session is not None and str(payload.get("system", "")) == _ps2_session.SYSTEM_ID:
++                try:
++                    offer = self._emulator.ps2_patches(self._find_game_by_id(str(payload.get("id", ""))))
++                except Exception:
++                    offer = None
++                if offer:
++                    payload["ps2_patches"] = offer
+             return payload
+ 
++        # B80: remember a PS2 title's patch toggles (read at its next launch)
++        if action == "ps2-patches" and _ps2_session is not None:
++            game_id = self._first(query, "id").strip()
++            if not game_id:
++                raise ValueError("Missing game id")
++            game = self._find_game_by_id(game_id)
++            wanted = {key: self._first(query, name).strip() == "1"
++                      for key, name in (("ws", "ws"), ("ni", "ni"), ("60", "fps60"))}
++            payload = self._emulator.set_ps2_patches(game, wanted)
++            return {"ok": True, "plugin": self.PLUGIN_ID, "game_id": game_id, "ps2_patches": payload}
++
+         # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
+         if action == "input-profiles":
+             game_id = self._first(
+diff --git a/companion/ps2_patches.py b/companion/ps2_patches.py
+new file mode 100644
+index 0000000..c6b5b8d
+--- /dev/null
++++ b/companion/ps2_patches.py
+@@ -0,0 +1,193 @@
++"""B80: PCSX2's bundled widescreen / no-interlacing / 60-fps patches offered per PS2 title, inside PRIVYHUB_PS2=1.
++
++- The title's serial and CRC come from PCSX2's own per-launch logs (`Disc changed to <file>.`, `  Serial: …`,
++  `  CRC: …`), cached on the hub by game id; so a title's patches show after its first PrivyHub launch.
++- The patch groups come from the AppImage's `resources/patches.zip` (`<SERIAL>_<CRC>.pnach`), read into memory with
++  `7z x -so`; nothing extracted, nothing edited.
++- The user's toggles are remembered per title on the hub; at launch the game's settings file (`gamesettings/<CRC>.ini`,
++  the name PCSX2 2.8.2's log shows it reading, and `<SERIAL>_<CRC>.ini`) carries `EnableWideScreenPatches` /
++  `EnableNoInterlacingPatches` and `[Patches] Enable = 60 FPS`.
++
++`PRIVYHUB_PS2_PATCHES=0` = today. Design: `docs/memory/evidence/b80_2026-11-09/design_written_before_code.md`.
++"""
++
++from __future__ import annotations
++
++import io
++import json
++import os
++import re
++import subprocess
++import zipfile
++from pathlib import Path
++from typing import Any, Callable, Mapping
++
++KNOB_ENV = "PRIVYHUB_PS2_PATCHES"
++ZIP_MEMBER = "usr/bin/resources/patches.zip"
++IDS_FILE = "data/games/ps2/title_ids.json"
++TOGGLES_FILE = "data/games/ps2/patch_toggles.json"
++MARKER = "; PrivyHub per-launch game settings (B80 / B81)"
++# the user's toggle -> PCSX2's group name in the bundle
++GROUPS = (("ws", "Widescreen 16:9"), ("ni", "No-Interlacing"), ("60", "60 FPS"))
++LABELS = {"ws": "Widescreen", "ni": "No interlacing", "60": "60 fps"}
++_DISC_RE = re.compile(r"Disc changed to (.+)\.\s*$")
++_SERIAL_RE = re.compile(r"^\[[^\]]*\]\s+Serial:\s*(\S+)\s*$")
++_CRC_RE = re.compile(r"^\[[^\]]*\]\s+CRC:\s*([0-9A-Fa-f]{8})\s*$")
++_SERIAL_OK = re.compile(r"[A-Z]{4}-[0-9]{5}")
++
++_zip_cache: dict[tuple[str, int], zipfile.ZipFile | None] = {}
++
++
++def enabled(environ: Mapping[str, str] | None = None) -> bool:
++    env = os.environ if environ is None else environ
++    return str(env.get(KNOB_ENV, "")).strip() != "0"
++
++
++def _atomic_json(path: Path, payload: dict) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    tmp = path.with_name(path.name + ".tmp")
++    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
++    tmp.replace(path)
++
++
++def _read_json(path: Path) -> dict:
++    try:
++        data = json.loads(path.read_text(encoding="utf-8"))
++    except (OSError, ValueError):
++        return {}
++    return data if isinstance(data, dict) else {}
++
++
++def ids_from_logs(logs_dir: Path) -> dict[str, tuple[str, str]]:
++    """`{file name: (serial, crc)}` from PCSX2's per-launch logs, oldest first, so the latest launch wins."""
++    out: dict[str, tuple[str, str]] = {}
++    try:
++        logs = sorted(p for p in Path(logs_dir).glob("*-pcsx2.log") if p.is_file())
++    except OSError:
++        return out
++    for log in logs:
++        try:
++            lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
++        except OSError:
++            continue
++        name = serial = None
++        for line in lines:
++            m = _DISC_RE.search(line)
++            if m:
++                name, serial = m.group(1).strip(), None
++                continue
++            if name is None:
++                continue
++            m = _SERIAL_RE.match(line)
++            if m:
++                serial = m.group(1).strip()
++                continue
++            m = _CRC_RE.match(line)
++            if m and serial and _SERIAL_OK.fullmatch(serial):
++                out[name] = (serial, m.group(1).upper())
++                name = serial = None
++    return out
++
++
++def title_ids(project_root: Path, game: Mapping[str, Any], logs_dir: Path) -> tuple[str, str] | None:
++    """The title's (serial, crc): the hub's cache by game id, else learned from the logs by the file's name."""
++    game_id = str(game.get("id", "")).strip()
++    if not game_id:
++        return None
++    path = Path(project_root) / IDS_FILE
++    cache = _read_json(path)
++    hit = cache.get(game_id)
++    if isinstance(hit, dict) and _SERIAL_OK.fullmatch(str(hit.get("serial", ""))) and re.fullmatch(
++            r"[0-9A-F]{8}", str(hit.get("crc", ""))):
++        return str(hit["serial"]), str(hit["crc"])
++    name = Path(str(game.get("relative_path", ""))).name
++    found = ids_from_logs(logs_dir).get(name) if name else None
++    if found is None:
++        return None
++    cache[game_id] = {"serial": found[0], "crc": found[1], "learned_from": "pcsx2_log"}
++    _atomic_json(path, cache)
++    return found
++
++
++def _bundle(appimage: Path, run: Callable[..., Any]) -> zipfile.ZipFile | None:
++    try:
++        key = (str(appimage), Path(appimage).stat().st_mtime_ns)
++    except OSError:
++        return None
++    if key not in _zip_cache:
++        z = None
++        try:
++            r = run(["7z", "x", "-so", str(appimage), ZIP_MEMBER], capture_output=True, timeout=30)
++            if getattr(r, "returncode", 1) == 0 and r.stdout:
++                z = zipfile.ZipFile(io.BytesIO(r.stdout))
++        except Exception:
++            z = None
++        _zip_cache[key] = z
++    return _zip_cache[key]
++
++
++def bundle_groups(appimage: Path, serial: str, crc: str, run: Callable[..., Any] | None = None) -> set[str]:
++    z = _bundle(appimage, run or subprocess.run)
++    if z is None:
++        return set()
++    try:
++        text = z.read(f"{serial}_{crc.upper()}.pnach").decode("utf-8", errors="replace")
++    except KeyError:
++        return set()
++    return {g.strip() for g in re.findall(r"^\s*\[([^\]]+)\]", text, re.M)}
++
++
++def available(groups: set[str]) -> list[str]:
++    return [key for key, group in GROUPS if group in groups]
++
++
++def get_toggles(project_root: Path, game_id: str) -> dict[str, bool] | None:
++    rec = _read_json(Path(project_root) / TOGGLES_FILE).get(game_id)
++    if not isinstance(rec, dict):
++        return None
++    return {key: bool(rec.get(key, False)) for key, _g in GROUPS}
++
++
++def set_toggles(project_root: Path, game_id: str, wanted: Mapping[str, bool], offered: list[str]) -> dict[str, bool]:
++    """Store the title's toggles; one not offered for the title is refused."""
++    bad = [k for k, v in wanted.items() if v and k not in offered]
++    if bad:
++        raise ValueError("patch not available for this title: " + ",".join(sorted(bad)))
++    path = Path(project_root) / TOGGLES_FILE
++    data = _read_json(path)
++    rec = {key: bool(wanted.get(key, False)) for key, _g in GROUPS}
++    data[game_id] = rec
++    _atomic_json(path, data)
++    return rec
++
++
++def game_ini_text(toggles: Mapping[str, bool] | None, extra: Mapping[str, Any] | None = None) -> str:
++    """The game's settings file. `extra` (B81): {"cheats": bool, "cheat_groups": [names]}."""
++    t = toggles or {}
++    lines = [MARKER, "[EmuCore]",
++             f"EnableWideScreenPatches = {'true' if t.get('ws') else 'false'}",
++             f"EnableNoInterlacingPatches = {'true' if t.get('ni') else 'false'}"]
++    if extra is not None:
++        lines.append(f"EnableCheats = {'true' if extra.get('cheats') else 'false'}")
++    if t.get("60"):
++        lines += ["", "[Patches]", "Enable = " + dict(GROUPS)["60"]]
++    groups = list((extra or {}).get("cheat_groups") or [])
++    if groups:
++        lines += ["", "[Cheats]"] + [f"Enable = {g}" for g in groups]
++    return "\n".join(lines) + "\n"
++
++
++def write_game_ini(gamesettings: Path, serial: str, crc: str, text: str) -> list[str]:
++    folder = Path(gamesettings)
++    folder.mkdir(parents=True, exist_ok=True)
++    names = [f"{crc.upper()}.ini", f"{serial}_{crc.upper()}.ini"]
++    for name in names:
++        tmp = folder / (name + ".privyhub.tmp")
++        tmp.write_text(text, encoding="utf-8")
++        tmp.replace(folder / name)
++    return names
++
++
++def log_line(toggles: Mapping[str, bool]) -> str:
++    on = {k: ("on" if toggles.get(k) else "off") for k, _g in GROUPS}
++    return f"PS2 patches: ws={on['ws']} ni={on['ni']} 60={on['60']}"
+diff --git a/tests/art_systems/test_b80.py b/tests/art_systems/test_b80.py
+new file mode 100644
+index 0000000..0f81886
+--- /dev/null
++++ b/tests/art_systems/test_b80.py
+@@ -0,0 +1,247 @@
++#!/usr/bin/env python3
++"""B80 (host): PCSX2's bundled widescreen / no-interlacing / 60-fps patches per PS2 title, inside PRIVYHUB_PS2=1
++(PRIVYHUB_PS2_PATCHES=0 = today). Fixtures only: made-up PCSX2 logs, a made-up patches.zip behind a fake `7z`,
++B49's PCSX2 launch rig; nothing fetched, no emulator started; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/art_systems -p 'test_b80.py' -v
++"""
++
++from __future__ import annotations
++
++import importlib.util
++import io
++import json
++import os
++import sys
++import tempfile
++import types
++import unittest
++import zipfile
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++import ps2_patches as pp  # noqa: E402
++import ps2_session as ps2  # noqa: E402
++
++sys.path.insert(0, str(ROOT / "tests" / "ps2_session"))
++import test_ps2_session as ps2rig  # noqa: E402
++
++SERIAL, CRC = "SLUS-99901", "1234ABCD"      # made up
++GAME = {"id": "game_ps2_x", "system": "ps2", "title": "made-up", "relative_path": "ps2/one.chd"}
++
++
++def log_text(name: str, serial: str = SERIAL, crc: str = CRC) -> str:
++    return (f"[    1.3284] GameDB: Has not been initialized yet, initializing...\n"
++            f"[    1.3691] Disc changed to {name}.\n[    1.3691]   Name: x\n[    1.3691]   Serial: {serial}\n"
++            f"[    1.3691]   Version: 1.00\n[    1.3691]   CRC: {crc}\n[    1.3691] Applying settings...\n")
++
++
++def bundle(files: dict[str, str]) -> bytes:
++    buf = io.BytesIO()
++    with zipfile.ZipFile(buf, "w") as z:
++        for n, txt in files.items():
++            z.writestr(n, txt)
++    return buf.getvalue()
++
++
++ZIP = bundle({f"{SERIAL}_{CRC}.pnach": "gametitle=x\n[Widescreen 16:9]\npatch=1,EE,0,word,0\n[60 FPS]\npatch=1,EE,4,word,0\n",
++              "SLUS-99902_AAAAAAAA.pnach": "[No-Interlacing]\npatch=1,EE,0,word,0\n"})
++
++
++def fake_7z(cmd, **kw):
++    assert cmd[:3] == ["7z", "x", "-so"] and cmd[-1] == pp.ZIP_MEMBER, cmd
++    return types.SimpleNamespace(returncode=0, stdout=ZIP)
++
++
++def project(logs: dict[str, str] | None = None) -> Path:
++    root = Path(tempfile.mkdtemp(prefix="b80_"))
++    d = root / "data/games/ps2/logs"
++    d.mkdir(parents=True)
++    for name, text in (logs or {}).items():
++        (d / name).write_text(text)
++    return root
++
++
++class Ids(unittest.TestCase):
++    def test_from_the_logs_last_launch_wins(self):
++        root = project({"20261101T000000Z-pcsx2.log": log_text("one.chd", crc="00000000"),
++                        "20261102T000000Z-pcsx2.log": log_text("one.chd"),
++                        "20261103T000000Z-pcsx2.log": log_text("two.chd", serial="SLUS-99902", crc="AAAAAAAA")})
++        ids = pp.ids_from_logs(root / "data/games/ps2/logs")
++        self.assertEqual(ids["one.chd"], (SERIAL, CRC))
++        self.assertEqual(ids["two.chd"], ("SLUS-99902", "AAAAAAAA"))
++
++    def test_cached_by_game_id_and_unknown_is_none(self):
++        root = project({"20261102T000000Z-pcsx2.log": log_text("one.chd")})
++        logs = root / "data/games/ps2/logs"
++        self.assertEqual(pp.title_ids(root, GAME, logs), (SERIAL, CRC))
++        (logs / "20261102T000000Z-pcsx2.log").unlink()        # the logs pruned: the cache keeps it
++        self.assertEqual(pp.title_ids(root, GAME, logs), (SERIAL, CRC))
++        self.assertIsNone(pp.title_ids(root, {**GAME, "id": "game_ps2_y", "relative_path": "ps2/never.chd"}, logs))
++
++    def test_a_malformed_serial_is_not_learned(self):
++        root = project({"20261102T000000Z-pcsx2.log": log_text("one.chd", serial="../x")})
++        self.assertIsNone(pp.title_ids(root, GAME, root / "data/games/ps2/logs"))
++
++
++class Bundle(unittest.TestCase):
++    def setUp(self):
++        pp._zip_cache.clear()
++        self.app = Path(tempfile.mkdtemp(prefix="b80_app_")) / "pcsx2.AppImage"
++        self.app.write_bytes(b"x")
++
++    def test_groups_and_available(self):
++        g = pp.bundle_groups(self.app, SERIAL, CRC, run=fake_7z)
++        self.assertEqual(g, {"Widescreen 16:9", "60 FPS"})
++        self.assertEqual(pp.available(g), ["ws", "60"])
++        self.assertEqual(pp.available(pp.bundle_groups(self.app, "SLUS-99902", "AAAAAAAA", run=fake_7z)), ["ni"])
++        self.assertEqual(pp.bundle_groups(self.app, "SLUS-00000", "00000000", run=fake_7z), set())
++
++    def test_read_once_per_appimage(self):
++        calls = []
++        run = lambda cmd, **kw: (calls.append(1), fake_7z(cmd))[1]
++        pp.bundle_groups(self.app, SERIAL, CRC, run=run)
++        pp.bundle_groups(self.app, SERIAL, CRC, run=run)
++        self.assertEqual(len(calls), 1)
++
++
++class Toggles(unittest.TestCase):
++    def test_stored_and_an_unavailable_one_refused(self):
++        root = project()
++        self.assertIsNone(pp.get_toggles(root, "g"))
++        self.assertEqual(pp.set_toggles(root, "g", {"ws": True, "60": False}, ["ws", "60"]),
++                         {"ws": True, "ni": False, "60": False})
++        self.assertEqual(pp.get_toggles(root, "g"), {"ws": True, "ni": False, "60": False})
++        with self.assertRaises(ValueError):
++            pp.set_toggles(root, "g", {"ni": True}, ["ws", "60"])
++
++    def test_the_keys_from_the_toggles(self):
++        self.assertEqual(pp.game_ini_text({"ws": True, "ni": False, "60": True}),
++                         pp.MARKER + "\n[EmuCore]\nEnableWideScreenPatches = true\nEnableNoInterlacingPatches = false\n"
++                         "\n[Patches]\nEnable = 60 FPS\n")
++        self.assertNotIn("[Patches]", pp.game_ini_text({"ws": False, "ni": True, "60": False}))
++        self.assertIn("EnableNoInterlacingPatches = true", pp.game_ini_text({"ni": True}))
++
++    def test_both_file_names(self):
++        d = Path(tempfile.mkdtemp(prefix="b80_gs_"))
++        self.assertEqual(pp.write_game_ini(d, SERIAL, "1234abcd", "x\n"), [f"{CRC}.ini", f"{SERIAL}_{CRC}.ini"])
++        self.assertEqual(sorted(p.name for p in d.iterdir()), sorted([f"{CRC}.ini", f"{SERIAL}_{CRC}.ini"]))
++
++    def test_the_line(self):
++        self.assertEqual(pp.log_line({"ws": True}), "PS2 patches: ws=on ni=off 60=off")
++
++
++class Launch(unittest.TestCase):
++    """B49's rig: the PCSX2 launch in a subprocess (PRIVYHUB_PS2=1), a fake Popen and Session."""
++
++    def setUp(self):
++        self.games = ps2rig.tree({"one.chd": b"1"})
++        self.bios = ps2rig.tree({"image.bin": b"\0" * ps2.BIOS_IMAGE_BYTES, "image.nvm": b"n"})
++
++    def launch(self, toggles=None, knob=None, learned=True):
++        proj = ps2rig.tree({"runtime/emulators/pcsx2/pcsx2-fake.AppImage": b"x"})
++        (proj / "runtime" / "h3_p1_paths.txt").write_text(f"BIOS_DIR={self.bios}\nGAMES_DIR={self.games}\n")
++        if learned:
++            (proj / "data/games/ps2/logs").mkdir(parents=True)
++            (proj / "data/games/ps2/logs/20261101T000000Z-pcsx2.log").write_text(log_text("one.chd"))
++        if toggles is not None:
++            pp.set_toggles(proj, GAME["id"], toggles, ["ws", "ni", "60"])
++        real_run = ps2rig.subprocess.run
++        extra = {} if knob is None else {"PRIVYHUB_PS2_PATCHES": knob}
++
++        def run(cmd, **kw):
++            kw["env"] = {**kw.get("env", {}), **extra}
++            return real_run(cmd, **kw)
++        with mock.patch.object(ps2rig.subprocess, "run", run):
++            out = ps2rig.run_launch("1", proj)
++        self.assertEqual(out["launch"]["launch_kind"], "pcsx2", out)
++        gs = proj / "data/games/ps2/config/PCSX2/gamesettings"
++        log = next((proj / "logs/games").glob("*-ps2.log")).read_text()
++        return gs, log
++
++    def test_a_record_writes_the_game_ini_and_the_line(self):
++        gs, log = self.launch({"ws": True, "ni": False, "60": True})
++        text = (gs / f"{CRC}.ini").read_text()
++        self.assertIn("EnableWideScreenPatches = true", text)
++        self.assertIn("Enable = 60 FPS", text)
++        self.assertEqual(text, (gs / f"{SERIAL}_{CRC}.ini").read_text())
++        self.assertIn("PS2 patches: ws=on ni=off 60=on", log)
++        self.assertNotIn(SERIAL, log)
++
++    def test_all_off_still_written_so_an_earlier_on_is_undone(self):
++        gs, log = self.launch({"ws": False, "ni": False, "60": False})
++        self.assertIn("EnableWideScreenPatches = false", (gs / f"{CRC}.ini").read_text())
++        self.assertIn("PS2 patches: ws=off ni=off 60=off", log)
++
++    def test_no_record_or_knob_zero_or_unknown_ids_is_today(self):
++        for kw in ({}, {"toggles": {"ws": True}, "knob": "0"}, {"toggles": {"ws": True}, "learned": False}):
++            gs, log = self.launch(**kw)
++            self.assertFalse(gs.exists(), kw)
++            self.assertNotIn("PS2 patches", log)
++
++
++class Plugin(unittest.TestCase):
++    def load(self):
++        spec = importlib.util.spec_from_file_location("g_b80", ROOT / "companion/plugins/games.py")
++        G = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(G)
++        G._ps2_session = ps2
++        return G
++
++    def plugin(self, G, offer):
++        p = object.__new__(G.GamesPlugin)
++        p.details = lambda q: {"ok": True, "id": GAME["id"], "system": "ps2"}
++        p._tile_session_fields = lambda gid: {}
++        p._find_game_by_id = lambda gid: dict(GAME)
++        stored = {}
++        p._emulator = types.SimpleNamespace(
++            ps2_patches=lambda g: offer,
++            set_ps2_patches=lambda g, w: (stored.update(w), {"available": ["ws"], "on": ["ws"] if w["ws"] else []})[1])
++        return p, stored
++
++    def test_details_key_only_with_a_patch(self):
++        G = self.load()
++        p, _ = self.plugin(G, {"available": ["ws", "60"], "on": ["ws"]})
++        self.assertEqual(p.handle("details", f"id={GAME['id']}")["ps2_patches"], {"available": ["ws", "60"], "on": ["ws"]})
++        p2, _ = self.plugin(G, None)
++        self.assertNotIn("ps2_patches", p2.handle("details", f"id={GAME['id']}"))
++        G._ps2_session = None
++        self.assertNotIn("ps2_patches", p.handle("details", f"id={GAME['id']}"))
++
++    def test_the_action(self):
++        G = self.load()
++        p, stored = self.plugin(G, None)
++        r = p.handle("ps2-patches", f"id={GAME['id']}&ws=1&ni=0&fps60=0")
++        self.assertEqual(stored, {"ws": True, "ni": False, "60": False})
++        self.assertEqual(r["ps2_patches"], {"available": ["ws"], "on": ["ws"]})
++
++
++class Manager(unittest.TestCase):
++    def test_offer_and_set_through_the_manager(self):
++        from games import emulator_manager as em
++        old = em._ps2
++        em._ps2 = ps2
++        self.addCleanup(lambda: setattr(em, "_ps2", old))
++        pp._zip_cache.clear()
++        root = project({"20261102T000000Z-pcsx2.log": log_text("one.chd")})
++        (root / "runtime/emulators/pcsx2").mkdir(parents=True)
++        (root / "runtime/emulators/pcsx2/pcsx2-fake.AppImage").write_bytes(b"x")
++        m = em.EmulatorManager(root, config_path=ROOT / "companion/games/config/emulators.json")
++        with mock.patch.object(pp.subprocess, "run", fake_7z):
++            self.assertEqual(m.ps2_patches(GAME), {"available": ["ws", "60"], "on": []})
++            self.assertEqual(m.set_ps2_patches(GAME, {"ws": True}), {"available": ["ws", "60"], "on": ["ws"]})
++            with self.assertRaises(em.EmulatorError):
++                m.set_ps2_patches(GAME, {"ni": True})
++            with mock.patch.dict(os.environ, {"PRIVYHUB_PS2_PATCHES": "0"}):
++                self.assertIsNone(m.ps2_patches(GAME))
++            self.assertIsNone(m.ps2_patches({**GAME, "id": "game_ps2_z", "relative_path": "ps2/unseen.chd"}))
++        self.assertNotIn(SERIAL, json.dumps(m.ps2_patches(GAME) or {}))
++
++
++if __name__ == "__main__":
++    unittest.main()

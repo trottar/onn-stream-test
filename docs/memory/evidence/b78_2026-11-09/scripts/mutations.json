@@ -1,0 +1,8 @@
+[
+ {"id": "M1", "file": "companion/games/cheat_importer.py", "old": "        specs[\"n64\"] = dict(EXTRA_SYSTEM_SPECS[\"n64\"])", "new": "        pass", "why": "N64 never added to the cheat map"},
+ {"id": "M2", "file": "companion/games/cheat_importer.py", "old": "            and str(env.get(N64_CHEATS_ENV, \"\")).strip() != \"0\"):", "new": "            ):", "why": "the knob ignored in the tool"},
+ {"id": "M3", "file": "companion/games/emulator_manager.py", "old": "    N64_CHEAT_CORE_LIBRARY_NAME = \"Mupen64Plus-Next\"", "new": "    N64_CHEAT_CORE_LIBRARY_NAME = \"Mupen64Plus Next\"", "why": "a wrong core library folder"},
+ {"id": "M4", "file": "companion/games/emulator_manager.py", "old": "        if (name is None and _n64 is not None and system_id == _n64.SYSTEM_ID", "new": "        if (name is None and system_id == \"n64\"", "why": "the N64 name without the N64 flag"},
+ {"id": "M5", "file": "companion/games/emulator_manager.py", "old": "                and (os.environ.get(\"PRIVYHUB_N64_CHEATS\") or \"\").strip() != \"0\"):", "new": "                ):", "why": "the knob ignored in the manager"},
+ {"id": "M6", "file": "companion/games/emulator_manager.py", "old": "        core_library_name = self._cheat_core_library_name(system_id)   # B78", "new": "        core_library_name = self.CHEAT_CORE_LIBRARY_NAMES.get(system_id)", "why": "the launch prep keeps today's table"}
+]

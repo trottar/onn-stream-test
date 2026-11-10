@@ -1,0 +1,9 @@
+[
+ {"id": "M1", "file": "companion/games/metadata_importer.py", "old": "return str(env.get(ART_SYSTEMS_ENV, \"\")).strip() == \"1\"", "new": "return True", "why": "the knob always on"},
+ {"id": "M2", "file": "companion/games/metadata_importer.py", "old": "\"database_name\": \"Sony - PlayStation 2\"", "new": "\"database_name\": \"Sony - PlayStation2\"", "why": "a wrong thumbnail set name"},
+ {"id": "M3", "file": "companion/games/metadata_importer.py", "old": "        spec = self.system_specs.get(system_id)", "new": "        spec = SYSTEM_SPECS.get(system_id)", "why": "the provider ignores the three"},
+ {"id": "M4", "file": "companion/games/metadata_importer.py", "old": "        if key != \"matched\":\n            labels", "new": "        if key == \"no_match\":\n            labels", "why": "unavailable / ambiguous not labelled as misses"},
+ {"id": "M5", "file": "companion/games/metadata_importer.py", "old": "        self.system_specs = dict(specs) if specs is not None else system_specs()", "new": "        self.system_specs = system_specs()", "why": "the passed map ignored"},
+ {"id": "M6", "file": "companion/games/metadata_importer.py", "old": "        if system_id not in specs:\n            not_offered", "new": "        if system_id not in SYSTEM_SPECS:\n            not_offered", "why": "the dry run counts only today's four"},
+ {"id": "M7", "file": "companion/games/metadata_importer.py", "old": "        \"catalog_path\": \"metadat/redump/Nintendo - GameCube.dat\",", "new": "        \"catalog_path\": \"metadat/no-intro/Nintendo - GameCube.dat\",", "why": "the GameCube list from the wrong set"}
+]

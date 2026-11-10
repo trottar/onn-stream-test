@@ -1,0 +1,663 @@
+diff --git a/companion/cheat_dropins.py b/companion/cheat_dropins.py
+new file mode 100644
+index 0000000..a8536a2
+--- /dev/null
++++ b/companion/cheat_dropins.py
+@@ -0,0 +1,115 @@
++"""B81: the user's own cheat files, dropped into folders on the hub (nothing is ever downloaded for these).
++
++- PS1 / SNES: `.cht` files (RetroArch's format) in `data/games/retroarch/cheats/<system>/<the game's file name without
++  its ending>/` are offered in the Cheats list after the database's, and launched the same way.
++- PS2: `.pnach` files in `data/games/ps2/cheats/<serial>/` (or the folder `PS2_CHEATS_DIR=` names in the paths file,
++  then `<serial>/`) are offered by file name; the ticked ones are put together into PCSX2's
++  `cheats/<SERIAL>_<CRC>.pnach` for that launch (PCSX2's own loading).
++
++`PRIVYHUB_CHEAT_DROPINS=0` = today. Design: `docs/memory/evidence/b81_2026-11-09/design_written_before_code.md`.
++"""
++
++from __future__ import annotations
++
++import os
++import re
++from pathlib import Path
++from typing import Any, Mapping
++
++KNOB_ENV = "PRIVYHUB_CHEAT_DROPINS"
++RETRO_ROOT = "data/games/retroarch/cheats"
++RETRO_SYSTEMS = ("ps1", "snes")
++PS2_ROOT = "data/games/ps2/cheats"
++PS2_DIR_KEY = "PS2_CHEATS_DIR"
++PNACH_SOURCE_NAME = "Your PS2 cheat files"
++PNACH_PROVIDER = "user_pnach"
++USER_PROVIDER = "user"
++_SERIAL_OK = re.compile(r"[A-Z]{4}-[0-9]{5}")
++
++
++def enabled(environ: Mapping[str, str] | None = None) -> bool:
++    env = os.environ if environ is None else environ
++    return str(env.get(KNOB_ENV, "")).strip() != "0"
++
++
++def _files(folder: Path, suffix: str) -> list[Path]:
++    try:
++        if not folder.is_dir():
++            return []
++        return sorted((p for p in folder.iterdir()
++                       if p.is_file() and not p.name.startswith(".") and p.suffix.casefold() == suffix),
++                      key=lambda p: p.name.casefold())
++    except OSError:
++        return []
++
++
++def retro_dir(project_root: Path, system: str, stem: str) -> Path | None:
++    if system not in RETRO_SYSTEMS or not stem or stem in (".", "..") or "/" in stem or "\\" in stem:
++        return None
++    return Path(project_root) / RETRO_ROOT / system / stem
++
++
++def user_cht_files(project_root: Path, game: Mapping[str, Any]) -> list[Path]:
++    system = str(game.get("system", "")).strip().casefold()
++    stem = Path(str(game.get("relative_path", ""))).stem
++    folder = retro_dir(project_root, system, stem)
++    return _files(folder, ".cht") if folder is not None else []
++
++
++def ps2_dir(project_root: Path, serial: str, environ: Mapping[str, str] | None = None) -> Path | None:
++    if not _SERIAL_OK.fullmatch(serial or ""):
++        return None
++    import inplace_library
++    named = inplace_library.read_dir(Path(project_root), PS2_DIR_KEY, environ)
++    base = named if named is not None else Path(project_root) / PS2_ROOT
++    return base / serial
++
++
++def pnach_files(project_root: Path, serial: str, environ: Mapping[str, str] | None = None) -> list[Path]:
++    folder = ps2_dir(project_root, serial, environ)
++    return _files(folder, ".pnach") if folder is not None else []
++
++
++def pnach_groups(text: str) -> list[str]:
++    out: list[str] = []
++    for g in re.findall(r"^\s*\[([^\]\r\n]+)\]\s*$", text or "", re.M):
++        g = g.strip()
++        if g and g not in out:
++            out.append(g)
++    return out
++
++
++def stage_pnach(cheats_dir: Path, serial: str, crc: str, files: list[Path]) -> tuple[Path, list[str]]:
++    """The ticked files' text, in order, as PCSX2's `<SERIAL>_<CRC>.pnach`; returns it and the files' groups."""
++    if not _SERIAL_OK.fullmatch(serial or "") or not re.fullmatch(r"[0-9A-Fa-f]{8}", crc or ""):
++        raise ValueError("the title's serial / CRC are not known")
++    parts: list[str] = []
++    groups: list[str] = []
++    for n, f in enumerate(files, start=1):
++        text = f.read_text(encoding="utf-8", errors="replace")
++        parts.append(f"// PrivyHub: your cheat file {n} of {len(files)}\n" + text.rstrip("\n") + "\n")
++        for g in pnach_groups(text):
++            if g not in groups:
++                groups.append(g)
++    folder = Path(cheats_dir)
++    folder.mkdir(parents=True, exist_ok=True)
++    target = folder / f"{serial}_{crc.upper()}.pnach"
++    tmp = target.with_name(target.name + ".privyhub.tmp")
++    tmp.write_text("\n".join(parts), encoding="utf-8")
++    tmp.replace(target)
++    return target, groups
++
++
++def ensure_folders(project_root: Path, ps2: bool) -> list[str]:
++    """The empty drop-in folders, created when missing (nothing is written inside them). Returns those created."""
++    made = []
++    wanted = [Path(RETRO_ROOT) / s for s in RETRO_SYSTEMS] + ([Path(PS2_ROOT)] if ps2 else [])
++    for rel in wanted:
++        p = Path(project_root) / rel
++        if not p.is_dir():
++            try:
++                p.mkdir(parents=True, exist_ok=True)
++                made.append(rel.as_posix())
++            except OSError:
++                pass
++    return made
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 184f6c0..f35dd98 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -4161,6 +4161,44 @@ class EmulatorManager:
+     def _cheat_catalog_unlocked(
+         self,
+         game: dict[str, Any],
++    ) -> dict[str, Any]:
++        """B81: today's catalog, then the user's own `.cht` files for a PS1 / SNES title (none: today's dict)."""
++        import cheat_dropins as _dropins
++        if not _dropins.enabled():
++            return self._cheat_catalog_base_unlocked(game)
++        files = _dropins.user_cht_files(self.project_root, game)
++        if not files:
++            return self._cheat_catalog_base_unlocked(game)
++        manifest = self.project_root / self.CHEAT_MANIFEST_RELATIVE
++        if manifest.is_file():
++            base = self._cheat_catalog_base_unlocked(game)
++        else:   # today's "no record" shape: the user's files need no fetched manifest
++            base = {"game_id": str(game.get("id", "")).strip(), "system": str(game.get("system", "")).strip(),
++                    "status": "no_manifest_record", "activation_available": False,
++                    "activation_locked_reason": "isolated_cheat_profile_launch_required", "sources": []}
++        sources = list(base.get("sources") or [])
++        skipped = 0
++        for f in files:
++            rel = f.relative_to(self.project_root).as_posix()
++            try:
++                digest = hashlib.sha256(f.read_bytes()).hexdigest().upper()
++                parsed = self._read_cheat_source(rel, digest)
++            except (OSError, EmulatorError):
++                skipped += 1
++                continue
++            sources.append({"source_index": len(sources), "provider": _dropins.USER_PROVIDER, "filename": f.name,
++                            "local_path": rel, "sha256": parsed["sha256"], "cheat_count": parsed["cheat_count"],
++                            "entries": parsed["entries"]})
++        out = dict(base)
++        out["sources"] = sources
++        if sources:
++            out["status"] = "cached"
++        out["user_files_skipped"] = skipped
++        return out
++
++    def _cheat_catalog_base_unlocked(
++        self,
++        game: dict[str, Any],
+     ) -> dict[str, Any]:
+         game_id = str(game.get("id", "")).strip()
+         relative_path = str(
+@@ -4270,6 +4308,7 @@ class EmulatorManager:
+         game: dict[str, Any],
+     ) -> dict[str, Any]:
+         with self.lock:
++            self._dropin_folders_once()   # B81
+             ext = self._ext_cheat_catalog(game)   # B79 / B81: None = today's code
+             if ext is not None:
+                 return {k: v for k, v in ext.items() if not k.startswith("_")}   # the disc id stays on the hub
+@@ -4284,8 +4323,65 @@ class EmulatorManager:
+             import gc_cheats as _gc_cheats
+             if _gc_cheats.enabled():
+                 return self._gc_cheat_catalog(game)
++        if _ps2 is not None and system_id == _ps2.SYSTEM_ID and self._ps2_dropins_on():
++            return self._ps2_cheat_catalog(game)
+         return None
+ 
++    # --- B81: the user's PS2 .pnach files (no download) -----------------------------------------------------------
++
++    def _dropin_folders_once(self) -> None:
++        """B81: the empty drop-in folders, made at the first Cheats list this process serves (knob 0: never)."""
++        if getattr(self, "_dropin_folders_done", False):
++            return
++        self._dropin_folders_done = True
++        import cheat_dropins as _dropins
++        if _dropins.enabled():
++            _dropins.ensure_folders(self.project_root, _ps2 is not None)
++
++    @staticmethod
++    def _ps2_dropins_on() -> bool:
++        import cheat_dropins as _dropins
++        import ps2_patches as _patches
++        return _dropins.enabled() and _patches.enabled()
++
++    def _ps2_cheat_catalog(self, game: dict[str, Any]) -> dict[str, Any]:
++        import cheat_dropins as _dropins
++        import ps2_patches as _patches
++        result: dict[str, Any] = {"game_id": str(game.get("id", "")).strip(), "system": _ps2.SYSTEM_ID,
++                                  "status": "unavailable", "provider": _dropins.PNACH_PROVIDER,
++                                  "activation_available": False,
++                                  "activation_locked_reason": "isolated_cheat_profile_launch_required", "sources": []}
++        ids = _patches.title_ids(self.project_root, game, Path(self.project_root) / _ps2.DATA_DIR / "logs")
++        if ids is None:   # PCSX2 has not shown this title's serial yet (its first PrivyHub launch)
++            return result
++        files = _dropins.pnach_files(self.project_root, ids[0])
++        result["status"] = "cached" if files else "no_files"
++        if files:
++            result["sources"] = [{"source_index": 0, "provider": _dropins.PNACH_PROVIDER,
++                                  "filename": _dropins.PNACH_SOURCE_NAME, "cheat_count": len(files),
++                                  "entries": [{"index": i, "description": f.name, "kind": "pnach"}
++                                              for i, f in enumerate(files)]}]
++        result["_ids"] = ids
++        result["_files"] = files
++        return result
++
++    def _ps2_cheat_pick(self, game: dict[str, Any], source_index: Any,
++                        indexes: list[int] | tuple[int, ...] | None) -> dict[str, Any]:
++        catalog = self._ps2_cheat_catalog(game)
++        try:
++            src = int(source_index)
++        except (TypeError, ValueError) as exc:
++            raise EmulatorError("Cheat source index must be an integer") from exc
++        files = catalog.get("_files") or []
++        if src != 0 or not files:
++            raise EmulatorError("No PS2 cheat files are available for this game")
++        picked = sorted({int(i) for i in (indexes or [])})
++        if not picked:
++            raise EmulatorError("Select at least one cheat")
++        if any(i < 0 or i >= len(files) for i in picked):
++            raise EmulatorError("Cheat index is out of range")
++        return {"ids": catalog["_ids"], "files": [files[i] for i in picked]}
++
+     def _gc_cheat_catalog(self, game: dict[str, Any]) -> dict[str, Any]:
+         import gc_cheats as _gc_cheats
+         game_id = str(game.get("id", "")).strip()
+@@ -4437,6 +4533,7 @@ class EmulatorManager:
+         game: dict[str, Any],
+     ) -> dict[str, Any]:
+         with self.lock:
++            self._dropin_folders_once()   # B81
+             ext = self._ext_cheat_catalog(game)   # B79 / B81: no saved cheat profiles for these (None = today)
+             if ext is not None:
+                 return {"game_id": ext["game_id"], "system": ext["system"], "status": ext["status"],
+@@ -5674,6 +5771,9 @@ class EmulatorManager:
+ 
+             # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
+             if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
++                # B81: the ticked .pnach files reach PCSX2 (PRIVYHUB_CHEAT_DROPINS=0: today's call, the arguments dropped)
++                if self._ps2_dropins_on() and cheat_source_index is not None:
++                    return self._launch_pcsx2(game, players_chosen, cheat_source_index, cheat_enabled_indexes)
+                 return self._launch_pcsx2(game, players_chosen)
+             # B69: a GameCube title launches Dolphin (only with PRIVYHUB_GAMECUBE=1; absent = today's refusal below)
+             if _gc is not None and str(game.get("system", "")).strip().casefold() == _gc.SYSTEM_ID:
+@@ -7128,19 +7228,33 @@ class EmulatorManager:
+         root = self.project_root
+         ids = _patches.title_ids(root, game, Path(root) / _ps2.DATA_DIR / "logs")
+         toggles = _patches.get_toggles(root, str(game.get("id", "")))
+-        if ids is None or (toggles is None and cheat_extra is None):
++        if ids is None:
+             return []
++        gamesettings = _ps2.ini_path(root).parent.parent / "gamesettings"
++        if toggles is None and cheat_extra is None:
++            # B81: a file this writer made before (a cheat launch's switch) is rewritten with cheats off; else today
++            import cheat_dropins as _dropins
++            if not (_dropins.enabled() and _patches.wrote_before(gamesettings, ids[0], ids[1])):
++                return []
++            cheat_extra = {"cheats": False}
+         text = _patches.game_ini_text(toggles, cheat_extra)
+-        _patches.write_game_ini(_ps2.ini_path(root).parent.parent / "gamesettings", ids[0], ids[1], text)
++        _patches.write_game_ini(gamesettings, ids[0], ids[1], text)
+         return [_patches.log_line(toggles or {})]
+ 
+     def _launch_pcsx2(
+         self,
+         game: dict[str, Any],
+         players_chosen: int | None,
++        cheat_source_index: int | None = None,
++        cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
+     ) -> dict[str, Any]:
+         import players_session as _players_session
+ 
++        # B81: a cheat launch's files, checked before anything is written (None = today)
++        ps2_cheat_pick = None
++        if cheat_source_index is not None:
++            ps2_cheat_pick = self._ps2_cheat_pick(game, cheat_source_index, cheat_enabled_indexes)
++
+         root = self.project_root
+         try:
+             paths = _ps2.read_paths(root)
+@@ -7173,9 +7287,19 @@ class EmulatorManager:
+         temporary.write_text(merged, encoding="utf-8")
+         temporary.replace(ini)
+         # B80: the title's patch toggles in its game settings file (no record: nothing written, as today)
++        # B81: a cheat launch stages the ticked files as PCSX2's cheats file and switches cheats on for this title
+         try:
+-            patch_lines = self._ps2_game_settings(game)
+-        except OSError as exc:
++            cheat_extra = None
++            if ps2_cheat_pick is not None:
++                import cheat_dropins as _dropins
++                serial, crc = ps2_cheat_pick["ids"]
++                _staged, groups = _dropins.stage_pnach(ini.parent.parent / "cheats", serial, crc,
++                                                       ps2_cheat_pick["files"])
++                cheat_extra = {"cheats": True, "cheat_groups": groups}
++            patch_lines = self._ps2_game_settings(game, cheat_extra)
++            if ps2_cheat_pick is not None:
++                patch_lines.append(f"PS2 cheats: {len(ps2_cheat_pick['files'])} files enabled")
++        except (OSError, ValueError) as exc:
+             raise EmulatorError(f"PS2 launch refused: {exc}") from exc
+ 
+         logs_dir = self._project_path("logs/games")
+diff --git a/companion/ps2_patches.py b/companion/ps2_patches.py
+index c6b5b8d..9dfe591 100644
+--- a/companion/ps2_patches.py
++++ b/companion/ps2_patches.py
+@@ -188,6 +188,15 @@ def write_game_ini(gamesettings: Path, serial: str, crc: str, text: str) -> list
+     return names
+ 
+ 
++def wrote_before(gamesettings: Path, serial: str, crc: str) -> bool:
++    """B81: the title's game settings file exists and is this writer's (its marker line first)."""
++    try:
++        first = (Path(gamesettings) / f"{crc.upper()}.ini").read_text(encoding="utf-8").splitlines()[:1]
++    except (OSError, UnicodeDecodeError):
++        return False
++    return first == [MARKER]
++
++
+ def log_line(toggles: Mapping[str, bool]) -> str:
+     on = {k: ("on" if toggles.get(k) else "off") for k, _g in GROUPS}
+     return f"PS2 patches: ws={on['ws']} ni={on['ni']} 60={on['60']}"
+diff --git a/tests/art_systems/test_b81.py b/tests/art_systems/test_b81.py
+new file mode 100644
+index 0000000..12d7b1b
+--- /dev/null
++++ b/tests/art_systems/test_b81.py
+@@ -0,0 +1,253 @@
++#!/usr/bin/env python3
++"""B81 (host): the drop-in folders — the user's PS2 .pnach per game, and the user's own .cht on PS1 / SNES
++(PRIVYHUB_CHEAT_DROPINS=0 = today). Fixture folders only, made-up names; B49's PCSX2 rig; nothing fetched, nothing
++started; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/art_systems -p 'test_b81.py' -v
++"""
++
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++import cheat_dropins as cd  # noqa: E402
++import ps2_patches as pp  # noqa: E402
++import ps2_session as ps2  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++
++sys.path.insert(0, str(ROOT / "tests" / "ps2_session"))
++import test_ps2_session as ps2rig  # noqa: E402
++import test_b80 as b80  # noqa: E402
++
++CONFIG = ROOT / "companion/games/config/emulators.json"
++DB_CHT = b'cheats = 1\n\ncheat0_desc = "Database One"\ncheat0_code = "80000000 0001"\ncheat0_enable = false\n'
++USER_CHT = b'cheats = 2\n\ncheat0_desc = "My Own A"\ncheat0_code = "80000004 0001"\ncheat0_enable = false\n\n' \
++           b'cheat1_desc = "My Own B"\ncheat1_code = "80000008 0001"\ncheat1_enable = false\n'
++PRE_ENABLED = b'cheats = 1\n\ncheat0_desc = "On Already"\ncheat0_code = "8000000C 0001"\ncheat0_enable = true\n'
++PS1 = {"id": "game_ps1_0000000000000001", "system": "ps1", "title": "Made Up", "relative_path": "games/ps1/Made Up (USA).chd"}
++
++
++def ps1_project(manifest: bool = True, user: dict[str, bytes] | None = None) -> Path:
++    root = Path(tempfile.mkdtemp(prefix="b81_"))
++    (root / "data/games").mkdir(parents=True)
++    if manifest:
++        rel = f"data/games/user_content/{PS1['id']}/cheats/libretro/Made Up (USA).cht"
++        (root / rel).parent.mkdir(parents=True)
++        (root / rel).write_bytes(DB_CHT)
++        (root / "data/games/cheats.json").write_text(json.dumps({"games": {PS1["id"]: {
++            "id": PS1["id"], "system": "ps1", "relative_path": PS1["relative_path"], "status": "cached",
++            "provider": "libretro", "files": [{"local_path": rel, "local_filename": "Made Up (USA).cht",
++                                               "local_sha256": hashlib.sha256(DB_CHT).hexdigest().upper(),
++                                               "cheat_count": 1}]}}}))
++    for name, data in (user or {}).items():
++        d = root / "data/games/retroarch/cheats/ps1/Made Up (USA)"
++        d.mkdir(parents=True, exist_ok=True)
++        (d / name).write_bytes(data)
++    return root
++
++
++def manager(root: Path) -> em.EmulatorManager:
++    return em.EmulatorManager(root, config_path=CONFIG)
++
++
++class RetroArchDropIns(unittest.TestCase):
++    def test_appended_after_the_database(self):
++        root = ps1_project(user={"mine.cht": USER_CHT})
++        cat = manager(root).cheat_catalog(PS1)
++        self.assertEqual([s["provider"] for s in cat["sources"]], ["libretro", "user"])
++        user = cat["sources"][1]
++        self.assertEqual((user["source_index"], user["filename"], user["cheat_count"]), (1, "mine.cht", 2))
++        self.assertEqual([e["description"] for e in user["entries"]], ["My Own A", "My Own B"])
++        self.assertEqual(cat["user_files_skipped"], 0)
++
++    def test_launched_as_a_database_file(self):
++        root = ps1_project(user={"mine.cht": USER_CHT})
++        m = manager(root)
++        rt, session = m._prepare_cheat_runtime(PS1, Path("/nowhere/Made Up (USA).chd"), 1, [1])
++        staged = rt / "Beetle PSX HW" / "Made Up (USA).cht"
++        self.assertEqual(staged.read_bytes(), USER_CHT)
++        self.assertEqual((session["source_filename"], session["enabled_cheat_indexes"]), ("mine.cht", [1]))
++
++    def test_a_pre_enabled_file_is_skipped_and_counted(self):
++        root = ps1_project(user={"a.cht": PRE_ENABLED, "b.cht": USER_CHT})
++        cat = manager(root).cheat_catalog(PS1)
++        self.assertEqual([s["filename"] for s in cat["sources"]], ["Made Up (USA).cht", "b.cht"])
++        self.assertEqual(cat["user_files_skipped"], 1)
++
++    def test_no_user_file_is_todays_dict(self):
++        root = ps1_project()
++        today = manager(root)._cheat_catalog_base_unlocked(PS1)
++        self.assertEqual(manager(root).cheat_catalog(PS1), today)
++        with mock.patch.dict(os.environ, {"PRIVYHUB_CHEAT_DROPINS": "0"}):
++            root2 = ps1_project(user={"mine.cht": USER_CHT})
++            self.assertEqual(manager(root2).cheat_catalog(PS1), manager(root2)._cheat_catalog_base_unlocked(PS1))
++
++    def test_no_manifest_still_lists_the_users(self):
++        root = ps1_project(manifest=False, user={"mine.cht": USER_CHT})
++        cat = manager(root).cheat_catalog(PS1)
++        self.assertEqual((cat["status"], [s["filename"] for s in cat["sources"]]), ("cached", ["mine.cht"]))
++        with mock.patch.dict(os.environ, {"PRIVYHUB_CHEAT_DROPINS": "0"}):
++            with self.assertRaises(em.EmulatorError):                     # today: no manifest is an error
++                manager(root).cheat_catalog(PS1)
++
++    def test_only_ps1_and_snes(self):
++        self.assertIsNone(cd.retro_dir(Path("/p"), "n64", "x"))
++        self.assertIsNone(cd.retro_dir(Path("/p"), "ps1", ".."))
++        self.assertEqual(cd.retro_dir(Path("/p"), "snes", "A Game"), Path("/p/data/games/retroarch/cheats/snes/A Game"))
++
++
++class Folders(unittest.TestCase):
++    def test_created_empty_once_and_not_with_the_knob_off(self):
++        root = ps1_project()
++        manager(root).cheat_catalog(PS1)
++        for rel in ("data/games/retroarch/cheats/ps1", "data/games/retroarch/cheats/snes"):
++            self.assertTrue((root / rel).is_dir())
++            self.assertEqual(list((root / rel).iterdir()), [])
++        self.assertEqual(cd.ensure_folders(root, ps2=True), ["data/games/ps2/cheats"])
++        root2 = ps1_project()
++        with mock.patch.dict(os.environ, {"PRIVYHUB_CHEAT_DROPINS": "0"}):
++            manager(root2).cheat_catalog(PS1)
++        self.assertFalse((root2 / "data/games/retroarch/cheats").exists())
++
++
++class Pnach(unittest.TestCase):
++    def test_groups_and_staging(self):
++        d = Path(tempfile.mkdtemp(prefix="b81_p_"))
++        (d / "a.pnach").write_text("[Made Up Lives]\npatch=1,EE,0,word,1\n")
++        (d / "b.pnach").write_text("patch=1,EE,4,word,1\n[Made Up Lives]\n[Made Up Money]\npatch=1,EE,8,word,1\n")
++        target, groups = cd.stage_pnach(d / "cheats", b80.SERIAL, "1234abcd", [d / "a.pnach", d / "b.pnach"])
++        self.assertEqual(target.name, f"{b80.SERIAL}_{b80.CRC}.pnach")
++        self.assertEqual(groups, ["Made Up Lives", "Made Up Money"])
++        text = target.read_text()
++        self.assertIn("patch=1,EE,0,word,1", text)
++        self.assertIn("patch=1,EE,8,word,1", text)
++        self.assertNotIn("a.pnach", text)
++        with self.assertRaises(ValueError):
++            cd.stage_pnach(d / "cheats", "../x", b80.CRC, [])
++
++    def test_the_users_own_folder_from_the_paths_file(self):
++        root = Path(tempfile.mkdtemp(prefix="b81_r_"))
++        mine = Path(tempfile.mkdtemp(prefix="b81_mine_"))
++        (mine / b80.SERIAL).mkdir()
++        (mine / b80.SERIAL / "x.pnach").write_text("patch=1\n")
++        paths = root / "paths.txt"
++        paths.write_text(f"PS2_CHEATS_DIR={mine}\n")
++        env = {"PRIVYHUB_PS2_PATHS": str(paths)}
++        self.assertEqual([p.name for p in cd.pnach_files(root, b80.SERIAL, env)], ["x.pnach"])
++        self.assertEqual(cd.pnach_files(root, b80.SERIAL, {"PRIVYHUB_PS2_PATHS": str(root / "none")}), [])
++
++
++class PS2Launch(unittest.TestCase):
++    """B49's rig: the PCSX2 launch in a subprocess (PRIVYHUB_PS2=1) with cheat arguments."""
++
++    CODE_TAIL = '''
++import json as _j
++'''
++
++    def setUp(self):
++        self.games = ps2rig.tree({"one.chd": b"1"})
++        self.bios = ps2rig.tree({"image.bin": b"\0" * ps2.BIOS_IMAGE_BYTES, "image.nvm": b"n"})
++
++    def project(self, files=True):
++        proj = ps2rig.tree({"runtime/emulators/pcsx2/pcsx2-fake.AppImage": b"x"})
++        (proj / "runtime" / "h3_p1_paths.txt").write_text(f"BIOS_DIR={self.bios}\nGAMES_DIR={self.games}\n")
++        (proj / "data/games/ps2/logs").mkdir(parents=True)
++        (proj / "data/games/ps2/logs/20261101T000000Z-pcsx2.log").write_text(b80.log_text("one.chd"))
++        if files:
++            d = proj / "data/games/ps2/cheats" / b80.SERIAL
++            d.mkdir(parents=True)
++            (d / "first.pnach").write_text("[Made Up Lives]\npatch=1,EE,0,word,1\n")
++            (d / "second.pnach").write_text("patch=1,EE,4,word,1\n")
++        return proj
++
++    def launch(self, proj, cheats=None, knob=None):
++        code = ps2rig.LAUNCH_CODE
++        if cheats is not None:
++            code = code.replace('r = m.launch(game, players_chosen=int(os.environ["B49_PICK"]) if os.environ.get("B49_PICK") else None)',
++                                f'r = m.launch(game, cheat_source_index=0, cheat_enabled_indexes={cheats!r})')
++            assert "cheat_source_index=0" in code
++        env = {"PATH": "/usr/bin:/bin", "B49_PROJ": str(proj), "PRIVYHUB_PS2": "1"}
++        if knob is not None:
++            env["PRIVYHUB_CHEAT_DROPINS"] = knob
++        r = ps2rig.subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True)
++        if r.returncode:
++            raise AssertionError(r.stderr[-2000:])
++        out = json.loads(r.stdout.strip().splitlines()[-1])
++        gs = proj / "data/games/ps2/config/PCSX2/gamesettings"
++        cheats_dir = proj / "data/games/ps2/config/PCSX2/cheats"
++        logs = sorted((proj / "logs/games").glob("*-ps2.log"))
++        # two launches in the same second share one log file (opened for append): the last session's part only
++        text = logs[-1].read_text() if logs else ""
++        return out, gs, cheats_dir, "PrivyHub game session (PS2)" + text.split("PrivyHub game session (PS2)")[-1]
++
++    def test_listed_by_name(self):
++        proj = self.project()
++        old = em._ps2
++        em._ps2 = ps2
++        self.addCleanup(lambda: setattr(em, "_ps2", old))
++        cat = manager(proj).cheat_catalog(b80.GAME)
++        self.assertEqual([e["description"] for e in cat["sources"][0]["entries"]], ["first.pnach", "second.pnach"])
++        self.assertNotIn(b80.SERIAL, json.dumps(cat))
++        unknown = manager(proj).cheat_catalog({**b80.GAME, "id": "game_ps2_q", "relative_path": "ps2/unseen.chd"})
++        self.assertEqual((unknown["status"], unknown["sources"]), ("unavailable", []))
++
++    def test_a_cheat_launch_stages_and_switches_on_then_a_plain_launch_switches_off(self):
++        proj = self.project()
++        out, gs, cheats_dir, log = self.launch(proj, cheats=[0, 1])
++        self.assertEqual(out["launch"]["launch_kind"], "pcsx2", out)
++        staged = (cheats_dir / f"{b80.SERIAL}_{b80.CRC}.pnach").read_text()
++        self.assertIn("patch=1,EE,0,word,1", staged)
++        self.assertIn("patch=1,EE,4,word,1", staged)
++        ini = (gs / f"{b80.CRC}.ini").read_text()
++        self.assertIn("EnableCheats = true", ini)
++        self.assertIn("[Cheats]\nEnable = Made Up Lives", ini)
++        self.assertIn("PS2 cheats: 2 files enabled", log)
++        self.assertNotIn("first.pnach", log)
++        out2, gs2, _c, log2 = self.launch(proj)
++        self.assertIn("EnableCheats = false", (gs2 / f"{b80.CRC}.ini").read_text())
++        self.assertNotIn("PS2 cheats", log2)
++
++    def test_knob_zero_is_today(self):
++        proj = self.project()
++        out, gs, cheats_dir, log = self.launch(proj, cheats=[0], knob="0")
++        self.assertEqual(out["launch"]["launch_kind"], "pcsx2", out)
++        self.assertFalse(cheats_dir.exists())
++        self.assertFalse(gs.exists())
++        self.assertNotIn("PS2 cheats", log)
++
++    def test_a_bad_pick_refuses_before_anything_is_written(self):
++        proj = self.project()
++        out, gs, cheats_dir, _log = self.launch(proj, cheats=[5])
++        self.assertEqual(out.get("error"), "EmulatorError")
++        self.assertEqual(out["calls"]["popen"], [])
++        self.assertFalse(cheats_dir.exists())
++
++    def test_a_plain_launch_without_a_written_file_is_today(self):
++        proj = self.project()
++        out, gs, cheats_dir, log = self.launch(proj)
++        self.assertFalse(gs.exists())
++        self.assertFalse(cheats_dir.exists())
++
++
++class Docs(unittest.TestCase):
++    def test_cheats_md_names_the_folders(self):
++        text = (ROOT / "docs/CHEATS.md").read_text()
++        for needle in ("data/games/retroarch/cheats/ps1/", "data/games/retroarch/cheats/snes/", "data/games/ps2/cheats/",
++                       ".pnach", ".cht", "PS2_CHEATS_DIR"):
++            self.assertIn(needle, text)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/docs/CHEATS.md b/docs/CHEATS.md
+new file mode 100644
+index 00000000..ee04ffc1
+--- /dev/null
++++ b/docs/CHEATS.md
+@@ -0,0 +1,58 @@
++# Cheats — where they come from, and how to add your own
++
++PrivyHub shows cheats on the TV under a game's **Launch on Companion → Extras → Cheats**. You tick the ones you want
++and press **Launch Cheat Session**. The game then starts with those cheats on. A normal start (Start Fresh / Load
++Save) never has cheats on.
++
++## Where the cheats come from, by system
++
++| System | Where the list comes from | Anything downloaded? |
++| --- | --- | --- |
++| PlayStation, SNES, NES, Genesis | RetroArch's cheat collection, fetched by the hub when someone runs the cheat update | yes, when the update runs (each game's name is sent) |
++| N64 | the same RetroArch collection | yes, the same way |
++| GameCube | the codes that come with Dolphin, already on the hub | **no** |
++| PlayStation 2 | **your own files only** (below) | **no** |
++| PlayStation, SNES | **also your own files** (below), listed after RetroArch's | **no** |
++
++The hub never downloads anything for your own files. It only reads the folders below.
++
++## Your own PlayStation 2 cheats (`.pnach` files)
++
++1. Find the game's **serial**. It looks like `SLUS-12345` (four letters, a dash, five numbers). PCSX2 shows it, and so
++   do most cheat sites.
++2. Put your `.pnach` files in a folder named after that serial, inside the hub's PS2 cheat folder:
++
++   `data/games/ps2/cheats/SLUS-12345/`
++
++   (the `data/games/ps2/cheats/` folder appears by itself the first time the TV opens a Cheats list). If you
++   prefer a folder of your own, add a line `PS2_CHEATS_DIR=<your folder>` to the hub's paths file; the serial folders
++   then go inside your folder.
++3. On the TV, each file shows as one entry, by its file name. Tick the files you want.
++
++**Note:** the hub learns a PS2 game's serial from PCSX2 the first time the game is played through PrivyHub. Until
++then, its Cheats list is empty. Play it once (a minute is enough), and the files show from then on.
++
++The ticked files are joined into one cheat file for PCSX2, just for that game. Cheats inside a file that has a name in
++square brackets (`[Infinite Health]`) are switched on by that name; lines without a name are always on.
++
++## Your own PlayStation and SNES cheats (`.cht` files)
++
++1. Use RetroArch's cheat file format (`.cht`), the same as the files RetroArch's collection has.
++2. Put them in a folder named after the **game's file name without its ending**, inside:
++
++   `data/games/retroarch/cheats/ps1/` for PlayStation, or `data/games/retroarch/cheats/snes/` for SNES.
++
++   For a game file called `My Game (USA).chd`, the folder is
++   `data/games/retroarch/cheats/ps1/My Game (USA)/`.
++3. On the TV, your files show after RetroArch's in the Cheats list, each with its own cheats to tick, as usual.
++
++**Every cheat in your file must start switched off** (`cheat0_enable = false`, and so on). The TV switches on only
++the ones you tick. A file with a cheat already switched on is left out of the list.
++
++## Good to know
++
++- A PS2 or GameCube cheat session saves into the game's normal save slots and memory card. PlayStation and SNES
++  cheat sessions keep their own save slots, as before.
++- To stop using cheats, start the game normally (Start Fresh or Load Save).
++- To switch this off on the hub: `PRIVYHUB_CHEAT_DROPINS=0` (your own files), `PRIVYHUB_GC_CHEATS=0` (GameCube),
++  `PRIVYHUB_N64_CHEATS=0` (N64).

@@ -15,10 +15,25 @@ from pathlib import Path
 from typing import Any, Callable
 
 from games.metadata_importer import (
+    EXTRA_SYSTEM_SPECS,
     SYSTEM_SPECS,
     normalize_title,
     scan_privyhub_games,
 )
+
+
+# B78: N64's folder in RetroArch's cheat database, only with PRIVYHUB_N64=1 (and PRIVYHUB_N64_CHEATS not "0").
+# Absent = today's four systems.
+N64_CHEATS_ENV = "PRIVYHUB_N64_CHEATS"
+
+
+def cheat_system_specs(environ: Any = None) -> dict[str, dict[str, Any]]:
+    env = os.environ if environ is None else environ
+    specs = dict(SYSTEM_SPECS)
+    if (str(env.get("PRIVYHUB_N64", "")).strip() == "1"
+            and str(env.get(N64_CHEATS_ENV, "")).strip() != "0"):
+        specs["n64"] = dict(EXTRA_SYSTEM_SPECS["n64"])
+    return specs
 
 
 CHEAT_SCHEMA_VERSION = 1
@@ -729,10 +744,11 @@ class LibretroCheatProvider:
         system_id = system_id.strip().casefold()
         if system_id in self._prepared:
             return self._prepared[system_id]
-        if system_id not in SYSTEM_SPECS:
+        specs = cheat_system_specs()   # B78: N64 with PRIVYHUB_N64=1; absent = SYSTEM_SPECS's four
+        if system_id not in specs:
             raise CheatError("Unsupported game system: " + system_id)
 
-        system_name = str(SYSTEM_SPECS[system_id]["database_name"])
+        system_name = str(specs[system_id]["database_name"])
         root = self._root_index()
         systems = root.get("systems", {})
         if not isinstance(systems, dict):

@@ -1,0 +1,11 @@
+[
+ {"id": "M1", "file": "companion/gc_cheats.py", "old": "HEADER_OFFSETS = {b\"RVZ\\x01\": 0x58, b\"WIA\\x01\": 0x58}", "new": "HEADER_OFFSETS = {b\"RVZ\\x01\": 0x48, b\"WIA\\x01\": 0x58}", "why": "the RVZ disc header offset"},
+ {"id": "M2", "file": "companion/gc_cheats.py", "old": "            name = s[1:].split(\"[\", 1)[0].strip()", "new": "            name = s[1:].strip()", "why": "a Gecko name keeps its [author] (Dolphin would not match it)"},
+ {"id": "M3", "file": "companion/gc_cheats.py", "old": "    if not (ar or gecko):\n        return None", "new": "    if False:\n        return None", "why": "a file written with nothing enabled"},
+ {"id": "M4", "file": "companion/gc_cheats.py", "old": "        if section in replaced:\n            continue", "new": "        if False:\n            continue", "why": "the old enabled sections kept"},
+ {"id": "M5", "file": "companion/gamecube_session.py", "old": "(\"EnableCheats\", \"True\" if cheats else \"False\")", "new": "(\"EnableCheats\", \"False\")", "why": "Dolphin's switch never turned on"},
+ {"id": "M6", "file": "companion/games/emulator_manager.py", "old": "                if _gc_cheats.enabled() and cheat_source_index is not None:", "new": "                if cheat_source_index is not None:", "why": "the knob ignored at launch"},
+ {"id": "M7", "file": "companion/games/emulator_manager.py", "old": "        if any(i < 0 or i >= len(entries) for i in picked):", "new": "        if any(i >= len(entries) for i in picked):", "why": "a negative index accepted"},
+ {"id": "M8", "file": "companion/gc_cheats.py", "old": "    for name in (gid[:3] + \".ini\", gid + \".ini\"):", "new": "    for name in (gid + \".ini\",):", "why": "the 3-character file not read"},
+ {"id": "M9", "file": "companion/games/emulator_manager.py", "old": "                return {k: v for k, v in ext.items() if not k.startswith(\"_\")}   # the disc id stays on the hub", "new": "                return ext", "why": "the disc id sent to the onn"}
+]

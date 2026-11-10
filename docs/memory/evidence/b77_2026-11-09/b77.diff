@@ -1,0 +1,536 @@
+diff --git a/companion/gamecube_session.py b/companion/gamecube_session.py
+index 400e4ea..bd26ff4 100644
+--- a/companion/gamecube_session.py
++++ b/companion/gamecube_session.py
+@@ -233,11 +233,13 @@ def hotkeys_ini() -> str:
+     return ini_text([("Hotkeys", keys)])
+ 
+ 
+-def gcpad_ini() -> str:
++def gcpad_ini(layouts: list | None = None) -> str:
++    """B77: `layouts[n-1]` (from the Input Profile) replaces PAD_LAYOUT for GCPad<n>; None = today's."""
+     sections = []
+     for n in range(1, PORTS + 1):
++        layout = layouts[n - 1] if layouts is not None else PAD_LAYOUT
+         sections.append((f"GCPad{n}", [("Device", PAD_DEVICE.format(n=n))]
+-                         + [(k, _q(v)) for k, v in PAD_LAYOUT]))
++                         + [(k, _q(v)) for k, v in layout]))
+     return ini_text(sections)
+ 
+ 
+@@ -249,17 +251,18 @@ def logger_ini() -> str:
+     ])
+ 
+ 
+-def config_files() -> dict[str, str]:
++def config_files(gcpad_layouts: list | None = None) -> dict[str, str]:
+     return {"Dolphin.ini": dolphin_ini(), "GFX.ini": gfx_ini(), "Hotkeys.ini": hotkeys_ini(),
+-            "GCPadNew.ini": gcpad_ini(), "Logger.ini": logger_ini()}
++            "GCPadNew.ini": gcpad_ini(gcpad_layouts), "Logger.ini": logger_ini()}
+ 
+ 
+-def write_config(user_dir: Path) -> list[str]:
+-    """Each file written whole (a temp name, then renamed over Dolphin's own). Returns the names written."""
++def write_config(user_dir: Path, gcpad_layouts: list | None = None) -> list[str]:
++    """Each file written whole (a temp name, then renamed over Dolphin's own). Returns the names written.
++    B77: `gcpad_layouts` from the Input Profile (None = today's GCPadNew.ini)."""
+     folder = Path(user_dir) / "Config"
+     folder.mkdir(parents=True, exist_ok=True)
+     names = []
+-    for name, text in config_files().items():
++    for name, text in config_files(gcpad_layouts).items():
+         tmp = folder / (name + ".privyhub.tmp")
+         tmp.write_text(text, encoding="utf-8")
+         tmp.replace(folder / name)
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 358814a..67f4d27 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -6967,6 +6967,32 @@ class EmulatorManager:
+     # B49: the PS2 launch kind (PCSX2), reached only with PRIVYHUB_PS2=1
+     # ------------------------------------------------------------------
+ 
++    def _ext_profile_layouts(self, game: dict[str, Any], kind: str) -> tuple[list | None, str]:
++        """B77: the assigned Input Profile as PCSX2's (kind "ps2") / Dolphin's (kind "gamecube") four pad tables, and
++        the game log's line. None = today's tables: the knob 0, the Default profile (or one equal to the identity),
++        or a profile that fails the RetroArch path's own checks (logged; the launch goes on)."""
++        import profile_layouts as _layouts
++        what = "PS2" if kind == "ps2" else "GC"
++        if not _layouts.enabled():
++            return None, ""
++        try:
++            effective = self.input_profile_for_game(game)
++            profile = effective.get("profile") if isinstance(effective, dict) else None
++            if not isinstance(profile, dict):
++                raise EmulatorError("Effective input profile is invalid")
++            mapping = self._normalize_input_mapping(profile.get("mapping"))
++            self._a8_validate_runtime_mapping(mapping)
++        except Exception as exc:
++            return None, f"{what} input profile: unusable ({type(exc).__name__}); today's layout"
++        source = "assigned" if str(effective.get("source", "")) == "game_assignment" else "default"
++        if _layouts.is_default(mapping):
++            return None, f"{what} input profile: {source} overrides=0"
++        if kind == "ps2":
++            tables = _layouts.per_player(mapping, "ps2", _ps2.DS2_BINDINGS)
++        else:
++            tables = _layouts.per_player(mapping, "gamecube", _gc.PAD_LAYOUT)
++        return tables, f"{what} input profile: {source} overrides={_layouts.overridden_players(mapping)}"
++
+     def _launch_pcsx2(
+         self,
+         game: dict[str, Any],
+@@ -6994,9 +7020,12 @@ class EmulatorManager:
+         chosen = _players_session.parse(players_chosen) if players_chosen is not None else None
+         plan = _players_session.plan(_ps2.SYSTEM_ID, chosen or 2, None)
+         adapter = _ps2.pick_adapter(_ps2.ini_get(text, "EmuCore/GS", "Adapter"), _ps2.default_runner)
++        # B77: the assigned Input Profile onto the DualShock 2 bindings (None = today's)
++        profile_tables, profile_line = self._ext_profile_layouts(game, "ps2")
+         merged = _ps2.ini_merge(
+             text,
+-            _ps2.settings_for(root, bios, adapter, int(plan["ports"]), bool(plan["multitap"])),
++            _ps2.settings_for(root, bios, adapter, int(plan["ports"]), bool(plan["multitap"]),
++                              profile_tables),
+         )
+         ini.parent.mkdir(parents=True, exist_ok=True)
+         temporary = ini.with_name(ini.name + ".privyhub.tmp")
+@@ -7020,6 +7049,8 @@ class EmulatorManager:
+         log_handle.write(
+             f"{utc_ms()} PS2 memcards: " + " ".join(f"{k}={v}" for k, v in sorted(memcards.items())) + "\n"
+         )
++        if profile_line:   # B77 (empty with the knob 0: today's log)
++            log_handle.write(f"{utc_ms()} {profile_line}\n")
+         log_handle.flush()
+ 
+         # B53: PCSX2's own log for this launch, kept 30 days (the name: the UTC launch time only)
+@@ -7438,8 +7469,13 @@ class EmulatorManager:
+             # the previous Dolphin's AppImage helper (<= 10 s, then SIGKILL) before the next Popen
+             helper = _gc.wait_helpers(self._gc_helper_sid)
+             self._gc_helper_sid = None
++        # B77: the assigned Input Profile onto the GameCube layout (None = today's GCPadNew.ini)
++        profile_tables, profile_line = self._ext_profile_layouts(game, "gamecube")
+         try:
+-            _gc.write_config(user)
++            if profile_tables is not None:
++                _gc.write_config(user, profile_tables)
++            else:
++                _gc.write_config(user)
+         except OSError as exc:
+             raise EmulatorError(f"GameCube launch refused: {exc}") from exc
+ 
+@@ -7456,6 +7492,8 @@ class EmulatorManager:
+         log_handle.write(f"{utc_ms()} GC launch: dolphin ports={plan['ports']} backend=vulkan adapter=0 config=whole\n")
+         if helper is not None:
+             log_handle.write(f"{utc_ms()} GC helper: {helper}\n")
++        if profile_line:   # B77 (empty with the knob 0: today's log)
++            log_handle.write(f"{utc_ms()} {profile_line}\n")
+         # Dolphin's own log for this launch, kept 30 days (the name: the UTC launch time only)
+         launched_at = time.time()
+         dolphin_log = _gc.log_for_launch(root, launched_at)
+diff --git a/companion/profile_layouts.py b/companion/profile_layouts.py
+new file mode 100644
+index 0000000..2ccdfc1
+--- /dev/null
++++ b/companion/profile_layouts.py
+@@ -0,0 +1,124 @@
++"""B77: an Input Profile (the onn's, PS1's) translated onto PCSX2's DualShock 2 bindings and Dolphin's GameCube pad.
++
++Pure: no I/O. A profile's mapping is `{player: {target: source}}`: the target is a RetroPad name (`b` the bottom face
++button, `a` right, `y` left, `x` top, ...), the source the physical pad's Xbox-style name (`a` bottom, `b` right, `x`
++left, `y` top, ...). A target the mapping leaves out keeps its default source (the editor's default: the physical
++identity). The legacy whole-axis targets (`left_x` ...) are applied after the directional ones, as RetroArch reads
++the lines. The default resolution gives today's tables exactly (`ps2_session.DS2_BINDINGS`,
++`gamecube_session.PAD_LAYOUT`), so the Default profile writes today's files byte for byte.
++
++Design: `docs/memory/evidence/b77_2026-11-09/design_written_before_code.md` (hashed before this code).
++"""
++
++from __future__ import annotations
++
++import os
++from typing import Any, Mapping
++
++KNOB_ENV = "PRIVYHUB_PROFILES_EXT"   # default on; "0" = today (no profile read at a PCSX2 / Dolphin launch)
++
++STICK_DIRS = ("left_stick_left", "left_stick_right", "left_stick_up", "left_stick_down",
++              "right_stick_left", "right_stick_right", "right_stick_up", "right_stick_down")
++DIRECTIONAL = ("up", "down", "left", "right", "a", "b", "x", "y", "l", "r", "l2", "r2", "l3", "r3",
++               "select", "start", *STICK_DIRS)
++LEGACY_AXES = ("left_x", "left_y", "right_x", "right_y")
++# a legacy whole-axis target / source -> its (minus, plus) directional names
++AXIS_DIRS = {"left_x": ("left_stick_left", "left_stick_right"), "left_y": ("left_stick_up", "left_stick_down"),
++             "right_x": ("right_stick_left", "right_stick_right"), "right_y": ("right_stick_up", "right_stick_down")}
++
++# the editor's default: the physical identity in RetroPad terms
++DEFAULT_SOURCE = {t: t for t in DIRECTIONAL}
++DEFAULT_SOURCE.update({"a": "b", "b": "a", "x": "y", "y": "x"})
++
++# the physical source -> PCSX2 2.8.2's SDL name (B50's names)
++PHYSICAL_SDL = {
++    "a": "FaceSouth", "b": "FaceEast", "x": "FaceWest", "y": "FaceNorth",
++    "l": "LeftShoulder", "r": "RightShoulder", "l2": "+LeftTrigger", "r2": "+RightTrigger",
++    "l3": "LeftStick", "r3": "RightStick", "select": "Back", "start": "Start",
++    "up": "DPadUp", "down": "DPadDown", "left": "DPadLeft", "right": "DPadRight",
++    "left_stick_left": "-LeftX", "left_stick_right": "+LeftX", "left_stick_up": "-LeftY", "left_stick_down": "+LeftY",
++    "right_stick_left": "-RightX", "right_stick_right": "+RightX", "right_stick_up": "-RightY",
++    "right_stick_down": "+RightY",
++}
++# the physical source -> Dolphin's evdev name on the companion's pad (B69's names)
++PHYSICAL_EVDEV = {
++    "a": "SOUTH", "b": "EAST", "x": "WEST", "y": "NORTH",
++    "l": "TL", "r": "TR", "l2": "Axis 2-+", "r2": "Axis 5-+",
++    "l3": "THUMBL", "r3": "THUMBR", "select": "SELECT", "start": "START",
++    "up": "Axis 7-", "down": "Axis 7+", "left": "Axis 6-", "right": "Axis 6+",
++    "left_stick_left": "Axis 0-", "left_stick_right": "Axis 0+", "left_stick_up": "Axis 1-", "left_stick_down": "Axis 1+",
++    "right_stick_left": "Axis 3-", "right_stick_right": "Axis 3+", "right_stick_up": "Axis 4-",
++    "right_stick_down": "Axis 4+",
++}
++# PCSX2's DualShock 2 binding name -> its RetroPad target (the PS layout, as PS1's core reads the RetroPad)
++DS2_TARGETS = {
++    "Up": "up", "Right": "right", "Down": "down", "Left": "left",
++    "Triangle": "x", "Circle": "a", "Cross": "b", "Square": "y",
++    "Select": "select", "Start": "start",
++    "L1": "l", "L2": "l2", "R1": "r", "R2": "r2", "L3": "l3", "R3": "r3",
++    "LUp": "left_stick_up", "LRight": "left_stick_right", "LDown": "left_stick_down", "LLeft": "left_stick_left",
++    "RUp": "right_stick_up", "RRight": "right_stick_right", "RDown": "right_stick_down", "RLeft": "right_stick_left",
++}
++# Dolphin's GameCube key -> its RetroPad target (chosen so the default gives B69's PAD_LAYOUT)
++GC_TARGETS = {
++    "Buttons/A": "b", "Buttons/B": "y", "Buttons/X": "a", "Buttons/Y": "x",
++    "Buttons/Z": "r", "Buttons/Start": "start",
++    "Main Stick/Up": "left_stick_up", "Main Stick/Down": "left_stick_down",
++    "Main Stick/Left": "left_stick_left", "Main Stick/Right": "left_stick_right",
++    "C-Stick/Up": "right_stick_up", "C-Stick/Down": "right_stick_down",
++    "C-Stick/Left": "right_stick_left", "C-Stick/Right": "right_stick_right",
++    "Triggers/L": "l2", "Triggers/R": "r2", "Triggers/L-Analog": "l2", "Triggers/R-Analog": "r2",
++    "D-Pad/Up": "up", "D-Pad/Down": "down", "D-Pad/Left": "left", "D-Pad/Right": "right",
++}
++PLAYERS = ("player1", "player2", "player3", "player4")
++
++
++def enabled(environ: Mapping[str, str] | None = None) -> bool:
++    env = os.environ if environ is None else environ
++    return str(env.get(KNOB_ENV, "")).strip() != "0"
++
++
++def resolve(player_mapping: Mapping[str, str] | None) -> dict[str, str]:
++    """target -> physical source for every directional target: the default, the mapping's directional entries, then
++    its legacy whole axes (both directions of the target stick from the source stick's)."""
++    out = dict(DEFAULT_SOURCE)
++    pm = dict(player_mapping or {})
++    for target, source in pm.items():
++        if target in DEFAULT_SOURCE and source in PHYSICAL_SDL:
++            out[target] = source
++    for target in LEGACY_AXES:
++        source = pm.get(target)
++        if source in AXIS_DIRS:
++            t_minus, t_plus = AXIS_DIRS[target]
++            s_minus, s_plus = AXIS_DIRS[source]
++            out[t_minus], out[t_plus] = s_minus, s_plus
++    return out
++
++
++def ds2_bindings(player_mapping: Mapping[str, str] | None, order: tuple[tuple[str, str], ...]) -> tuple:
++    """PCSX2's `(name, sdl)` pairs in `order`'s order (`ps2_session.DS2_BINDINGS`)."""
++    r = resolve(player_mapping)
++    return tuple((name, PHYSICAL_SDL[r[DS2_TARGETS[name]]]) for name, _sdl in order)
++
++
++def gc_layout(player_mapping: Mapping[str, str] | None, order: tuple[tuple[str, str], ...]) -> tuple:
++    """Dolphin's `(key, evdev)` pairs in `order`'s order (`gamecube_session.PAD_LAYOUT`)."""
++    r = resolve(player_mapping)
++    return tuple((key, PHYSICAL_EVDEV[r[GC_TARGETS[key]]]) for key, _ev in order)
++
++
++def is_default(mapping: Mapping[str, Mapping[str, str]] | None) -> bool:
++    m = mapping or {}
++    return all(resolve(m.get(p)) == DEFAULT_SOURCE for p in PLAYERS)
++
++
++def overridden_players(mapping: Mapping[str, Mapping[str, str]] | None) -> int:
++    m = mapping or {}
++    return sum(resolve(m.get(p)) != DEFAULT_SOURCE for p in PLAYERS)
++
++
++def per_player(mapping: Mapping[str, Mapping[str, str]] | None, kind: str, order: tuple) -> list[tuple]:
++    """The four players' tables (`kind` "ps2" or "gamecube")."""
++    m = mapping or {}
++    fn = ds2_bindings if kind == "ps2" else gc_layout
++    return [fn(m.get(p), order) for p in PLAYERS]
+diff --git a/companion/ps2_session.py b/companion/ps2_session.py
+index 6265c6e..a525bf7 100644
+--- a/companion/ps2_session.py
++++ b/companion/ps2_session.py
+@@ -320,8 +320,10 @@ def ini_merge(text: str, settings: Mapping[str, Mapping[str, str]]) -> str:
+     return "\n".join(out).rstrip("\n") + "\n"
+ 
+ 
+-def pad_sections(players: int, multitap: bool) -> dict[str, dict[str, str]]:
+-    """[Pad] and [Pad1]-[Pad8]: the virtual pads P1-P4 (SDL-0..3, creation order) on the ports the pick needs."""
++def pad_sections(players: int, multitap: bool, bindings: list | None = None) -> dict[str, dict[str, str]]:
++    """[Pad] and [Pad1]-[Pad8]: the virtual pads P1-P4 (SDL-0..3, creation order) on the ports the pick needs.
++    B77: `bindings[k]` (the k-th player's `(name, sdl)` pairs, from the Input Profile) replaces DS2_BINDINGS for that
++    pad; None = today's."""
+     n = max(1, min(4 if multitap else 2, int(players)))
+     pads = MULTITAP_PORT1_PADS if multitap else PLAIN_PADS
+     out: dict[str, dict[str, str]] = {"Pad": {"MultitapPort1": "true" if multitap else "false",
+@@ -331,7 +333,8 @@ def pad_sections(players: int, multitap: bool) -> dict[str, dict[str, str]]:
+         if pad in used:
+             k = used[pad]
+             sec = {"Type": "DualShock2"}
+-            sec.update({name: f"SDL-{k}/{sdl}" for name, sdl in DS2_BINDINGS})
++            table = bindings[k] if bindings is not None else DS2_BINDINGS
++            sec.update({name: f"SDL-{k}/{sdl}" for name, sdl in table})
+         else:
+             sec = {"Type": "None"}
+         out[f"Pad{pad}"] = sec
+@@ -356,7 +359,7 @@ def pick_adapter(existing: str | None, run: Callable[[list[str]], str] | None) -
+ 
+ 
+ def settings_for(project_root: Path, bios_name: str, adapter: str | None, players: int,
+-                 multitap: bool) -> dict[str, dict[str, str]]:
++                 multitap: bool, bindings: list | None = None) -> dict[str, dict[str, str]]:
+     data = (Path(project_root) / DATA_DIR).resolve()
+     # B50: vsync on with mailbox allowed: a tear-free present (MAILBOX where the driver offers it, else FIFO)
+     gs = {"Renderer": "14", "upscale_multiplier": "1", "VsyncEnable": "true", "DisableMailboxPresentation": "false"}
+@@ -382,7 +385,7 @@ def settings_for(project_root: Path, bios_name: str, adapter: str | None, player
+         "MemoryCards": {"Slot1_Enable": "true", "Slot1_Filename": MEMCARDS[0], "Slot2_Enable": "true",
+                         "Slot2_Filename": MEMCARDS[1]},
+     }
+-    s.update(pad_sections(players, multitap))
++    s.update(pad_sections(players, multitap, bindings))   # B77: None = today's
+     return s
+ 
+ 
+diff --git a/tests/art_systems/test_b77.py b/tests/art_systems/test_b77.py
+new file mode 100644
+index 0000000..35ebf6d
+--- /dev/null
++++ b/tests/art_systems/test_b77.py
+@@ -0,0 +1,227 @@
++#!/usr/bin/env python3
++"""B77 (host): the onn's Input Profiles applied at PS2 (PCSX2 PAD bindings) and GameCube (Dolphin GCPadNew.ini)
++launches; the Default profile = today's files byte for byte; PRIVYHUB_PROFILES_EXT=0 = today; N64's path checked.
++
++Fakes only: B49's PCSX2 launch rig (a subprocess with a fake Popen / Session) and B69's Dolphin rig (a fake Dolphin);
++no emulator is started, nothing is fetched; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/art_systems -p 'test_b77.py' -v
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import sys
++import unittest
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++import gamecube_session as gc  # noqa: E402
++import profile_layouts as pl  # noqa: E402
++import ps2_session as ps2  # noqa: E402
++from games import emulator_manager as em  # noqa: E402
++
++sys.path.insert(0, str(ROOT / "tests" / "ps2_session"))
++sys.path.insert(0, str(ROOT / "tests" / "gamecube_session"))
++import test_ps2_session as ps2rig  # noqa: E402
++import test_gamecube_session as gcrig  # noqa: E402
++
++IDENTITY = dict(em.EmulatorManager.INPUT_PROFILE_EDITOR_DEFAULT_MAPPING)
++SWAP = {"b": "b", "a": "a"}          # the bottom and right face buttons swapped (RetroPad target <- physical source)
++CONFIG = ROOT / "companion/games/config/emulators.json"
++
++
++def setup_profile(proj: Path, game_id: str, mapping: dict | None) -> None:
++    """The fixture project's input_profiles.json through the manager's own API (as the onn's editor writes it)."""
++    m = em.EmulatorManager(proj, config_path=CONFIG)
++    if mapping is None:
++        return
++    if not set(mapping) <= set(pl.PLAYERS):
++        mapping = {"player1": mapping}       # a single player's mapping is player 1's
++    created = m.create_input_profile("Made Up", mapping)
++    pid = created.get("profile", created).get("id")
++    m.assign_input_profile({"id": game_id, "system": "x"}, pid)
++
++
++class Translation(unittest.TestCase):
++    def test_default_and_identity_are_todays_tables(self):
++        for mapping in (None, {}, IDENTITY):
++            self.assertEqual(pl.ds2_bindings(mapping, ps2.DS2_BINDINGS), ps2.DS2_BINDINGS)
++            self.assertEqual(pl.gc_layout(mapping, gc.PAD_LAYOUT), gc.PAD_LAYOUT)
++        self.assertTrue(pl.is_default({"player1": IDENTITY, "player3": {}}))
++
++    def test_a_swap_on_both(self):
++        ds2 = dict(pl.ds2_bindings(SWAP, ps2.DS2_BINDINGS))
++        self.assertEqual((ds2["Cross"], ds2["Circle"]), ("FaceEast", "FaceSouth"))
++        today = dict(ps2.DS2_BINDINGS)
++        self.assertEqual({k: v for k, v in ds2.items() if k not in ("Cross", "Circle")},
++                         {k: v for k, v in today.items() if k not in ("Cross", "Circle")})
++        gcl = dict(pl.gc_layout(SWAP, gc.PAD_LAYOUT))
++        self.assertEqual((gcl["Buttons/A"], gcl["Buttons/X"]), ("EAST", "SOUTH"))
++        base = dict(gc.PAD_LAYOUT)
++        self.assertEqual({k: v for k, v in gcl.items() if k not in ("Buttons/A", "Buttons/X")},
++                         {k: v for k, v in base.items() if k not in ("Buttons/A", "Buttons/X")})
++
++    def test_the_sticks(self):
++        legacy = dict(pl.ds2_bindings({"left_x": "right_x"}, ps2.DS2_BINDINGS))
++        self.assertEqual((legacy["LLeft"], legacy["LRight"], legacy["LUp"]), ("-RightX", "+RightX", "-LeftY"))
++        direct = dict(pl.gc_layout({"left_stick_up": "right_stick_up"}, gc.PAD_LAYOUT))
++        self.assertEqual((direct["Main Stick/Up"], direct["Main Stick/Down"]), ("Axis 4-", "Axis 1+"))
++        legacy_gc = dict(pl.gc_layout({"right_y": "left_y"}, gc.PAD_LAYOUT))
++        self.assertEqual((legacy_gc["C-Stick/Up"], legacy_gc["C-Stick/Down"]), ("Axis 1-", "Axis 1+"))
++
++    def test_legacy_axis_applied_after_directional(self):
++        d = dict(pl.ds2_bindings({"left_stick_left": "a", "left_x": "right_x"}, ps2.DS2_BINDINGS))
++        self.assertEqual(d["LLeft"], "-RightX")
++
++    def test_a_trigger_onto_a_button(self):
++        g = dict(pl.gc_layout({"l2": "a"}, gc.PAD_LAYOUT))
++        self.assertEqual((g["Triggers/L"], g["Triggers/L-Analog"]), ("SOUTH", "SOUTH"))
++        d = dict(pl.ds2_bindings({"l2": "a"}, ps2.DS2_BINDINGS))
++        self.assertEqual(d["L2"], "FaceSouth")
++
++    def test_per_player(self):
++        tables = pl.per_player({"player2": SWAP}, "ps2", ps2.DS2_BINDINGS)
++        self.assertEqual(tables[0], ps2.DS2_BINDINGS)
++        self.assertEqual(dict(tables[1])["Cross"], "FaceEast")
++        self.assertEqual(pl.overridden_players({"player2": SWAP}), 1)
++        secs = ps2.pad_sections(2, False, tables)
++        self.assertEqual((secs["Pad1"]["Cross"], secs["Pad2"]["Cross"]), ("SDL-0/FaceSouth", "SDL-1/FaceEast"))
++        ini = gc.gcpad_ini(pl.per_player({"player2": SWAP}, "gamecube", gc.PAD_LAYOUT))
++        self.assertIn("[GCPad2]\nDevice = evdev/0/PrivyHub Virtual Gamepad P2\nButtons/A = `EAST`", ini)
++        self.assertIn("[GCPad1]\nDevice = evdev/0/PrivyHub Virtual Gamepad P1\nButtons/A = `SOUTH`", ini)
++
++    def test_the_default_text_is_todays_bytes(self):
++        tables = pl.per_player({}, "ps2", ps2.DS2_BINDINGS)
++        for players, tap in ((1, False), (2, False), (4, True)):
++            self.assertEqual(ps2.pad_sections(players, tap, tables), ps2.pad_sections(players, tap))
++        self.assertEqual(gc.gcpad_ini(pl.per_player({}, "gamecube", gc.PAD_LAYOUT)), gc.gcpad_ini())
++        self.assertEqual(gc.config_files(), gc.config_files(None))
++
++    def test_the_knob(self):
++        self.assertTrue(pl.enabled({}))
++        self.assertTrue(pl.enabled({"PRIVYHUB_PROFILES_EXT": "1"}))
++        self.assertFalse(pl.enabled({"PRIVYHUB_PROFILES_EXT": "0"}))
++
++
++class PS2Launch(unittest.TestCase):
++    """B49's rig: the launch in a subprocess with PRIVYHUB_PS2=1, a fake Popen and a fake Session."""
++
++    def setUp(self):
++        self.games = ps2rig.tree({"one.chd": b"1"})
++        self.bios = ps2rig.tree({"image.bin": b"\0" * ps2.BIOS_IMAGE_BYTES, "image.nvm": b"n"})
++        self.ini = None
++
++    def launch(self, mapping, knob=None):
++        proj = ps2rig.tree({"runtime/emulators/pcsx2/pcsx2-fake.AppImage": b"x"})
++        (proj / "runtime" / "h3_p1_paths.txt").write_text(f"BIOS_DIR={self.bios}\nGAMES_DIR={self.games}\n")
++        setup_profile(proj, "game_ps2_x", mapping)
++        env_extra = {} if knob is None else {"PRIVYHUB_PROFILES_EXT": knob}
++        with mock.patch.dict(os.environ, env_extra):
++            real_run = ps2rig.subprocess.run
++
++            def run(cmd, **kw):
++                kw["env"] = {**kw.get("env", {}), **env_extra}
++                return real_run(cmd, **kw)
++            with mock.patch.object(ps2rig.subprocess, "run", run):
++                out = ps2rig.run_launch("1", proj)
++        self.assertEqual(out["launch"]["launch_kind"], "pcsx2", out)
++        ini = proj / "data/games/ps2/config/PCSX2/inis/PCSX2.ini"
++        log = next((proj / "logs/games").glob("*-ps2.log")).read_text()
++        # each launch has its own fixture project: its path is the only difference to take out
++        return ini.read_text().replace(str(proj.resolve()), "<proj>").replace(str(proj), "<proj>"), log
++
++    def test_a_swap_reaches_pad_ini(self):
++        text, log = self.launch(SWAP)
++        self.assertEqual(ps2.ini_get(text, "Pad1", "Cross"), "SDL-0/FaceEast")
++        self.assertEqual(ps2.ini_get(text, "Pad1", "Circle"), "SDL-0/FaceSouth")
++        self.assertEqual(ps2.ini_get(text, "Pad2", "Cross"), "SDL-1/FaceSouth")   # player 2: no override
++        self.assertIn("PS2 input profile: assigned overrides=1", log)
++        self.assertNotIn("Made Up", log)
++
++    def test_default_profile_is_todays_bytes(self):
++        today, log_today = self.launch(None, knob="0")
++        default, log_default = self.launch(None)
++        identity, _ = self.launch({p: IDENTITY for p in pl.PLAYERS})
++        self.assertEqual(default, today)
++        self.assertEqual(identity, today)
++        self.assertNotIn("input profile", log_today)
++        self.assertIn("PS2 input profile: default overrides=0", log_default)
++
++    def test_knob_zero_ignores_the_swap(self):
++        today, _ = self.launch(None, knob="0")
++        off, log = self.launch(SWAP, knob="0")
++        self.assertEqual(off, today)
++        self.assertNotIn("input profile", log)
++
++
++class GCLaunch(gcrig.Rig):
++    """B69's rig: the manager in process with a fake Dolphin."""
++
++    def launch_with(self, mapping, knob=None):
++        setup_profile(self.proj, "game_gc_fake", mapping)
++        env = {} if knob is None else {"PRIVYHUB_PROFILES_EXT": knob}
++        with mock.patch.dict(os.environ, env):
++            m, r = self.launch()
++        text = (self.user / "Config" / "GCPadNew.ini").read_text()
++        log = self.log_text()
++        m.stop()
++        for p in (self.proj / "logs/games").glob("*-gamecube.log"):
++            p.unlink()
++        return text, log
++
++    def test_a_swap_reaches_gcpadnew(self):
++        text, log = self.launch_with(SWAP)
++        self.assertIn("[GCPad1]\nDevice = evdev/0/PrivyHub Virtual Gamepad P1\nButtons/A = `EAST`\nButtons/B = `WEST`\n"
++                      "Buttons/X = `SOUTH`", text)
++        self.assertIn("[GCPad2]\nDevice = evdev/0/PrivyHub Virtual Gamepad P2\nButtons/A = `SOUTH`", text)
++        self.assertIn("GC input profile: assigned overrides=1", log)
++
++    def test_default_is_todays_bytes_and_knob_zero(self):
++        self.assertEqual(self.launch_with(None)[0], gc.gcpad_ini())
++        self.assertEqual(self.launch_with(SWAP, knob="0")[0], gc.gcpad_ini())
++
++    def test_other_config_files_unchanged_by_a_profile(self):
++        self.launch_with(SWAP)
++        for name in ("Dolphin.ini", "GFX.ini", "Hotkeys.ini", "Logger.ini"):
++            self.assertEqual((self.user / "Config" / name).read_text(), gc.config_files()[name])
++
++    def test_an_unusable_profile_is_todays_layout_and_logged(self):
++        setup_profile(self.proj, "game_gc_fake", SWAP)
++        path = self.proj / "data/games/input_profiles.json"
++        data = json.loads(path.read_text())
++        data["profiles"][0]["mapping"]["player1"]["a"] = "not_a_button"
++        path.write_text(json.dumps(data))
++        m, r = self.launch()
++        self.assertEqual((self.user / "Config" / "GCPadNew.ini").read_text(), gc.gcpad_ini())
++        self.assertIn("GC input profile: unusable", self.log_text())
++
++
++class N64(unittest.TestCase):
++    def test_the_profile_reaches_retroarchs_lines(self):
++        effective = {"source": "game_assignment",
++                     "profile": {"mapping": {"player1": SWAP, "player2": {}, "player3": {}, "player4": {}}}}
++        lines = em.EmulatorManager._a8_retroarch_profile_lines(effective, runtime_platform="linux")
++        self.assertIn('input_player1_b_btn = "1"', lines)   # RetroPad B (bottom) <- the physical right button
++        self.assertIn('input_player1_a_btn = "0"', lines)
++
++    def test_the_n64_launch_takes_the_input_override(self):
++        src = (ROOT / "companion/games/emulator_manager.py").read_text()
++        body = src[src.index("    def launch(\n"):]
++        body = body[:body.index("\n    def ", 10)]
++        self.assertIn("n64_launch = _n64 is not None", body)
++        n64_at = body.index("if n64_launch:")
++        override_at = body.index("self._prepare_input_override(")
++        self.assertLess(n64_at, override_at)
++        # no early return for N64 between the branch and the input override (only PS2 / GameCube return early)
++        self.assertNotIn("return self._launch", body[n64_at:override_at])
++
++
++if __name__ == "__main__":
++    unittest.main()

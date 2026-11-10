@@ -1,0 +1,10 @@
+[
+ {"id": "H1", "file": "companion/ps2_patches.py", "old": "GROUPS = ((\"ws\", \"Widescreen 16:9\"), (\"ni\", \"No-Interlacing\"), (\"60\", \"60 FPS\"))", "new": "GROUPS = ((\"ws\", \"Widescreen 16:10\"), (\"ni\", \"No-Interlacing\"), (\"60\", \"60 FPS\"))", "why": "the widescreen group name"},
+ {"id": "H2", "file": "companion/ps2_patches.py", "old": "    names = [f\"{crc.upper()}.ini\", f\"{serial}_{crc.upper()}.ini\"]", "new": "    names = [f\"{serial}_{crc.upper()}.ini\"]", "why": "the CRC-only name PCSX2 2.8.2 reads not written"},
+ {"id": "H3", "file": "companion/ps2_patches.py", "old": "                out[name] = (serial, m.group(1).upper())\n                name = serial = None", "new": "                out.setdefault(name, (serial, m.group(1).upper()))\n                name = serial = None", "why": "the oldest launch wins"},
+ {"id": "H4", "file": "companion/ps2_patches.py", "old": "    bad = [k for k, v in wanted.items() if v and k not in offered]", "new": "    bad = []", "why": "a patch not offered accepted"},
+ {"id": "H5", "file": "companion/ps2_patches.py", "old": "    if t.get(\"60\"):\n        lines += [\"\", \"[Patches]\", \"Enable = \" + dict(GROUPS)[\"60\"]]", "new": "    if False:\n        lines += [\"\", \"[Patches]\", \"Enable = \" + dict(GROUPS)[\"60\"]]", "why": "60 fps never enabled"},
+ {"id": "H6", "file": "companion/games/emulator_manager.py", "old": "        if ids is None:\n            return []\n        gamesettings", "new": "        if ids is None:\n            ids = (\"SLUS-00000\", \"00000000\")\n        gamesettings", "why": "written for a title whose ids are unknown"},
+ {"id": "H7", "file": "companion/plugins/games.py", "old": "                if offer:\n                    payload[\"ps2_patches\"] = offer", "new": "                payload[\"ps2_patches\"] = offer", "why": "the details key on every PS2 title"},
+ {"id": "H8", "file": "companion/ps2_patches.py", "old": "    return str(env.get(KNOB_ENV, \"\")).strip() != \"0\"", "new": "    return True", "why": "the knob ignored"}
+]

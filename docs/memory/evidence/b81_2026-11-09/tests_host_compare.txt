@@ -1,0 +1,9 @@
+Queue AC — every host suite on full exports of HEAD (a96c816c) and of HEAD + b76..b81 (the snapshot after B81, with
+docs/CHEATS.md), run_host.sh (queue AA's), TMPDIR on the main disk, no PRIVYHUB_* in the process.
+- suites: HEAD 72, after 73 (+ tests/art_systems: Ran 89, OK);
+- the 72 shared suites: the same result line in both (times aside);
+- failing in both, unchanged (the same six as queue AA's: they read fixtures under docs/ / logs/ that the copies do not hold):
+  tools/test_adaptive_bitrate_live.py, tools/test_c3_f1_recovery_restart.py, tools/test_c3_l4_nft_night.py,
+  tools/test_cl_b1_decoder_report_body.py, tools/test_e1_remote.py, tools/test_fec_xor8_2.py.
+- the suites wrote a logs/ dir into each copy while running; both were moved (not deleted) to
+  ~/.cache/b_q19ac_tmp/hostrun_logs_from_base and ..._from_after_b81, so the copies hold only their folders.

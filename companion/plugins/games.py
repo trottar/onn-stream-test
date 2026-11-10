@@ -3314,7 +3314,26 @@ class GamesPlugin:
                 discs = self._set_discs(str(payload.get("id", "")))
                 if discs > 1:
                     payload["discs"] = discs
+            # B80: a PS2 title's PCSX2 patches (absent unless the bundle has one for it; PRIVYHUB_PS2_PATCHES=0: never)
+            if _ps2_session is not None and str(payload.get("system", "")) == _ps2_session.SYSTEM_ID:
+                try:
+                    offer = self._emulator.ps2_patches(self._find_game_by_id(str(payload.get("id", ""))))
+                except Exception:
+                    offer = None
+                if offer:
+                    payload["ps2_patches"] = offer
             return payload
+
+        # B80: remember a PS2 title's patch toggles (read at its next launch)
+        if action == "ps2-patches" and _ps2_session is not None:
+            game_id = self._first(query, "id").strip()
+            if not game_id:
+                raise ValueError("Missing game id")
+            game = self._find_game_by_id(game_id)
+            wanted = {key: self._first(query, name).strip() == "1"
+                      for key, name in (("ws", "ws"), ("ni", "ni"), ("60", "fps60"))}
+            payload = self._emulator.set_ps2_patches(game, wanted)
+            return {"ok": True, "plugin": self.PLUGIN_ID, "game_id": game_id, "ps2_patches": payload}
 
         # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
         if action == "input-profiles":

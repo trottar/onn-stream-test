@@ -2840,6 +2840,50 @@ Acceptance:
 
 ## H6 — Feature parity across systems
 
+**Status: OPEN (2026-11-09) — the first parity queue built (queue AC, B76-B81), waiting for A's ART-1 and HOME-12.**
+
+**The matrix (B75):** `docs/memory/architecture/H6_PARITY_MATRIX_2026-11-09.md` — every per-game feature PS1 / SNES
+have on the onn, checked against N64 (RetroArch), PS2 (PCSX2 2.8.2) and GameCube (Dolphin 2609b): 23 rows; N64 13
+present / 6 missing / 4 impossible, PS2 13 / 9 / 1, GameCube 12 / 9 / 2.
+
+**The user's answers (2026-11-09), gap by gap:**
+
+| Gap | The answer | Where it went |
+| --- | --- | --- |
+| G1 art + details for N64 / PS2 / GameCube from RetroArch's library, as PS1's | **yes** | B76 |
+| G2 PS2 / GameCube use the same Input Profiles | **yes** (the same profiles) | B77 (N64 confirmed by a test) |
+| G3a N64 cheats from RetroArch's database | **yes** | B78 |
+| G3b GameCube cheats | **Dolphin's built-in codes only** (no download) | B79 |
+| G3c the PS2 `.pnach` drop-in; the user's own `.cht` on PS1 / SNES | "Maybe, I'll have to find them" → **the mechanism built; the files are the user's, later** | B81, `docs/CHEATS.md` |
+| G5 PS2 widescreen per game | **yes** (with no-interlacing and 60 fps where the bundle has them) | B80 |
+| G5 Mods on N64 / GameCube | **skipped** | deferred |
+| G6 two-disc titles | **yes on PS2**; GameCube **deferred** ("I have more which might") | PS2 designed only: `docs/memory/architecture/H6_PS2_DISC_CHANGE_DESIGN_2026-11-09.md` |
+| G7 "NEW" | "Sure, not sure what that means" → **not built** while imports are deferred (it marks newly imported titles; nothing is imported) | deferred |
+
+**The order (B's, kept):** artwork → controls → cheats → widescreen → the drop-ins; then the PS2 disc change.
+
+**Queue AC (2026-11-09; built, applied to the tree uncommitted, nothing adopted; APK `de6682dbaf00237c2f6477b68df4fa00e320c0a403ccb2d28863344dee86de28` NOT installed):**
+
+| Item | What | Knob (absent / `0` = today) | Record |
+| --- | --- | --- | --- |
+| **B76** | N64 / PS2 / GameCube in the hub's fetcher (RetroArch's system names; matched by the file name; the details as PS1's; the cache per system); a dry run (counts per system, the misses as labels, nothing per title) | `PRIVYHUB_ART_SYSTEMS=1` (opt-in) | `evidence/B76_ART_THREE_SYSTEMS_2026-11-09.md` |
+| **B77** | the assigned Input Profile onto PCSX2's DualShock 2 bindings and Dolphin's GameCube pad (B69's map = the identity); the Default profile = today's files | `PRIVYHUB_PROFILES_EXT=0` | `evidence/B77_PROFILES_PS2_GC_2026-11-09.md` |
+| **B78** | N64 in the cheat tool and the launch (Mupen64Plus-Next), the rest PS1's | inside `PRIVYHUB_N64=1`; `PRIVYHUB_N64_CHEATS=0` | `evidence/B78_N64_CHEATS_2026-11-09.md` |
+| **B79** | a GameCube title's disc id → Dolphin's bundled code names in Extras → Cheats; the ticked ones written to the user dir per launch; `GC cheats: n enabled` | inside `PRIVYHUB_GAMECUBE=1`; `PRIVYHUB_GC_CHEATS=0` | `evidence/B79_GC_CHEATS_2026-11-09.md` |
+| **B80** | PCSX2's bundled widescreen / no-interlacing / 60-fps patches per PS2 title (Extras → "Patches…", remembered on the hub, the game's settings file per launch); `PS2 patches: …` | inside `PRIVYHUB_PS2=1`; `PRIVYHUB_PS2_PATCHES=0`; client `debug.privyhub.ps2_patches=0` | `evidence/B80_PS2_PATCHES_2026-11-09.md` |
+| **B81** | the drop-in folders: PS2 `.pnach` per serial (or the user's folder), the user's `.cht` on PS1 / SNES; `docs/CHEATS.md` | `PRIVYHUB_CHEAT_DROPINS=0` | `evidence/B81_CHEAT_DROPINS_2026-11-09.md` |
+| design | the PS2 disc change without PCSX2's GUI: a relaunch on the next disc, the memory card carrying the game (size M) | — | `architecture/H6_PS2_DISC_CHANGE_DESIGN_2026-11-09.md` |
+
+**Next (A):** ART-1 (unattended: the dry run, then the art fetch and the N64 cheat fetch on the user's word), then
+HOME-12 at the TV (C44-C48), sketched in `docs/memory/handoffs/SESSION_B_DONE_2026-11-09AC.md`.
+
+**Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
+
+**Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,
+per-game core options / AV settings.
+
+**B75's status line (superseded by the above, kept):**
+
 **Status: OPEN (2026-11-09), waiting for the user's ranking.** The matrix is B75's:
 `docs/memory/architecture/H6_PARITY_MATRIX_2026-11-09.md` (artwork, controls, cheats and the other gaps per system).
 The user ranks the gaps; the first ranked item is the next parity work.

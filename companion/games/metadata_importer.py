@@ -5,6 +5,7 @@ import binascii
 import difflib
 import hashlib
 import json
+import os
 import re
 import threading
 import time
@@ -78,6 +79,41 @@ SYSTEM_SPECS: dict[str, dict[str, Any]] = {
         "checksum_mode": "title_fallback",
     },
 }
+
+# B76: N64 / PS2 / GameCube through the same fetcher, only with PRIVYHUB_ART_SYSTEMS=1 (absent: today's four systems).
+# RetroArch's own system names (its database and its thumbnail sets); matched by the file name as PS1 (no hashing).
+ART_SYSTEMS_ENV = "PRIVYHUB_ART_SYSTEMS"
+EXTRA_SYSTEM_SPECS: dict[str, dict[str, Any]] = {
+    "n64": {
+        "database_name": "Nintendo - Nintendo 64",
+        "catalog_path": "metadat/no-intro/Nintendo - Nintendo 64.dat",
+        "checksum_mode": "title_fallback",
+    },
+    "ps2": {
+        "database_name": "Sony - PlayStation 2",
+        "catalog_path": "metadat/redump/Sony - PlayStation 2.dat",
+        "checksum_mode": "title_fallback",
+    },
+    "gamecube": {
+        "database_name": "Nintendo - GameCube",
+        "catalog_path": "metadat/redump/Nintendo - GameCube.dat",
+        "checksum_mode": "title_fallback",
+    },
+}
+
+
+def art_systems_on(environ: Any = None) -> bool:
+    env = os.environ if environ is None else environ
+    return str(env.get(ART_SYSTEMS_ENV, "")).strip() == "1"
+
+
+def system_specs(environ: Any = None) -> dict[str, dict[str, Any]]:
+    """B76: today's four systems; the three more with the knob on."""
+    specs = dict(SYSTEM_SPECS)
+    if art_systems_on(environ):
+        specs.update(EXTRA_SYSTEM_SPECS)
+    return specs
+
 
 METADATA_FRAGMENT_FOLDERS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("developer", ("developer",)),
@@ -487,8 +523,11 @@ class LibretroProvider(MetadataProvider):
         cache_ttl_seconds: int = DEFAULT_PROVIDER_CACHE_TTL_SECONDS,
         database_base_url: str = LIBRETRO_DATABASE_BASE_URL,
         thumbnail_base_url: str = LIBRETRO_THUMBNAIL_BASE_URL,
+        specs: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         self.project_root = project_root.resolve()
+        # B76: the systems this provider serves (absent knob: SYSTEM_SPECS's four)
+        self.system_specs = dict(specs) if specs is not None else system_specs()
         self.offline = bool(offline)
         self.refresh_cache = bool(refresh_cache)
         self.cache_ttl_seconds = max(0, int(cache_ttl_seconds))
@@ -600,7 +639,7 @@ class LibretroProvider(MetadataProvider):
         if system_id in self._prepared:
             return self._prepared[system_id]
 
-        spec = SYSTEM_SPECS.get(system_id)
+        spec = self.system_specs.get(system_id)
         if spec is None:
             raise ProviderUnavailable(f"Unsupported system: {system_id}")
 
@@ -1136,7 +1175,7 @@ class LibretroProvider(MetadataProvider):
         return self._title_match(prepared, game)
 
     def _artwork_url(self, system_id: str, canonical_title: str) -> str:
-        database_name = str(SYSTEM_SPECS[system_id]["database_name"])
+        database_name = str(self.system_specs[system_id]["database_name"])
         return (
             self.thumbnail_base_url
             + "/"
@@ -1157,7 +1196,7 @@ class LibretroProvider(MetadataProvider):
         system_id = str(game.get("system", "")).strip().casefold()
         canonical = str(match.get("canonical_title", "")).strip()
 
-        if not game_id or not canonical or system_id not in SYSTEM_SPECS:
+        if not game_id or not canonical or system_id not in self.system_specs:
             return {"status": "invalid_match"}
 
         destination = self.artwork_root / (game_id + ".png")
@@ -1448,3 +1487,45 @@ def run_metadata_update(
     )
     report["text_log_path"] = str(log_text_path)
     return report
+
+
+def run_metadata_dry_run(
+    project_root: Path,
+    *,
+    offline: bool = False,
+    only_system: str = "",
+    environ: Any = None,
+    provider: "LibretroProvider | None" = None,
+    games: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """B76: matched / unmatched counts per system, nothing fetched per title and nothing written but the provider's
+    per-system list cache. The misses are labels in scan order; no title, id or path is returned."""
+    project_root = project_root.resolve()
+    specs = system_specs(environ)
+    if provider is None:
+        provider = LibretroProvider(project_root, offline=offline, specs=specs)
+    if games is None:
+        games = scan_privyhub_games(project_root)
+    wanted = only_system.strip().casefold()
+    systems: dict[str, dict[str, int]] = {}
+    misses: dict[str, list[str]] = {}
+    not_offered: dict[str, int] = {}
+    for game in games:
+        system_id = str(game.get("system", "")).strip().casefold()
+        if wanted and system_id != wanted:
+            continue
+        if system_id not in specs:
+            not_offered[system_id] = not_offered.get(system_id, 0) + 1
+            continue
+        row = systems.setdefault(system_id, {"total": 0, "matched": 0, "ambiguous": 0, "no_match": 0,
+                                             "provider_unavailable": 0})
+        row["total"] += 1
+        status = str(provider.match_game(game).get("status", ""))
+        key = status if status in row else "no_match"
+        row[key] += 1
+        if key != "matched":
+            labels = misses.setdefault(system_id, [])
+            labels.append(f"{system_id}-miss-{len(labels) + 1}")
+    return {"ok": True, "dry_run": True, "offline": bool(offline), "systems": systems, "misses": misses,
+            "not_offered": not_offered, "source_stats": {k: v for k, v in provider.stats.items()
+                                                          if k.startswith("source_")}}

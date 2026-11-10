@@ -14,7 +14,11 @@ COMPANION_DIR = PROJECT_ROOT / "companion"
 if str(COMPANION_DIR) not in sys.path:
     sys.path.insert(0, str(COMPANION_DIR))
 
-from games.metadata_importer import SYSTEM_SPECS, run_metadata_update  # noqa: E402
+from games.metadata_importer import (  # noqa: E402
+    run_metadata_dry_run,
+    run_metadata_update,
+    system_specs,
+)
 
 
 def main() -> int:
@@ -44,7 +48,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--system",
-        choices=sorted(SYSTEM_SPECS),
+        choices=sorted(system_specs()),   # B76: the three more with PRIVYHUB_ART_SYSTEMS=1
         default="",
         help="Restrict the run to one PrivyHub game system.",
     )
@@ -59,7 +63,47 @@ def main() -> int:
         action="store_true",
         help="Print the complete run result as JSON.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "B76: report matched / unmatched counts per system and the misses "
+            "as labels; no box art or per-title request, nothing written but "
+            "the per-system list cache."
+        ),
+    )
     args = parser.parse_args()
+
+    if args.dry_run:
+        try:
+            report = run_metadata_dry_run(
+                PROJECT_ROOT,
+                offline=args.offline,
+                only_system=args.system,
+            )
+        except Exception as exc:
+            print(
+                "PrivyHub game metadata dry run failed: " + type(exc).__name__,
+                file=sys.stderr,
+            )
+            return 1
+        if args.json:
+            print(json.dumps(report, indent=2, sort_keys=True))
+        else:
+            print("PrivyHub game metadata dry run (nothing fetched per title)")
+            for system_id, row in sorted(report["systems"].items()):
+                print(
+                    f"{system_id}: {row['matched']} matched, "
+                    f"{row['total'] - row['matched']} unmatched of {row['total']} "
+                    f"(ambiguous {row['ambiguous']}, no match {row['no_match']}, "
+                    f"list unavailable {row['provider_unavailable']})"
+                )
+                misses = report["misses"].get(system_id, [])
+                if misses:
+                    print("  misses: " + ", ".join(misses))
+            for system_id, count in sorted(report["not_offered"].items()):
+                print(f"{system_id}: {count} not offered (system not in the fetcher's map)")
+        return 0
 
     try:
         report = run_metadata_update(

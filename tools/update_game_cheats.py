@@ -14,7 +14,7 @@ COMPANION_DIR = PROJECT_ROOT / "companion"
 if str(COMPANION_DIR) not in sys.path:
     sys.path.insert(0, str(COMPANION_DIR))
 
-from games.cheat_importer import SYSTEM_SPECS, run_cheat_update  # noqa: E402
+from games.cheat_importer import cheat_system_specs, run_cheat_update  # noqa: E402
 
 
 def main() -> int:
@@ -45,7 +45,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--system",
-        choices=sorted(SYSTEM_SPECS),
+        choices=sorted(cheat_system_specs()),   # B78: n64 with PRIVYHUB_N64=1
         default="",
         help="Restrict the run to one PrivyHub game system.",
     )

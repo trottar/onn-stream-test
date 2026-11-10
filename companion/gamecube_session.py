@@ -202,7 +202,8 @@ def _q(name: str) -> str:
     return f"`{name}`"
 
 
-def dolphin_ini() -> str:
+def dolphin_ini(cheats: bool = False) -> str:
+    """B79: `cheats` (a cheat launch) sets EnableCheats = True; False = today's bytes."""
     return ini_text([
         ("General", [("UseDiscordPresence", "False")]),
         ("Interface", [("ConfirmStop", "False"), ("UsePanicHandlers", "False"), ("OnScreenDisplayMessages", "False"),
@@ -210,7 +211,7 @@ def dolphin_ini() -> str:
         ("Display", [("RenderToMain", "True"), ("Fullscreen", "True")]),
         ("Core", [("CPUThread", "True"), ("SkipIPL", "True"), ("GFXBackend", "Vulkan")]
          + [(f"SIDevice{i}", "6") for i in range(PORTS)]
-         + [("SlotA", "8"), ("SlotB", "255"), ("EnableCheats", "False")]),
+         + [("SlotA", "8"), ("SlotB", "255"), ("EnableCheats", "True" if cheats else "False")]),
         ("DSP", [("Backend", "Cubeb"), ("DSPThread", "True")]),
         ("Input", [("BackgroundInput", "True")]),
         ("Analytics", [("PermissionAsked", "True"), ("Enabled", "False")]),
@@ -233,11 +234,13 @@ def hotkeys_ini() -> str:
     return ini_text([("Hotkeys", keys)])
 
 
-def gcpad_ini() -> str:
+def gcpad_ini(layouts: list | None = None) -> str:
+    """B77: `layouts[n-1]` (from the Input Profile) replaces PAD_LAYOUT for GCPad<n>; None = today's."""
     sections = []
     for n in range(1, PORTS + 1):
+        layout = layouts[n - 1] if layouts is not None else PAD_LAYOUT
         sections.append((f"GCPad{n}", [("Device", PAD_DEVICE.format(n=n))]
-                         + [(k, _q(v)) for k, v in PAD_LAYOUT]))
+                         + [(k, _q(v)) for k, v in layout]))
     return ini_text(sections)
 
 
@@ -249,17 +252,18 @@ def logger_ini() -> str:
     ])
 
 
-def config_files() -> dict[str, str]:
-    return {"Dolphin.ini": dolphin_ini(), "GFX.ini": gfx_ini(), "Hotkeys.ini": hotkeys_ini(),
-            "GCPadNew.ini": gcpad_ini(), "Logger.ini": logger_ini()}
+def config_files(gcpad_layouts: list | None = None, cheats: bool = False) -> dict[str, str]:
+    return {"Dolphin.ini": dolphin_ini(cheats), "GFX.ini": gfx_ini(), "Hotkeys.ini": hotkeys_ini(),
+            "GCPadNew.ini": gcpad_ini(gcpad_layouts), "Logger.ini": logger_ini()}
 
 
-def write_config(user_dir: Path) -> list[str]:
-    """Each file written whole (a temp name, then renamed over Dolphin's own). Returns the names written."""
+def write_config(user_dir: Path, gcpad_layouts: list | None = None, cheats: bool = False) -> list[str]:
+    """Each file written whole (a temp name, then renamed over Dolphin's own). Returns the names written.
+    B77: `gcpad_layouts` from the Input Profile (None = today's GCPadNew.ini). B79: `cheats` for a cheat launch."""
     folder = Path(user_dir) / "Config"
     folder.mkdir(parents=True, exist_ok=True)
     names = []
-    for name, text in config_files().items():
+    for name, text in config_files(gcpad_layouts, cheats).items():
         tmp = folder / (name + ".privyhub.tmp")
         tmp.write_text(text, encoding="utf-8")
         tmp.replace(folder / name)

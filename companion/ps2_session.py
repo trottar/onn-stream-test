@@ -320,8 +320,10 @@ def ini_merge(text: str, settings: Mapping[str, Mapping[str, str]]) -> str:
     return "\n".join(out).rstrip("\n") + "\n"
 
 
-def pad_sections(players: int, multitap: bool) -> dict[str, dict[str, str]]:
-    """[Pad] and [Pad1]-[Pad8]: the virtual pads P1-P4 (SDL-0..3, creation order) on the ports the pick needs."""
+def pad_sections(players: int, multitap: bool, bindings: list | None = None) -> dict[str, dict[str, str]]:
+    """[Pad] and [Pad1]-[Pad8]: the virtual pads P1-P4 (SDL-0..3, creation order) on the ports the pick needs.
+    B77: `bindings[k]` (the k-th player's `(name, sdl)` pairs, from the Input Profile) replaces DS2_BINDINGS for that
+    pad; None = today's."""
     n = max(1, min(4 if multitap else 2, int(players)))
     pads = MULTITAP_PORT1_PADS if multitap else PLAIN_PADS
     out: dict[str, dict[str, str]] = {"Pad": {"MultitapPort1": "true" if multitap else "false",
@@ -331,7 +333,8 @@ def pad_sections(players: int, multitap: bool) -> dict[str, dict[str, str]]:
         if pad in used:
             k = used[pad]
             sec = {"Type": "DualShock2"}
-            sec.update({name: f"SDL-{k}/{sdl}" for name, sdl in DS2_BINDINGS})
+            table = bindings[k] if bindings is not None else DS2_BINDINGS
+            sec.update({name: f"SDL-{k}/{sdl}" for name, sdl in table})
         else:
             sec = {"Type": "None"}
         out[f"Pad{pad}"] = sec
@@ -356,7 +359,7 @@ def pick_adapter(existing: str | None, run: Callable[[list[str]], str] | None) -
 
 
 def settings_for(project_root: Path, bios_name: str, adapter: str | None, players: int,
-                 multitap: bool) -> dict[str, dict[str, str]]:
+                 multitap: bool, bindings: list | None = None) -> dict[str, dict[str, str]]:
     data = (Path(project_root) / DATA_DIR).resolve()
     # B50: vsync on with mailbox allowed: a tear-free present (MAILBOX where the driver offers it, else FIFO)
     gs = {"Renderer": "14", "upscale_multiplier": "1", "VsyncEnable": "true", "DisableMailboxPresentation": "false"}
@@ -382,7 +385,7 @@ def settings_for(project_root: Path, bios_name: str, adapter: str | None, player
         "MemoryCards": {"Slot1_Enable": "true", "Slot1_Filename": MEMCARDS[0], "Slot2_Enable": "true",
                         "Slot2_Filename": MEMCARDS[1]},
     }
-    s.update(pad_sections(players, multitap))
+    s.update(pad_sections(players, multitap, bindings))   # B77: None = today's
     return s
 
 

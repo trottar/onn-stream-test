@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-09 — Queue AC (B76-B81, H6's first parity queue): art + details for N64 / PS2 / GameCube (`PRIVYHUB_ART_SYSTEMS=1`, a dry run; nothing fetched by B); Input Profiles on PS2 / GameCube launches; N64 cheats from RetroArch's database; GameCube cheats from Dolphin's bundled codes (no download); PS2 widescreen / no-interlacing / 60-fps per title; the drop-in folders (PS2 `.pnach`, the user's `.cht` on PS1 / SNES, `docs/CHEATS.md`); the PS2 disc change designed only; APK `de6682db…` built, NOT installed — OPEN (A's ART-1, then HOME-12 C44-C48) — `## 2026-11-09 Queue AC` below
 - 2026-11-09 — HOME-11: APK `85220f99…` installed with every property empty (seventeen); C40 the four-button bar MET, C41 a set starts on disc 1 MET, C42 the warning once and a change MET, C43 no pointer on this APK MET → **`85220f99…` CONFIRMED** and pinned; queue AA CLOSED; HOME-10's C38 items closed (the bar, the restored disc; the black screen settled as the game's and warned); the user's "Close H" → Phase H CLOSED at its checkpoint; open: a real "insert disc" prompt, the H6 parity ranking — CLOSED (the open items listed in it) — `## 2026-11-09 HOME-11: …`
 - 2026-11-09 — Queue AA (B73 / B74): the paused bar fits (SAVE · LOAD · DISC · END, END at 880 of 960 dp); the disc change made safe (the HOME-10 black screens settled as the game's reaction, the sequence unchanged; a set starts on disc 1 by RetroArch's record; the warning once; Extras → "Start on disc…"); APK `85220f99…` built, NOT installed — OPEN (A's HOME-11 C40-C43) — `## 2026-11-09 Queue AA` below
 - 2026-11-09 — HOME-10: APK `64d02f31…` installed with every property empty; C37 no pointer MET (N64, PS1, GameCube; the host's `-draw_mouse 0` live), C39 the N64 card MET, B72 (e) only the evdev four MET, the one-disc bar without CHANGE DISC MET; **C38 NOT MET** (five disc changes `ok` true, but the change back left the game black twice; END ~95 % off the screen with CHANGE DISC) → **`64d02f31…` NOT CONFIRMED, `5f72af4b…` reinstalled**; H4: the user's "Keep all games" (every title offered) — OPEN (to B: the bar's width, the black screen after a change) — `## 2026-11-09 HOME-10` below; `docs/memory/evidence/HOME_10_POINTERS_DISC_2026-11-09.md`
@@ -64,6 +65,35 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-09 Queue AC (B76-B81): the first H6 parity queue — OPEN (A's ART-1, then HOME-12 C44-C48)
+
+(`docs/memory/evidence/B76_ART_THREE_SYSTEMS_2026-11-09.md` … `B81_CHEAT_DROPINS_2026-11-09.md`; patches
+`docs/memory/patches/B76_…` … `B81_…`; `docs/memory/architecture/H6_PS2_DISC_CHANGE_DESIGN_2026-11-09.md`;
+`docs/CHEATS.md`)
+
+- **Built, applied to the tree uncommitted, nothing adopted.** Host parts go live at the companion's next restart;
+  B80's client part comes with the APK `de6682dbaf00237c2f6477b68df4fa00e320c0a403ccb2d28863344dee86de28` (pinned in `queue_ac_built/`, **NOT installed**;
+  property `debug.privyhub.ps2_patches`, `0` = before). `85220f99…` stays CONFIRMED until HOME-12's rule.
+- **The knobs:** `PRIVYHUB_ART_SYSTEMS=1` (B76, opt-in; A's ART-1 sets it in the tool's command only);
+  default on with `0` = today: `PRIVYHUB_PROFILES_EXT` (B77), `PRIVYHUB_N64_CHEATS` (B78, inside `PRIVYHUB_N64=1`),
+  `PRIVYHUB_GC_CHEATS` (B79, inside `PRIVYHUB_GAMECUBE=1`), `PRIVYHUB_PS2_PATCHES` (B80, inside `PRIVYHUB_PS2=1`),
+  `PRIVYHUB_CHEAT_DROPINS` (B81).
+- **Open, unattended (ART-1, on the user's word):** the dry run per system, then the art fetch (each matched title's
+  database name is sent, as PS1's); then the N64 cheat fetch (the same, C46 needs it).
+- **Open, at the TV (HOME-12):** C44 art / details on the three; C45 a profile with a swap on PS2 and GameCube; C46 an
+  N64 cheat seen; C47 a GameCube cheat seen; C48 PS2 widescreen on a title that has it.
+- **Known limits (disclosed in the records):**
+  - a PS2 or GameCube cheat session saves into the title's own slots and memory card (PS1 / SNES cheat profiles keep
+    their own);
+  - a PS2 title's patches and cheat files show only after its first PrivyHub launch (the serial / CRC come from
+    PCSX2's own log);
+  - with `PRIVYHUB_N64_CHEATS=0` and N64 records present, today's cheat tool run with `PRIVYHUB_N64=1` stops at the
+    first N64 title ("Unsupported game system"), as it would without B78;
+  - every PS2 / GameCube launch writes one more game-log line (the Input Profile's source) while B77's knob is on;
+  - the GameCube pad has no Select / L1 / L3 / R3: a profile's mapping onto those has nothing to drive there.
+- **Deferred (the user's answers):** Mods on N64 / GameCube; GameCube two-disc titles; "NEW" (imports deferred).
+  The PS2 disc change is designed (a relaunch on the next disc with the memory card carrying the game), not built.
 
 ## 2026-11-09 HOME-11: the bar fits, discs start on 1, the warning — 85220f99… CONFIRMED; queue AA CLOSED; Phase H CLOSED
 

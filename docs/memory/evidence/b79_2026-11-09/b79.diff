@@ -1,0 +1,572 @@
+diff --git a/companion/gamecube_session.py b/companion/gamecube_session.py
+index bd26ff4..f2167c0 100644
+--- a/companion/gamecube_session.py
++++ b/companion/gamecube_session.py
+@@ -202,7 +202,8 @@ def _q(name: str) -> str:
+     return f"`{name}`"
+ 
+ 
+-def dolphin_ini() -> str:
++def dolphin_ini(cheats: bool = False) -> str:
++    """B79: `cheats` (a cheat launch) sets EnableCheats = True; False = today's bytes."""
+     return ini_text([
+         ("General", [("UseDiscordPresence", "False")]),
+         ("Interface", [("ConfirmStop", "False"), ("UsePanicHandlers", "False"), ("OnScreenDisplayMessages", "False"),
+@@ -210,7 +211,7 @@ def dolphin_ini() -> str:
+         ("Display", [("RenderToMain", "True"), ("Fullscreen", "True")]),
+         ("Core", [("CPUThread", "True"), ("SkipIPL", "True"), ("GFXBackend", "Vulkan")]
+          + [(f"SIDevice{i}", "6") for i in range(PORTS)]
+-         + [("SlotA", "8"), ("SlotB", "255"), ("EnableCheats", "False")]),
++         + [("SlotA", "8"), ("SlotB", "255"), ("EnableCheats", "True" if cheats else "False")]),
+         ("DSP", [("Backend", "Cubeb"), ("DSPThread", "True")]),
+         ("Input", [("BackgroundInput", "True")]),
+         ("Analytics", [("PermissionAsked", "True"), ("Enabled", "False")]),
+@@ -251,18 +252,18 @@ def logger_ini() -> str:
+     ])
+ 
+ 
+-def config_files(gcpad_layouts: list | None = None) -> dict[str, str]:
+-    return {"Dolphin.ini": dolphin_ini(), "GFX.ini": gfx_ini(), "Hotkeys.ini": hotkeys_ini(),
++def config_files(gcpad_layouts: list | None = None, cheats: bool = False) -> dict[str, str]:
++    return {"Dolphin.ini": dolphin_ini(cheats), "GFX.ini": gfx_ini(), "Hotkeys.ini": hotkeys_ini(),
+             "GCPadNew.ini": gcpad_ini(gcpad_layouts), "Logger.ini": logger_ini()}
+ 
+ 
+-def write_config(user_dir: Path, gcpad_layouts: list | None = None) -> list[str]:
++def write_config(user_dir: Path, gcpad_layouts: list | None = None, cheats: bool = False) -> list[str]:
+     """Each file written whole (a temp name, then renamed over Dolphin's own). Returns the names written.
+-    B77: `gcpad_layouts` from the Input Profile (None = today's GCPadNew.ini)."""
++    B77: `gcpad_layouts` from the Input Profile (None = today's GCPadNew.ini). B79: `cheats` for a cheat launch."""
+     folder = Path(user_dir) / "Config"
+     folder.mkdir(parents=True, exist_ok=True)
+     names = []
+-    for name, text in config_files(gcpad_layouts).items():
++    for name, text in config_files(gcpad_layouts, cheats).items():
+         tmp = folder / (name + ".privyhub.tmp")
+         tmp.write_text(text, encoding="utf-8")
+         tmp.replace(folder / name)
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 7cb2302..14b50ce 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -4270,8 +4270,76 @@ class EmulatorManager:
+         game: dict[str, Any],
+     ) -> dict[str, Any]:
+         with self.lock:
++            ext = self._ext_cheat_catalog(game)   # B79 / B81: None = today's code
++            if ext is not None:
++                return {k: v for k, v in ext.items() if not k.startswith("_")}   # the disc id stays on the hub
+             return self._cheat_catalog_unlocked(game)
+ 
++    # --- B79: GameCube's codes from Dolphin's bundled files (no download) ------------------------------------------
++
++    def _ext_cheat_catalog(self, game: dict[str, Any]) -> dict[str, Any] | None:
++        """The onn's Cheats list for a title whose cheats are not RetroArch's (None = today's code path)."""
++        system_id = str(game.get("system", "")).strip().casefold()
++        if _gc is not None and system_id == _gc.SYSTEM_ID:
++            import gc_cheats as _gc_cheats
++            if _gc_cheats.enabled():
++                return self._gc_cheat_catalog(game)
++        return None
++
++    def _gc_cheat_catalog(self, game: dict[str, Any]) -> dict[str, Any]:
++        import gc_cheats as _gc_cheats
++        game_id = str(game.get("id", "")).strip()
++        result: dict[str, Any] = {"game_id": game_id, "system": _gc.SYSTEM_ID, "status": "no_codes",
++                                  "provider": _gc_cheats.PROVIDER, "activation_available": False,
++                                  "activation_locked_reason": "isolated_cheat_profile_launch_required",
++                                  "sources": []}
++        root = self.project_root
++        try:
++            content = _gc.resolve_title(_gc.read_dir(root), str(game.get("relative_path", "")))
++            appimage = _gc.find_appimage(root)
++            st, ast = content.stat(), appimage.stat()
++        except (_gc.GCError, OSError):
++            result["status"] = "unavailable"
++            return result
++        key = (game_id, st.st_size, st.st_mtime_ns, str(appimage), ast.st_mtime_ns)
++        cache = getattr(self, "_gc_cheat_cache", None)
++        if cache is None:
++            cache = self._gc_cheat_cache = {}
++        if key not in cache:
++            gid = _gc_cheats.disc_id(content)
++            codes = (_gc_cheats.codes_for(gid, lambda name: _gc_cheats.read_bundled(appimage, name))
++                     if gid else [])
++            cache[key] = (gid, codes)
++        gid, codes = cache[key]
++        result["game_id_known"] = gid is not None
++        if codes:
++            result["status"] = "cached"
++            result["sources"] = [{"source_index": 0, "provider": _gc_cheats.PROVIDER,
++                                  "filename": _gc_cheats.SOURCE_NAME, "cheat_count": len(codes),
++                                  "entries": [dict(c) for c in codes]}]
++        result["_gid"] = gid
++        return result
++
++    def _gc_cheat_pick(self, game: dict[str, Any], source_index: Any,
++                       indexes: list[int] | tuple[int, ...] | None) -> dict[str, Any]:
++        catalog = self._gc_cheat_catalog(game)
++        sources = catalog.get("sources") or []
++        try:
++            src = int(source_index)
++        except (TypeError, ValueError) as exc:
++            raise EmulatorError("Cheat source index must be an integer") from exc
++        if src != 0 or not sources:
++            raise EmulatorError("No Dolphin codes are available for this game")
++        entries = sources[0]["entries"]
++        picked = sorted({int(i) for i in (indexes or [])})
++        if not picked:
++            raise EmulatorError("Select at least one cheat")
++        if any(i < 0 or i >= len(entries) for i in picked):
++            raise EmulatorError("Cheat index is out of range")
++        ar = [entries[i]["description"] for i in picked if entries[i]["kind"] == "ar"]
++        gecko = [entries[i]["description"] for i in picked if entries[i]["kind"] == "gecko"]
++        return {"gid": catalog["_gid"], "ar": ar, "gecko": gecko, "count": len(picked)}
++
+     def _cheat_profile_slot_summaries(
+         self,
+         game: dict[str, Any],
+@@ -4369,6 +4437,11 @@ class EmulatorManager:
+         game: dict[str, Any],
+     ) -> dict[str, Any]:
+         with self.lock:
++            ext = self._ext_cheat_catalog(game)   # B79 / B81: no saved cheat profiles for these (None = today)
++            if ext is not None:
++                return {"game_id": ext["game_id"], "system": ext["system"], "status": ext["status"],
++                        "profile_schema": self.CHEAT_PROFILE_SCHEMA, "profiles": [], "legacy_profiles_ignored": 0,
++                        "invalid_profiles": []}
+             catalog = self._cheat_catalog_unlocked(game)
+             game_id = str(game.get("id", "")).strip()
+             system = str(game.get("system", "")).strip()
+@@ -5604,6 +5677,10 @@ class EmulatorManager:
+                 return self._launch_pcsx2(game, players_chosen)
+             # B69: a GameCube title launches Dolphin (only with PRIVYHUB_GAMECUBE=1; absent = today's refusal below)
+             if _gc is not None and str(game.get("system", "")).strip().casefold() == _gc.SYSTEM_ID:
++                # B79: the ticked codes reach Dolphin (PRIVYHUB_GC_CHEATS=0: today's call, the arguments dropped)
++                import gc_cheats as _gc_cheats
++                if _gc_cheats.enabled() and cheat_source_index is not None:
++                    return self._launch_dolphin(game, players_chosen, cheat_source_index, cheat_enabled_indexes)
+                 return self._launch_dolphin(game, players_chosen)
+ 
+             # B46: the chooser's pick for this launch (None = today: the metadata alone)
+@@ -7463,6 +7540,8 @@ class EmulatorManager:
+         self,
+         game: dict[str, Any],
+         players_chosen: int | None,
++        cheat_source_index: int | None = None,
++        cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
+     ) -> dict[str, Any]:
+         root = self.project_root
+         try:
+@@ -7470,6 +7549,10 @@ class EmulatorManager:
+             appimage = _gc.find_appimage(root)
+         except (_gc.GCError, OSError) as exc:
+             raise EmulatorError(f"GameCube launch refused: {exc}") from exc
++        # B79: a cheat launch's codes, checked against the title's list before anything is written (None = today)
++        gc_cheat_pick = None
++        if cheat_source_index is not None:
++            gc_cheat_pick = self._gc_cheat_pick(game, cheat_source_index, cheat_enabled_indexes)
+ 
+         # four native ports on every launch, whatever the pick or the join (no multitap, no relaunch)
+         plan = _gc.plan()
+@@ -7482,7 +7565,11 @@ class EmulatorManager:
+         # B77: the assigned Input Profile onto the GameCube layout (None = today's GCPadNew.ini)
+         profile_tables, profile_line = self._ext_profile_layouts(game, "gamecube")
+         try:
+-            if profile_tables is not None:
++            if gc_cheat_pick is not None:   # B79
++                import gc_cheats as _gc_cheats
++                _gc_cheats.write_enabled(user, gc_cheat_pick["gid"], gc_cheat_pick["ar"], gc_cheat_pick["gecko"])
++                _gc.write_config(user, profile_tables, cheats=True)
++            elif profile_tables is not None:
+                 _gc.write_config(user, profile_tables)
+             else:
+                 _gc.write_config(user)
+@@ -7504,6 +7591,8 @@ class EmulatorManager:
+             log_handle.write(f"{utc_ms()} GC helper: {helper}\n")
+         if profile_line:   # B77 (empty with the knob 0: today's log)
+             log_handle.write(f"{utc_ms()} {profile_line}\n")
++        if gc_cheat_pick is not None:   # B79: the count only (no code name, no id)
++            log_handle.write(f"{utc_ms()} GC cheats: {gc_cheat_pick['count']} enabled\n")
+         # Dolphin's own log for this launch, kept 30 days (the name: the UTC launch time only)
+         launched_at = time.time()
+         dolphin_log = _gc.log_for_launch(root, launched_at)
+@@ -7577,6 +7666,8 @@ class EmulatorManager:
+         payload["launch_kind"] = "dolphin"
+         payload["gc_mode"] = True
+         payload["players_session"] = dict(plan)
++        if gc_cheat_pick is not None:   # B79
++            payload["gc_cheats"] = gc_cheat_pick["count"]
+         return payload
+ 
+     def _dolphin_ended(self, pid: int) -> None:
+diff --git a/companion/gc_cheats.py b/companion/gc_cheats.py
+new file mode 100644
+index 0000000..6e0b232
+--- /dev/null
++++ b/companion/gc_cheats.py
+@@ -0,0 +1,142 @@
++"""B79: GameCube cheats from Dolphin's own bundled codes (no download), inside PRIVYHUB_GAMECUBE=1.
++
++- the title's id from its disc header (read-only): `.rvz` / `.wia` keep the disc's first bytes uncompressed at 0x58,
++  `.ciso` at 0x8000, `.iso` / `.gcm` at 0; the GameCube magic C2 33 9F 3D at the disc's 0x1C;
++- the code names from Dolphin's `Sys/GameSettings/<ID3>.ini` and `<ID6>.ini`, read from the AppImage with `7z x -so`
++  (never extracted, never edited): `[ActionReplay]` `$<name>`, `[Gecko]` `$<name> [<author>]`;
++- the ticked codes written per launch to the user dir's `GameSettings/<ID6>.ini` `[ActionReplay_Enabled]` /
++  `[Gecko_Enabled]` (Dolphin reads the enabled lists only from the user's files), only when at least one is ticked.
++
++`PRIVYHUB_GC_CHEATS=0` = today. Design: `docs/memory/evidence/b79_2026-11-09/design_written_before_code.md`.
++"""
++
++from __future__ import annotations
++
++import os
++import re
++import subprocess
++from pathlib import Path
++from typing import Any, Callable, Mapping
++
++KNOB_ENV = "PRIVYHUB_GC_CHEATS"
++BUNDLED_DIR = "usr/share/dolphin-emu/Sys/GameSettings"
++GC_MAGIC = bytes.fromhex("C2339F3D")
++HEADER_OFFSETS = {b"RVZ\x01": 0x58, b"WIA\x01": 0x58}
++CISO_OFFSET = 0x8000
++ID_RE = re.compile(rb"[A-Z0-9]{6}")
++SOURCE_NAME = "Dolphin's built-in codes"
++PROVIDER = "dolphin_bundled"
++
++
++def enabled(environ: Mapping[str, str] | None = None) -> bool:
++    env = os.environ if environ is None else environ
++    return str(env.get(KNOB_ENV, "")).strip() != "0"
++
++
++def disc_id(path: Path) -> str | None:
++    """The 6-character game id from the disc header, or None (no file, too short, not a GameCube disc)."""
++    try:
++        with open(path, "rb") as fh:
++            head = fh.read(CISO_OFFSET + 0x100)
++    except OSError:
++        return None
++    if head[:4] in HEADER_OFFSETS:
++        off = HEADER_OFFSETS[head[:4]]
++    elif Path(path).suffix.casefold() == ".ciso" or head[:4] == b"CISO":
++        off = CISO_OFFSET
++    else:
++        off = 0
++    gid = head[off:off + 6]
++    if len(gid) < 6 or not ID_RE.fullmatch(gid) or head[off + 0x1C:off + 0x20] != GC_MAGIC:
++        return None
++    return gid.decode("ascii")
++
++
++def read_bundled(appimage: Path, name: str, run: Callable[..., Any] = subprocess.run) -> str | None:
++    """One bundled GameSettings file's text from the AppImage (read into memory only), or None."""
++    if not re.fullmatch(r"[A-Z0-9]{3,6}\.ini", name):
++        return None
++    try:
++        r = run(["7z", "x", "-so", str(appimage), f"{BUNDLED_DIR}/{name}"], capture_output=True, timeout=10)
++    except Exception:
++        return None
++    if getattr(r, "returncode", 1) != 0 or not r.stdout:
++        return None
++    return r.stdout.decode("utf-8", errors="replace")
++
++
++def parse_codes(text: str) -> list[tuple[str, str]]:
++    out: list[tuple[str, str]] = []
++    section = None
++    for line in (text or "").splitlines():
++        s = line.strip()
++        if s.startswith("[") and s.endswith("]"):
++            section = s[1:-1]
++            continue
++        if not s.startswith("$"):
++            continue
++        if section == "ActionReplay":
++            name = s[1:].strip()
++            kind = "ar"
++        elif section == "Gecko":
++            name = s[1:].split("[", 1)[0].strip()
++            kind = "gecko"
++        else:
++            continue
++        if name:
++            out.append((kind, name))
++    return out
++
++
++def codes_for(gid: str, reader: Callable[[str], str | None]) -> list[dict[str, Any]]:
++    """The codes Dolphin lists for `gid`: `<ID3>.ini` then `<ID6>.ini`, each (kind, name) once."""
++    seen: set[tuple[str, str]] = set()
++    out: list[dict[str, Any]] = []
++    for name in (gid[:3] + ".ini", gid + ".ini"):
++        for kind, code in parse_codes(reader(name) or ""):
++            if (kind, code) in seen:
++                continue
++            seen.add((kind, code))
++            out.append({"index": len(out), "description": code, "kind": kind})
++    return out
++
++
++def enabled_text(existing: str, ar: list[str], gecko: list[str]) -> str:
++    """The user file: every other section of `existing` kept as it was; the two `_Enabled` sections replaced."""
++    replaced = ("ActionReplay_Enabled", "Gecko_Enabled")
++    kept: list[str] = []
++    section = None
++    for line in (existing or "").splitlines():
++        s = line.strip()
++        if s.startswith("[") and s.endswith("]"):
++            section = s[1:-1]
++        if section in replaced:
++            continue
++        kept.append(line)
++    while kept and not kept[-1].strip():
++        kept.pop()
++    out = kept + ([""] if kept else [])
++    for title, names in (("ActionReplay_Enabled", ar), ("Gecko_Enabled", gecko)):
++        if names:
++            out.append(f"[{title}]")
++            out.extend(f"${n}" for n in names)
++    return "\n".join(out).rstrip("\n") + "\n"
++
++
++def write_enabled(user_dir: Path, gid: str, ar: list[str], gecko: list[str]) -> Path | None:
++    """`GameSettings/<gid>.ini` in the user dir, only with at least one code; None (nothing written) otherwise."""
++    if not (ar or gecko):
++        return None
++    if not ID_RE.fullmatch(gid.encode("ascii", "replace")):
++        raise ValueError("not a GameCube game id")
++    folder = Path(user_dir) / "GameSettings"
++    folder.mkdir(parents=True, exist_ok=True)
++    target = folder / f"{gid}.ini"
++    try:
++        existing = target.read_text(encoding="utf-8")
++    except (OSError, UnicodeDecodeError):
++        existing = ""
++    tmp = target.with_name(target.name + ".privyhub.tmp")
++    tmp.write_text(enabled_text(existing, ar, gecko), encoding="utf-8")
++    tmp.replace(target)
++    return target
+diff --git a/tests/art_systems/test_b79.py b/tests/art_systems/test_b79.py
+new file mode 100644
+index 0000000..5ac1972
+--- /dev/null
++++ b/tests/art_systems/test_b79.py
+@@ -0,0 +1,216 @@
++#!/usr/bin/env python3
++"""B79 (host): GameCube cheats from Dolphin's bundled codes, inside PRIVYHUB_GAMECUBE=1 (PRIVYHUB_GC_CHEATS=0 =
++today). Fixtures only: made-up disc headers, a fake bundled reader (no 7z run, no AppImage read), B69's fake Dolphin;
++nothing fetched, no emulator started; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/art_systems -p 'test_b79.py' -v
++"""
++
++from __future__ import annotations
++
++import os
++import sys
++import tempfile
++import types
++import unittest
++from pathlib import Path
++from unittest import mock
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import _tmp_cleanup  # noqa: E402,F401
++
++import gamecube_session as gc  # noqa: E402
++import gc_cheats  # noqa: E402
++
++sys.path.insert(0, str(ROOT / "tests" / "gamecube_session"))
++import test_gamecube_session as gcrig  # noqa: E402
++
++GID = "GZZE01"          # made up
++ID3_INI = """[Core]
++CPUThread = False
++[ActionReplay]
++# a comment
++$Made Up Infinite Health
++04000000 00000000
++$Made Up Moon Jump
++04000004 00000000
++[Gecko]
++$Made Up Speed [someone]
++C2000000 00000000
++"""
++ID6_INI = """[ActionReplay]
++$Made Up Infinite Health
++04000000 00000000
++$Made Up All Items
++04000008 00000000
++[Gecko]
++$Made Up Debug Menu [another] [x]
++C2000004 00000000
++[Video_Settings]
++SafeTextureCacheColorSamples = 0
++"""
++BUNDLED = {GID[:3] + ".ini": ID3_INI, GID + ".ini": ID6_INI}
++
++
++def header(kind: str, gid: str = GID, magic: bytes = gc_cheats.GC_MAGIC) -> bytes:
++    disc = gid.encode() + b"\0" * (0x1C - 6) + magic + b"\0" * 0x60
++    if kind == "rvz":
++        return b"RVZ\x01" + b"\0" * (0x58 - 4) + disc + b"\0" * 0x100
++    if kind == "ciso":
++        return b"CISO" + b"\0" * (gc_cheats.CISO_OFFSET - 4) + disc
++    return disc + b"\0" * 0x100
++
++
++def fake_reader(name: str):
++    return BUNDLED.get(name)
++
++
++class DiscId(unittest.TestCase):
++    def write(self, name, data):
++        d = Path(tempfile.mkdtemp(prefix="b79_"))
++        (d / name).write_bytes(data)
++        return d / name
++
++    def test_offsets(self):
++        self.assertEqual(gc_cheats.disc_id(self.write("a.rvz", header("rvz"))), GID)
++        self.assertEqual(gc_cheats.disc_id(self.write("a.iso", header("iso"))), GID)
++        self.assertEqual(gc_cheats.disc_id(self.write("a.ciso", header("ciso"))), GID)
++
++    def test_not_a_gamecube_disc(self):
++        self.assertIsNone(gc_cheats.disc_id(self.write("a.rvz", header("rvz", magic=b"\0\0\0\0"))))
++        self.assertIsNone(gc_cheats.disc_id(self.write("a.iso", header("iso", gid="gz e01"))))
++        self.assertIsNone(gc_cheats.disc_id(self.write("a.iso", b"short")))
++        self.assertIsNone(gc_cheats.disc_id(Path("/nowhere/x.rvz")))
++
++
++class Codes(unittest.TestCase):
++    def test_names_listed_author_stripped_merged_once(self):
++        codes = gc_cheats.codes_for(GID, fake_reader)
++        self.assertEqual([(c["kind"], c["description"]) for c in codes], [
++            ("ar", "Made Up Infinite Health"), ("ar", "Made Up Moon Jump"), ("gecko", "Made Up Speed"),
++            ("ar", "Made Up All Items"), ("gecko", "Made Up Debug Menu")])
++        self.assertEqual([c["index"] for c in codes], [0, 1, 2, 3, 4])
++
++    def test_nothing_bundled_is_empty(self):
++        self.assertEqual(gc_cheats.codes_for("GQQE01", fake_reader), [])
++
++    def test_the_7z_command_reads_only_the_bundled_path(self):
++        calls = []
++
++        def run(cmd, **kw):
++            calls.append(cmd)
++            return types.SimpleNamespace(returncode=0, stdout=b"[Gecko]\n")
++        self.assertEqual(gc_cheats.read_bundled(Path("/x/dolphin.AppImage"), "GZZ.ini", run=run), "[Gecko]\n")
++        self.assertEqual(calls, [["7z", "x", "-so", "/x/dolphin.AppImage", "usr/share/dolphin-emu/Sys/GameSettings/GZZ.ini"]])
++        self.assertIsNone(gc_cheats.read_bundled(Path("/x/a"), "../../etc/passwd", run=run))
++        self.assertEqual(len(calls), 1)
++        self.assertIsNone(gc_cheats.read_bundled(Path("/x/a"), "GZZ.ini",
++                                                 run=lambda *a, **k: types.SimpleNamespace(returncode=2, stdout=b"")))
++
++
++class Enabled(unittest.TestCase):
++    def test_written_and_other_sections_kept(self):
++        user = Path(tempfile.mkdtemp(prefix="b79_user_"))
++        (user / "GameSettings").mkdir()
++        (user / "GameSettings" / f"{GID}.ini").write_text(
++            "[Core]\nCPUThread = False\n[ActionReplay_Enabled]\n$Old One\n[Video_Settings]\nX = 1\n")
++        p = gc_cheats.write_enabled(user, GID, ["Made Up Moon Jump"], ["Made Up Speed"])
++        self.assertEqual(p.read_text(), "[Core]\nCPUThread = False\n[Video_Settings]\nX = 1\n\n"
++                                        "[ActionReplay_Enabled]\n$Made Up Moon Jump\n[Gecko_Enabled]\n$Made Up Speed\n")
++
++    def test_none_enabled_no_file(self):
++        user = Path(tempfile.mkdtemp(prefix="b79_user_"))
++        self.assertIsNone(gc_cheats.write_enabled(user, GID, [], []))
++        self.assertFalse((user / "GameSettings").exists())
++
++    def test_dolphin_ini_default_is_todays_bytes(self):
++        self.assertEqual(gc.dolphin_ini(), gc.dolphin_ini(False))
++        self.assertIn("EnableCheats = False", gc.dolphin_ini())
++        self.assertIn("EnableCheats = True", gc.dolphin_ini(True))
++        self.assertEqual(gc.dolphin_ini(True).replace("EnableCheats = True", "EnableCheats = False"), gc.dolphin_ini())
++
++
++class Manager(gcrig.Rig):
++    def setUp(self):
++        super().setUp()
++        (self.games / "one.rvz").write_bytes(header("rvz") + b"\0" * gcrig.MIB)
++        self.reader = mock.patch.object(gc_cheats, "read_bundled", lambda appimage, name, run=None: BUNDLED.get(name))
++        self.reader.start()
++        self.addCleanup(self.reader.stop)
++        self.game = {"id": "game_gc_fake", "system": "gamecube", "title": "made-up", "relative_path": "gamecube/one.rvz"}
++
++    def manager(self):
++        from games import emulator_manager as em
++        return em.EmulatorManager(self.proj, config_path=ROOT / "companion/games/config/emulators.json")
++
++    def cheat_launch(self, indexes):
++        from games import emulator_manager as em
++        rig = self
++        f = gcrig.FakeDolphin(self.proj, user_dir=self.user)
++        self.fake = f
++        em.subprocess.Popen = lambda cmd, **kw: (rig.popen.append({"cmd": cmd}), gcrig.FakeProc(f.pid))[1]
++
++        class S(rig.old_session):
++            def __init__(self, pid, log, **kw):
++                super().__init__(pid, log, run=f.run, kill=f.kill, sleep=f.sleep, clock=f.clock, proc_root=f.proc,
++                                 grab=f.grab, **kw)
++        gc.Session = S
++        gc.wait_helpers = lambda sid, *a, **k: "gone 1.0s"
++        m = self.manager()
++        self.addCleanup(lambda: m._close_quietly(m.log_handle))
++        return m, m.launch(self.game, cheat_source_index=0, cheat_enabled_indexes=indexes)
++
++    def test_the_onns_shape(self):
++        cat = self.manager().cheat_catalog(self.game)
++        self.assertEqual(cat["status"], "cached")
++        src = cat["sources"][0]
++        self.assertEqual((src["source_index"], src["filename"], src["cheat_count"]), (0, "Dolphin's built-in codes", 5))
++        self.assertEqual(src["entries"][2], {"index": 2, "description": "Made Up Speed", "kind": "gecko"})
++        self.assertNotIn("_gid", cat)
++        self.assertNotIn(GID, repr(cat))
++        prof = self.manager().cheat_profiles(self.game)
++        self.assertEqual((prof["profiles"], prof["status"]), ([], "cached"))
++
++    def test_a_cheat_launch_writes_the_user_file_and_the_switch(self):
++        m, r = self.cheat_launch([1, 2])
++        self.assertEqual(r["gc_cheats"], 2)
++        ini = (self.user / "GameSettings" / f"{GID}.ini").read_text()
++        self.assertEqual(ini, "[ActionReplay_Enabled]\n$Made Up Moon Jump\n[Gecko_Enabled]\n$Made Up Speed\n")
++        self.assertEqual((self.user / "Config" / "Dolphin.ini").read_text(), gc.dolphin_ini(True))
++        log = self.log_text()
++        self.assertIn("GC cheats: 2 enabled", log)
++        self.assertNotIn("Made Up", log)
++        self.assertNotIn(GID, log)
++
++    def test_a_plain_launch_is_today(self):
++        m, r = self.launch()
++        self.assertNotIn("gc_cheats", r)
++        self.assertEqual((self.user / "Config" / "Dolphin.ini").read_text(), gc.dolphin_ini())
++        self.assertFalse((self.user / "GameSettings").exists())
++        self.assertNotIn("GC cheats", self.log_text())
++
++    def test_bad_picks_refuse_before_anything_is_written(self):
++        for idx in ([], [9], [-1]):
++            with self.assertRaises(Exception):
++                self.cheat_launch(idx)
++        self.assertFalse((self.user / "GameSettings").exists())
++
++    def test_knob_zero_is_today(self):
++        with mock.patch.dict(os.environ, {"PRIVYHUB_GC_CHEATS": "0"}):
++            m = self.manager()
++            self.assertIsNone(m._ext_cheat_catalog(self.game))
++            m2, r = self.cheat_launch([1])
++        self.assertNotIn("gc_cheats", r)
++        self.assertFalse((self.user / "GameSettings").exists())
++        self.assertEqual((self.user / "Config" / "Dolphin.ini").read_text(), gc.dolphin_ini())
++
++    def test_an_unknown_disc_lists_nothing(self):
++        (self.games / "one.rvz").write_bytes(b"\0" * gcrig.MIB)
++        cat = self.manager().cheat_catalog(self.game)
++        self.assertEqual((cat["status"], cat["sources"], cat["game_id_known"]), ("no_codes", [], False))
++
++
++if __name__ == "__main__":
++    unittest.main()

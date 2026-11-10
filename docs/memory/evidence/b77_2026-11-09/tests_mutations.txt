@@ -1,0 +1,11 @@
+M1 CAUGHT (Ran 17 tests in 0.579s FAILED (failures=6)) -- the identity taken as RetroPad = physical names
+M2 CAUGHT (Ran 17 tests in 0.577s FAILED (failures=4)) -- GameCube B / X swapped in the table
+M3 CAUGHT (Ran 17 tests in 0.576s FAILED (failures=2)) -- the legacy whole axes ignored
+M4 CAUGHT (Ran 17 tests in 0.577s FAILED (failures=4)) -- the knob ignored
+M5 MISSED (Ran 17 tests in 0.579s OK) -- the default not short-circuited (still today's tables by value; the log line differs)
+M6 CAUGHT (Ran 17 tests in 0.576s FAILED (failures=1)) -- PCSX2's launch drops the profile
+M7 CAUGHT (Ran 17 tests in 0.578s FAILED (failures=1)) -- Dolphin's launch drops the profile
+M8 CAUGHT (Ran 17 tests in 0.577s FAILED (failures=2)) -- every pad takes player 1's table
+M9 CAUGHT (Ran 17 tests in 0.575s FAILED (failures=3)) -- the left trigger's evdev name changed (identity broken)
+caught 8 / 9
+M5 is an equivalent mutant: without the short-circuit the default mapping resolves to today's tables by value (test_default_profile_is_todays_bytes passes either way, which is the point) and overridden_players() gives the same 'overrides=0' line. Not a gap.

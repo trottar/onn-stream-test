@@ -15,6 +15,7 @@ import com.safeiot.privyhub.streaming.GameStreamStatusUi
 import com.safeiot.privyhub.streaming.DiscChange
 import com.safeiot.privyhub.streaming.DiscSafe
 import com.safeiot.privyhub.streaming.PausedBar
+import com.safeiot.privyhub.streaming.Ps2Patches
 import com.safeiot.privyhub.diagnostics.DiagnosticsActivity
 
 import android.os.Bundle
@@ -104,6 +105,8 @@ class MainActivity : AppCompatActivity() {
     private val pausedBarFitOn: Boolean by lazy { PausedBar.fromSystem() }
     // B74: the disc change made safe (debug.privyhub.disc_safe=0 = B71's flow)
     private val discSafeOn: Boolean by lazy { DiscSafe.fromSystem() }
+    // B80: a PS2 title's PCSX2 patches in Extras (debug.privyhub.ps2_patches=0 = today's Extras)
+    private val ps2PatchesOn: Boolean by lazy { Ps2Patches.fromSystem() }
     private var pausedBarSaved: IntArray? = null
     private var pausedBarSavedDiscText: CharSequence? = null
     private var pausedBarApplied = false
@@ -7281,7 +7284,10 @@ class MainActivity : AppCompatActivity() {
                                             node.id,
                                             title,
                                             // B74: a set's disc count ("Start on disc…"); 0 for every other game
-                                            json.optInt("discs", 0)
+                                            json.optInt("discs", 0),
+                                            // B80: the PCSX2 patches the hub offers for a PS2 title (none: today)
+                                            jsonStrings(json.optJSONObject("ps2_patches")?.optJSONArray("available")),
+                                            jsonStrings(json.optJSONObject("ps2_patches")?.optJSONArray("on"))
                                         )
                                     }
                                 }
@@ -9265,22 +9271,63 @@ class MainActivity : AppCompatActivity() {
     private fun showGameExtrasMenu(
         gameId: String,
         title: String,
-        discs: Int = 0
+        discs: Int = 0,
+        ps2PatchesAvailable: List<String> = emptyList(),
+        ps2PatchesEnabled: List<String> = emptyList()
     ) {
-        // B74: a set (discs > 1) also offers "Start on disc…"; every other game: today's two items
-        val items =
-            if (DiscSafe.showStartOnDisc(discSafeOn, discs)) {
-                arrayOf("Cheats", "Mods", DiscSafe.START_LABEL)
-            } else {
-                arrayOf("Cheats", "Mods")
-            }
+        // B74: a set (discs > 1) also offers "Start on disc…"; B80: a PS2 title with a PCSX2 patch offers "Patches…";
+        // every other game: today's two items
+        val items = Ps2Patches.extrasItems(
+            startOnDisc = DiscSafe.showStartOnDisc(discSafeOn, discs),
+            patches = Ps2Patches.showEntry(ps2PatchesOn, ps2PatchesAvailable)
+        )
         AlertDialog.Builder(this)
             .setTitle("Extras — $title")
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> showGameCheatSelector(gameId, title)
-                    1 -> showGameModSelector(gameId, title)
-                    2 -> showStartDiscChooser(gameId, title, discs)
+            .setItems(items.toTypedArray()) { _, which ->
+                when (items[which]) {
+                    "Cheats" -> showGameCheatSelector(gameId, title)
+                    "Mods" -> showGameModSelector(gameId, title)
+                    DiscSafe.START_LABEL -> showStartDiscChooser(gameId, title, discs)
+                    Ps2Patches.ENTRY_LABEL ->
+                        showPs2PatchesDialog(gameId, title, ps2PatchesAvailable, ps2PatchesEnabled)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // B80: tick the PCSX2 patches for this title; the hub remembers them for its next launch
+    private fun showPs2PatchesDialog(
+        gameId: String,
+        title: String,
+        available: List<String>,
+        enabled: List<String>
+    ) {
+        val keys = Ps2Patches.known(available)
+        val labels = keys.map { Ps2Patches.label(it) }.toTypedArray()
+        val checked = BooleanArray(keys.size) { keys[it] in enabled }
+        AlertDialog.Builder(this)
+            .setTitle("${Ps2Patches.TITLE} — $title")
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
+            .setPositiveButton(Ps2Patches.SAVE) { _, _ ->
+                val host = getCompanionHost()
+                if (host.isBlank()) {
+                    showCompanionSettings()
+                    return@setPositiveButton
+                }
+                val picked = keys.filterIndexed { index, _ -> checked[index] }.toSet()
+                networkExecutor.execute {
+                    val message = try {
+                        httpPost(
+                            "http://$host:$CONTROL_PORT/plugins/games/ps2-patches?" +
+                                Ps2Patches.query(gameId, keys, picked)
+                        )
+                        Ps2Patches.SAVED
+                    } catch (error: Exception) {
+                        Log.e(TAG, "Failed to save PS2 patches", error)
+                        "Patches not saved: ${error.message ?: "unknown error"}"
+                    }
+                    runOnUiThread { statusText.text = message }
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -12265,10 +12312,16 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // B80: a JSON array of strings (none -> an empty list)
+    private fun jsonStrings(array: JSONArray?): List<String> =
+        if (array == null) emptyList() else (0 until array.length()).mapNotNull { array.optString(it, null) }
+
     private fun showGameLaunchModeDialog(
         gameId: String,
         title: String,
-        discs: Int = 0
+        discs: Int = 0,
+        ps2PatchesAvailable: List<String> = emptyList(),
+        ps2PatchesEnabled: List<String> = emptyList()
     ) {
 
         AlertDialog.Builder(this)
@@ -12305,7 +12358,9 @@ class MainActivity : AppCompatActivity() {
                 showGameExtrasMenu(
                     gameId,
                     title,
-                    discs
+                    discs,
+                    ps2PatchesAvailable,
+                    ps2PatchesEnabled
                 )
             }
             .show()
