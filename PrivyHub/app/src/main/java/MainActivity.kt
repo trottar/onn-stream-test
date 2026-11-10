@@ -9863,6 +9863,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // B84: PrivyHub's own picker (Launch at the top, a filter, sections); debug.privyhub.cheat_picker=0 = this dialog
+        if (com.safeiot.privyhub.streaming.CheatPicker.fromSystem()) {
+            showCheatPickerScreen(gameId, title, sourceIndex, entries)
+            return
+        }
+
         val labels = Array(entries.length()) { index ->
             entries.getJSONObject(index).optString("description", "Cheat ${index + 1}")
         }
@@ -9907,6 +9913,180 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    // B84: the cheat picker as PrivyHub's own screen. The model (streaming/CheatPicker.kt) holds the rows, the focus, the
+    // keys, the filter, the sections and the selection; this view draws the fixed bar and filter row and a recycled list.
+    private fun showCheatPickerScreen(
+        gameId: String,
+        title: String,
+        sourceIndex: Int,
+        entries: JSONArray
+    ) {
+        val picker = com.safeiot.privyhub.streaming.CheatPicker
+        val list = ArrayList<com.safeiot.privyhub.streaming.CheatEntry>(entries.length())
+        for (i in 0 until entries.length()) {
+            val e = entries.optJSONObject(i) ?: continue
+            val index = e.optInt("index", -1)
+            if (index < 0) continue
+            list.add(
+                com.safeiot.privyhub.streaming.CheatEntry(
+                    index = index,
+                    label = e.optString("description", "Cheat ${i + 1}"),
+                    group = picker.groupOf(e.optString("group", "")),
+                    variantOf = if (e.has("variant_of") && !e.isNull("variant_of")) e.optInt("variant_of") else null
+                )
+            )
+        }
+        val model = com.safeiot.privyhub.streaming.CheatPickerModel(list)
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val focusColor = 0xFF2E5C8A.toInt()
+        val root = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 16)
+        }
+        val heading = TextView(this).apply { text = "Cheats — $title"; textSize = 20f }
+        val bar = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
+        val launchButton = TextView(this).apply { text = picker.LAUNCH; textSize = 19f; setPadding(24, 12, 24, 12) }
+        val cancelButton = TextView(this).apply { text = picker.CANCEL; textSize = 19f; setPadding(24, 12, 24, 12) }
+        val countLine = TextView(this).apply { textSize = 17f; setPadding(24, 12, 24, 12) }
+        bar.addView(launchButton)
+        bar.addView(cancelButton)
+        bar.addView(countLine)
+        val filterRow = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
+        val filterEdit = android.widget.EditText(this).apply {
+            hint = picker.FILTER_HINT
+            setSingleLine(true)
+            isFocusable = false
+            isFocusableInTouchMode = false
+        }
+        val selectedOnlyText = TextView(this).apply { textSize = 17f; setPadding(24, 12, 24, 12) }
+        filterRow.addView(filterEdit, android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        filterRow.addView(selectedOnlyText)
+        val hint = TextView(this).apply { text = picker.HINT; textSize = 14f; setPadding(8, 4, 8, 8) }
+        val listView = android.widget.ListView(this).apply {
+            isFocusable = false
+            itemsCanFocus = false
+            divider = null
+        }
+        val adapter = object : android.widget.BaseAdapter() {
+            override fun getCount(): Int = (model.rows.size - 2).coerceAtLeast(0)
+            override fun getItem(position: Int): Any = model.rows[position + 2]
+            override fun getItemId(position: Int): Long = position.toLong()
+            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup?): android.view.View {
+                val view = (convertView as? TextView) ?: TextView(this@MainActivity).apply {
+                    textSize = 18f
+                    setPadding(16, 10, 16, 10)
+                }
+                val row = model.rows[position + 2]
+                view.text = model.text(row)
+                view.setTypeface(null, if (row is com.safeiot.privyhub.streaming.PickerRow.Header) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+                view.setBackgroundColor(if (model.focus == position + 2) focusColor else 0)
+                return view
+            }
+        }
+        listView.adapter = adapter
+        root.addView(heading)
+        root.addView(bar)
+        root.addView(filterRow)
+        root.addView(hint)
+        root.addView(listView, android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        dialog.setContentView(root)
+
+        var editing = false
+        fun redraw() {
+            launchButton.setBackgroundColor(if (model.focus == 0 && model.barButton == 0) focusColor else 0)
+            cancelButton.setBackgroundColor(if (model.focus == 0 && model.barButton == 1) focusColor else 0)
+            countLine.text = picker.selectedLine(model.selectedCount)
+            filterRow.setBackgroundColor(if (model.focus == 1) focusColor else 0)
+            selectedOnlyText.text = (if (model.selectedOnly) "☑ " else "☐ ") + picker.SELECTED_ONLY
+            adapter.notifyDataSetChanged()
+            val pos = model.focus - 2
+            if (pos >= 0) {
+                val first = listView.firstVisiblePosition
+                val last = listView.lastVisiblePosition
+                if (last > first) model.pageSize = (last - first).coerceAtLeast(1)
+                if (pos < first || pos > last || last < 0) listView.setSelection((pos - model.pageSize / 2).coerceAtLeast(0))
+            } else {
+                listView.setSelection(0)
+            }
+        }
+        fun launch() {
+            val chosen = model.selection()
+            if (chosen.isEmpty()) {
+                AlertDialog.Builder(this)
+                    .setTitle("No cheats selected")
+                    .setMessage("Select at least one cheat, or use Start Fresh for a normal session.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return
+            }
+            dialog.dismiss()
+            launchGameOnCompanion(
+                gameId = gameId,
+                title = title,
+                loadSaveAfterLaunch = false,
+                cheatSourceIndex = sourceIndex,
+                cheatEnabledIndexes = chosen.map { it.index },
+                cheatProfileLabel = GameCheatUiState.buildProfileLabel(chosen.map { it.label })
+            )
+        }
+        fun stopEditing() {
+            editing = false
+            filterEdit.isFocusable = false
+            filterEdit.isFocusableInTouchMode = false
+            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.hideSoftInputFromWindow(filterEdit.windowToken, 0)
+        }
+        filterEdit.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                model.setFilter(s?.toString().orEmpty())
+                redraw()
+            }
+        })
+        filterEdit.setOnEditorActionListener { _, _, _ -> stopEditing(); model.onKey(com.safeiot.privyhub.streaming.PickerKey.DOWN); redraw(); true }
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            val key = com.safeiot.privyhub.streaming.CheatPickerModel.keyOf(keyCode)
+            if (editing) {
+                // the keyboard owns the keys while the filter is typed; Down or Back leaves it
+                if (key == com.safeiot.privyhub.streaming.PickerKey.DOWN || key == com.safeiot.privyhub.streaming.PickerKey.BACK) {
+                    stopEditing()
+                    if (key == com.safeiot.privyhub.streaming.PickerKey.DOWN) model.onKey(key)
+                    redraw()
+                    return@setOnKeyListener true
+                }
+                return@setOnKeyListener false
+            }
+            if (key == com.safeiot.privyhub.streaming.PickerKey.OTHER) return@setOnKeyListener false
+            when (model.onKey(key)) {
+                com.safeiot.privyhub.streaming.PickerAction.LAUNCH -> launch()
+                com.safeiot.privyhub.streaming.PickerAction.CANCEL -> dialog.dismiss()
+                com.safeiot.privyhub.streaming.PickerAction.EDIT_FILTER -> {
+                    editing = true
+                    filterEdit.isFocusable = true
+                    filterEdit.isFocusableInTouchMode = true
+                    filterEdit.requestFocus()
+                    val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                    imm.showSoftInput(filterEdit, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                }
+                com.safeiot.privyhub.streaming.PickerAction.NONE -> {}
+            }
+            redraw()
+            true
+        }
+        launchButton.setOnClickListener { launch() }
+        cancelButton.setOnClickListener { dialog.dismiss() }
+        listView.setOnItemClickListener { _, _, position, _ ->
+            val row = model.rows.getOrNull(position + 2)
+            if (row is com.safeiot.privyhub.streaming.PickerRow.Item) model.toggle(row.entry.index)
+            if (row is com.safeiot.privyhub.streaming.PickerRow.Header && model.filter.isBlank() && !model.selectedOnly) model.toggleSection(row.group)
+            redraw()
+        }
+        dialog.setOnShowListener { redraw() }
+        dialog.show()
     }
 
     // PRIVYHUB_A8_PATCH_03_ANDROID_INPUT_PROFILE_EDITOR
@@ -11555,6 +11735,29 @@ class MainActivity : AppCompatActivity() {
             heading
         )
 
+        // B86: a controller picture of the current mapping and one set of letters (debug.privyhub.mapping_picture=0 =
+        // today's editor); display only, the stored mapping is never touched here
+        val editorDefault: Map<String, String>? =
+            if (com.safeiot.privyhub.streaming.MappingPicture.fromSystem()) {
+                try { inputProfileEditorDefaultMapping(payload) } catch (_: Exception) { null }
+            } else {
+                null
+            }
+        val pictureView =
+            if (editorDefault != null) com.safeiot.privyhub.streaming.ControllerPictureView(this) else null
+        if (pictureView != null) {
+            container.addView(pictureView)
+            container.addView(
+                TextView(this).apply {
+                    text = com.safeiot.privyhub.streaming.MappingPicture.LEGEND
+                    setPadding(8, 4, 8, 16)
+                }
+            )
+        }
+        fun editorSourceLabel(source: String): String =
+            if (pictureView != null) com.safeiot.privyhub.streaming.MappingPicture.padLabel(source)
+            else inputProfileSourceLabel(source)
+
         val status =
             TextView(
                 this
@@ -11778,11 +11981,16 @@ class MainActivity : AppCompatActivity() {
                         if (source.isBlank()) {
                             "UNMAPPED"
                         } else {
-                            inputProfileSourceLabel(
+                            editorSourceLabel(
                                 source
                             )
                         }
 
+                if (pictureView != null) {
+                    targetLabel.text =
+                        com.safeiot.privyhub.streaming.MappingPicture.rowText(target, source)
+                    currentLabel.visibility = View.GONE
+                }
                 if (target in invalid) {
                     targetLabel.setTextColor(
                         0xFFFF5252.toInt()
@@ -11809,6 +12017,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            pictureView?.show(working, editorDefault ?: emptyMap())
             if (invalid.isEmpty()) {
                 status.text =
                     "Mapping valid - Save is enabled."
@@ -11915,7 +12124,7 @@ class MainActivity : AppCompatActivity() {
                     for (source in sources) {
 
                         labels.add(
-                            inputProfileSourceLabel(
+                            editorSourceLabel(
                                 source
                             ) +
                                 if (source == currentSource) {
@@ -11930,7 +12139,7 @@ class MainActivity : AppCompatActivity() {
                         if (currentSource.isBlank()) {
                             "UNMAPPED"
                         } else {
-                            inputProfileSourceLabel(
+                            editorSourceLabel(
                                 currentSource
                             )
                         }
@@ -12003,7 +12212,12 @@ class MainActivity : AppCompatActivity() {
 
                     AlertDialog.Builder(this)
                         .setTitle(
-                            "Change ${inputProfileTargetLabel(target)} - Current: $currentLabel"
+                            if (pictureView != null) {
+                                "Change what sends the game's " +
+                                    "${com.safeiot.privyhub.streaming.MappingPicture.gameLabel(target)} — now: $currentLabel"
+                            } else {
+                                "Change ${inputProfileTargetLabel(target)} - Current: $currentLabel"
+                            }
                         )
                         .setAdapter(
                             sourceAdapter

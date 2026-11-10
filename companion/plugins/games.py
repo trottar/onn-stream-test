@@ -139,6 +139,8 @@ if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
 
 # B71: "Change disc" (a multi-disc PS1 session's action; PRIVYHUB_DISC_SWAP=0 = today's unknown action)
 import disc_swap as _disc_swap  # noqa: E402
+# B85: the cheat list cleaned for the TV (PRIVYHUB_CHEAT_CLEAN=0 = today's raw list; read per request)
+import cheat_clean as _cheat_clean  # noqa: E402
 
 # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
 # Absent = today: nothing imported.
@@ -3602,6 +3604,9 @@ class GamesPlugin:
                 raise ValueError("Missing game id")
             game = self._find_game_by_id(game_id)
             payload = self._emulator.cheat_catalog(game)
+            # B85: the list cleaned for the TV (raw=1 or PRIVYHUB_CHEAT_CLEAN=0: today's raw list)
+            if _cheat_clean.enabled() and self._first(query, "raw").strip() != "1":
+                payload = _cheat_clean.clean(payload, self.PROJECT_ROOT)
             return {"ok": True, "plugin": self.PLUGIN_ID, **payload}
 
         if action == "cheat-profiles":
@@ -4799,6 +4804,13 @@ class GamesPlugin:
                 cheat_source_index, cheat_enabled_indexes = (
                     self._parse_cheat_launch_request(query)
                 )
+                # B85: the picks from the cleaned list -> the file's real indexes (its parts, its "must be on" codes);
+                # PRIVYHUB_CHEAT_CLEAN=0 or cheat_raw=1 -> today's indexes as sent
+                if (cheat_source_index is not None and _cheat_clean.enabled()
+                        and self._first(query, "cheat_raw").strip() != "1"):
+                    cheat_enabled_indexes = _cheat_clean.expand(
+                        _cheat_clean.clean(self._emulator.cheat_catalog(game), self.PROJECT_ROOT),
+                        cheat_source_index, cheat_enabled_indexes)
                 mod_index_text = self._first(query, "mod_index").strip()
                 mod_index = None
                 if mod_index_text:

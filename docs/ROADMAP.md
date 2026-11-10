@@ -2912,6 +2912,16 @@ genre / players) absent from RetroArch's database — a second source; the art m
 cheat list rejected by the bound check; the PS2 disc change designed, not built; Mods and GameCube discs deferred;
 the user's own cheat files (the folders ready, `docs/CHEATS.md`).
 
+**Queue AE (2026-11-10; HOME-12's three requirements; built, applied to the tree uncommitted, nothing adopted):**
+**B84** the cheat picker as PrivyHub's own screen — Launch / Cancel fixed at the top (Left from any row; Start on a pad),
+a filter, sections (General, Player 1-4, Other, Your files) collapsed with counts, paging by a screen
+(`evidence/B84_CHEAT_PICKER_2026-11-10.md`); **B85** every system's cheat list cleaned on the hub — lone cartridge
+triggers hidden, "must be on" codes applied with any pick, "Player 1", parts folded, repeats as variants, heading rows
+read (8 N64 + 1 SNES lists that failed now list) (`evidence/B85_CHEAT_LIST_CLEAN_2026-11-10.md`); **B86** the mapping
+editor's controller picture and one set of letters ("Bottom (✕) → B") (`evidence/B86_MAPPING_PICTURE_2026-11-10.md`).
+APK `c801caab…` pinned, NOT installed. **Next (A):** HOME-12 resumed — C49 the picker, C46 / C47 cheats seen, C48 PS2
+widescreen, C50 the picture (`docs/memory/handoffs/SESSION_B_DONE_2026-11-10AE.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,

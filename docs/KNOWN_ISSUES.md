@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-10 — Queue AE (B84-B86, HOME-12's three requirements): B84 the cheat picker as PrivyHub's own screen (Launch / Cancel at the top — Left from any row, Start on a pad; a filter; sections with counts; paging); B85 every system's cheat list cleaned on the hub (lone cartridge triggers hidden, "must be on" codes applied with any pick, "Player 1", parts folded, repeats shown as variants; heading rows no longer make 8 N64 and 1 SNES lists fail); B86 the mapping editor's controller picture and one set of letters; APK `c801caab…` built, NOT installed; nothing adopted — OPEN (A's HOME-12 resumed: C49, C46-C48, C50) — `## 2026-11-10 Queue AE` below
 - 2026-11-10 — HOME-12: APK `de6682db…` installed with every property empty (eighteen); C44 art / details MET (B76), C45 Input Profiles on PS2 / GameCube MET (B77; swaps of the user's choosing), the drop-in folders present and empty (B81); **C46 stopped by the user at the N64 cheat list** (677 entries, the Launch button after them all: "we need to fix this bloat first"), C47 / C48 not run → **`de6682db…` NOT CONFIRMED, `85220f99…` reinstalled**; three client requirements OPEN for B (the picker's button, the list's clutter, a controller picture in the mapping editor) — `## 2026-11-10 HOME-12` below
 - 2026-11-10 — ART-1R (ART-1 again after queue AD): the dry run saw all seven systems; fetched on the user's "fetch" — art N64 13/13, PS2 100/115, GameCube 24/27; N64 cheats for 12 of 13 (one list rejected: cheat count outside the hub's bounds); PS2 / GameCube details carry no year / genre / players (not in RetroArch's database); the records survive a companion start without the art knob (no drop-in); the first ART-1's hidden update made no request and wrote no record — ART-1's defect RESOLVED; two small items OPEN — `## 2026-11-10 ART-1R` below
 - 2026-11-10 — Queue AD (B82, B83): B82 the tools' game scan sees every system the hub lists (one systems builder shared with the plugin's constructor) and no longer builds the companion's plugins in the tool's process (HEAD's tools ran the startup reconcile — a full metadata update — inside every tool run); the cheat tool counts systems without a cheat list as not offered; B83 the real-entry-point audit of B76-B81 (broken on the real path: B76 and B78's tool part, both the scan; the rest sound); nothing adopted — OPEN (A's ART-1 again, then HOME-12) — `## 2026-11-10 Queue AD` below
@@ -69,6 +70,26 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-10 Queue AE (B84-B86): the cheat picker, the cleaned lists, the mapping picture — OPEN (A's HOME-12 resumed)
+
+(`docs/memory/evidence/B84_CHEAT_PICKER_2026-11-10.md`, `B85_CHEAT_LIST_CLEAN_2026-11-10.md`,
+`B86_MAPPING_PICTURE_2026-11-10.md`, `docs/memory/handoffs/SESSION_B_DONE_2026-11-10AE.md`)
+
+- **Built, not installed / not adopted:** APK `c801caabe6f121d979afa873668b0c48b47d310067cad8ec57cfa8cbdd48582b` (B84 +
+  B86 on `de6682db…`'s sources; pinned `PrivyHub/app/build/queue_ae_built/`); B85 on the hub at the companion's next
+  restart. Switches: `debug.privyhub.cheat_picker=0`, `debug.privyhub.mapping_picture=0`, `PRIVYHUB_CHEAT_CLEAN=0`.
+- **Found and fixed in B85 (addendum 1):** the hub's cheat reader refused a whole cached list when one entry was a
+  heading row (a name with no code) — **N64 8 of 18 and SNES 1 of 13 lists failed on the onn**; with B85 they list.
+- **OPEN, honest:** the biggest N64 lists stay long after cleaning (2,092 → 2,072 entries; HOME-12's 677 → 588 with
+  282 of them variants): their repeats are real cheats for other targets whose names the source lost. The picker's
+  sections, filter and top-fixed Launch are the answer offered; HOME-12's C49 asks the user whether it is usable.
+- **OPEN, not proven:** "must be on" codes (N64 17, PS1 15, SNES 6 across the hub's lists) are applied with any pick on
+  the lists' own say-so; whether the cores need them is not documented on the hub.
+- The client views (the picker's dialog, the picture) are not exercised by the JVM tests (no Robolectric in the
+  project) — C49 / C50 at the TV are their checks.
+- **OPEN, next queue (pre-existing, not from queue AE):** `tests/input_hold_b8` fails one test (a frame count off by one,
+  1347 vs 1348) on HEAD's own export; queue AD's runs passed it — time-dependent.
 
 ## 2026-11-10 HOME-12: the first parity sitting — de6682db… NOT CONFIRMED (C46-C48 not run); three client requirements OPEN
 

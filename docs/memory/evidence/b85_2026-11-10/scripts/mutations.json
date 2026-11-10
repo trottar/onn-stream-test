@@ -1,0 +1,13 @@
+[
+ {"id": "M1", "file": "companion/cheat_clean.py", "old": "        if lines and system in CONDITIONAL_SYSTEMS and all(_CONDITIONAL.match(c) for c in lines):", "new": "        if False:", "why": "lone conditionals shown"},
+ {"id": "M2", "file": "companion/cheat_clean.py", "old": "                requires.append(index)\n", "new": "", "why": "the must-be-on code not applied"},
+ {"id": "M3", "file": "companion/cheat_clean.py", "old": "        first[\"parts\"] = [it[\"index\"] for _n, it, _b in members]", "new": "        first[\"parts\"] = [first[\"index\"]]", "why": "a split cheat stages only its first part"},
+ {"id": "M4", "file": "companion/cheat_clean.py", "old": "            item[\"label\"] = f\"{context} — Player {n}\" if context else f\"Player {n}\"", "new": "            item[\"label\"] = f\"P{n}\"", "why": "the bare row keeps its bare name"},
+ {"id": "M5", "file": "companion/cheat_clean.py", "old": "    text = _PLAYER_TAG.sub(lambda m: f\"Player {next(g for g in m.groups() if g)}\", text)", "new": "", "why": "P1 not spelled Player 1"},
+ {"id": "M6", "file": "companion/cheat_clean.py", "old": "        if item[\"code\"] is not None and item[\"code\"] in first[\"codes_seen\"]:", "new": "        if False:", "why": "identical repeats not folded"},
+ {"id": "M7", "file": "companion/plugins/games.py", "old": "            if _cheat_clean.enabled() and self._first(query, \"raw\").strip() != \"1\":", "new": "            if _cheat_clean.enabled():", "why": "raw=1 ignored"},
+ {"id": "M8", "file": "companion/plugins/games.py", "old": "                    cheat_enabled_indexes = _cheat_clean.expand(", "new": "                    cheat_enabled_indexes = (lambda c, s, i: i)(", "why": "the launch does not expand the picks"},
+ {"id": "M9", "file": "companion/games/emulator_manager.py", "old": "            if not description or (not code and not _cheat_clean.enabled()):", "new": "            if not description or not code:", "why": "heading rows refuse the whole file (today's) with the knob on"},
+ {"id": "M10", "file": "companion/cheat_clean.py", "old": "    return str(env.get(KNOB_ENV, \"\")).strip() != \"0\"", "new": "    return True", "why": "the knob 0 ignored"},
+ {"id": "M11", "file": "companion/cheat_clean.py", "old": "        if provider in USER_PROVIDERS:\n            sources.append(_clean_light(source, \"yours\"))", "new": "        if provider in USER_PROVIDERS:\n            sources.append(_clean_retroarch(source, system, project_root))", "why": "the user's own file cleaned like RetroArch's"}
+]

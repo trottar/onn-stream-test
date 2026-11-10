@@ -16,6 +16,27 @@ Save) never has cheats on.
 
 The hub never downloads anything for your own files. It only reads the folders below.
 
+## Picking cheats on the TV
+
+On a game, press **Launch on Companion → Extras → Cheats → New Cheat Session**. The cheat list opens on its own screen:
+
+- **"Launch Cheat Session" and "Cancel" are always at the top.** From anywhere in the list, press **Left** to jump to
+  Launch, then **OK** to start. On a game pad, **Start** launches straight away and **Back** (or B) cancels.
+- **The list is split into sections:** General, Player 1, Player 2, Player 3, Player 4, Other and Your files. Each
+  section starts closed with the number of cheats in it — press **OK** on a section to open or close it.
+- **To find a cheat by name,** go up to the filter line, press **OK** and type a word or two (for example "lives"):
+  the list shows only the cheats with those words. On the filter line, press **Right** to show only the cheats you
+  have ticked.
+- **To move faster,** the shoulder buttons (L1 / R1) or the remote's channel buttons jump a screen at a time.
+- **OK on a cheat** ticks or unticks it. "n selected" at the top counts your ticks.
+
+The hub tidies the lists before they reach the TV. Cheats that do nothing on their own (a cheat cartridge's button
+triggers) are left out. "Must be on" codes are switched on for you whenever you pick any cheat. "P1" is written
+"Player 1". A cheat split into parts ("Part 1", "Part 2") shows once. When a list has the same name more than once with
+different codes, the others appear under the first as "variant 2", "variant 3" — they usually do the same thing for
+another character, player or slot, so try the first one, then a variant if it doesn't work. Your own files are shown
+exactly as you wrote them.
+
 ## Your own PlayStation 2 cheats (`.pnach` files)
 
 1. Find the game's **serial**. It looks like `SLUS-12345` (four letters, a dash, five numbers). PCSX2 shows it, and so

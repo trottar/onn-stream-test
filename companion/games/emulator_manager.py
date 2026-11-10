@@ -50,6 +50,7 @@ if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
 
 # B71: "Change disc" on a multi-disc PS1 (.m3u) session; PRIVYHUB_DISC_SWAP=0 (read at each launch) = today
 import disc_swap as _disc_swap  # noqa: E402
+import cheat_clean as _cheat_clean  # noqa: E402  (B85: heading rows read with the knob on)
 
 
 class EmulatorError(RuntimeError):
@@ -4132,7 +4133,9 @@ class EmulatorManager:
                 item.get("enable", "false")
             ).strip().casefold()
 
-            if not description or not code:
+            # B85: a named entry with an empty code is a heading row of RetroArch's list (hidden by the cleaner);
+            # PRIVYHUB_CHEAT_CLEAN=0 -> today's refusal of the whole file
+            if not description or (not code and not _cheat_clean.enabled()):
                 raise EmulatorError(
                     "Cached cheat file is missing a cheat description or payload"
                 )

@@ -1,0 +1,11 @@
+Queue AE — every host suite on full exports of HEAD (c514c543, /tmp/b_q20ae_base) and of HEAD + b84 + b85
+(/tmp/b_q20ae_after_b85; B86 has no host part), run_host.sh (queue AC's), TMPDIR on the main disk, no PRIVYHUB_* in the
+process, docs/CHEATS.md copied into both for B81's docs test.
+- suites: HEAD 73, after 73;
+- the 72 other suites: the same result line in both (times aside);
+- tests/art_systems: HEAD Ran 112 OK; after Ran 120 OK (+ test_b85 8);
+- failing in both, unchanged: the same six tools/ suites as queues AA / AC / AD (fixtures under docs/ / logs/ the copies
+  do not hold), and tests/input_hold_b8 (1 of 14: test_hold_ownership.AtBoth...pre_hold_plus_stall, "1347 != 1348") —
+  it fails on HEAD's own export run alone too (re-run 21:4xZ), it passed in queue AD's runs: a pre-existing,
+  time-dependent off-by-one in that suite, not from this queue; listed for the next queue, not touched.
+- the suites wrote logs/ into each copy; moved (not deleted), with the docs/ copies, to ~/.cache/b_q20ae_tmp/.

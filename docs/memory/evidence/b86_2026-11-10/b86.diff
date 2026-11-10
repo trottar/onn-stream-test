@@ -1,0 +1,386 @@
+diff -ruN a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+--- a/PrivyHub/app/src/main/java/MainActivity.kt	2026-11-10 16:25:39.368458111 -0500
++++ b/PrivyHub/app/src/main/java/MainActivity.kt	2026-11-10 16:24:31.050941576 -0500
+@@ -11735,6 +11735,29 @@
+             heading
+         )
+ 
++        // B86: a controller picture of the current mapping and one set of letters (debug.privyhub.mapping_picture=0 =
++        // today's editor); display only, the stored mapping is never touched here
++        val editorDefault: Map<String, String>? =
++            if (com.safeiot.privyhub.streaming.MappingPicture.fromSystem()) {
++                try { inputProfileEditorDefaultMapping(payload) } catch (_: Exception) { null }
++            } else {
++                null
++            }
++        val pictureView =
++            if (editorDefault != null) com.safeiot.privyhub.streaming.ControllerPictureView(this) else null
++        if (pictureView != null) {
++            container.addView(pictureView)
++            container.addView(
++                TextView(this).apply {
++                    text = com.safeiot.privyhub.streaming.MappingPicture.LEGEND
++                    setPadding(8, 4, 8, 16)
++                }
++            )
++        }
++        fun editorSourceLabel(source: String): String =
++            if (pictureView != null) com.safeiot.privyhub.streaming.MappingPicture.padLabel(source)
++            else inputProfileSourceLabel(source)
++
+         val status =
+             TextView(
+                 this
+@@ -11958,11 +11981,16 @@
+                         if (source.isBlank()) {
+                             "UNMAPPED"
+                         } else {
+-                            inputProfileSourceLabel(
++                            editorSourceLabel(
+                                 source
+                             )
+                         }
+ 
++                if (pictureView != null) {
++                    targetLabel.text =
++                        com.safeiot.privyhub.streaming.MappingPicture.rowText(target, source)
++                    currentLabel.visibility = View.GONE
++                }
+                 if (target in invalid) {
+                     targetLabel.setTextColor(
+                         0xFFFF5252.toInt()
+@@ -11989,6 +12017,7 @@
+                 }
+             }
+ 
++            pictureView?.show(working, editorDefault ?: emptyMap())
+             if (invalid.isEmpty()) {
+                 status.text =
+                     "Mapping valid - Save is enabled."
+@@ -12095,7 +12124,7 @@
+                     for (source in sources) {
+ 
+                         labels.add(
+-                            inputProfileSourceLabel(
++                            editorSourceLabel(
+                                 source
+                             ) +
+                                 if (source == currentSource) {
+@@ -12110,7 +12139,7 @@
+                         if (currentSource.isBlank()) {
+                             "UNMAPPED"
+                         } else {
+-                            inputProfileSourceLabel(
++                            editorSourceLabel(
+                                 currentSource
+                             )
+                         }
+@@ -12183,7 +12212,12 @@
+ 
+                     AlertDialog.Builder(this)
+                         .setTitle(
+-                            "Change ${inputProfileTargetLabel(target)} - Current: $currentLabel"
++                            if (pictureView != null) {
++                                "Change what sends the game's " +
++                                    "${com.safeiot.privyhub.streaming.MappingPicture.gameLabel(target)} — now: $currentLabel"
++                            } else {
++                                "Change ${inputProfileTargetLabel(target)} - Current: $currentLabel"
++                            }
+                         )
+                         .setAdapter(
+                             sourceAdapter
+diff -ruN a/PrivyHub/app/src/main/java/streaming/ControllerPictureView.kt b/PrivyHub/app/src/main/java/streaming/ControllerPictureView.kt
+--- a/PrivyHub/app/src/main/java/streaming/ControllerPictureView.kt	1969-12-31 19:00:00.000000000 -0500
++++ b/PrivyHub/app/src/main/java/streaming/ControllerPictureView.kt	2026-11-10 16:24:07.818424802 -0500
+@@ -0,0 +1,71 @@
++package com.safeiot.privyhub.streaming
++
++import android.content.Context
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Paint
++import android.graphics.RectF
++import android.view.View
++
++/**
++ * B86: a small controller picture drawn by the app itself — a plain, original outline (a body with two grips, a cross
++ * for the D-pad, four round face buttons, two round sticks, shoulders and triggers, Select / Start); no brand marks.
++ * Each control is labelled with what it sends to the game now ([MappingPicture.pictureLabels]); changed ones in an
++ * accent colour. Only drawing: the mapping is read, never written.
++ */
++class ControllerPictureView(context: Context) : View(context) {
++    private var labels: Map<String, String> = emptyMap()
++    private var changed: Set<String> = emptySet()
++    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f; color = Color.LTGRAY }
++    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textAlign = Paint.Align.CENTER }
++    private val accent = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFC107.toInt(); textAlign = Paint.Align.CENTER }
++
++    fun show(mapping: Map<String, String>, default: Map<String, String>) {
++        labels = MappingPicture.pictureLabels(mapping)
++        changed = MappingPicture.changed(mapping, default)
++        invalidate()
++    }
++
++    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
++        val w = MeasureSpec.getSize(widthMeasureSpec)
++        setMeasuredDimension(w, (w * 0.5f).toInt())
++    }
++
++    override fun onDraw(canvas: Canvas) {
++        super.onDraw(canvas)
++        val w = width.toFloat()
++        val h = height.toFloat()
++        if (w <= 0f || h <= 0f) return
++        fun px(x: Float) = x * w
++        fun py(y: Float) = y * h
++        // the outline: a rounded body and two grips; shoulders and triggers as small rounded tabs
++        canvas.drawRoundRect(RectF(px(0.08f), py(0.24f), px(0.92f), py(0.80f)), h * 0.18f, h * 0.18f, line)
++        canvas.drawRoundRect(RectF(px(0.08f), py(0.50f), px(0.30f), py(0.98f)), h * 0.14f, h * 0.14f, line)
++        canvas.drawRoundRect(RectF(px(0.70f), py(0.50f), px(0.92f), py(0.98f)), h * 0.14f, h * 0.14f, line)
++        for (x in listOf(0.18f, 0.82f)) {
++            canvas.drawRoundRect(RectF(px(x - 0.08f), py(0.00f), px(x + 0.08f), py(0.10f)), 8f, 8f, line)
++            canvas.drawRoundRect(RectF(px(x - 0.09f), py(0.11f), px(x + 0.09f), py(0.20f)), 8f, 8f, line)
++        }
++        // the D-pad as a cross, the face buttons and the sticks as circles
++        val arm = w * 0.035f
++        canvas.drawRect(px(0.22f) - arm, py(0.28f), px(0.22f) + arm, py(0.58f), line)
++        canvas.drawRect(px(0.10f), py(0.43f) - arm, px(0.34f), py(0.43f) + arm, line)
++        for (key in listOf("x", "y", "a", "b")) {
++            val (x, y) = MappingPicture.LAYOUT.getValue(key)
++            canvas.drawCircle(px(x), py(y), h * 0.075f, line)
++        }
++        for (key in listOf("l3", "r3")) {
++            val (x, y) = MappingPicture.LAYOUT.getValue(key)
++            canvas.drawCircle(px(x), py(y), h * 0.13f, line)
++        }
++        // the labels: what each control sends now
++        val size = (h * 0.065f).coerceAtLeast(12f)
++        text.textSize = size
++        accent.textSize = size
++        for ((key, pos) in MappingPicture.LAYOUT) {
++            val label = labels[key] ?: continue
++            if (key.contains("stick") && key !in changed) continue      // stick directions: only when changed
++            canvas.drawText(label, px(pos.first), py(pos.second) + size / 3f, if (key in changed) accent else text)
++        }
++    }
++}
+diff -ruN a/PrivyHub/app/src/main/java/streaming/MappingPicture.kt b/PrivyHub/app/src/main/java/streaming/MappingPicture.kt
+--- a/PrivyHub/app/src/main/java/streaming/MappingPicture.kt	1969-12-31 19:00:00.000000000 -0500
++++ b/PrivyHub/app/src/main/java/streaming/MappingPicture.kt	2026-11-10 16:23:45.533928575 -0500
+@@ -0,0 +1,99 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B86: the Input Profile editor in one set of letters, with a small controller picture.
++ *
++ * A mapping is stored as `{target: source}`: the target is the button the game receives (RetroArch's RetroPad names,
++ * Nintendo layout: b bottom, a right, y left, x top), the source is your pad's button (Xbox names: a bottom, b right,
++ * x left, y top). The editor used to print both as bare letters, so the hub's default (a ← b, b ← a, …: the identity by
++ * position) read as a swap. Here your pad's buttons are named by position and glyph and the game's by its letter:
++ * "Bottom (✕) → B". The picture shows, on each of your pad's controls, what it sends now; changed ones highlighted.
++ * A display change only: the stored mapping is never touched. `debug.privyhub.mapping_picture=0` = today's editor.
++ * Design: docs/memory/evidence/b86_2026-11-10/design_written_before_code.md (hashed before this code).
++ */
++object MappingPicture {
++    const val PROPERTY = "debug.privyhub.mapping_picture"
++    const val LEGEND = "The picture shows what each of your pad's buttons sends to the game. " +
++        "A, B, X, Y are the game's buttons: B bottom, A right, Y left, X top."
++    const val NOTHING = "—"
++
++    private val PAD = mapOf(
++        "a" to "Bottom (✕)", "b" to "Right (○)", "x" to "Left (□)", "y" to "Top (△)",
++        "l" to "L1", "r" to "R1", "l2" to "L2", "r2" to "R2", "l3" to "L3", "r3" to "R3",
++        "select" to "Select", "start" to "Start",
++        "up" to "D-pad Up", "down" to "D-pad Down", "left" to "D-pad Left", "right" to "D-pad Right",
++        "left_stick_up" to "Left stick Up", "left_stick_down" to "Left stick Down",
++        "left_stick_left" to "Left stick Left", "left_stick_right" to "Left stick Right",
++        "right_stick_up" to "Right stick Up", "right_stick_down" to "Right stick Down",
++        "right_stick_left" to "Right stick Left", "right_stick_right" to "Right stick Right"
++    )
++    private val GAME = mapOf(
++        "a" to "A", "b" to "B", "x" to "X", "y" to "Y",
++        "l" to "L1", "r" to "R1", "l2" to "L2", "r2" to "R2", "l3" to "L3", "r3" to "R3",
++        "select" to "Select", "start" to "Start",
++        "up" to "Up", "down" to "Down", "left" to "Left", "right" to "Right",
++        "left_stick_up" to "L-stick Up", "left_stick_down" to "L-stick Down",
++        "left_stick_left" to "L-stick Left", "left_stick_right" to "L-stick Right",
++        "right_stick_up" to "R-stick Up", "right_stick_down" to "R-stick Down",
++        "right_stick_left" to "R-stick Left", "right_stick_right" to "R-stick Right"
++    )
++
++    /** Your pad's button, by position and glyph (the source of a mapping). */
++    fun padLabel(source: String): String = PAD[source.trim().lowercase()] ?: source
++
++    /** What the game receives (the target of a mapping). */
++    fun gameLabel(target: String): String = GAME[target.trim().lowercase()] ?: target
++
++    /** One editor row: "<your pad's button> → <what the game receives>". */
++    fun rowText(target: String, source: String?): String =
++        "${if (source.isNullOrBlank()) "nothing" else padLabel(source)} → ${gameLabel(target)}"
++
++    /** On each of your pad's controls: what it sends to the game now (the mapping inverted; never changes the map). */
++    fun pictureLabels(mapping: Map<String, String>): Map<String, String> {
++        val out = LinkedHashMap<String, String>()
++        for (source in LAYOUT.keys) out[source] = NOTHING
++        val sends = LinkedHashMap<String, MutableList<String>>()
++        for ((target, source) in mapping) {
++            val s = source.trim().lowercase()
++            if (s.isEmpty()) continue
++            sends.getOrPut(s) { mutableListOf() }.add(gameLabel(target))
++        }
++        for ((s, labels) in sends) out[s] = labels.joinToString("+")
++        return out
++    }
++
++    /** The controls whose label differs from the default mapping's (highlighted on the picture). */
++    fun changed(mapping: Map<String, String>, default: Map<String, String>): Set<String> {
++        val now = pictureLabels(mapping)
++        val before = pictureLabels(default)
++        return now.keys.filter { now[it] != before[it] }.toSet()
++    }
++
++    /**
++     * Where each of your pad's controls sits on the picture, in a 0..1 box (x, y): a plain outline drawn by the app —
++     * a body with two grips, a D-pad (left), four face buttons (right), two sticks (lower middle), shoulders and
++     * triggers (top), Select / Start (centre).
++     */
++    val LAYOUT: Map<String, Pair<Float, Float>> = linkedMapOf(
++        "l2" to (0.18f to 0.05f), "r2" to (0.82f to 0.05f),
++        "l" to (0.18f to 0.15f), "r" to (0.82f to 0.15f),
++        "up" to (0.22f to 0.33f), "down" to (0.22f to 0.53f), "left" to (0.13f to 0.43f), "right" to (0.31f to 0.43f),
++        "y" to (0.78f to 0.31f), "a" to (0.78f to 0.55f), "x" to (0.69f to 0.43f), "b" to (0.87f to 0.43f),
++        "select" to (0.42f to 0.36f), "start" to (0.58f to 0.36f),
++        "l3" to (0.36f to 0.66f), "r3" to (0.64f to 0.66f),
++        "left_stick_up" to (0.36f to 0.58f), "left_stick_down" to (0.36f to 0.74f),
++        "left_stick_left" to (0.29f to 0.66f), "left_stick_right" to (0.43f to 0.66f),
++        "right_stick_up" to (0.64f to 0.58f), "right_stick_down" to (0.64f to 0.74f),
++        "right_stick_left" to (0.57f to 0.66f), "right_stick_right" to (0.71f to 0.66f)
++    )
++
++    fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
++
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as String?)
++        } catch (_: Throwable) {
++            true
++        }
++}
+diff -ruN a/PrivyHub/app/src/test/java/streaming/B86MappingPictureTest.kt b/PrivyHub/app/src/test/java/streaming/B86MappingPictureTest.kt
+--- a/PrivyHub/app/src/test/java/streaming/B86MappingPictureTest.kt	1969-12-31 19:00:00.000000000 -0500
++++ b/PrivyHub/app/src/test/java/streaming/B86MappingPictureTest.kt	2026-11-10 16:24:51.479395498 -0500
+@@ -0,0 +1,113 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** B86: the editor's one set of letters and the controller picture's labels (the code the editor runs). */
++class B86MappingPictureTest {
++
++    /** The hub's default (emulator_manager.INPUT_PROFILE_EDITOR_DEFAULT_MAPPING): {target (game): source (your pad)}. */
++    private val default: Map<String, String> = linkedMapOf(
++        "up" to "up", "down" to "down", "left" to "left", "right" to "right",
++        "a" to "b", "b" to "a", "x" to "y", "y" to "x",
++        "l" to "l", "r" to "r", "l2" to "l2", "r2" to "r2", "l3" to "l3", "r3" to "r3",
++        "select" to "select", "start" to "start",
++        "left_stick_left" to "left_stick_left", "left_stick_right" to "left_stick_right",
++        "left_stick_up" to "left_stick_up", "left_stick_down" to "left_stick_down",
++        "right_stick_left" to "right_stick_left", "right_stick_right" to "right_stick_right",
++        "right_stick_up" to "right_stick_up", "right_stick_down" to "right_stick_down"
++    )
++
++    private fun with(vararg pairs: Pair<String, String>): Map<String, String> =
++        LinkedHashMap(default).apply { pairs.forEach { (k, v) -> put(k, v) } }
++
++    private fun face(labels: Map<String, String>) = listOf("a", "b", "x", "y").associateWith { labels.getValue(it) }
++
++    @Test
++    fun theDefaultReadsByPositionNeverAsASwap() {
++        val labels = MappingPicture.pictureLabels(default)
++        // your pad's Bottom sends the game's B (bottom), Right → A (right), Left → Y (left), Top → X (top)
++        assertEquals(mapOf("a" to "B", "b" to "A", "x" to "Y", "y" to "X"), face(labels))
++        assertEquals(emptySet<String>(), MappingPicture.changed(default, default))
++        assertEquals("Bottom (✕) → B", MappingPicture.rowText("b", default.getValue("b")))
++        assertEquals("Right (○) → A", MappingPicture.rowText("a", default.getValue("a")))
++        assertEquals("Left (□) → Y", MappingPicture.rowText("y", default.getValue("y")))
++        assertEquals("Top (△) → X", MappingPicture.rowText("x", default.getValue("x")))
++        assertEquals("L1", labels["l"])
++        assertEquals("Start", labels["start"])
++    }
++
++    @Test
++    fun aBottomRightSwap() {
++        val swap = with("a" to "a", "b" to "b")                // the game's A from your Bottom, its B from your Right
++        val labels = MappingPicture.pictureLabels(swap)
++        assertEquals(mapOf("a" to "A", "b" to "B", "x" to "Y", "y" to "X"), face(labels))
++        assertEquals(setOf("a", "b"), MappingPicture.changed(swap, default))
++        assertEquals("Bottom (✕) → A", MappingPicture.rowText("a", swap.getValue("a")))
++    }
++
++    @Test
++    fun aSquareTriangleSwap() {
++        val swap = with("x" to "x", "y" to "y")                // the game's X from your Left (□), its Y from your Top (△)
++        val labels = MappingPicture.pictureLabels(swap)
++        assertEquals(mapOf("a" to "B", "b" to "A", "x" to "X", "y" to "Y"), face(labels))
++        assertEquals(setOf("x", "y"), MappingPicture.changed(swap, default))
++        assertEquals("Left (□) → X", MappingPicture.rowText("x", swap.getValue("x")))
++    }
++
++    @Test
++    fun aRowChangeUpdatesTheLabel() {
++        val working = LinkedHashMap(default)
++        assertEquals("L1", MappingPicture.pictureLabels(working)["l"])
++        working["r2"] = "l"                                    // the game's R2 now from your L1 as well
++        working["l"] = ""                                       // and the game's L1 from nothing
++        val labels = MappingPicture.pictureLabels(working)
++        assertEquals("R2", labels["l"])
++        assertEquals(MappingPicture.NOTHING, labels["r2"])
++        assertEquals(setOf("l", "r2"), MappingPicture.changed(working, default))
++        assertEquals("nothing → L1", MappingPicture.rowText("l", working["l"]))
++        working["a"] = "a"
++        working["b"] = "a"                                      // two targets on one control are both shown
++        assertEquals("A+B", MappingPicture.pictureLabels(working)["a"])
++    }
++
++    @Test
++    fun theStoredMappingIsNeverTouched() {
++        val stored = with("a" to "a", "b" to "b")
++        val before = stored.toString()
++        val copy = LinkedHashMap(stored)
++        repeat(3) {                                             // open, redraw, close: the editor's calls
++            MappingPicture.pictureLabels(stored)
++            MappingPicture.changed(stored, default)
++            stored.forEach { (t, s) -> MappingPicture.rowText(t, s) }
++        }
++        assertEquals(copy, stored)
++        assertEquals(before, stored.toString())                // the same bytes, the same order
++        assertEquals(before, LinkedHashMap(stored).toString())
++    }
++
++    @Test
++    fun everyControlHasAPlaceOnThePicture() {
++        val layout = MappingPicture.LAYOUT
++        assertEquals(default.values.toSet(), layout.keys)        // every source the hub lists
++        assertTrue(layout.values.all { (x, y) -> x in 0f..1f && y in 0f..1f })
++        assertEquals(layout.size, layout.values.toSet().size)    // no two controls on one spot
++        val (bx, by) = layout.getValue("a")
++        val (tx, ty) = layout.getValue("y")
++        assertTrue(by > ty && bx == tx)                          // Bottom below Top
++        assertNotEquals(layout.getValue("x"), layout.getValue("b"))
++    }
++
++    @Test
++    fun theProperty() {
++        assertTrue(MappingPicture.parse(null))
++        assertTrue(MappingPicture.parse(""))
++        assertFalse(MappingPicture.parse("0"))
++        assertFalse(MappingPicture.parse("off"))
++        assertEquals("debug.privyhub.mapping_picture", MappingPicture.PROPERTY)
++        assertTrue(MappingPicture.LEGEND.contains("B bottom, A right, Y left, X top"))
++    }
++}

@@ -1,0 +1,653 @@
+diff -ruN a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+--- a/PrivyHub/app/src/main/java/MainActivity.kt	2026-11-10 16:05:33.000000000 -0500
++++ b/PrivyHub/app/src/main/java/MainActivity.kt	2026-11-10 16:25:39.360457933 -0500
+@@ -9863,6 +9863,12 @@
+             return
+         }
+ 
++        // B84: PrivyHub's own picker (Launch at the top, a filter, sections); debug.privyhub.cheat_picker=0 = this dialog
++        if (com.safeiot.privyhub.streaming.CheatPicker.fromSystem()) {
++            showCheatPickerScreen(gameId, title, sourceIndex, entries)
++            return
++        }
++
+         val labels = Array(entries.length()) { index ->
+             entries.getJSONObject(index).optString("description", "Cheat ${index + 1}")
+         }
+@@ -9909,6 +9915,180 @@
+             .show()
+     }
+ 
++    // B84: the cheat picker as PrivyHub's own screen. The model (streaming/CheatPicker.kt) holds the rows, the focus, the
++    // keys, the filter, the sections and the selection; this view draws the fixed bar and filter row and a recycled list.
++    private fun showCheatPickerScreen(
++        gameId: String,
++        title: String,
++        sourceIndex: Int,
++        entries: JSONArray
++    ) {
++        val picker = com.safeiot.privyhub.streaming.CheatPicker
++        val list = ArrayList<com.safeiot.privyhub.streaming.CheatEntry>(entries.length())
++        for (i in 0 until entries.length()) {
++            val e = entries.optJSONObject(i) ?: continue
++            val index = e.optInt("index", -1)
++            if (index < 0) continue
++            list.add(
++                com.safeiot.privyhub.streaming.CheatEntry(
++                    index = index,
++                    label = e.optString("description", "Cheat ${i + 1}"),
++                    group = picker.groupOf(e.optString("group", "")),
++                    variantOf = if (e.has("variant_of") && !e.isNull("variant_of")) e.optInt("variant_of") else null
++                )
++            )
++        }
++        val model = com.safeiot.privyhub.streaming.CheatPickerModel(list)
++        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
++        val focusColor = 0xFF2E5C8A.toInt()
++        val root = android.widget.LinearLayout(this).apply {
++            orientation = android.widget.LinearLayout.VERTICAL
++            setPadding(40, 24, 40, 16)
++        }
++        val heading = TextView(this).apply { text = "Cheats — $title"; textSize = 20f }
++        val bar = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
++        val launchButton = TextView(this).apply { text = picker.LAUNCH; textSize = 19f; setPadding(24, 12, 24, 12) }
++        val cancelButton = TextView(this).apply { text = picker.CANCEL; textSize = 19f; setPadding(24, 12, 24, 12) }
++        val countLine = TextView(this).apply { textSize = 17f; setPadding(24, 12, 24, 12) }
++        bar.addView(launchButton)
++        bar.addView(cancelButton)
++        bar.addView(countLine)
++        val filterRow = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.HORIZONTAL }
++        val filterEdit = android.widget.EditText(this).apply {
++            hint = picker.FILTER_HINT
++            setSingleLine(true)
++            isFocusable = false
++            isFocusableInTouchMode = false
++        }
++        val selectedOnlyText = TextView(this).apply { textSize = 17f; setPadding(24, 12, 24, 12) }
++        filterRow.addView(filterEdit, android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
++        filterRow.addView(selectedOnlyText)
++        val hint = TextView(this).apply { text = picker.HINT; textSize = 14f; setPadding(8, 4, 8, 8) }
++        val listView = android.widget.ListView(this).apply {
++            isFocusable = false
++            itemsCanFocus = false
++            divider = null
++        }
++        val adapter = object : android.widget.BaseAdapter() {
++            override fun getCount(): Int = (model.rows.size - 2).coerceAtLeast(0)
++            override fun getItem(position: Int): Any = model.rows[position + 2]
++            override fun getItemId(position: Int): Long = position.toLong()
++            override fun getView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup?): android.view.View {
++                val view = (convertView as? TextView) ?: TextView(this@MainActivity).apply {
++                    textSize = 18f
++                    setPadding(16, 10, 16, 10)
++                }
++                val row = model.rows[position + 2]
++                view.text = model.text(row)
++                view.setTypeface(null, if (row is com.safeiot.privyhub.streaming.PickerRow.Header) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
++                view.setBackgroundColor(if (model.focus == position + 2) focusColor else 0)
++                return view
++            }
++        }
++        listView.adapter = adapter
++        root.addView(heading)
++        root.addView(bar)
++        root.addView(filterRow)
++        root.addView(hint)
++        root.addView(listView, android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
++        dialog.setContentView(root)
++
++        var editing = false
++        fun redraw() {
++            launchButton.setBackgroundColor(if (model.focus == 0 && model.barButton == 0) focusColor else 0)
++            cancelButton.setBackgroundColor(if (model.focus == 0 && model.barButton == 1) focusColor else 0)
++            countLine.text = picker.selectedLine(model.selectedCount)
++            filterRow.setBackgroundColor(if (model.focus == 1) focusColor else 0)
++            selectedOnlyText.text = (if (model.selectedOnly) "☑ " else "☐ ") + picker.SELECTED_ONLY
++            adapter.notifyDataSetChanged()
++            val pos = model.focus - 2
++            if (pos >= 0) {
++                val first = listView.firstVisiblePosition
++                val last = listView.lastVisiblePosition
++                if (last > first) model.pageSize = (last - first).coerceAtLeast(1)
++                if (pos < first || pos > last || last < 0) listView.setSelection((pos - model.pageSize / 2).coerceAtLeast(0))
++            } else {
++                listView.setSelection(0)
++            }
++        }
++        fun launch() {
++            val chosen = model.selection()
++            if (chosen.isEmpty()) {
++                AlertDialog.Builder(this)
++                    .setTitle("No cheats selected")
++                    .setMessage("Select at least one cheat, or use Start Fresh for a normal session.")
++                    .setPositiveButton("OK", null)
++                    .show()
++                return
++            }
++            dialog.dismiss()
++            launchGameOnCompanion(
++                gameId = gameId,
++                title = title,
++                loadSaveAfterLaunch = false,
++                cheatSourceIndex = sourceIndex,
++                cheatEnabledIndexes = chosen.map { it.index },
++                cheatProfileLabel = GameCheatUiState.buildProfileLabel(chosen.map { it.label })
++            )
++        }
++        fun stopEditing() {
++            editing = false
++            filterEdit.isFocusable = false
++            filterEdit.isFocusableInTouchMode = false
++            val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
++            imm.hideSoftInputFromWindow(filterEdit.windowToken, 0)
++        }
++        filterEdit.addTextChangedListener(object : android.text.TextWatcher {
++            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
++            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
++            override fun afterTextChanged(s: android.text.Editable?) {
++                model.setFilter(s?.toString().orEmpty())
++                redraw()
++            }
++        })
++        filterEdit.setOnEditorActionListener { _, _, _ -> stopEditing(); model.onKey(com.safeiot.privyhub.streaming.PickerKey.DOWN); redraw(); true }
++        dialog.setOnKeyListener { _, keyCode, event ->
++            if (event.action != android.view.KeyEvent.ACTION_DOWN) return@setOnKeyListener false
++            val key = com.safeiot.privyhub.streaming.CheatPickerModel.keyOf(keyCode)
++            if (editing) {
++                // the keyboard owns the keys while the filter is typed; Down or Back leaves it
++                if (key == com.safeiot.privyhub.streaming.PickerKey.DOWN || key == com.safeiot.privyhub.streaming.PickerKey.BACK) {
++                    stopEditing()
++                    if (key == com.safeiot.privyhub.streaming.PickerKey.DOWN) model.onKey(key)
++                    redraw()
++                    return@setOnKeyListener true
++                }
++                return@setOnKeyListener false
++            }
++            if (key == com.safeiot.privyhub.streaming.PickerKey.OTHER) return@setOnKeyListener false
++            when (model.onKey(key)) {
++                com.safeiot.privyhub.streaming.PickerAction.LAUNCH -> launch()
++                com.safeiot.privyhub.streaming.PickerAction.CANCEL -> dialog.dismiss()
++                com.safeiot.privyhub.streaming.PickerAction.EDIT_FILTER -> {
++                    editing = true
++                    filterEdit.isFocusable = true
++                    filterEdit.isFocusableInTouchMode = true
++                    filterEdit.requestFocus()
++                    val imm = getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
++                    imm.showSoftInput(filterEdit, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
++                }
++                com.safeiot.privyhub.streaming.PickerAction.NONE -> {}
++            }
++            redraw()
++            true
++        }
++        launchButton.setOnClickListener { launch() }
++        cancelButton.setOnClickListener { dialog.dismiss() }
++        listView.setOnItemClickListener { _, _, position, _ ->
++            val row = model.rows.getOrNull(position + 2)
++            if (row is com.safeiot.privyhub.streaming.PickerRow.Item) model.toggle(row.entry.index)
++            if (row is com.safeiot.privyhub.streaming.PickerRow.Header && model.filter.isBlank() && !model.selectedOnly) model.toggleSection(row.group)
++            redraw()
++        }
++        dialog.setOnShowListener { redraw() }
++        dialog.show()
++    }
++
+     // PRIVYHUB_A8_PATCH_03_ANDROID_INPUT_PROFILE_EDITOR
+     private fun inputProfileQuery(
+         values: Map<String, String>
+diff -ruN a/PrivyHub/app/src/main/java/streaming/CheatPicker.kt b/PrivyHub/app/src/main/java/streaming/CheatPicker.kt
+--- a/PrivyHub/app/src/main/java/streaming/CheatPicker.kt	1969-12-31 19:00:00.000000000 -0500
++++ b/PrivyHub/app/src/main/java/streaming/CheatPicker.kt	2026-11-10 16:25:39.356457844 -0500
+@@ -0,0 +1,239 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * B84: the cheat picker as PrivyHub's own screen, usable from the couch. "Launch Cheat Session" and "Cancel" sit at the
++ * top (Left from any row reaches Launch; the pad's Start launches; Back cancels); a filter row; the list in sections
++ * (General, Player 1 … Player 4, Other, Your files — B85's groups), each collapsed to its header with a count until
++ * opened; the shoulder buttons / the remote's channel keys page by a screen.
++ *
++ * [CheatPickerModel] is the screen's whole behaviour (rows, focus, keys, filter, sections, selection); the activity's
++ * view only draws its rows and forwards the keys. `debug.privyhub.cheat_picker=0` = today's multi-choice dialog.
++ * Design: docs/memory/evidence/b84_2026-11-10/design_written_before_code.md (hashed before this code).
++ */
++object CheatPicker {
++    const val PROPERTY = "debug.privyhub.cheat_picker"
++    const val LAUNCH = "Launch Cheat Session"
++    const val CANCEL = "Cancel"
++    const val FILTER_HINT = "Filter — type to narrow the list"
++    const val SELECTED_ONLY = "Selected only"
++    const val HINT = "Left: jump to Launch · Start: launch · L1 / R1: page · on the filter: Right = selected only"
++
++    /** The sections in the order shown, and their headers. */
++    val GROUPS = listOf("general", "player1", "player2", "player3", "player4", "other", "yours")
++    private val GROUP_NAMES = mapOf(
++        "general" to "General", "player1" to "Player 1", "player2" to "Player 2", "player3" to "Player 3",
++        "player4" to "Player 4", "other" to "Other", "yours" to "Your files"
++    )
++
++    fun groupName(group: String): String = GROUP_NAMES[group] ?: "General"
++
++    /** An unknown or missing group (a hub without B85, `raw=1`) is General. */
++    fun groupOf(value: String?): String = value?.trim()?.lowercase()?.takeIf { it in GROUPS } ?: "general"
++
++    fun selectedLine(n: Int): String = "$n selected"
++
++    fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
++
++    fun fromSystem(): Boolean =
++        try {
++            val get = Class.forName("android.os.SystemProperties").getMethod("get", String::class.java)
++            parse(get.invoke(null, PROPERTY) as String?)
++        } catch (_: Throwable) {
++            true
++        }
++}
++
++/** One selectable cheat as the hub lists it: `index` is what the launch sends (B85 expands parts / enablers). */
++data class CheatEntry(val index: Int, val label: String, val group: String = "general", val variantOf: Int? = null)
++
++/** The screen's rows. */
++sealed class PickerRow {
++    object Bar : PickerRow()
++    object Filter : PickerRow()
++    data class Header(val group: String, val count: Int, val open: Boolean) : PickerRow()
++    data class Item(val entry: CheatEntry, val checked: Boolean, val indent: Boolean) : PickerRow()
++}
++
++enum class PickerAction { NONE, LAUNCH, CANCEL, EDIT_FILTER }
++
++enum class PickerKey { UP, DOWN, LEFT, RIGHT, OK, START, BACK, PAGE_UP, PAGE_DOWN, OTHER }
++
++class CheatPickerModel(entries: List<CheatEntry>, var pageSize: Int = 8) {
++    companion object {
++        /** Android's key codes (KeyEvent.KEYCODE_*), as literals so the model runs on the JVM. */
++        fun keyOf(code: Int): PickerKey = when (code) {
++            19 -> PickerKey.UP                                   // DPAD_UP
++            20 -> PickerKey.DOWN                                 // DPAD_DOWN
++            21 -> PickerKey.LEFT                                 // DPAD_LEFT
++            22 -> PickerKey.RIGHT                                // DPAD_RIGHT
++            23, 66, 160, 96 -> PickerKey.OK                      // DPAD_CENTER, ENTER, NUMPAD_ENTER, BUTTON_A
++            108 -> PickerKey.START                               // BUTTON_START
++            4, 97 -> PickerKey.BACK                              // BACK, BUTTON_B
++            102, 166, 92 -> PickerKey.PAGE_UP                    // BUTTON_L1, CHANNEL_UP, PAGE_UP
++            103, 167, 93 -> PickerKey.PAGE_DOWN                  // BUTTON_R1, CHANNEL_DOWN, PAGE_DOWN
++            else -> PickerKey.OTHER
++        }
++    }
++
++    private val all: List<CheatEntry> = entries
++    private val byGroup: Map<String, List<CheatEntry>> = run {
++        val out = LinkedHashMap<String, MutableList<CheatEntry>>()
++        for (g in CheatPicker.GROUPS) out[g] = mutableListOf()
++        for (e in entries) out.getValue(CheatPicker.groupOf(e.group)).add(e)
++        out
++    }
++    private val opened = mutableSetOf<String>()
++    private val selected = LinkedHashSet<Int>()
++    private var words: List<String> = emptyList()
++
++    var filter: String = ""
++        private set
++    var selectedOnly: Boolean = false
++        private set
++
++    /** The row the focus is on; on the bar, [barButton] 0 = Launch, 1 = Cancel. */
++    var focus: Int = 0
++        private set
++    var barButton: Int = 0
++        private set
++    private var returnTo: Int = 2
++
++    var rows: List<PickerRow> = emptyList()
++        private set
++
++    init {
++        rebuild()
++        focus = if (rows.size > 2) 2 else 0
++    }
++
++    val selectedCount: Int get() = selected.size
++
++    fun isSelected(index: Int): Boolean = index in selected
++
++    private fun matches(e: CheatEntry): Boolean {
++        if (selectedOnly && e.index !in selected) return false
++        if (words.isEmpty()) return true
++        val label = e.label.lowercase()
++        return words.all { it in label }
++    }
++
++    private fun narrowing(): Boolean = words.isNotEmpty() || selectedOnly
++
++    private fun rebuild() {
++        val out = ArrayList<PickerRow>()
++        out.add(PickerRow.Bar)
++        out.add(PickerRow.Filter)
++        for ((group, list) in byGroup) {
++            if (list.isEmpty()) continue
++            if (narrowing()) {
++                val shown = list.filter(::matches)
++                if (shown.isEmpty()) continue
++                out.add(PickerRow.Header(group, shown.size, true))
++                for (e in shown) out.add(PickerRow.Item(e, e.index in selected, e.variantOf != null))
++            } else {
++                val open = group in opened
++                out.add(PickerRow.Header(group, list.size, open))
++                if (open) for (e in list) out.add(PickerRow.Item(e, e.index in selected, e.variantOf != null))
++            }
++        }
++        rows = out
++        if (focus >= rows.size) focus = rows.size - 1
++    }
++
++    fun setFilter(text: String) {
++        filter = text
++        words = text.lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
++        rebuild()
++    }
++
++    fun toggleSelectedOnly() {
++        selectedOnly = !selectedOnly
++        rebuild()
++    }
++
++    fun toggle(index: Int) {
++        if (!selected.remove(index)) selected.add(index)
++        rebuild()
++    }
++
++    fun toggleSection(group: String) {
++        if (!opened.remove(group)) opened.add(group)
++        rebuild()
++    }
++
++    private fun moveTo(row: Int) {
++        focus = row.coerceIn(0, rows.size - 1)
++    }
++
++    /** The selected entries in the source's order: what the launch sends. */
++    fun selection(): List<CheatEntry> = all.filter { it.index in selected }
++
++    /** One key; returns what the activity must do. */
++    fun onKey(key: PickerKey): PickerAction {
++        when (key) {
++            PickerKey.START -> return PickerAction.LAUNCH
++            PickerKey.BACK -> return PickerAction.CANCEL
++            PickerKey.LEFT -> {
++                if (focus == 0) {
++                    barButton = 0
++                } else {
++                    returnTo = focus
++                    focus = 0
++                    barButton = 0
++                }
++                return PickerAction.NONE
++            }
++            PickerKey.RIGHT -> {
++                if (focus == 0) barButton = 1
++                if (focus == 1) toggleSelectedOnly()          // the filter row: Right = "Selected only" on / off
++                return PickerAction.NONE
++            }
++            PickerKey.UP -> {
++                if (focus == 1) {
++                    returnTo = 1
++                    focus = 0
++                    barButton = 0
++                } else if (focus > 1) {
++                    moveTo(focus - 1)
++                }
++                return PickerAction.NONE
++            }
++            PickerKey.DOWN -> {
++                if (focus == 0) moveTo(returnTo.coerceAtLeast(1)) else moveTo(focus + 1)
++                return PickerAction.NONE
++            }
++            PickerKey.PAGE_UP -> {
++                if (focus > 1) moveTo((focus - pageSize).coerceAtLeast(2))
++                return PickerAction.NONE
++            }
++            PickerKey.PAGE_DOWN -> {
++                moveTo(if (focus < 2) 2 + pageSize - 1 else focus + pageSize)
++                return PickerAction.NONE
++            }
++            PickerKey.OK -> {
++                return when (val row = rows[focus]) {
++                    PickerRow.Bar -> if (barButton == 0) PickerAction.LAUNCH else PickerAction.CANCEL
++                    PickerRow.Filter -> PickerAction.EDIT_FILTER
++                    is PickerRow.Header -> {
++                        if (!narrowing()) toggleSection(row.group)
++                        PickerAction.NONE
++                    }
++                    is PickerRow.Item -> {
++                        toggle(row.entry.index)
++                        PickerAction.NONE
++                    }
++                }
++            }
++            PickerKey.OTHER -> return PickerAction.NONE
++        }
++    }
++
++    /** The text a row shows on the TV. */
++    fun text(row: PickerRow): String = when (row) {
++        PickerRow.Bar -> "${CheatPicker.LAUNCH}   ${CheatPicker.CANCEL}   ${CheatPicker.selectedLine(selected.size)}"
++        PickerRow.Filter -> (if (filter.isBlank()) CheatPicker.FILTER_HINT else "Filter: $filter") +
++            "   ${if (selectedOnly) "☑" else "☐"} ${CheatPicker.SELECTED_ONLY}"
++        is PickerRow.Header -> "${if (row.open) "▾" else "▸"} ${CheatPicker.groupName(row.group)} (${row.count})"
++        is PickerRow.Item -> "${if (row.checked) "☑" else "☐"} ${if (row.indent) "    " else ""}${row.entry.label}"
++    }
++}
+diff -ruN a/PrivyHub/app/src/test/java/streaming/B84CheatPickerTest.kt b/PrivyHub/app/src/test/java/streaming/B84CheatPickerTest.kt
+--- a/PrivyHub/app/src/test/java/streaming/B84CheatPickerTest.kt	1969-12-31 19:00:00.000000000 -0500
++++ b/PrivyHub/app/src/test/java/streaming/B84CheatPickerTest.kt	2026-11-10 16:25:39.356457844 -0500
+@@ -0,0 +1,209 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** B84: the cheat picker's model, the whole behaviour the screen runs (rows, keys, filter, sections, selection). */
++class B84CheatPickerTest {
++
++    private fun catalog(n: Int): List<CheatEntry> = (0 until n).map { i ->
++        val group = when (i % 7) {
++            0, 1 -> "general"
++            2 -> "player1"
++            3 -> "player2"
++            4 -> "player3"
++            5 -> "player4"
++            else -> "other"
++        }
++        CheatEntry(index = i, label = "Made Up Cheat $i ${if (i % 2 == 0) "Health" else "Speed"}", group = group)
++    }
++
++    private val small = listOf(
++        CheatEntry(0, "Infinite Health", "general"),
++        CheatEntry(1, "Infinite Health — variant 2", "general", variantOf = 0),
++        CheatEntry(2, "Max Money", "general"),
++        CheatEntry(3, "Infinite Lives — Player 1", "player1"),
++        CheatEntry(4, "Infinite Lives — Player 2", "player2"),
++        CheatEntry(5, "Moon Jump", "other"),
++        CheatEntry(6, "mine.cht: My Own", "yours"),
++    )
++
++    private fun press(m: CheatPickerModel, vararg keys: PickerKey): PickerAction {
++        var last = PickerAction.NONE
++        for (k in keys) last = m.onKey(k)
++        return last
++    }
++
++    private fun openAll(m: CheatPickerModel) {
++        for (g in CheatPicker.GROUPS) if (m.rows.any { it is PickerRow.Header && it.group == g && !it.open }) m.toggleSection(g)
++    }
++
++    /** To the filter row with the TV's keys (Down from the bar returns to the row the focus came from; Up climbs). */
++    private fun toFilterRow(m: CheatPickerModel) {
++        while (m.focus != 1) m.onKey(if (m.focus == 0) PickerKey.DOWN else PickerKey.UP)
++    }
++
++    private fun focusRow(m: CheatPickerModel, row: Int) {
++        toFilterRow(m)
++        while (m.focus < row) m.onKey(PickerKey.DOWN)
++        assertEquals(row, m.focus)
++    }
++
++    @Test
++    fun launchInTwoPressesFromEveryRow() {
++        val m = CheatPickerModel(catalog(300))
++        openAll(m)
++        m.toggle(5)
++        for (row in 1 until m.rows.size) {
++            focusRow(m, row)
++            assertEquals("row $row", PickerAction.NONE, m.onKey(PickerKey.LEFT))       // 1: to Launch
++            assertEquals(0, m.focus)
++            assertEquals(0, m.barButton)
++            assertEquals("row $row", PickerAction.LAUNCH, m.onKey(PickerKey.OK))       // 2: Launch
++        }
++        for (row in 1 until m.rows.size step 37) {
++            focusRow(m, row)
++            assertEquals(PickerAction.LAUNCH, m.onKey(PickerKey.START))               // the pad's Start: one press
++        }
++    }
++
++    @Test
++    fun upFromTheFilterRowReachesTheBarAndDownComesBack() {
++        val m = CheatPickerModel(small)
++        assertEquals(2, m.focus)                            // the list's first row on opening
++        press(m, PickerKey.UP)
++        assertEquals(1, m.focus)                            // the filter row
++        press(m, PickerKey.UP)
++        assertEquals(0, m.focus)                            // the bar, on Launch
++        press(m, PickerKey.DOWN)
++        assertEquals(1, m.focus)
++        press(m, PickerKey.DOWN, PickerKey.DOWN, PickerKey.LEFT, PickerKey.DOWN)
++        assertEquals(3, m.focus)                            // Left from a list row, then Down: back to that row
++    }
++
++    @Test
++    fun cancelFromTheBarAndBack() {
++        val m = CheatPickerModel(small)
++        assertEquals(PickerAction.CANCEL, press(m, PickerKey.LEFT, PickerKey.RIGHT, PickerKey.OK))
++        assertEquals(PickerAction.CANCEL, CheatPickerModel(small).onKey(PickerKey.BACK))
++        assertEquals(PickerKey.BACK, CheatPickerModel.keyOf(4))       // KEYCODE_BACK
++        assertEquals(PickerKey.START, CheatPickerModel.keyOf(108))    // KEYCODE_BUTTON_START
++        assertEquals(PickerKey.PAGE_DOWN, CheatPickerModel.keyOf(103)) // KEYCODE_BUTTON_R1
++        assertEquals(PickerKey.PAGE_UP, CheatPickerModel.keyOf(166))   // KEYCODE_CHANNEL_UP
++    }
++
++    @Test
++    fun sectionsCollapsedWithTheirCounts() {
++        val m = CheatPickerModel(small)
++        val headers = m.rows.filterIsInstance<PickerRow.Header>()
++        assertEquals(listOf("general", "player1", "player2", "other", "yours"), headers.map { it.group })
++        assertEquals(listOf(3, 1, 1, 1, 1), headers.map { it.count })
++        assertTrue(headers.none { it.open })
++        assertEquals(2 + 5, m.rows.size)                     // the bar, the filter, five headers: nothing else
++        assertEquals("▸ Player 1 (1)", m.text(headers[1]))
++        assertEquals("▸ Your files (1)", m.text(headers[4]))
++        assertEquals(PickerAction.NONE, m.onKey(PickerKey.OK))   // OK on the first header opens it
++        assertEquals(listOf(0, 1, 2), m.rows.filterIsInstance<PickerRow.Item>().map { it.entry.index })
++        assertTrue(m.rows.filterIsInstance<PickerRow.Item>()[1].indent)   // the variant sits under its first
++    }
++
++    @Test
++    fun theFilterNarrowsAndCounts() {
++        val m = CheatPickerModel(small)
++        m.setFilter("lives")
++        val headers = m.rows.filterIsInstance<PickerRow.Header>()
++        assertEquals(listOf("player1", "player2"), headers.map { it.group })
++        assertTrue(headers.all { it.open && it.count == 1 })
++        m.setFilter("player   2 LIVES")                     // every word, any order, any case
++        assertEquals(listOf(4), m.rows.filterIsInstance<PickerRow.Item>().map { it.entry.index })
++        m.setFilter("nothing like this")
++        assertEquals(2, m.rows.size)
++        m.setFilter("")
++        assertEquals(2 + 5, m.rows.size)
++    }
++
++    @Test
++    fun startLaunchesTheTickedIndexes() {
++        val m = CheatPickerModel(small)
++        press(m, PickerKey.OK, PickerKey.DOWN, PickerKey.OK, PickerKey.DOWN, PickerKey.DOWN, PickerKey.OK)
++        assertEquals(listOf(0, 2), m.selection().map { it.index })
++        assertEquals("☑ Max Money", m.text(m.rows[m.focus]))
++        assertEquals("Launch Cheat Session   Cancel   2 selected", m.text(PickerRow.Bar))
++        assertEquals(PickerAction.LAUNCH, m.onKey(PickerKey.START))
++    }
++
++    @Test
++    fun theSelectionSurvivesFilterSelectedOnlyAndClosing() {
++        val m = CheatPickerModel(small)
++        m.toggle(3)
++        m.toggle(6)
++        m.setFilter("health")
++        m.toggle(1)
++        assertEquals(setOf(1, 3, 6), m.selection().map { it.index }.toSet())
++        m.setFilter("")
++        m.toggleSection("player1")
++        m.toggleSection("player1")
++        assertEquals(listOf(1, 3, 6), m.selection().map { it.index })
++        toFilterRow(m)
++        press(m, PickerKey.RIGHT)                                      // the filter row: Right = "Selected only"
++        assertTrue(m.selectedOnly)
++        assertEquals(listOf(1, 3, 6), m.rows.filterIsInstance<PickerRow.Item>().map { it.entry.index })
++        assertEquals(listOf(1, 1, 1), m.rows.filterIsInstance<PickerRow.Header>().map { it.count })
++        m.toggleSelectedOnly()
++        assertFalse(m.selectedOnly)
++        assertEquals(3, m.selectedCount)
++    }
++
++    @Test
++    fun twoThousandNinetyTwoEntriesOpenAsHeadersOnly() {
++        val start = System.nanoTime()
++        val m = CheatPickerModel(catalog(2092))
++        val ms = (System.nanoTime() - start) / 1_000_000
++        assertTrue("built in $ms ms", ms < 1000)
++        assertEquals(2 + 6, m.rows.size)                     // the bar, the filter and six headers, no entry row
++        assertEquals(2092, m.rows.filterIsInstance<PickerRow.Header>().sumOf { it.count })
++        m.toggleSection("player1")
++        assertEquals(2 + 6 + 299, m.rows.size)              // only the opened section's own rows
++        val t2 = System.nanoTime()
++        m.setFilter("health")
++        assertTrue((System.nanoTime() - t2) / 1_000_000 < 1000)
++        assertEquals(1046, m.rows.count { it is PickerRow.Item })
++    }
++
++    @Test
++    fun pagingByAScreen() {
++        val m = CheatPickerModel(catalog(200), pageSize = 10)
++        m.toggleSection("general")
++        assertEquals(2, m.focus)
++        press(m, PickerKey.PAGE_DOWN)
++        assertEquals(12, m.focus)
++        press(m, PickerKey.PAGE_DOWN, PickerKey.PAGE_DOWN)
++        assertEquals(32, m.focus)
++        press(m, PickerKey.PAGE_UP)
++        assertEquals(22, m.focus)
++        press(m, PickerKey.PAGE_UP, PickerKey.PAGE_UP, PickerKey.PAGE_UP)
++        assertEquals(2, m.focus)                             // never into the bar or the filter row by paging
++    }
++
++    @Test
++    fun aHubWithoutGroupsIsOneGeneralSection() {
++        assertEquals("general", CheatPicker.groupOf(null))
++        assertEquals("general", CheatPicker.groupOf(""))
++        assertEquals("general", CheatPicker.groupOf("something_new"))
++        assertEquals("player3", CheatPicker.groupOf("Player3"))
++        val m = CheatPickerModel(listOf(CheatEntry(0, "a"), CheatEntry(1, "b")))
++        assertEquals(listOf("general"), m.rows.filterIsInstance<PickerRow.Header>().map { it.group })
++    }
++
++    @Test
++    fun theProperty() {
++        assertTrue(CheatPicker.parse(null))
++        assertTrue(CheatPicker.parse(""))
++        assertTrue(CheatPicker.parse("1"))
++        assertFalse(CheatPicker.parse("0"))
++        assertFalse(CheatPicker.parse("off"))
++        assertEquals("debug.privyhub.cheat_picker", CheatPicker.PROPERTY)
++    }
++}
