@@ -2922,6 +2922,16 @@ editor's controller picture and one set of letters ("Bottom (✕) → B") (`evid
 APK `c801caab…` pinned, NOT installed. **Next (A):** HOME-12 resumed — C49 the picker, C46 / C47 cheats seen, C48 PS2
 widescreen, C50 the picture (`docs/memory/handoffs/SESSION_B_DONE_2026-11-10AE.md`).
 
+**HOME-12R (2026-11-10, HOME-12 resumed at the TV; APK `c801caab…` NOT CONFIRMED, `85220f99…` back on):** [x] B84
+the cheat picker (C49, its first real run); [x] B85 the cleaned lists (N64's sections; a PS1 cheat through the picker);
+[x] B79 GameCube cheats (C47); [x] B86 the mapping picture (C50, "Much clearer"; "a big poorly drawn controller");
+[ ] B78 N64 cheats — the launch fails on the hub (RetroArch has not loaded the cheat file when the hub toggles; C46 not
+run); [ ] B80 PS2 widescreen — the onn's Save is a POST the hub takes only as GET (C48). **Next (B):** the N64 cheat
+launch's wait; `ps2-patches` on the real HTTP route; the picture smaller and better drawn; then a new APK and C46 /
+C48 again (`docs/memory/evidence/HOME_12R_PARITY_2026-11-10.md`). **What stays open in H6:** as HOME-12's line above
+(PS2 / GameCube details, the art misses, the rejected N64 list, the PS2 disc change, Mods and GameCube discs, the
+user's cheat files).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,

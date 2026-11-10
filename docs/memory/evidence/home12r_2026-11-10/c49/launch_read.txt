@@ -1,0 +1,10 @@
+# T81's cheat launch, read on the hub (labels; counts; no title, code name or path)
+2026-11-10T17:00:07-05:00 POST /plugins/games/cheat-profiles?id=T81 -> 200
+2026-11-10T17:00:07-05:00 POST /plugins/games/cheat-catalog?id=T81 -> 200
+2026-11-10T17:01:46-05:00 POST /plugins/games/cheat-profiles?id=T81 -> 200
+2026-11-10T17:01:46-05:00 POST /plugins/games/cheat-catalog?id=T81 -> 200
+2026-11-10T17:02:02-05:00 POST /plugins/games/launch?id=T81&cheat_source=0&cheat_indexes=6&players_joined=3 -> 503
+game log (T81, 22:01:59Z launch): 139 lines; '[Cheats]' lines: 0; 'Load game-specific cheatfile': 0; 'Cheat #' lines: 0
+the game log's order (line numbers): content load 41, network command interface up 104, the core's dynarec init 123, 'Content ran for a total of: 00 hours, 00 minutes, 00 seconds' 126
+a PS1 cheat session for comparison (an earlier HOME log): 'Load game-specific cheatfile' present, then 'Cheat #n: …: off/on' lines
+the watcher (1 s): no active status, no staged file seen — the session ended inside a second; the staging dir cleaned by the hub's failure path

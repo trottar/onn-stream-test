@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-10
-baseline_commit: e3ad4d36 (ART-1R; HOME-12's close uncommitted beside it)
+baseline_commit: 0de0b290 (queue AE + the H7 note; HOME-12R's close uncommitted beside it)
 ---
 
 # Current State
@@ -12,15 +12,15 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 ## Active Objective
 
 **Phase H CLOSED at its checkpoint 2026-11-09** on the user's "Close H" (`evidence/H5_CHECKPOINT_2026-11-09.md`).
-**H6 (feature parity) OPEN**: queue AC checked at HOME-12 — B76 / B77 / B81 met; B78-B80 wait on B's cheat-picker fixes. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
-E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED** (HOME-11; back on after HOME-12).
+**H6 (feature parity) OPEN**: HOME-12 / 12R met B76 / B77 / B79 / B81 / B84-B86; B78 (N64 cheat launch) and B80 (Patches save) not. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
+E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED** (HOME-11; back on after HOME-12 and HOME-12R).
 H7 (PrivyHub-native games; first PrivyParty) PLANNED 2026-11-10 — not started; the user's word starts it (`docs/ROADMAP.md` §H7)
 
 ## Current Work Item
 
-- **HOME-12 DONE** (`evidence/HOME_12_PARITY_2026-11-10.md`): C44 met (B76), C45 met (B77), B81's folders met;
-  C46 stopped by the user at the 677-entry cheat list ("fix this bloat first"), C47 / C48 not run → **`de6682db…` NOT
-  CONFIRMED**, `85220f99…` reinstalled. Three client requirements for B (`KNOWN_ISSUES.md` HOME-12).
+- **HOME-12R DONE** (`evidence/HOME_12R_PARITY_2026-11-10.md`): C49 picker, C47, C50, the PS1 check met; C46 not run
+  (the N64 cheat launch fails on the hub), C48 not met (the Patches Save: POST vs GET) → **`c801caab…` NOT CONFIRMED**,
+  `85220f99…` reinstalled. Three items for B (`KNOWN_ISSUES.md` HOME-12R).
 
 ## Verified State
 
@@ -57,9 +57,9 @@ line 15 writes one redacted row per movie range request and a retrying client's 
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`85220f99…` is CONFIRMED** on the onn (HOME-11), pinned in the three places; reinstalled at HOME-12's close
-  (`home12_previous/`); `de6682db…` (queue AC) tried and NOT CONFIRMED, kept in `home12_installed/`.
-- The eighteen client properties (+ `ps2_patches`) are empty. One device is paired, with `identity_v2` on.
+- APK **`85220f99…` CONFIRMED** on the onn (HOME-11), pinned in the three places; back on at HOME-12R's close.
+  Tried, NOT CONFIRMED: `de6682db…` (HOME-12), `c801caab…` (HOME-12R; `home12r_installed/`).
+- The twenty client properties are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
 `tools/diag_keeper.py`, read with `tools/diag_read.py` and `tools/diag_check.py`.
@@ -88,9 +88,11 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **HOME-12 again** (the user's word): queue AE in (B84-B86, APK `c801caab…` pinned, not installed); C46-C50.
-2. The user's next parity picks: the PS2 disc change (designed); a second source for PS2 / GameCube details and the
-   missing art; the user's own cheat files; the rejected N64 list. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
+1. **B:** the N64 cheat launch waits for RetroArch's cheat file; `ps2-patches` on the onn's POST route; the picture
+   smaller / better drawn. Then a new APK and C46 / C48 (+ C49 / C50 / PS1 on it).
+2. Then the user's pick: H6's rest or **H7 PrivyParty** (the user's word).
+3. H6's rest: the PS2 disc change (designed); a second source for PS2 / GameCube details and
+   art misses; the user's cheat files; the rejected N64 list. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over
