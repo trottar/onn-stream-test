@@ -3317,6 +3317,17 @@ class GamesPlugin:
             ),
         }
 
+    def _ps2_patches_save(self, query: dict[str, list[str]]) -> dict[str, Any]:
+        """B80's save of a PS2 title's patch toggles; served on GET (as before) and, B88, on POST (the onn's Save)."""
+        game_id = self._first(query, "id").strip()
+        if not game_id:
+            raise ValueError("Missing game id")
+        game = self._find_game_by_id(game_id)
+        wanted = {key: self._first(query, name).strip() == "1"
+                  for key, name in (("ws", "ws"), ("ni", "ni"), ("60", "fps60"))}
+        payload = self._emulator.set_ps2_patches(game, wanted)
+        return {"ok": True, "plugin": self.PLUGIN_ID, "game_id": game_id, "ps2_patches": payload}
+
     def handle(
         self,
         action: str,
@@ -3358,14 +3369,7 @@ class GamesPlugin:
 
         # B80: remember a PS2 title's patch toggles (read at its next launch)
         if action == "ps2-patches" and _ps2_session is not None:
-            game_id = self._first(query, "id").strip()
-            if not game_id:
-                raise ValueError("Missing game id")
-            game = self._find_game_by_id(game_id)
-            wanted = {key: self._first(query, name).strip() == "1"
-                      for key, name in (("ws", "ws"), ("ni", "ni"), ("60", "fps60"))}
-            payload = self._emulator.set_ps2_patches(game, wanted)
-            return {"ok": True, "plugin": self.PLUGIN_ID, "game_id": game_id, "ps2_patches": payload}
+            return self._ps2_patches_save(query)
 
         # PRIVYHUB_A8_PATCH_01_INPUT_PROFILE_BACKEND
         if action == "input-profiles":
@@ -4864,7 +4868,9 @@ class GamesPlugin:
                     payload["native_stream_warning"] = str(exc)
                 return payload
 
-
+            # B88: the onn's Patches… → Save is a POST (the GET stays for the same call)
+            if action == "ps2-patches" and _ps2_session is not None:
+                return self._ps2_patches_save(query)
 
         except EmulatorError as exc:
             raise RuntimeError(str(exc)) from exc

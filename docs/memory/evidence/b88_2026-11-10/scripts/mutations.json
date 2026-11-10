@@ -1,0 +1,6 @@
+[
+ {"id": "N1", "file": "companion/plugins/games.py", "old": "            # B88: the onn's Patches… → Save is a POST (the GET stays for the same call)\n            if action == \"ps2-patches\" and _ps2_session is not None:\n                return self._ps2_patches_save(query)\n", "new": "", "why": "the POST route removed (HOME-12R's C48)"},
+ {"id": "N2", "file": "tests/client_contract/calls.json", "old": "   \"path\": \"/plugins/games/mod-catalog\",", "new": "   \"path\": \"/plugins/games/mod-catalog-gone\",", "why": "a call the client makes dropped from the list"},
+ {"id": "N3", "file": "tests/client_contract/scan.py", "old": "_PLUGIN = re.compile(r\"/plugins/([a-z_]+)/(\\$\\{[^}]+\\}|\\$[A-Za-z_]+|[a-z0-9][a-z0-9-]*)\")", "new": "_PLUGIN = re.compile(r\"/never/([a-z_]+)/(x)\")", "why": "the source check blind"},
+ {"id": "N4", "file": "tests/client_contract/scan.py", "old": "                    method = {\"httpGet\": \"GET\", \"getJson\": \"GET\"}.get(helpers[-1], \"POST\")", "new": "                    method = \"POST\"", "why": "every call read as POST"}
+]

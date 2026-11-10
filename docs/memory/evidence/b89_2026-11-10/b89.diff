@@ -1,0 +1,453 @@
+diff -ruN a/PrivyHub/app/src/main/java/streaming/ControllerPictureView.kt b/PrivyHub/app/src/main/java/streaming/ControllerPictureView.kt
+--- a/PrivyHub/app/src/main/java/streaming/ControllerPictureView.kt	2026-11-10 17:39:46.000000000 -0500
++++ b/PrivyHub/app/src/main/java/streaming/ControllerPictureView.kt	2026-11-10 18:01:19.828099622 -0500
+@@ -4,68 +4,62 @@
+ import android.graphics.Canvas
+ import android.graphics.Color
+ import android.graphics.Paint
++import android.graphics.Path
+ import android.graphics.RectF
+ import android.view.View
+ 
+ /**
+- * B86: a small controller picture drawn by the app itself — a plain, original outline (a body with two grips, a cross
+- * for the D-pad, four round face buttons, two round sticks, shoulders and triggers, Select / Start); no brand marks.
+- * Each control is labelled with what it sends to the game now ([MappingPicture.pictureLabels]); changed ones in an
+- * accent colour. Only drawing: the mapping is read, never written.
++ * B86 / B89: a small controller picture drawn by the app itself from [MappingPicture]'s one geometry — a plain,
++ * original gamepad outline (one path: a body with two grips), shoulders and triggers above, a D-pad left, four face
++ * buttons right, two sticks, Select / Start; one stroke width; no brand marks. Each control's label is fitted inside its
++ * box ([MappingPicture.BOXES]); the changed ones in an accent colour. At most a fifth of the screen's height
++ * ([MappingPicture.pictureSize]). Only drawing: the mapping is read, never written.
+  */
+ class ControllerPictureView(context: Context) : View(context) {
+     private var labels: Map<String, String> = emptyMap()
+     private var changed: Set<String> = emptySet()
+-    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f; color = Color.LTGRAY }
++    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
++        style = Paint.Style.STROKE; color = Color.LTGRAY; strokeJoin = Paint.Join.ROUND
++    }
+     private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE; textAlign = Paint.Align.CENTER }
+     private val accent = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFFFC107.toInt(); textAlign = Paint.Align.CENTER }
+ 
+     fun show(mapping: Map<String, String>, default: Map<String, String>) {
+-        labels = MappingPicture.pictureLabels(mapping)
++        labels = MappingPicture.shortLabels(mapping)
+         changed = MappingPicture.changed(mapping, default)
+         invalidate()
+     }
+ 
+     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+-        val w = MeasureSpec.getSize(widthMeasureSpec)
+-        setMeasuredDimension(w, (w * 0.5f).toInt())
++        val (w, h) = MappingPicture.pictureSize(MeasureSpec.getSize(widthMeasureSpec), resources.displayMetrics.heightPixels)
++        setMeasuredDimension(w, h)
+     }
+ 
+     override fun onDraw(canvas: Canvas) {
+         super.onDraw(canvas)
+-        val w = width.toFloat()
+-        val h = height.toFloat()
+-        if (w <= 0f || h <= 0f) return
+-        fun px(x: Float) = x * w
+-        fun py(y: Float) = y * h
+-        // the outline: a rounded body and two grips; shoulders and triggers as small rounded tabs
+-        canvas.drawRoundRect(RectF(px(0.08f), py(0.24f), px(0.92f), py(0.80f)), h * 0.18f, h * 0.18f, line)
+-        canvas.drawRoundRect(RectF(px(0.08f), py(0.50f), px(0.30f), py(0.98f)), h * 0.14f, h * 0.14f, line)
+-        canvas.drawRoundRect(RectF(px(0.70f), py(0.50f), px(0.92f), py(0.98f)), h * 0.14f, h * 0.14f, line)
+-        for (x in listOf(0.18f, 0.82f)) {
+-            canvas.drawRoundRect(RectF(px(x - 0.08f), py(0.00f), px(x + 0.08f), py(0.10f)), 8f, 8f, line)
+-            canvas.drawRoundRect(RectF(px(x - 0.09f), py(0.11f), px(x + 0.09f), py(0.20f)), 8f, 8f, line)
+-        }
+-        // the D-pad as a cross, the face buttons and the sticks as circles
+-        val arm = w * 0.035f
+-        canvas.drawRect(px(0.22f) - arm, py(0.28f), px(0.22f) + arm, py(0.58f), line)
+-        canvas.drawRect(px(0.10f), py(0.43f) - arm, px(0.34f), py(0.43f) + arm, line)
+-        for (key in listOf("x", "y", "a", "b")) {
+-            val (x, y) = MappingPicture.LAYOUT.getValue(key)
+-            canvas.drawCircle(px(x), py(y), h * 0.075f, line)
+-        }
+-        for (key in listOf("l3", "r3")) {
+-            val (x, y) = MappingPicture.LAYOUT.getValue(key)
+-            canvas.drawCircle(px(x), py(y), h * 0.13f, line)
++        val k = width.toFloat()
++        if (k <= 0f) return
++        line.strokeWidth = MappingPicture.STROKE * k
++        for (s in MappingPicture.SHAPES) when (s) {
++            is MappingPicture.Shape.Outline -> canvas.drawPath(polygon(s.points, k), line)
++            is MappingPicture.Shape.RoundRect ->
++                canvas.drawRoundRect(RectF(s.x * k, s.y * k, (s.x + s.w) * k, (s.y + s.h) * k), s.r * k, s.r * k, line)
++            is MappingPicture.Shape.Circle -> canvas.drawCircle(s.cx * k, s.cy * k, s.r * k, line)
++            is MappingPicture.Shape.Cross -> canvas.drawPath(polygon(MappingPicture.crossPath(s), k), line)
+         }
+-        // the labels: what each control sends now
+-        val size = (h * 0.065f).coerceAtLeast(12f)
+-        text.textSize = size
+-        accent.textSize = size
+-        for ((key, pos) in MappingPicture.LAYOUT) {
+-            val label = labels[key] ?: continue
+-            if (key.contains("stick") && key !in changed) continue      // stick directions: only when changed
+-            canvas.drawText(label, px(pos.first), py(pos.second) + size / 3f, if (key in changed) accent else text)
++        for (box in MappingPicture.BOXES) {
++            val label = labels[box.id] ?: continue
++            if (box.id.contains("stick") && box.id !in changed) continue      // stick directions: only when changed
++            val paint = if (box.id in changed) accent else text
++            paint.textSize = box.h * k * 0.85f
++            while (paint.textSize > 6f && paint.measureText(label) > box.w * k) paint.textSize *= 0.9f
++            val fm = paint.fontMetrics
++            canvas.drawText(label, box.cx * k, box.cy * k - (fm.ascent + fm.descent) / 2f, paint)
+         }
+     }
++
++    private fun polygon(points: List<Pair<Float, Float>>, k: Float): Path = Path().apply {
++        points.forEachIndexed { i, (x, y) -> if (i == 0) moveTo(x * k, y * k) else lineTo(x * k, y * k) }
++        close()
++    }
+ }
+diff -ruN a/PrivyHub/app/src/main/java/streaming/MappingPicture.kt b/PrivyHub/app/src/main/java/streaming/MappingPicture.kt
+--- a/PrivyHub/app/src/main/java/streaming/MappingPicture.kt	2026-11-10 17:39:46.000000000 -0500
++++ b/PrivyHub/app/src/main/java/streaming/MappingPicture.kt	2026-11-10 18:20:40.846633311 -0500
+@@ -69,24 +69,156 @@
+         return now.keys.filter { now[it] != before[it] }.toSet()
+     }
+ 
+-    /**
+-     * Where each of your pad's controls sits on the picture, in a 0..1 box (x, y): a plain outline drawn by the app —
+-     * a body with two grips, a D-pad (left), four face buttons (right), two sticks (lower middle), shoulders and
+-     * triggers (top), Select / Start (centre).
+-     */
+-    val LAYOUT: Map<String, Pair<Float, Float>> = linkedMapOf(
+-        "l2" to (0.18f to 0.05f), "r2" to (0.82f to 0.05f),
+-        "l" to (0.18f to 0.15f), "r" to (0.82f to 0.15f),
+-        "up" to (0.22f to 0.33f), "down" to (0.22f to 0.53f), "left" to (0.13f to 0.43f), "right" to (0.31f to 0.43f),
+-        "y" to (0.78f to 0.31f), "a" to (0.78f to 0.55f), "x" to (0.69f to 0.43f), "b" to (0.87f to 0.43f),
+-        "select" to (0.42f to 0.36f), "start" to (0.58f to 0.36f),
+-        "l3" to (0.36f to 0.66f), "r3" to (0.64f to 0.66f),
+-        "left_stick_up" to (0.36f to 0.58f), "left_stick_down" to (0.36f to 0.74f),
+-        "left_stick_left" to (0.29f to 0.66f), "left_stick_right" to (0.43f to 0.66f),
+-        "right_stick_up" to (0.64f to 0.58f), "right_stick_down" to (0.64f to 0.74f),
+-        "right_stick_left" to (0.57f to 0.66f), "right_stick_right" to (0.71f to 0.66f)
++    // --- B89: the picture's geometry, in one place (the view, the SVG and the off-device render all draw this) -----
++
++    /** The picture's height / width. Every shape below is in "width units": x in 0..1, y in 0..ASPECT. */
++    const val ASPECT = 0.62f
++    /** One stroke width for every line, in width units. */
++    const val STROKE = 0.006f
++    /** The picture is at most this share of the screen's height (B89: the editor's rows stay in view). */
++    const val MAX_SCREEN_SHARE = 0.2f
++
++    sealed class Shape {
++        data class Outline(val points: List<Pair<Float, Float>>) : Shape()
++        data class RoundRect(val id: String, val x: Float, val y: Float, val w: Float, val h: Float, val r: Float) : Shape()
++        data class Circle(val id: String, val cx: Float, val cy: Float, val r: Float) : Shape()
++        data class Cross(val id: String, val cx: Float, val cy: Float, val arm: Float, val half: Float) : Shape()
++    }
++
++    /** A label's box (width units): the control's text is fitted inside it. */
++    data class Box(val id: String, val x: Float, val y: Float, val w: Float, val h: Float) {
++        fun overlaps(o: Box): Boolean = x < o.x + o.w && o.x < x + w && y < o.y + o.h && o.y < y + h
++        val cx: Float get() = x + w / 2
++        val cy: Float get() = y + h / 2
++    }
++
++    private fun arc(cx: Float, cy: Float, r: Float, from: Double, to: Double, steps: Int): List<Pair<Float, Float>> =
++        (0..steps).map { i ->
++            val a = Math.toRadians(from + (to - from) * i / steps)
++            (cx + r * Math.cos(a).toFloat()) to (cy + r * Math.sin(a).toFloat())
++        }
++
++    /** The body: a flat top with rounded corners, two rounded grips, a raised middle between them (right half drawn,
++     *  then mirrored: the outline is symmetric by construction). */
++    val OUTLINE: List<Pair<Float, Float>> = run {
++        val right = mutableListOf(0.5f to 0.14f, 0.80f to 0.14f)
++        right += arc(0.80f, 0.24f, 0.10f, -90.0, 0.0, 8)                     // the top-right corner
++        right += 0.94f to 0.44f                                                // the grip's outer side
++        right += arc(0.83f, 0.46f, 0.11f, 0.0, 150.0, 14)                     // the grip's rounded end
++        right += listOf(0.66f to 0.50f, 0.5f to 0.50f)                         // up to the raised middle
++        val left = right.reversed().map { (x, y) -> (1f - x) to y }
++        (right + left.drop(1)).distinct()
++    }
++
++    val SHAPES: List<Shape> = listOf(
++        Shape.Outline(OUTLINE),
++        Shape.RoundRect("l2", 0.15f, 0.015f, 0.16f, 0.05f, 0.015f), Shape.RoundRect("r2", 0.69f, 0.015f, 0.16f, 0.05f, 0.015f),
++        Shape.RoundRect("l", 0.13f, 0.075f, 0.20f, 0.05f, 0.015f), Shape.RoundRect("r", 0.67f, 0.075f, 0.20f, 0.05f, 0.015f),
++        Shape.Cross("dpad", 0.24f, 0.30f, 0.06f, 0.022f),
++        Shape.Circle("y", 0.76f, 0.235f, 0.028f), Shape.Circle("a", 0.76f, 0.365f, 0.028f),
++        Shape.Circle("x", 0.695f, 0.30f, 0.028f), Shape.Circle("b", 0.825f, 0.30f, 0.028f),
++        Shape.RoundRect("select", 0.405f, 0.24f, 0.05f, 0.022f, 0.011f),
++        Shape.RoundRect("start", 0.545f, 0.24f, 0.05f, 0.022f, 0.011f),
++        Shape.Circle("l3", 0.37f, 0.41f, 0.05f), Shape.Circle("r3", 0.63f, 0.41f, 0.05f)
+     )
+ 
++    /** Each control's label box: inside the control, or beside it (Select / Start under theirs, stick directions around
++     *  their stick). */
++    val BOXES: List<Box> = run {
++        val b = mutableListOf<Box>()
++        fun at(id: String, cx: Float, cy: Float, w: Float, h: Float) { b += Box(id, cx - w / 2, cy - h / 2, w, h) }
++        at("l2", 0.23f, 0.04f, 0.12f, 0.036f); at("r2", 0.77f, 0.04f, 0.12f, 0.036f)
++        at("l", 0.23f, 0.10f, 0.14f, 0.036f); at("r", 0.77f, 0.10f, 0.14f, 0.036f)
++        at("up", 0.24f, 0.26f, 0.034f, 0.03f); at("down", 0.24f, 0.34f, 0.034f, 0.03f)
++        at("left", 0.20f, 0.30f, 0.034f, 0.03f); at("right", 0.28f, 0.30f, 0.034f, 0.03f)
++        for (id in listOf("y", "a", "x", "b")) {
++            val c = SHAPES.filterIsInstance<Shape.Circle>().first { it.id == id }
++            at(id, c.cx, c.cy, 0.036f, 0.036f)
++        }
++        at("select", 0.43f, 0.283f, 0.07f, 0.026f); at("start", 0.57f, 0.283f, 0.07f, 0.026f)
++        for ((stick, cx) in listOf("left" to 0.37f, "right" to 0.63f)) {
++            val press = if (stick == "left") "l3" else "r3"
++            at(press, cx, 0.41f, 0.044f, 0.03f)
++            at("${stick}_stick_up", cx, 0.343f, 0.05f, 0.022f)
++            at("${stick}_stick_down", cx, 0.477f, 0.05f, 0.022f)
++            at("${stick}_stick_left", cx - 0.073f, 0.41f, 0.04f, 0.022f)
++            at("${stick}_stick_right", cx + 0.073f, 0.41f, 0.04f, 0.022f)
++        }
++        b
++    }
++
++    /** The short words a box holds: the game's letter, L1 … R3, SEL / START, arrows for directions. */
++    fun shortLabel(target: String): String = when (val t = target.trim().lowercase()) {
++        "a", "b", "x", "y" -> t.uppercase()
++        "l" -> "L1"; "r" -> "R1"; "l2" -> "L2"; "r2" -> "R2"; "l3" -> "L3"; "r3" -> "R3"
++        "select" -> "SEL"; "start" -> "START"
++        "up" -> "↑"; "down" -> "↓"; "left" -> "←"; "right" -> "→"
++        else -> when {
++            t.startsWith("left_stick_") -> "L" + shortLabel(t.removePrefix("left_stick_"))
++            t.startsWith("right_stick_") -> "R" + shortLabel(t.removePrefix("right_stick_"))
++            else -> t
++        }
++    }
++
++    /** On each control's box: what it sends now, in short words (never changes the map). */
++    fun shortLabels(mapping: Map<String, String>): Map<String, String> {
++        val out = LinkedHashMap<String, String>()
++        for (box in BOXES) out[box.id] = NOTHING
++        val sends = LinkedHashMap<String, MutableList<String>>()
++        for ((target, source) in mapping) {
++            val s = source.trim().lowercase()
++            if (s.isNotEmpty()) sends.getOrPut(s) { mutableListOf() }.add(shortLabel(target))
++        }
++        for ((s, labels) in sends) if (s in out) out[s] = labels.joinToString("+")
++        return out
++    }
++
++    /** The picture's size in pixels: at most a fifth of the screen's height, never wider than the space. */
++    fun pictureSize(availableWidth: Int, screenHeight: Int): Pair<Int, Int> {
++        val byHeight = (screenHeight * MAX_SCREEN_SHARE).toInt()
++        val h = minOf(byHeight, (availableWidth * ASPECT).toInt()).coerceAtLeast(1)
++        return (h / ASPECT).toInt() to h
++    }
++
++    /** The same picture as an SVG document (`px` wide), for looking at off the device. */
++    fun svg(mapping: Map<String, String>, default: Map<String, String>, px: Int = 800): String {
++        val k = px.toFloat()
++        val labels = shortLabels(mapping)
++        val changed = changed(mapping, default)
++        val sw = STROKE * k
++        val sb = StringBuilder()
++        sb.append("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"$px\" height=\"${(ASPECT * k).toInt()}\" ")
++            .append("viewBox=\"0 0 $px ${(ASPECT * k).toInt()}\"><rect width=\"100%\" height=\"100%\" fill=\"#1c1c1c\"/>")
++            .append("<g fill=\"none\" stroke=\"#cfcfcf\" stroke-width=\"$sw\" stroke-linejoin=\"round\">")
++        for (s in SHAPES) when (s) {
++            is Shape.Outline -> sb.append("<polygon points=\"")
++                .append(s.points.joinToString(" ") { (x, y) -> "${x * k},${y * k}" }).append("\"/>")
++            is Shape.RoundRect -> sb.append("<rect x=\"${s.x * k}\" y=\"${s.y * k}\" width=\"${s.w * k}\" height=\"${s.h * k}\" rx=\"${s.r * k}\"/>")
++            is Shape.Circle -> sb.append("<circle cx=\"${s.cx * k}\" cy=\"${s.cy * k}\" r=\"${s.r * k}\"/>")
++            is Shape.Cross -> sb.append("<path d=\"").append(crossPath(s).joinToString(" ", postfix = " Z") { (x, y) -> "L${x * k},${y * k}" }.replaceFirst("L", "M")).append("\"/>")
++        }
++        sb.append("</g><g font-family=\"sans-serif\" text-anchor=\"middle\" dominant-baseline=\"central\">")
++        for (box in BOXES) {
++            val text = labels[box.id] ?: continue
++            if (box.id.contains("stick") && box.id !in changed) continue
++            val size = minOf(box.h * k * 0.85f, box.w * k / (0.62f * maxOf(1, text.length)))
++            sb.append("<text x=\"${box.cx * k}\" y=\"${box.cy * k}\" font-size=\"$size\" fill=\"")
++                .append(if (box.id in changed) "#ffc107" else "#ffffff").append("\">")
++                .append(text.replace("&", "&amp;").replace("<", "&lt;")).append("</text>")
++        }
++        return sb.append("</g></svg>").toString()
++    }
++
++    /** The cross's outline (12 points). */
++    fun crossPath(c: Shape.Cross): List<Pair<Float, Float>> {
++        val (x, y, a, h) = listOf(c.cx, c.cy, c.arm, c.half)
++        return listOf(x - h to y - a, x + h to y - a, x + h to y - h, x + a to y - h, x + a to y + h, x + h to y + h,
++                      x + h to y + a, x - h to y + a, x - h to y + h, x - a to y + h, x - a to y - h, x - h to y - h)
++    }
++
++    /** B86's map of each control's place (x, y as fractions of the picture), now the centres of B89's boxes. */
++    val LAYOUT: Map<String, Pair<Float, Float>> = BOXES.associate { it.id to (it.cx to it.cy / ASPECT) }
++
+     fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
+ 
+     fun fromSystem(): Boolean =
+diff -ruN a/PrivyHub/app/src/test/java/streaming/B89MappingPictureTest.kt b/PrivyHub/app/src/test/java/streaming/B89MappingPictureTest.kt
+--- a/PrivyHub/app/src/test/java/streaming/B89MappingPictureTest.kt	1969-12-31 19:00:00.000000000 -0500
++++ b/PrivyHub/app/src/test/java/streaming/B89MappingPictureTest.kt	2026-11-10 18:20:39.274597806 -0500
+@@ -0,0 +1,167 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import java.awt.BasicStroke
++import java.awt.Color
++import java.awt.Font
++import java.awt.RenderingHints
++import java.awt.geom.Ellipse2D
++import java.awt.geom.Path2D
++import java.awt.geom.RoundRectangle2D
++import java.awt.image.BufferedImage
++import java.io.File
++import javax.imageio.ImageIO
++
++/** B89: the redrawn picture's one geometry — labels per case, no overlap, the size rule — and its render off the device. */
++class B89MappingPictureTest {
++
++    private val default: Map<String, String> = linkedMapOf(
++        "up" to "up", "down" to "down", "left" to "left", "right" to "right",
++        "a" to "b", "b" to "a", "x" to "y", "y" to "x",
++        "l" to "l", "r" to "r", "l2" to "l2", "r2" to "r2", "l3" to "l3", "r3" to "r3",
++        "select" to "select", "start" to "start",
++        "left_stick_left" to "left_stick_left", "left_stick_right" to "left_stick_right",
++        "left_stick_up" to "left_stick_up", "left_stick_down" to "left_stick_down",
++        "right_stick_left" to "right_stick_left", "right_stick_right" to "right_stick_right",
++        "right_stick_up" to "right_stick_up", "right_stick_down" to "right_stick_down"
++    )
++
++    private fun with(vararg pairs: Pair<String, String>): Map<String, String> =
++        LinkedHashMap(default).apply { pairs.forEach { (k, v) -> put(k, v) } }
++
++    private val swap = with("a" to "a", "b" to "b")                    // your Bottom → the game's A, your Right → B
++    private val many = with(                                          // a many-button remap
++        "a" to "a", "b" to "b",                                       // bottom / right swapped
++        "l" to "r", "r" to "l", "l2" to "r2", "r2" to "l2",           // shoulders and triggers swapped side for side
++        "select" to "start", "start" to "select",                     // the centre buttons swapped
++        "x" to "l3", "l3" to "y",                                     // the game's X from the left stick's press, its L3 from Top
++        "up" to "left_stick_up", "left_stick_up" to "up"              // D-pad Up and the stick's Up swapped
++    )
++
++    @Test
++    fun labelsPerCaseEqualTheMapping() {
++        val d = MappingPicture.shortLabels(default)
++        assertEquals(listOf("B", "A", "Y", "X"), listOf("a", "b", "x", "y").map { d.getValue(it) })
++        assertEquals(listOf("L1", "R1", "L2", "R2", "L3", "R3", "SEL", "START"),
++                     listOf("l", "r", "l2", "r2", "l3", "r3", "select", "start").map { d.getValue(it) })
++        assertEquals(listOf("↑", "↓", "←", "→"), listOf("up", "down", "left", "right").map { d.getValue(it) })
++        val s = MappingPicture.shortLabels(swap)
++        assertEquals(listOf("A", "B"), listOf("a", "b").map { s.getValue(it) })
++        assertEquals(setOf("a", "b"), MappingPicture.changed(swap, default))
++        val m = MappingPicture.shortLabels(many)
++        assertEquals("A", m["a"]); assertEquals("B", m["b"])
++        assertEquals("R1", m["l"]); assertEquals("L1", m["r"]); assertEquals("R2", m["l2"]); assertEquals("L2", m["r2"])
++        assertEquals("START", m["select"]); assertEquals("SEL", m["start"])
++        assertEquals("L3", m["y"]); assertEquals("X", m["l3"]); assertEquals("Y", m["x"])
++        assertEquals("L↑", m["up"]); assertEquals("↑", m["left_stick_up"])
++        assertEquals("A+B", MappingPicture.shortLabels(with("a" to "a", "b" to "a"))["a"])   // two on one control
++        // every control's label is what the mapping says it sends (the inverse of the stored {target: source})
++        for (case in listOf(default, swap, many)) {
++            val labels = MappingPicture.shortLabels(case)
++            for ((target, source) in case) assertTrue("$source sends $target", labels.getValue(source).split("+")
++                .contains(MappingPicture.shortLabel(target)))
++        }
++    }
++
++    @Test
++    fun noTwoLabelBoxesOverlapAndAllAreInside() {
++        val boxes = MappingPicture.BOXES
++        for (i in boxes.indices) for (j in i + 1 until boxes.size)
++            assertFalse("${boxes[i].id} / ${boxes[j].id}", boxes[i].overlaps(boxes[j]))
++        for (b in boxes) assertTrue(b.id, b.x >= 0f && b.y >= 0f && b.x + b.w <= 1f && b.y + b.h <= MappingPicture.ASPECT)
++        assertEquals(default.values.toSet(), boxes.map { it.id }.toSet())       // every control the hub lists has a box
++        val shapeIds = MappingPicture.SHAPES.mapNotNull {
++            when (it) {
++                is MappingPicture.Shape.RoundRect -> it.id; is MappingPicture.Shape.Circle -> it.id
++                is MappingPicture.Shape.Cross -> it.id; else -> null
++            }
++        }.toSet()
++        assertEquals(setOf("l", "r", "l2", "r2", "a", "b", "x", "y", "select", "start", "l3", "r3", "dpad"), shapeIds)
++        assertEquals(1, MappingPicture.SHAPES.count { it is MappingPicture.Shape.Outline })
++    }
++
++    @Test
++    fun theHeightRule() {
++        val (w, h) = MappingPicture.pictureSize(1700, 1080)         // the TV: the dialog's width, the screen's height
++        assertTrue("$h", h <= 216)
++        assertEquals((h / MappingPicture.ASPECT).toInt(), w)
++        val (w2, h2) = MappingPicture.pictureSize(300, 1080)         // a narrow space: never wider than it
++        assertTrue(w2 <= 300 && h2 <= 216)
++        val (_, h3) = MappingPicture.pictureSize(1000, 600)          // a small screen
++        assertTrue(h3 <= 120)
++    }
++
++    @Test
++    fun theOutlineIsClosedAndSymmetric() {
++        val pts = MappingPicture.OUTLINE
++        assertTrue(pts.size > 20)
++        for ((x, y) in pts) assertTrue("($x, $y)", pts.any { (u, v) -> Math.abs(u - (1f - x)) < 1e-4 && Math.abs(v - y) < 1e-4 })
++        assertTrue(pts.all { (x, y) -> x in 0f..1f && y in 0f..MappingPicture.ASPECT })
++    }
++
++    @Test
++    fun theSvgHoldsEveryLabel() {
++        val svg = MappingPicture.svg(many, default)
++        for (label in listOf(">A<", ">B<", ">R1<", ">L1<", ">START<", ">SEL<", ">L3<", ">X<")) assertTrue(label, label in svg)
++        assertTrue("<polygon" in svg)
++        assertEquals(1, Regex("stroke-width=").findAll(svg).count())         // one stroke width for every line
++    }
++
++    @Test
++    fun theSwitch() {
++        assertFalse(MappingPicture.parse("0"))
++        assertFalse(MappingPicture.parse("off"))
++        assertTrue(MappingPicture.parse(null))
++    }
++
++    /** With B89_RENDER_DIR set: the three cases as SVG and PNG (java.awt, headless), the same geometry as the view. */
++    @Test
++    fun renderOffTheDevice() {
++        val dir = System.getenv("B89_RENDER_DIR") ?: return
++        System.setProperty("java.awt.headless", "true")
++        File(dir).mkdirs()
++        for ((name, case) in listOf("default" to default, "swap_bottom_right" to swap, "many_button_remap" to many)) {
++            File(dir, "$name.svg").writeText(MappingPicture.svg(case, default))
++            File(dir, "$name.png").let { ImageIO.write(png(case, 800), "png", it) }
++        }
++    }
++
++    private fun png(mapping: Map<String, String>, px: Int): BufferedImage {
++        val k = px.toFloat()
++        val img = BufferedImage(px, (MappingPicture.ASPECT * k).toInt(), BufferedImage.TYPE_INT_RGB)
++        val g = img.createGraphics()
++        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
++        g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
++        g.color = Color(0x1c, 0x1c, 0x1c); g.fillRect(0, 0, img.width, img.height)
++        g.color = Color(0xcf, 0xcf, 0xcf)
++        g.stroke = BasicStroke(MappingPicture.STROKE * k, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
++        fun poly(points: List<Pair<Float, Float>>) = Path2D.Float().apply {
++            points.forEachIndexed { i, (x, y) -> if (i == 0) moveTo(x * k, y * k) else lineTo(x * k, y * k) }; closePath()
++        }
++        for (s in MappingPicture.SHAPES) when (s) {
++            is MappingPicture.Shape.Outline -> g.draw(poly(s.points))
++            is MappingPicture.Shape.RoundRect -> g.draw(RoundRectangle2D.Float(s.x * k, s.y * k, s.w * k, s.h * k, 2 * s.r * k, 2 * s.r * k))
++            is MappingPicture.Shape.Circle -> g.draw(Ellipse2D.Float((s.cx - s.r) * k, (s.cy - s.r) * k, 2 * s.r * k, 2 * s.r * k))
++            is MappingPicture.Shape.Cross -> g.draw(poly(MappingPicture.crossPath(s)))
++        }
++        val labels = MappingPicture.shortLabels(mapping)
++        val changed = MappingPicture.changed(mapping, default)
++        for (b in MappingPicture.BOXES) {
++            val text = labels[b.id] ?: continue
++            if (b.id.contains("stick") && b.id !in changed) continue
++            var size = b.h * k * 0.85f
++            var fm = g.getFontMetrics(Font(Font.SANS_SERIF, Font.BOLD, size.toInt().coerceAtLeast(1)))
++            while (size > 6f && fm.stringWidth(text) > b.w * k) {
++                size *= 0.9f; fm = g.getFontMetrics(Font(Font.SANS_SERIF, Font.BOLD, size.toInt().coerceAtLeast(1)))
++            }
++            g.font = fm.font
++            g.color = if (b.id in changed) Color(0xff, 0xc1, 0x07) else Color.WHITE
++            g.drawString(text, b.cx * k - fm.stringWidth(text) / 2f, b.cy * k + (fm.ascent - fm.descent) / 2f)
++        }
++        g.dispose()
++        return img
++    }
++}

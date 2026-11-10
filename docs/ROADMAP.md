@@ -2932,6 +2932,15 @@ C48 again (`docs/memory/evidence/HOME_12R_PARITY_2026-11-10.md`). **What stays o
 (PS2 / GameCube details, the art misses, the rejected N64 list, the PS2 disc change, Mods and GameCube discs, the
 user's cheat files).
 
+**Queue AF (2026-11-10; HOME-12R's findings; built, applied to the tree uncommitted, nothing adopted):** **B87** the
+N64 cheat launch — RetroArch's own cheat-file name (one more dot-suffix stripped; titles with a dot inside their name
+never got cheats, any RetroArch system) and a wait for RetroArch's evidence before any cheat command
+(`evidence/B87_N64_CHEAT_LAUNCH_2026-11-10.md`); **B88** `ps2-patches` on the onn's POST and the client ↔ hub contract
+test — all 46 client calls through the hub's real HTTP server (`evidence/B88_PS2_PATCHES_ROUTE_AND_CONTRACT_2026-11-10.md`);
+**B89** the mapping picture redrawn, at most a fifth of the screen (`evidence/B89_MAPPING_PICTURE_REDRAWN_2026-11-10.md`).
+APK `3f21e2c6…` pinned, NOT installed. **Next (A):** HOME-12's third sitting — (a) the APK's cells C51 / C52 / C53,
+(b) the hub's C46 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-10AF.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,

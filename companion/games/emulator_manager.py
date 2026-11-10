@@ -4936,6 +4936,17 @@ class EmulatorManager:
             self._cleanup_cheat_runtime()
             raise EmulatorError("Staged cheat source failed SHA-256 verification")
 
+        # B87: RetroArch looks for the file under the content's name with one more dot-suffix stripped ("X v1.1.v64" ->
+        # "X v1.cht"); the same bytes under that name too when it differs (PRIVYHUB_CHEAT_READY=0: today's one file)
+        retroarch_name = self._retroarch_cheat_name(content_path)
+        if retroarch_name is not None:
+            try:
+                (target_dir / f"{retroarch_name}.cht").resolve().relative_to(root.resolve())
+                (target_dir / f"{retroarch_name}.cht").write_bytes(parsed["raw"])
+            except (OSError, ValueError) as exc:
+                self._cleanup_cheat_runtime()
+                raise EmulatorError(f"Unable to stage cheat source: {exc}") from exc
+
         try:
             profile = self._prepare_cheat_profile_storage(
                 game,
@@ -5112,6 +5123,47 @@ class EmulatorManager:
         ).upper():
             raise EmulatorError("Active cheat profile ID mismatch")
 
+    # B87: before any cheat command, RetroArch's own evidence that the cheat file is loaded and that the content runs
+    # (PRIVYHUB_CHEAT_READY=0: today's order, the first pulse at PLAYING)
+    CHEAT_READY_ENV = "PRIVYHUB_CHEAT_READY"
+    CHEAT_READY_BOUND_SECONDS = 10.0
+    CHEAT_READY_PROBE_SECONDS = 0.25
+    CHEAT_NOT_READY = "cheats not ready — the game did not finish loading"
+
+    @classmethod
+    def _cheat_ready_on(cls) -> bool:
+        return str(os.environ.get(cls.CHEAT_READY_ENV, "")).strip() != "0"
+
+    @classmethod
+    def _retroarch_cheat_name(cls, content_path: Path) -> str | None:
+        """RetroArch's own name for the game-specific cheat file when it differs from the content's stem."""
+        if not cls._cheat_ready_on():
+            return None
+        stem = Path(content_path).stem
+        if "." not in stem.lstrip("."):
+            return None
+        name = Path(stem).stem
+        return name if name and name != stem else None
+
+    def _wait_for_cheats_ready(self) -> None:
+        """RetroArch's `Load game-specific cheatfile` line in this launch's log, then a cheat-index pulse answered
+        (the content running), within the bound; a miss raises the plain error before any toggle."""
+        deadline = time.monotonic() + self.CHEAT_READY_BOUND_SECONDS
+        while not any("Load game-specific cheatfile" in line for line in self._retroarch_session_log_since(0)):
+            if time.monotonic() >= deadline:
+                raise EmulatorError(self.CHEAT_NOT_READY)
+            time.sleep(0.05)
+        while True:
+            offset = self._retroarch_session_log_position()
+            self._retroarch_network_request("CHEAT_INDEX_PLUS", expect_response=False, retries=1)
+            probe_end = time.monotonic() + self.CHEAT_READY_PROBE_SECONDS
+            while time.monotonic() < probe_end:
+                if any("[Cheats] Cheat #" in line for line in self._retroarch_session_log_since(offset)):
+                    return
+                time.sleep(0.02)
+            if time.monotonic() >= deadline:
+                raise EmulatorError(self.CHEAT_NOT_READY)
+
     def _apply_active_cheat_profile(self) -> dict[str, Any]:
         session = self._active_cheat_session
         if not isinstance(session, dict):
@@ -5130,6 +5182,19 @@ class EmulatorManager:
             raise EmulatorError(
                 "Cheat profile activation requires RetroArch to begin in PLAYING state"
             )
+
+        if self._cheat_ready_on():   # B87: no cheat command before RetroArch has loaded the file and runs the content
+            try:
+                self._wait_for_cheats_ready()
+            except EmulatorError:
+                session["activation_available"] = False
+                session["activation_verified"] = False
+                session["activation_error"] = self.CHEAT_NOT_READY
+                process = self.process
+                if process is not None and process.poll() is None:
+                    self._force_stop_process(process)
+                self._refresh_process()
+                raise
 
         self.pause()
         toggled_indexes: list[int] = []

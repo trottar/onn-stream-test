@@ -1,0 +1,530 @@
+{
+ "about": "B88: every hub call the client makes (from the APK's source), checked by test_contract.py: the source check (scan.py) and the hub's real HTTP server on loopback (no 404 / 405 / unknown action).",
+ "templates": {
+  "/plugins/games/$action": "input-profile-* (POST)",
+  "/plugins/games/$action$query": "recovery-* (POST)",
+  "/plugins/games/$endpoint": "save-state / load-state (POST)",
+  "/plugins/games/${DiscChange.ENDPOINT}": "disc-swap (POST)"
+ },
+ "calls": [
+  {
+   "path": "/sources",
+   "method": "GET",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/status",
+   "method": "GET",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/games",
+   "method": "GET",
+   "params": [
+    "view",
+    "q"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "note": "the search node's lazy path, fetched with httpGet"
+  },
+  {
+   "path": "/plugins/games/favorite",
+   "method": "POST",
+   "params": [
+    "id"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/player-mode",
+   "method": "POST",
+   "params": [
+    "id",
+    "mode"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/controller-profile",
+   "method": "POST",
+   "params": [
+    "id",
+    "profile"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/ps1-multitap",
+   "method": "POST",
+   "params": [
+    "id",
+    "enabled"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/native-stream-stop",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt",
+    "NativeStreamActivity.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/mod-profiles",
+   "method": "POST",
+   "params": [
+    "id"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/mod-catalog",
+   "method": "POST",
+   "params": [
+    "id"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/cheat-profiles",
+   "method": "POST",
+   "params": [
+    "id"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/cheat-catalog",
+   "method": "POST",
+   "params": [
+    "id"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/input-profiles",
+   "method": "GET",
+   "params": [
+    "id"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/launch",
+   "method": "POST",
+   "params": [
+    "id",
+    "cheat_source",
+    "cheat_indexes",
+    "mod_index",
+    "players_joined",
+    "disc"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/ps2-patches",
+   "method": "POST",
+   "params": [
+    "id",
+    "ws",
+    "ni",
+    "fps60"
+   ],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "note": "B88: HOME-12R's C48"
+  },
+  {
+   "path": "/plugins/games/stop",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/stop",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/diagnostics/vod-client",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "note": "VodRetryAndroid's requestMethod"
+  },
+  {
+   "path": "/plugins/epg/prefetch",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "TvEpgRepository.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/epg/guide",
+   "method": "GET",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "TvEpgRepository.kt"
+   ]
+  },
+  {
+   "path": "/plugins/tv_state/state",
+   "method": "GET",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "TvStateSyncClient.kt"
+   ]
+  },
+  {
+   "path": "/plugins/tv_state/state",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "TvStateSyncClient.kt"
+   ]
+  },
+  {
+   "path": "/diagnostics/health",
+   "method": "GET",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "DiagnosticsActivity.kt"
+   ]
+  },
+  {
+   "path": "/diagnostics/self-test",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "DiagnosticsActivity.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/diagnostics/bundle",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "DiagnosticsActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/decoder-session-log",
+   "method": "POST",
+   "params": [
+    "(body)"
+   ],
+   "source": "literal",
+   "files": [
+    "DecoderReportUpload.kt",
+    "NativeStreamActivity.kt"
+   ],
+   "note": "httpPostBody: the report in the body"
+  },
+  {
+   "path": "/plugins/games/native-stream-start",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "NativeStreamActivity.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/native-stream-relaunch-ports",
+   "method": "POST",
+   "params": [
+    "players"
+   ],
+   "source": "literal",
+   "files": [
+    "NativeStreamActivity.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/native-stream-heartbeat",
+   "method": "POST",
+   "params": [
+    "sequence",
+    "interval_ms",
+    "last_output_age_ms"
+   ],
+   "source": "literal",
+   "files": [
+    "NativeStreamActivity.kt"
+   ]
+  },
+  {
+   "path": "/diagnostics/client-health",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "NativeStreamActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/native-stream-ready",
+   "method": "POST",
+   "params": [],
+   "source": "literal",
+   "files": [
+    "NativeStreamActivity.kt"
+   ],
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/native-stream-desync",
+   "method": "POST",
+   "params": [
+    "reason",
+    "age_ms"
+   ],
+   "source": "literal",
+   "files": [
+    "NativeStreamActivity.kt"
+   ]
+  },
+  {
+   "path": "/plugins/games/input-profile-create",
+   "method": "POST",
+   "params": [
+    "name",
+    "mapping"
+   ],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$action (postInputProfileAction)"
+  },
+  {
+   "path": "/plugins/games/input-profile-update",
+   "method": "POST",
+   "params": [
+    "profile_id",
+    "name",
+    "mapping"
+   ],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$action (postInputProfileAction)"
+  },
+  {
+   "path": "/plugins/games/input-profile-delete",
+   "method": "POST",
+   "params": [
+    "profile_id"
+   ],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$action (postInputProfileAction)"
+  },
+  {
+   "path": "/plugins/games/input-profile-assign",
+   "method": "POST",
+   "params": [
+    "id",
+    "profile_id"
+   ],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$action (postInputProfileAction)"
+  },
+  {
+   "path": "/plugins/games/recovery-resume",
+   "method": "POST",
+   "params": [],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$action$query (requestRecoveryAction)",
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/recovery-copy",
+   "method": "POST",
+   "params": [
+    "slot"
+   ],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$action$query (requestRecoveryAction)",
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/recovery-discard",
+   "method": "POST",
+   "params": [],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$action$query (requestRecoveryAction)",
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/save-state",
+   "method": "POST",
+   "params": [
+    "slot",
+    "replace"
+   ],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$endpoint",
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/load-state",
+   "method": "POST",
+   "params": [
+    "slot"
+   ],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/$endpoint",
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/disc-swap",
+   "method": "POST",
+   "params": [
+    "disc"
+   ],
+   "source": "template",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "template": "/plugins/games/${DiscChange.ENDPOINT}",
+   "side_effect": true
+  },
+  {
+   "path": "/plugins/games/systems",
+   "method": "GET",
+   "params": [],
+   "source": "hub_lazy_path",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "note": "named by the hub (config/sources.json or its nodes), fetched with httpGet"
+  },
+  {
+   "path": "/plugins/games/details",
+   "method": "GET",
+   "params": [
+    "id"
+   ],
+   "source": "hub_lazy_path",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "note": "named by the hub (config/sources.json or its nodes), fetched with httpGet"
+  },
+  {
+   "path": "/plugins/iptv_org/categories",
+   "method": "GET",
+   "params": [],
+   "source": "hub_lazy_path",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "note": "named by the hub (config/sources.json or its nodes), fetched with httpGet"
+  },
+  {
+   "path": "/plugins/iptv_org/channels",
+   "method": "GET",
+   "params": [],
+   "source": "hub_lazy_path",
+   "files": [
+    "MainActivity.kt"
+   ],
+   "note": "named by the hub (config/sources.json or its nodes), fetched with httpGet"
+  }
+ ]
+}

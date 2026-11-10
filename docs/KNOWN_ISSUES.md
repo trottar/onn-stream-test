@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-10 — Queue AF (B87-B89, HOME-12R's three findings): B87 the N64 cheat launch — the real cause settled headless: RetroArch looks for the cheat file under the content's name with one more dot-suffix stripped, and a title with a dot inside its name never got its cheats (every RetroArch system); plus a cheat pulse sent before the N64 core runs is lost — the hub now stages RetroArch's name and waits for RetroArch's evidence (`PRIVYHUB_CHEAT_READY=0` = today); B88 `ps2-patches` on the onn's POST and **a contract test of all 46 client calls through the hub's real HTTP server** (before 45 / 46 served, now 46 / 46); B89 the mapping picture redrawn, a fifth of the screen's height, rendered off the device; APK `3f21e2c6…` built, NOT installed — OPEN (A's HOME-12 third sitting) — `## 2026-11-10 Queue AF` below
 - 2026-11-10 — HOME-12R (HOME-12 resumed): APK `c801caab…` installed with every property empty (twenty); C49 the cheat picker MET on its first real run (Launch at the top, the sections and counts, the filter), C47 a GameCube cheat MET, C50 the mapping picture MET ("Much clearer"; "a big poorly drawn controller"), the PS1 check MET; **C46 not run — the N64 cheat launch failed on the hub** (RetroArch had not loaded the cheat file when the hub toggled), **C48 not met — the onn's Patches Save is a POST the hub only takes as GET** → **`c801caab…` NOT CONFIRMED, `85220f99…` reinstalled**; HOME-12's three requirements met at the TV but not on the confirmed APK; three items OPEN for B — `## 2026-11-10 HOME-12R` below
 - 2026-11-10 — Queue AE (B84-B86, HOME-12's three requirements): B84 the cheat picker as PrivyHub's own screen (Launch / Cancel at the top — Left from any row, Start on a pad; a filter; sections with counts; paging); B85 every system's cheat list cleaned on the hub (lone cartridge triggers hidden, "must be on" codes applied with any pick, "Player 1", parts folded, repeats shown as variants; heading rows no longer make 8 N64 and 1 SNES lists fail); B86 the mapping editor's controller picture and one set of letters; APK `c801caab…` built, NOT installed; nothing adopted — OPEN (A's HOME-12 resumed: C49, C46-C48, C50) — `## 2026-11-10 Queue AE` below
 - 2026-11-10 — HOME-12: APK `de6682db…` installed with every property empty (eighteen); C44 art / details MET (B76), C45 Input Profiles on PS2 / GameCube MET (B77; swaps of the user's choosing), the drop-in folders present and empty (B81); **C46 stopped by the user at the N64 cheat list** (677 entries, the Launch button after them all: "we need to fix this bloat first"), C47 / C48 not run → **`de6682db…` NOT CONFIRMED, `85220f99…` reinstalled**; three client requirements OPEN for B (the picker's button, the list's clutter, a controller picture in the mapping editor) — `## 2026-11-10 HOME-12` below
@@ -71,6 +72,25 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-10 Queue AF (B87-B89): the N64 cheat launch, the PS2 Patches route + the client contract, the picture redrawn — OPEN (A's HOME-12 third sitting)
+
+(`docs/memory/evidence/B87_N64_CHEAT_LAUNCH_2026-11-10.md`, `B88_PS2_PATCHES_ROUTE_AND_CONTRACT_2026-11-10.md`,
+`B89_MAPPING_PICTURE_REDRAWN_2026-11-10.md`, `docs/memory/handoffs/SESSION_B_DONE_2026-11-10AF.md`)
+
+- **The N64 cheat launch's cause, settled (B87):** RetroArch's game-specific cheat file is named after the content with
+  one more dot-suffix stripped (`X v1.1.v64` → `X v1.cht`); the hub staged `X v1.1.cht`, so **any title with a dot
+  inside its name never got its cheats, on every RetroArch system**. Also latent: a cheat pulse sent before the N64
+  core runs is lost. Fixed behind `PRIVYHUB_CHEAT_READY` (default on): RetroArch's name staged too; the hub waits for
+  RetroArch's cheat-file line and an answered pulse (≤ 10 s); a miss stops the game cleanly with "cheats not ready —
+  the game did not finish loading". **OPEN, not measured:** the 10-s bound on a real title (only the fixture's ≤ 0.6 s).
+- **`ps2-patches` on POST (B88)** and **a standing contract test** (`tests/client_contract/`): every hub call the
+  client's source makes (46, as data), sent with the client's method through the companion's own HTTP server on
+  loopback; a source check fails when the client gains a call the list lacks. Only `ps2-patches` POST was unserved.
+- **The picture (B89):** one geometry, a fifth of the screen's height at most, labels in non-overlapping boxes; renders
+  in `evidence/b89_2026-11-10/render/`.
+- **OPEN, next queue (pre-existing):** `tests/input_hold_b8`'s one time-dependent off-by-one (queue AE's note) — see the
+  host-suite comparison in `b89_2026-11-10/`.
 
 ## 2026-11-10 HOME-12R: the picker and the picture work; the N64 cheat launch and the PS2 Patches save fail — c801caab… NOT CONFIRMED; three items OPEN
 

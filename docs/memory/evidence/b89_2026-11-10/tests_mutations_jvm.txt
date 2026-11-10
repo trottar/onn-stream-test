@@ -1,0 +1,13 @@
+K1: NOT CAUGHT (tests="7" skipped="0" failures="0" errors="0")
+K2: CAUGHT (gradle rc 1; tests="7" skipped="0" failures="1" errors="0")
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import sys;p=sys.argv[1];s=open(p).read();o=sys.argv[2];n=sys.argv[3];assert s.count(o)==1,('not once',o);open(p,'w').write(s.replace(o,n))
+                                                                                 ^^^^^^^^^^^^^
+AssertionError: ('not once', '        at("start", 0.57f, 0.283f, 0.07f, 0.026f)')
+K3: NOT APPLIED
+K4: CAUGHT (gradle rc 1; tests="7" skipped="0" failures="1" errors="0")
+K5: CAUGHT (gradle rc 1; tests="7" skipped="0" failures="1" errors="0")
+# re-run after the test gained the two-on-one-control case (K1) and K3's text was corrected (the first run: K1 NOT CAUGHT, K3 NOT APPLIED)
+K1: CAUGHT (gradle rc 1; tests="7" skipped="0" failures="1" errors="0")
+K3: CAUGHT (gradle rc 1; tests="7" skipped="0" failures="1" errors="0")
