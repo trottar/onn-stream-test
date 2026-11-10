@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-10
-baseline_commit: 1739c816 (queue AD; ART-1R's close uncommitted beside it)
+baseline_commit: e3ad4d36 (ART-1R; HOME-12's close uncommitted beside it)
 ---
 
 # Current State
@@ -12,16 +12,14 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 ## Active Objective
 
 **Phase H CLOSED at its checkpoint 2026-11-09** on the user's "Close H" (`evidence/H5_CHECKPOINT_2026-11-09.md`).
-**H6 (feature parity) OPEN**, waiting for the user's ranking of B75's gaps
-(`architecture/H6_PARITY_MATRIX_2026-11-09.md`). The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
-E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED** (HOME-11).
+**H6 (feature parity) OPEN**: queue AC checked at HOME-12 — B76 / B77 / B81 met; B78-B80 wait on B's cheat-picker fixes. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
+E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED** (HOME-11; back on after HOME-12).
 
 ## Current Work Item
 
-- **ART-1R DONE** (`evidence/ART_1R_2026-11-10.md`): queue AD (B82) live at the
-  restart; the dry run saw seven systems; on "fetch" the art, details and N64 cheats were fetched; they survive
-  a companion start without the art knob. ART-1's hidden update wrote nothing.
-- Queue AD committed (`1739c816`); APK `de6682db…` NOT installed.
+- **HOME-12 DONE** (`evidence/HOME_12_PARITY_2026-11-10.md`): C44 met (B76), C45 met (B77), B81's folders met;
+  C46 stopped by the user at the 677-entry cheat list ("fix this bloat first"), C47 / C48 not run → **`de6682db…` NOT
+  CONFIRMED**, `85220f99…` reinstalled. Three client requirements for B (`KNOWN_ISSUES.md` HOME-12).
 
 ## Verified State
 
@@ -58,13 +56,12 @@ line 15 writes one redacted row per movie range request and a retrying client's 
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`85220f99…` is CONFIRMED** on the onn (HOME-11: queue AA, B73 + B74 on queue Z's), pinned in the three
-  places; `5f72af4b…` kept in `home11_previous/`.
-- The seventeen client properties are empty. One device is paired, with `identity_v2` on.
+- APK **`85220f99…` is CONFIRMED** on the onn (HOME-11), pinned in the three places; reinstalled at HOME-12's close
+  (`home12_previous/`); `de6682db…` (queue AC) tried and NOT CONFIRMED, kept in `home12_installed/`.
+- The eighteen client properties (+ `ps2_patches`) are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
-`tools/diag_keeper.py`, read with `tools/diag_read.py` and `tools/diag_check.py`. The nightly watch
-(`privyhub-link-n1`) ended 2026-10-31 and the trip keeper (`privyhub-trip-log`) ended 2026-11-01.
+`tools/diag_keeper.py`, read with `tools/diag_read.py` and `tools/diag_check.py`.
 
 **Live inside an adopted line:** B33. A release under 1 s with no loss in its window resumes without the state load;
 the save is still made. Off: `PRIVYHUB_REWIND_NEEDS_LOSS=0` (`evidence/B33_NO_REWIND_WITHOUT_LOSS_2026-10-31.md`).
@@ -90,11 +87,12 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **The user's commit** of ART-1R's close (`logs/art1r_git_status.txt`).
-2. **HOME-12 at the TV** (B's sketch, `handoffs/SESSION_B_DONE_2026-11-09AC.md` + `_2026-11-10AD.md`): install APK
-   `de6682db…`, C44-C48. **No art drop-in** (ART-1R's ADDITION 2: the art survives a companion start without the
-   knob). C44: PS2 / GameCube show the picture, not year / genre / players. C46: N64 cheats for 12 of 13.
-3. Then what the user names next (for B, small: the N64 cheat list the bound check rejected). **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
+1. **The user's commit** of HOME-12's close (`logs/home12_git_status.txt`).
+2. **B (the user's three requirements, HOME-12):** the cheat picker's Launch reachable without walking the list; the
+   list cleaned (repeats, cartridge codes, "Player 1"); a controller picture in the mapping editor. Then **HOME-12
+   again** (the user's word): a new APK, C46-C48 (B78-B80).
+3. The user's next parity picks: the PS2 disc change (designed); a second source for PS2 / GameCube details and the
+   missing art; the user's own cheat files; the rejected N64 list. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

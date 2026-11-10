@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-10 — HOME-12: APK `de6682db…` installed with every property empty (eighteen); C44 art / details MET (B76), C45 Input Profiles on PS2 / GameCube MET (B77; swaps of the user's choosing), the drop-in folders present and empty (B81); **C46 stopped by the user at the N64 cheat list** (677 entries, the Launch button after them all: "we need to fix this bloat first"), C47 / C48 not run → **`de6682db…` NOT CONFIRMED, `85220f99…` reinstalled**; three client requirements OPEN for B (the picker's button, the list's clutter, a controller picture in the mapping editor) — `## 2026-11-10 HOME-12` below
 - 2026-11-10 — ART-1R (ART-1 again after queue AD): the dry run saw all seven systems; fetched on the user's "fetch" — art N64 13/13, PS2 100/115, GameCube 24/27; N64 cheats for 12 of 13 (one list rejected: cheat count outside the hub's bounds); PS2 / GameCube details carry no year / genre / players (not in RetroArch's database); the records survive a companion start without the art knob (no drop-in); the first ART-1's hidden update made no request and wrote no record — ART-1's defect RESOLVED; two small items OPEN — `## 2026-11-10 ART-1R` below
 - 2026-11-10 — Queue AD (B82, B83): B82 the tools' game scan sees every system the hub lists (one systems builder shared with the plugin's constructor) and no longer builds the companion's plugins in the tool's process (HEAD's tools ran the startup reconcile — a full metadata update — inside every tool run); the cheat tool counts systems without a cheat list as not offered; B83 the real-entry-point audit of B76-B81 (broken on the real path: B76 and B78's tool part, both the scan; the rest sound); nothing adopted — OPEN (A's ART-1 again, then HOME-12) — `## 2026-11-10 Queue AD` below
 - 2026-11-10 — ART-1: SKIPPED at the user's "Skip" after stage 1; the companion restarted with queue AC (clean); the dry run saw PS1 66/72, SNES 44/44 and **not N64 / PS2 / GameCube** — B76's scan (`scan_privyhub_games`) skips `GamesPlugin.__init__`, so the three systems are never scanned (the N64 cheat tool too); nothing fetched — OPEN for B
@@ -68,6 +69,30 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-10 HOME-12: the first parity sitting — de6682db… NOT CONFIRMED (C46-C48 not run); three client requirements OPEN
+
+(`docs/memory/evidence/HOME_12_PARITY_2026-11-10.md`, `docs/memory/evidence/home12_2026-11-10/`)
+
+- **Met at the TV:** C44 → B76 (art on N64 / PS2 / GameCube; details on N64); C45 → B77 (the assigned profile reached
+  PCSX2's and Dolphin's pads; `assigned overrides=1` both; the user: "The input profiles work well"); B81's three
+  drop-in folders appeared empty at the first Cheats list.
+- **OPEN (client, blocks C46 / C47) — the cheat picker's button:** Extras → Cheats is Android's multi-choice dialog;
+  **Launch Cheat Session** comes after every entry in D-pad order. On an N64 list of 677 entries the user held Down a
+  minute without reaching it (lists run to 2092; GameCube to 147). Needed: the button reachable without walking the
+  list (above it, a jump key, or a filter). The dialog is the same in `85220f99…` (PS1's lists were short).
+- **OPEN (client / host) — the cheat list's clutter:** RetroArch's N64 lists merge several collections: on the tested
+  title 290 of 677 names repeat, 85 are cheat-cartridge enabler / activator codes (no use on the onn), 461 carry
+  P1-P4. The user: "a lot of overlap and ones just called p1 or p2 what does that even mean". Needed: repeats folded,
+  enabler / activator entries hidden, "P1" spelled "Player 1".
+- **OPEN (client) — the mapping editor:** the user: "it would be much easier to interpret changes if there were a little
+  image of a controller with the current mappings showing". Also seen: the rows use the game's (Nintendo-style)
+  letters and the choices the pad's (Xbox-style) letters, so the default reads A ← B, B ← A, X ← Y, Y ← X.
+- **Not confirmed at the TV (built; tests stand):** B78 (C46 stopped), B79 (C47), B80 (C48, the APK's own cell) —
+  run again after the fixes, with a new APK.
+- `85220f99…` stays CONFIRMED (reinstalled at the close, read back, paired, every property empty).
+- **The user, after the close:** "We need to return to this update once my requests are fixed/implemented" — HOME-12
+  resumes (C46-C48 on the next APK) after B builds the three requirements above.
 
 ## 2026-11-10 ART-1R: the art, details and N64 cheats fetched — ART-1's defect RESOLVED; two small items OPEN
 

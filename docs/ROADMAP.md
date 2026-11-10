@@ -2900,6 +2900,18 @@ lists for them). B78's fetch run — N64 cheats for 12 of 13 titles (one list re
 and `box_art_available` survive a companion start without `PRIVYHUB_ART_SYSTEMS` (no drop-in). **Next (A):** HOME-12
 at the TV — APK `de6682db…`, C44-C48 (`docs/memory/evidence/ART_1R_2026-11-10.md`).
 
+**HOME-12 (2026-11-10, the first parity queue checked at the TV; APK `de6682db…` NOT CONFIRMED, `85220f99…` back
+on):** [x] B76 art on N64 / PS2 / GameCube, details on N64 (C44 met); [x] B77 Input Profiles on PS2 / GameCube (C45
+met); [x] B81's drop-in folders (present, empty); [ ] B78 N64 cheats — C46 stopped by the user at the cheat list
+("we need to fix this bloat first"); [ ] B79 GameCube cheats (C47) and [ ] B80 PS2 widescreen (C48, the APK's own
+cell) not run. **Next (B):** the cheat picker's Launch button reachable without walking the list; the list cleaned
+for the TV (repeats folded, cheat-cartridge enabler / activator codes hidden, "Player 1" spelled out); a controller
+picture of the current mapping in the profile editor; then a new APK and C46-C48 again
+(`docs/memory/evidence/HOME_12_PARITY_2026-11-10.md`). **What stays open in H6:** PS2 / GameCube details (year /
+genre / players) absent from RetroArch's database — a second source; the art misses (PS2 15, GameCube 3); one N64
+cheat list rejected by the bound check; the PS2 disc change designed, not built; Mods and GameCube discs deferred;
+the user's own cheat files (the folders ready, `docs/CHEATS.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,
