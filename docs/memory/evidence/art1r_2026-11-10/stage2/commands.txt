@@ -1,0 +1,9 @@
+ART-1R stage 2 (the user's "fetch", 2026-11-10 ~02:57Z). Each run: the companion's eighteen PRIVYHUB_ lines
+(stage1/environ_after_restart.txt) plus PRIVYHUB_ART_SYSTEMS=1 in the command only, TMPDIR on the main disk (off the
+repo); the raw outputs (they carry titles) kept off the repo.
+02:57:26Z  python3 tools/update_game_metadata.py --system n64 --json        exit 0, stderr empty
+02:57:38Z  python3 tools/update_game_metadata.py --system ps2 --json        exit 0, stderr empty
+02:59:15Z  python3 tools/update_game_metadata.py --system gamecube --json   exit 0, stderr empty (ended ~02:59:50Z)
+02:59:56Z  PRIVYHUB_N64=1 python3 tools/update_game_cheats.py --system n64 --no-download --json   exit 0 (the report)
+03:00:04Z  PRIVYHUB_N64=1 python3 tools/update_game_cheats.py --system n64 --json                 exit 0 (ended 03:00:08Z)
+Read-backs: python3 -I readback.py <repo> <control API> <media port> n64 ps2 gamecube ps1 snes (stage2/readback_after_fetch.json)

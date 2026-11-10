@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-10
-baseline_commit: 64065d71 (ART-1 stage 1 + queue AD; the skip's close uncommitted beside it)
+baseline_commit: 1739c816 (queue AD; ART-1R's close uncommitted beside it)
 ---
 
 # Current State
@@ -18,10 +18,10 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **ART-1 SKIPPED after stage 1** (`evidence/ART_1_2026-11-10.md`, `logs/art1_git_status.txt`): the
-  companion restarted with queue AC, clean; the dry run saw **no N64 / PS2 / GameCube** — `scan_privyhub_games`
-  skips `GamesPlugin.__init__` (the N64 cheat tool too). Nothing fetched.
-- Queue AC committed (`c9dcd8fd`); APK `de6682db…` NOT installed.
+- **ART-1R DONE** (`evidence/ART_1R_2026-11-10.md`): queue AD (B82) live at the
+  restart; the dry run saw seven systems; on "fetch" the art, details and N64 cheats were fetched; they survive
+  a companion start without the art knob. ART-1's hidden update wrote nothing.
+- Queue AD committed (`1739c816`); APK `de6682db…` NOT installed.
 
 ## Verified State
 
@@ -82,21 +82,19 @@ the save is still made. Off: `PRIVYHUB_REWIND_NEEDS_LOSS=0` (`evidence/B33_NO_RE
 redundancy 2/4 (`P10`); the live ladder's top 7000; the PS1 source 1920×1080 at 4x (C5-M4A). The D-BASE close-out table
 (`evidence/D_BASE_CLOSEOUT_2026-09-23.md`) must stay met; the E4 reference: idle 1.2 % CPU / 5.3 W, PS1 10.9 % / 20.1 W.
 
-**Art (ART-1 dry run 2026-11-10):** N64 — not seen (13 on the hub), no art or cheats.
-PS2 — not seen (115), no art.
-GameCube — not seen (27), no art.
+**Art (ART-1R 2026-11-10, no knob in the companion):** N64 — art 13 / 13, full details, cheats for 12 of 13.
+PS2 — art 100 / 115 (10 ambiguous, 5 no picture); no year / genre / players in RetroArch.
+GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 **ABSENT:** Live TV, browser / camera sources, NES / Genesis coverage, a power meter.
 
 ## Next Action
 
-1. **The user's commit** of the skip's close (`logs/art1_git_status.txt`).
-2. **Session B: queue AD** (`handoffs/QUEUE_2026-11-10AD.md`, B82): `scan_privyhub_games` must
-   carry the three systems `__init__` adds, with a test through the real scan path; then **ART-1 again** from stage 1.
-3. Then **HOME-12 at the TV** (B's sketch, `handoffs/SESSION_B_DONE_2026-11-09AC.md`): install APK
-   `de6682db…`, C44-C48. C44 / C46 need ART-1's fetch (no art drop-in expected, per B76); run now, C44 is skipped and
-   C46 has no N64 cheat list.
-4. Then what the user names next. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
+1. **The user's commit** of ART-1R's close (`logs/art1r_git_status.txt`).
+2. **HOME-12 at the TV** (B's sketch, `handoffs/SESSION_B_DONE_2026-11-09AC.md` + `_2026-11-10AD.md`): install APK
+   `de6682db…`, C44-C48. **No art drop-in** (ART-1R's ADDITION 2: the art survives a companion start without the
+   knob). C44: PS2 / GameCube show the picture, not year / genre / players. C46: N64 cheats for 12 of 13.
+3. Then what the user names next (for B, small: the N64 cheat list the bound check rejected). **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

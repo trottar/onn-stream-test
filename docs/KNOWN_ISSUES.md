@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-10 — ART-1R (ART-1 again after queue AD): the dry run saw all seven systems; fetched on the user's "fetch" — art N64 13/13, PS2 100/115, GameCube 24/27; N64 cheats for 12 of 13 (one list rejected: cheat count outside the hub's bounds); PS2 / GameCube details carry no year / genre / players (not in RetroArch's database); the records survive a companion start without the art knob (no drop-in); the first ART-1's hidden update made no request and wrote no record — ART-1's defect RESOLVED; two small items OPEN — `## 2026-11-10 ART-1R` below
 - 2026-11-10 — Queue AD (B82, B83): B82 the tools' game scan sees every system the hub lists (one systems builder shared with the plugin's constructor) and no longer builds the companion's plugins in the tool's process (HEAD's tools ran the startup reconcile — a full metadata update — inside every tool run); the cheat tool counts systems without a cheat list as not offered; B83 the real-entry-point audit of B76-B81 (broken on the real path: B76 and B78's tool part, both the scan; the rest sound); nothing adopted — OPEN (A's ART-1 again, then HOME-12) — `## 2026-11-10 Queue AD` below
 - 2026-11-10 — ART-1: SKIPPED at the user's "Skip" after stage 1; the companion restarted with queue AC (clean); the dry run saw PS1 66/72, SNES 44/44 and **not N64 / PS2 / GameCube** — B76's scan (`scan_privyhub_games`) skips `GamesPlugin.__init__`, so the three systems are never scanned (the N64 cheat tool too); nothing fetched — OPEN for B
 - 2026-11-09 — Queue AC (B76-B81, H6's first parity queue): art + details for N64 / PS2 / GameCube (`PRIVYHUB_ART_SYSTEMS=1`, a dry run; nothing fetched by B); Input Profiles on PS2 / GameCube launches; N64 cheats from RetroArch's database; GameCube cheats from Dolphin's bundled codes (no download); PS2 widescreen / no-interlacing / 60-fps per title; the drop-in folders (PS2 `.pnach`, the user's `.cht` on PS1 / SNES, `docs/CHEATS.md`); the PS2 disc change designed only; APK `de6682db…` built, NOT installed — OPEN (A's ART-1, then HOME-12 C44-C48) — `## 2026-11-09 Queue AC` below
@@ -67,6 +68,26 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-10 ART-1R: the art, details and N64 cheats fetched — ART-1's defect RESOLVED; two small items OPEN
+
+(`docs/memory/evidence/ART_1R_2026-11-10.md`, `docs/memory/evidence/art1r_2026-11-10/`)
+
+- **ART-1's defect (the section below) — RESOLVED by B82, seen live:** the dry run listed seven systems (N64 13,
+  PS2 115, GameCube 27, every folder available); the fetch found the titles. The companion restart's reconcile wrote
+  the 155 `provider_unavailable` records as B expected; the fetch replaced them.
+- **The first ART-1's hidden update (B82's finding): no harm** — it only rewrote its own status file to `RUNNING`; no
+  list, picture or record written (ADDITION 1).
+- **Survives without the knob:** a companion start with no `PRIVYHUB_ART_SYSTEMS` keeps every fetched record and
+  `box_art_available` (`SKIPPED_CURRENT`; the files byte-identical); a later full update keeps them via
+  `preserve_prior` (read from the code). No drop-in for HOME-12's C44.
+- **OPEN (small, for B / the user):** one N64 title's cheat list was rejected by the importer's bound check ("cheat
+  count outside accepted bounds"), so N64 cheats show for 12 of 13 titles (`n64-cheat-miss-1`).
+- **OPEN (expectation, not a defect):** PS2 / GameCube details have no year / genre / players (PS2 a developer for 60
+  of 105) — RetroArch's database has no such lists for them (13 lists unavailable, PS1's 4 included). HOME-12's C44
+  should expect the picture and name on those systems, not the details line.
+- **Noted:** the dry run downloads each new system's catalog **and its detail lists** (9 files for the three, not
+  3) — still whole database files, nothing about any title.
 
 ## 2026-11-10 Queue AD (B82, B83): the scan sees every system; the real-entry-point audit — OPEN (A's ART-1 again, then HOME-12)
 

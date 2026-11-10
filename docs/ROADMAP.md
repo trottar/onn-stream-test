@@ -2893,6 +2893,13 @@ launch; broken on the real path at HEAD only B76 and B78's tool part (the scan, 
 dry run must show seven systems — N64 13, PS2 115, GameCube 27 — before the user's "fetch"), then HOME-12
 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-10AD.md`).
 
+**ART-1R (2026-11-10, ART-1 again after queue AD, fetched on the user's "fetch"):** B76's fetch run — the dry run
+listed seven systems; art N64 13 / 13, PS2 100 / 115 (10 ambiguous, 5 no picture), GameCube 24 / 27 (1 no match,
+2 no picture); details full on N64, PS2 / GameCube the picture and name only (RetroArch has no year / genre / players
+lists for them). B78's fetch run — N64 cheats for 12 of 13 titles (one list rejected by the bound check). The records
+and `box_art_available` survive a companion start without `PRIVYHUB_ART_SYSTEMS` (no drop-in). **Next (A):** HOME-12
+at the TV — APK `de6682db…`, C44-C48 (`docs/memory/evidence/ART_1R_2026-11-10.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,
