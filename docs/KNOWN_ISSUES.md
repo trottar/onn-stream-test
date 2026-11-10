@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-10 — ART-1: SKIPPED at the user's "Skip" after stage 1; the companion restarted with queue AC (clean); the dry run saw PS1 66/72, SNES 44/44 and **not N64 / PS2 / GameCube** — B76's scan (`scan_privyhub_games`) skips `GamesPlugin.__init__`, so the three systems are never scanned (the N64 cheat tool too); nothing fetched — OPEN for B
 - 2026-11-09 — Queue AC (B76-B81, H6's first parity queue): art + details for N64 / PS2 / GameCube (`PRIVYHUB_ART_SYSTEMS=1`, a dry run; nothing fetched by B); Input Profiles on PS2 / GameCube launches; N64 cheats from RetroArch's database; GameCube cheats from Dolphin's bundled codes (no download); PS2 widescreen / no-interlacing / 60-fps per title; the drop-in folders (PS2 `.pnach`, the user's `.cht` on PS1 / SNES, `docs/CHEATS.md`); the PS2 disc change designed only; APK `de6682db…` built, NOT installed — OPEN (A's ART-1, then HOME-12 C44-C48) — `## 2026-11-09 Queue AC` below
 - 2026-11-09 — HOME-11: APK `85220f99…` installed with every property empty (seventeen); C40 the four-button bar MET, C41 a set starts on disc 1 MET, C42 the warning once and a change MET, C43 no pointer on this APK MET → **`85220f99…` CONFIRMED** and pinned; queue AA CLOSED; HOME-10's C38 items closed (the bar, the restored disc; the black screen settled as the game's and warned); the user's "Close H" → Phase H CLOSED at its checkpoint; open: a real "insert disc" prompt, the H6 parity ranking — CLOSED (the open items listed in it) — `## 2026-11-09 HOME-11: …`
 - 2026-11-09 — Queue AA (B73 / B74): the paused bar fits (SAVE · LOAD · DISC · END, END at 880 of 960 dp); the disc change made safe (the HOME-10 black screens settled as the game's reaction, the sequence unchanged; a set starts on disc 1 by RetroArch's record; the warning once; Extras → "Start on disc…"); APK `85220f99…` built, NOT installed — OPEN (A's HOME-11 C40-C43) — `## 2026-11-09 Queue AA` below
@@ -65,6 +66,18 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-10 ART-1: the fetcher does not see N64 / PS2 / GameCube — OPEN (session B)
+
+(`docs/memory/evidence/ART_1_2026-11-10.md`, `docs/memory/evidence/art1_2026-11-10/`)
+
+- **The defect:** `scan_privyhub_games` (`companion/games/metadata_importer.py`) builds `GamesPlugin` with `__new__`,
+  skipping `__init__`, where PS2 / N64 / GameCube join the instance's `SYSTEMS`; the scan returns PS1 / SNES only. It
+  also feeds `cheat_importer.py` (B78's N64 cheats) and `startup_reconcile.py`. B76's tests used `games=` fixtures.
+- **Effect:** the dry run counts none of the three; the art fetch and the N64 cheat fetch would find no titles;
+  HOME-12's C44 and C46 have nothing to show until it is fixed and ART-1 is run again.
+- **Seen clean at ART-1:** the companion restart with queue AC's host parts (eighteen lines, `--check` ok, the journal
+  clean, the counts as before); no list downloaded, nothing about any title sent.
 
 ## 2026-11-09 Queue AC (B76-B81): the first H6 parity queue — OPEN (A's ART-1, then HOME-12 C44-C48)
 

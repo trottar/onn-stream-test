@@ -2877,6 +2877,11 @@ present / 6 missing / 4 impossible, PS2 13 / 9 / 1, GameCube 12 / 9 / 2.
 **Next (A):** ART-1 (unattended: the dry run, then the art fetch and the N64 cheat fetch on the user's word), then
 HOME-12 at the TV (C44-C48), sketched in `docs/memory/handoffs/SESSION_B_DONE_2026-11-09AC.md`.
 
+**ART-1 (2026-11-10, SKIPPED after stage 1 on the user's "Skip"):** the companion restarted with queue AC, clean; the
+B76 dry run saw PS1 66 / 72 and SNES 44 / 44, **N64 / PS2 / GameCube not seen** — the fetcher's scan skips
+`GamesPlugin.__init__` (the N64 cheat tool shares it); B76's and B78's fetch not run. **Next (B):** fix the scan, tested
+through the real scan path; then ART-1 again, then HOME-12 (`docs/memory/evidence/ART_1_2026-11-10.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,
