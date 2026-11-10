@@ -1250,6 +1250,31 @@ class LibretroProvider(MetadataProvider):
         }
 
 
+def _games_plugin_module() -> Any:
+    """B82: the `plugins.games` module without running `plugins/__init__.py` when the package is not imported yet (the
+    tools): that file constructs every plugin, a GamesPlugin() for the code's own root among them, whose startup
+    reconcile then ran in the tool's process. A bare `plugins` package stands in for this one import and is removed
+    after it (a later `import plugins` runs the real one, reusing the module). The companion: today's import."""
+    import importlib
+    import importlib.util
+    import sys
+    import types
+
+    if "plugins" in sys.modules or "plugins.games" in sys.modules:
+        return importlib.import_module("plugins.games")
+    spec = importlib.util.find_spec("plugins")      # found as the plain import finds it; not executed
+    if spec is None or not spec.submodule_search_locations:
+        return importlib.import_module("plugins.games")
+    stub = types.ModuleType("plugins")
+    stub.__path__ = list(spec.submodule_search_locations)
+    sys.modules["plugins"] = stub
+    try:
+        return importlib.import_module("plugins.games")
+    finally:
+        if sys.modules.get("plugins") is stub:
+            del sys.modules["plugins"]
+
+
 def scan_privyhub_games(project_root: Path) -> list[dict[str, Any]]:
     project_root = project_root.resolve()
     companion_dir = project_root / "companion"
@@ -1263,15 +1288,47 @@ def scan_privyhub_games(project_root: Path) -> list[dict[str, Any]]:
         inserted = True
 
     try:
-        from plugins.games import GamesPlugin
+        GamesPlugin = _games_plugin_module().GamesPlugin
 
         scanner = GamesPlugin.__new__(GamesPlugin)
+        # B82: the list's systems (the in-place ones with their flags), the builder __init__ uses
+        systems = GamesPlugin.listed_systems()
+        if systems is not GamesPlugin.SYSTEMS:
+            scanner.SYSTEMS = systems
         scanner.PROJECT_ROOT = project_root
         scanner.GAMES_ROOT = project_root / "games"
         scanner._lock = threading.RLock()
         scanner._cached_at = 0.0
         scanner._cached_games = []
         return [dict(game) for game in scanner._scan()]
+    finally:
+        if inserted:
+            try:
+                sys.path.remove(companion_text)
+            except ValueError:
+                pass
+
+
+def listed_privyhub_systems(project_root: Path) -> dict[str, dict[str, str]]:
+    """B82: every system the hub's list shows, with whether the folder its titles are read from is reachable
+    (read-only)."""
+    project_root = project_root.resolve()
+    companion_dir = project_root / "companion"
+
+    import sys
+
+    companion_text = str(companion_dir)
+    inserted = False
+    if companion_text not in sys.path:
+        sys.path.insert(0, companion_text)
+        inserted = True
+    try:
+        GamesPlugin = _games_plugin_module().GamesPlugin
+        return {
+            system_id: {"folder": "available" if GamesPlugin.folder_available(project_root, system_id)
+                        else "unavailable"}
+            for system_id in GamesPlugin.listed_systems()
+        }
     finally:
         if inserted:
             try:
@@ -1526,6 +1583,23 @@ def run_metadata_dry_run(
         if key != "matched":
             labels = misses.setdefault(system_id, [])
             labels.append(f"{system_id}-miss-{len(labels) + 1}")
-    return {"ok": True, "dry_run": True, "offline": bool(offline), "systems": systems, "misses": misses,
-            "not_offered": not_offered, "source_stats": {k: v for k, v in provider.stats.items()
-                                                          if k.startswith("source_")}}
+    report = {"ok": True, "dry_run": True, "offline": bool(offline), "systems": systems, "misses": misses,
+              "not_offered": not_offered, "source_stats": {k: v for k, v in provider.stats.items()
+                                                            if k.startswith("source_")}}
+    # B82 (with B76's knob only): every listed system has a row, zero titles too, and its folder / list state
+    if art_systems_on(environ):
+        hub = listed_privyhub_systems(project_root)
+        for system_id in hub:
+            if system_id in specs and (not wanted or system_id == wanted):
+                systems.setdefault(system_id, {"total": 0, "matched": 0, "ambiguous": 0, "no_match": 0,
+                                               "provider_unavailable": 0})
+        report["listed"] = {
+            system_id: {
+                "titles": row["total"],
+                "folder": hub.get(system_id, {}).get("folder", "not_listed"),
+                "list": ("not_needed" if row["total"] == 0
+                         else "unavailable" if row["provider_unavailable"] else "available"),
+            }
+            for system_id, row in systems.items()
+        }
+    return report

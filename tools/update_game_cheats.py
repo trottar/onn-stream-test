@@ -90,6 +90,8 @@ def main() -> int:
         print("Ambiguous: " + str(counts["ambiguous"]))
         print("Metadata missing: " + str(counts["metadata_missing"]))
         print("Cheat files downloaded: " + str(counts["cheat_files_downloaded"]))
+        for system_id, count in sorted(report.get("not_offered", {}).items()):   # B82
+            print(f"{system_id}: {count} not offered (no cheat list for this system)")
         print("Activation: DISABLED")
         print("Summary log: " + str(report["text_log_path"]))
         print(

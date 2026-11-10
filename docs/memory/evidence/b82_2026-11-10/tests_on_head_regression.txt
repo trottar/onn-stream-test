@@ -1,0 +1,30 @@
+B82's tests on HEAD's code (a fresh export of 8813f06a + only tests/art_systems/test_b82.py), 2026-11-10T01:47:26Z: the regression run
+test_a_full_run_with_the_flags_skips_the_systems_without_a_list (test_b82.CheatCli.test_a_full_run_with_the_flags_skips_the_systems_without_a_list) ... FAIL
+test_absent_flags_nothing_counted (test_b82.CheatCli.test_absent_flags_nothing_counted) ... ok
+test_n64_titles_through_the_tool (test_b82.CheatCli.test_n64_titles_through_the_tool) ... FAIL
+test_the_dry_runs_systems_are_the_lists (test_b82.ListAndScan.test_the_dry_runs_systems_are_the_lists) ... FAIL
+test_absent_is_todays_report (test_b82.MetadataCli.test_absent_is_todays_report) ... ok
+test_counts_for_all_seven (test_b82.MetadataCli.test_counts_for_all_seven) ... FAIL
+test_folder_unavailable_and_list_unavailable_told_apart (test_b82.MetadataCli.test_folder_unavailable_and_list_unavailable_told_apart) ... ERROR
+test_without_the_art_knob_the_three_are_not_offered (test_b82.MetadataCli.test_without_the_art_knob_the_three_are_not_offered) ... FAIL
+test_unchanged_for_the_four_and_the_three_with_the_flags (test_b82.Reconcile.test_unchanged_for_the_four_and_the_three_with_the_flags) ... FAIL
+test_an_unreachable_folder_lists_no_titles_and_says_so (test_b82.Scan.test_an_unreachable_folder_lists_no_titles_and_says_so) ... ERROR
+test_each_flag_adds_its_own_system (test_b82.Scan.test_each_flag_adds_its_own_system) ... FAIL
+test_four_systems_without_the_flags (test_b82.Scan.test_four_systems_without_the_flags) ... ok
+test_seven_systems_with_the_flags (test_b82.Scan.test_seven_systems_with_the_flags) ... FAIL
+test_the_list_without_the_flags_is_the_four (test_b82.Scan.test_the_list_without_the_flags_is_the_four) ... ERROR
+test_the_scan_does_not_build_the_companions_plugins (test_b82.Scan.test_the_scan_does_not_build_the_companions_plugins) ... FAIL
+KeyError: 'listed'
+TypeError: 'NoneType' object is not subscriptable
+TypeError: 'NoneType' object is not iterable
+AssertionError: 0 != 3
+AssertionError: 0 != 3
+AssertionError: {'snes': 2, 'ps1': 2, 'ps2': 2, 'n64': 3, 'gamecube': 2} != {'ps1': 2, 'snes': 2}
+AssertionError: Items in the second set but not the first:
+AssertionError: {} != {'ps2': 2, 'n64': 3, 'gamecube': 2}
+AssertionError: 'SKIPPED_CURRENT' != 'RECONCILED'
+AssertionError: Items in the second set but not the first:
+AssertionError: {'ps1': 2, 'snes': 2} != {'snes': 2, 'ps1': 2, 'ps2': 2, 'n64': 3, 'gamecube': 2}
+AssertionError: True is not false
+Ran 15 tests in 6.301s
+FAILED (failures=9, errors=3)

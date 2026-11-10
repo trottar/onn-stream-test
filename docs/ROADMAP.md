@@ -2882,6 +2882,17 @@ B76 dry run saw PS1 66 / 72 and SNES 44 / 44, **N64 / PS2 / GameCube not seen** 
 `GamesPlugin.__init__` (the N64 cheat tool shares it); B76's and B78's fetch not run. **Next (B):** fix the scan, tested
 through the real scan path; then ART-1 again, then HOME-12 (`docs/memory/evidence/ART_1_2026-11-10.md`).
 
+**Queue AD (2026-11-10; built, applied to the tree uncommitted, nothing adopted, no APK):** **B82** — the tools'
+scan sees every system the hub lists (`GamesPlugin.listed_systems()`, shared with the constructor; the three system
+flags as the hub reads them), the tools no longer build the companion's plugins (HEAD's ran the startup reconcile in
+every tool run), the dry run lists every system with its folder / list state (with `PRIVYHUB_ART_SYSTEMS=1`), the cheat
+tool counts systems without a list as not offered (`evidence/B82_SCAN_ALL_SYSTEMS_2026-11-10.md`). **B83** — the
+real-entry-point audit of B76-B81: one test per item through the CLI / the plugin as the companion builds it / the
+launch; broken on the real path at HEAD only B76 and B78's tool part (the scan, fixed by B82)
+(`evidence/B83_REAL_ENTRY_AUDIT_2026-11-10.md`). **Next (A):** ART-1 again from stage 1 (the restart loads B82; the
+dry run must show seven systems — N64 13, PS2 115, GameCube 27 — before the user's "fetch"), then HOME-12
+(`docs/memory/handoffs/SESSION_B_DONE_2026-11-10AD.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,

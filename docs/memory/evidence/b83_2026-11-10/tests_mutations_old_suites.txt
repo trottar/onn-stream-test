@@ -1,0 +1,7 @@
+The same mutations against the items' OWN suites (before B83): does the old test see them?
+-- m5_only vs test_b79.py
+M5 CAUGHT (Ran 14 tests in 0.030s FAILED (failures=1)) -- B79: the bundled codes read from a wrong path in the AppImage
+-- m6_only vs test_b80.py
+M6 MISSED (Ran 15 tests in 0.738s OK) -- B80: the bundle read from a wrong path -> no Patches entry
+-- m2_only vs test_b77.py
+M2 CAUGHT (Ran 17 tests in 0.695s FAILED (failures=2)) -- B77: the PS2 launch ignores the assigned profile

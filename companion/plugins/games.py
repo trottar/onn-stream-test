@@ -194,19 +194,49 @@ class GamesPlugin:
         },
     }
 
-    def __init__(self) -> None:
-        # B49: the PS2 system listed from the drive's games folder (instance only; absent = the class dict, today)
+    @classmethod
+    def listed_systems(cls) -> dict[str, dict[str, Any]]:
+        """B82: the systems the list shows -- the class's four, plus the in-place systems their flags imported (B49 PS2,
+        B59 N64, B69 GameCube; instance only). Shared by __init__ and the tools' scan (scan_privyhub_games), so the
+        scan's systems are always the list's. Absent (no flag): the class dict itself."""
+        systems = cls.SYSTEMS
+        # B49: the PS2 system listed from the drive's games folder
         if _ps2_session is not None:
-            self.SYSTEMS = {**type(self).SYSTEMS, _ps2_session.SYSTEM_ID: {
+            systems = {**systems, _ps2_session.SYSTEM_ID: {
                 "name": _ps2_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
-        # B59: the N64 system listed from the drive's N64 folder (instance only; absent = today)
+        # B59: the N64 system listed from the drive's N64 folder
         if _n64_session is not None:
-            self.SYSTEMS = {**self.SYSTEMS, _n64_session.SYSTEM_ID: {
+            systems = {**systems, _n64_session.SYSTEM_ID: {
                 "name": _n64_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
-        # B69: the GameCube system listed from the drive's GameCube folder (instance only; absent = today)
+        # B69: the GameCube system listed from the drive's GameCube folder
         if _gc_session is not None:
-            self.SYSTEMS = {**self.SYSTEMS, _gc_session.SYSTEM_ID: {
+            systems = {**systems, _gc_session.SYSTEM_ID: {
                 "name": _gc_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
+        return systems
+
+    @classmethod
+    def folder_available(cls, project_root: Path, system_id: str) -> bool:
+        """B82: the folder _scan reads for `system_id` is named and is a directory (read-only: no mkdir, no write)."""
+        root = Path(project_root)
+        if _ps2_session is not None and system_id == _ps2_session.SYSTEM_ID:
+            folder = _ps2_session.read_paths(root)["games_dir"]
+        elif _n64_session is not None and system_id == _n64_session.SYSTEM_ID:
+            folder = _n64_session.read_dir(root)
+        elif _gc_session is not None and system_id == _gc_session.SYSTEM_ID:
+            folder = _gc_session.read_dir(root)
+        else:
+            config = cls.SYSTEMS.get(system_id)
+            folder = root / "games" / str(config["folder"]) if config else None
+        try:
+            return folder is not None and Path(folder).is_dir()
+        except OSError:
+            return False
+
+    def __init__(self) -> None:
+        # B49 / B59 / B69: the in-place systems (instance only; absent = the class dict, today) -- B82's shared builder
+        systems = type(self).listed_systems()
+        if systems is not type(self).SYSTEMS:
+            self.SYSTEMS = systems
         self._lock = threading.RLock()
         self._cached_at = 0.0
         self._cached_games: list[dict[str, Any]] = []

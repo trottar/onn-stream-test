@@ -1,0 +1,11 @@
+Queue AD — every host suite on full exports of HEAD (8813f06a, /tmp/b_q20ad_base) and of HEAD + b82 + b83
+(/tmp/b_q20ad_work), run_host.sh (queue AC's), TMPDIR on the main disk, no PRIVYHUB_* in the process, docs/CHEATS.md
+copied into both for B81's docs test.
+- suites: HEAD 73, after 73;
+- the 72 other suites: the same result line in both (times aside);
+- tests/art_systems: HEAD Ran 89 OK; after Ran 112 OK (+ test_b82 15, test_b83 8; test_b78's refusal test changed);
+- failing in both, unchanged (the same six as queues AA / AC: they read fixtures under docs/ / logs/ that the copies do
+  not hold): tools/test_adaptive_bitrate_live.py, tools/test_c3_f1_recovery_restart.py, tools/test_c3_l4_nft_night.py,
+  tools/test_cl_b1_decoder_report_body.py, tools/test_e1_remote.py, tools/test_fec_xor8_2.py.
+- the suites wrote a logs/ dir into each copy; both moved (not deleted), with the docs/ copies, to
+  ~/.cache/b_q20ad_tmp/hostrun_logs_from_{base,work} and hostrun_docs_copy_from_{base,work}.

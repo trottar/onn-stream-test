@@ -1,0 +1,12 @@
+[
+ {"id": "M1", "file": "companion/plugins/games.py", "old": "        if _ps2_session is not None:\n            systems = {**systems, _ps2_session.SYSTEM_ID", "new": "        if False:\n            systems = {**systems, _ps2_session.SYSTEM_ID", "why": "the builder drops PS2"},
+ {"id": "M2", "file": "companion/plugins/games.py", "old": "        if systems is not type(self).SYSTEMS:\n            self.SYSTEMS = systems", "new": "        if False:\n            self.SYSTEMS = systems", "why": "__init__ ignores the builder (the onn's list loses the three)"},
+ {"id": "M3", "file": "companion/plugins/games.py", "old": "            return folder is not None and Path(folder).is_dir()", "new": "            return folder is not None", "why": "a missing folder reads available"},
+ {"id": "M4", "file": "companion/games/metadata_importer.py", "old": "        if systems is not GamesPlugin.SYSTEMS:\n            scanner.SYSTEMS = systems", "new": "        if False:\n            scanner.SYSTEMS = systems", "why": "the scan keeps the class's four (HEAD's bug)"},
+ {"id": "M5", "file": "companion/games/metadata_importer.py", "old": "    sys.modules[\"plugins\"] = stub\n", "new": "    pass\n", "why": "the scan's import runs plugins/__init__.py (HEAD's registry + reconcile in the tool)"},
+ {"id": "M6", "file": "companion/games/metadata_importer.py", "old": "            if system_id in specs and (not wanted or system_id == wanted):", "new": "            if False:", "why": "no zero-title rows"},
+ {"id": "M7", "file": "companion/games/metadata_importer.py", "old": "                         else \"unavailable\" if row[\"provider_unavailable\"] else \"available\"),", "new": "                         else \"available\"),", "why": "list unavailable never said"},
+ {"id": "M8", "file": "tools/update_game_metadata.py", "old": "                if state.get(\"folder\") == \"unavailable\":", "new": "                if False:", "why": "the text drops 'folder unavailable'"},
+ {"id": "M9", "file": "companion/games/cheat_importer.py", "old": "        if system_id and system_id not in offered:", "new": "        if False:", "why": "the cheat tool processes PS2 / GameCube (CheatError)"},
+ {"id": "M10", "file": "companion/games/cheat_importer.py", "old": "    if not_offered:   # B82: absent flags never\n        report[\"not_offered\"] = not_offered\n", "new": "", "why": "the report hides the skipped systems"}
+]

@@ -101,6 +101,12 @@ def main() -> int:
                 misses = report["misses"].get(system_id, [])
                 if misses:
                     print("  misses: " + ", ".join(misses))
+                # B82: the folder / list state, with B76's knob (the report then carries "listed")
+                state = report.get("listed", {}).get(system_id, {})
+                if state.get("folder") == "unavailable":
+                    print("  folder unavailable (the drive or folder is not reachable)")
+                if state.get("list") == "unavailable":
+                    print("  list unavailable (RetroArch's list could not be read)")
             for system_id, count in sorted(report["not_offered"].items()):
                 print(f"{system_id}: {count} not offered (system not in the fetcher's map)")
         return 0

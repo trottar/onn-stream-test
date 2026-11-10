@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-10 — Queue AD (B82, B83): B82 the tools' game scan sees every system the hub lists (one systems builder shared with the plugin's constructor) and no longer builds the companion's plugins in the tool's process (HEAD's tools ran the startup reconcile — a full metadata update — inside every tool run); the cheat tool counts systems without a cheat list as not offered; B83 the real-entry-point audit of B76-B81 (broken on the real path: B76 and B78's tool part, both the scan; the rest sound); nothing adopted — OPEN (A's ART-1 again, then HOME-12) — `## 2026-11-10 Queue AD` below
 - 2026-11-10 — ART-1: SKIPPED at the user's "Skip" after stage 1; the companion restarted with queue AC (clean); the dry run saw PS1 66/72, SNES 44/44 and **not N64 / PS2 / GameCube** — B76's scan (`scan_privyhub_games`) skips `GamesPlugin.__init__`, so the three systems are never scanned (the N64 cheat tool too); nothing fetched — OPEN for B
 - 2026-11-09 — Queue AC (B76-B81, H6's first parity queue): art + details for N64 / PS2 / GameCube (`PRIVYHUB_ART_SYSTEMS=1`, a dry run; nothing fetched by B); Input Profiles on PS2 / GameCube launches; N64 cheats from RetroArch's database; GameCube cheats from Dolphin's bundled codes (no download); PS2 widescreen / no-interlacing / 60-fps per title; the drop-in folders (PS2 `.pnach`, the user's `.cht` on PS1 / SNES, `docs/CHEATS.md`); the PS2 disc change designed only; APK `de6682db…` built, NOT installed — OPEN (A's ART-1, then HOME-12 C44-C48) — `## 2026-11-09 Queue AC` below
 - 2026-11-09 — HOME-11: APK `85220f99…` installed with every property empty (seventeen); C40 the four-button bar MET, C41 a set starts on disc 1 MET, C42 the warning once and a change MET, C43 no pointer on this APK MET → **`85220f99…` CONFIRMED** and pinned; queue AA CLOSED; HOME-10's C38 items closed (the bar, the restored disc; the black screen settled as the game's and warned); the user's "Close H" → Phase H CLOSED at its checkpoint; open: a real "insert disc" prompt, the H6 parity ranking — CLOSED (the open items listed in it) — `## 2026-11-09 HOME-11: …`
@@ -66,6 +67,32 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-10 Queue AD (B82, B83): the scan sees every system; the real-entry-point audit — OPEN (A's ART-1 again, then HOME-12)
+
+(`docs/memory/evidence/B82_SCAN_ALL_SYSTEMS_2026-11-10.md`, `docs/memory/evidence/B83_REAL_ENTRY_AUDIT_2026-11-10.md`,
+`docs/memory/handoffs/SESSION_B_DONE_2026-11-10AD.md`)
+
+- **ART-1's defect, fixed by B82 (not adopted; applied to the tree uncommitted):** `GamesPlugin.listed_systems()` is
+  the one systems builder (the constructor and the tools' scan both use it). With the three system flags the scan
+  lists PS2 / N64 / GameCube; without them it is today's, byte for byte.
+- **Found while settling B82, fixed by B82:** `from plugins.games import …` runs `companion/plugins/__init__.py`, which
+  constructs every plugin; so every run of `tools/update_game_metadata.py` or `tools/update_game_cheats.py` built a
+  `GamesPlugin()` for the hub's root and ran the startup reconcile (a full metadata update) in the tool's process. The
+  hub's `logs/games/game_metadata_startup_reconcile.json` has read `RUNNING` since ART-1's tool runs (00:33:31Z). With
+  the scan fixed alone, A's next dry run would have fetched the three systems' art in the background.
+- **Also fixed by B82:** a full cheat run stopped with `CheatError("Unsupported game system")` at the first title of a
+  system without a cheat list that has a matched record (PS2 / GameCube after ART-1's fetch; N64 with
+  `PRIVYHUB_N64_CHEATS=0`, B78's kept refusal — its test changed). They are now counted as `not_offered`.
+- **Expected at the companion restart that loads B82:** the startup reconcile finds the three systems' titles new and
+  runs one full metadata update; their records read `provider_unavailable` (no request while `PRIVYHUB_ART_SYSTEMS`
+  is off in the companion). — OPEN, next queue: those records count as incomplete, so the update repeats at a
+  companion start at most once per 7 days until ART-1's fetch replaces them (for good after a "skip").
+- **OPEN, next queue (not changed):** a full metadata update drops the records of titles it did not scan, so one run
+  while a drive folder is unreachable loses those systems' fetched details until the next fetch.
+- **B83:** every item of queue AC now has a test through the entry point A or the hub calls
+  (`tests/art_systems/test_b83.py`); B80's own suite missed a wrong bundle path (B83's catches it). B's standing rule
+  from now on: every coded item carries at least one test through the entry point A will call.
 
 ## 2026-11-10 ART-1: the fetcher does not see N64 / PS2 / GameCube — OPEN (session B)
 

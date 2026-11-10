@@ -100,16 +100,15 @@ class Tool(unittest.TestCase):
         self.assertIn(f"data/games/user_content/{GAME['id']}/cheats/libretro/", f["local_path"])
         self.assertEqual(f["cheat_count"], 2)
 
-    def test_knob_zero_is_todays_refusal(self):
-        # today's tool with an N64 title that has a matched record (after B76's fetch): it stops on the system it
-        # does not know. Kept as today with the knob 0 (disclosed in KNOWN_ISSUES); absent PRIVYHUB_N64 the scanner
-        # lists no N64 title at all.
+    def test_knob_zero_skips_n64_as_not_offered(self):
+        # B82 (was B78's kept refusal: the tool stopped with CheatError on the first N64 title with a matched record):
+        # with the knob 0 the N64 title is counted as not offered and not processed; the run completes
         root = project()
-        with self.assertRaises(ci.CheatError) as cm:
-            run_tool(root, {"PRIVYHUB_N64": "1", "PRIVYHUB_N64_CHEATS": "0"})
-        self.assertIn("Unsupported game system: n64", str(cm.exception))
+        report = run_tool(root, {"PRIVYHUB_N64": "1", "PRIVYHUB_N64_CHEATS": "0"})
+        self.assertEqual(report["not_offered"], {"n64": 1})
+        self.assertEqual(report["counts"]["total_games"], 0)
         self.assertFalse((root / "data/games/user_content").exists())
-        self.assertFalse((root / "data/games/cheats.json").exists())
+        self.assertEqual(json.loads((root / "data/games/cheats.json").read_text())["games"], {})
 
 
 class Manager(unittest.TestCase):

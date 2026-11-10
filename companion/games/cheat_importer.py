@@ -1075,6 +1075,17 @@ def run_cheat_update(
         ]
     if limit > 0:
         games = games[:limit]
+    # B82: the scan lists every system the hub lists; one without a cheat list here (PS2, GameCube, N64 with
+    # PRIVYHUB_N64_CHEATS=0) is counted, not processed (absent flags: every scanned system has one, nothing counted)
+    offered = cheat_system_specs()
+    not_offered: dict[str, int] = {}
+    for game in games:
+        system_id = str(game.get("system", "")).strip().casefold()
+        if system_id and system_id not in offered:
+            not_offered[system_id] = not_offered.get(system_id, 0) + 1
+    if not_offered:
+        games = [game for game in games
+                 if str(game.get("system", "")).strip().casefold() not in not_offered]
 
     provider = LibretroCheatProvider(
         project_root,
@@ -1346,6 +1357,8 @@ def run_cheat_update(
         "provider_stats": provider.stats,
         "games": diagnostics,
     }
+    if not_offered:   # B82: absent flags never
+        report["not_offered"] = not_offered
     _atomic_json_write(log_json_path, report)
 
     lines = [

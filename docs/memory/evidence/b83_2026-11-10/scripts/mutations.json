@@ -1,0 +1,51 @@
+[
+ {
+  "id": "M1",
+  "file": "companion/games/metadata_importer.py",
+  "old": "        \"database_name\": \"Nintendo - Nintendo 64\",",
+  "new": "        \"database_name\": \"Nintendo - N64\",",
+  "why": "B76: a wrong set name -> the fetched N64 title has no art / details"
+ },
+ {
+  "id": "M2",
+  "file": "companion/games/emulator_manager.py",
+  "old": "        profile_tables, profile_line = self._ext_profile_layouts(game, \"ps2\")",
+  "new": "        profile_tables, profile_line = None, \"\"",
+  "why": "B77: the PS2 launch ignores the assigned profile"
+ },
+ {
+  "id": "M3",
+  "file": "companion/games/emulator_manager.py",
+  "old": "        profile_tables, profile_line = self._ext_profile_layouts(game, \"gamecube\")",
+  "new": "        profile_tables, profile_line = None, \"\"",
+  "why": "B77: the GameCube launch ignores the assigned profile"
+ },
+ {
+  "id": "M4",
+  "file": "companion/games/emulator_manager.py",
+  "old": "    N64_CHEAT_CORE_LIBRARY_NAME = \"Mupen64Plus-Next\"",
+  "new": "    N64_CHEAT_CORE_LIBRARY_NAME = \"Mupen64Plus\"",
+  "why": "B78: staged under the wrong core folder"
+ },
+ {
+  "id": "M5",
+  "file": "companion/gc_cheats.py",
+  "old": "BUNDLED_DIR = \"usr/share/dolphin-emu/Sys/GameSettings\"",
+  "new": "BUNDLED_DIR = \"usr/share/dolphin/Sys/GameSettings\"",
+  "why": "B79: the bundled codes read from a wrong path in the AppImage"
+ },
+ {
+  "id": "M6",
+  "file": "companion/ps2_patches.py",
+  "old": "ZIP_MEMBER = \"usr/bin/resources/patches.zip\"",
+  "new": "ZIP_MEMBER = \"usr/bin/patches.zip\"",
+  "why": "B80: the bundle read from a wrong path -> no Patches entry"
+ },
+ {
+  "id": "M7",
+  "file": "companion/games/emulator_manager.py",
+  "old": "            self._dropin_folders_once()   # B81\n            ext = self._ext_cheat_catalog(game)   # B79 / B81: None = today's code\n",
+  "new": "            ext = self._ext_cheat_catalog(game)   # B79 / B81: None = today's code\n",
+  "why": "B81: the folders never made at the first Cheats list (the cheat-catalog call site; the onn's first call)"
+ }
+]
