@@ -14,6 +14,7 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 **Phase H CLOSED at its checkpoint 2026-11-09** on the user's "Close H" (`evidence/H5_CHECKPOINT_2026-11-09.md`).
 **H6 (feature parity) OPEN**: queue AC checked at HOME-12 — B76 / B77 / B81 met; B78-B80 wait on B's cheat-picker fixes. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
 E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED** (HOME-11; back on after HOME-12).
+H7 (PrivyHub-native games; first PrivyParty) PLANNED 2026-11-10 — not started; the user's word starts it (`docs/ROADMAP.md` §H7)
 
 ## Current Work Item
 
@@ -87,11 +88,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **The user's commit** of HOME-12's close (`logs/home12_git_status.txt`).
-2. **B (the user's three requirements, HOME-12):** the cheat picker's Launch reachable without walking the list; the
-   list cleaned (repeats, cartridge codes, "Player 1"); a controller picture in the mapping editor. Then **HOME-12
-   again** (the user's word): a new APK, C46-C48 (B78-B80).
-3. The user's next parity picks: the PS2 disc change (designed); a second source for PS2 / GameCube details and the
+1. **HOME-12 again** (the user's word): queue AE in (B84-B86, APK `c801caab…` pinned, not installed); C46-C50.
+2. The user's next parity picks: the PS2 disc change (designed); a second source for PS2 / GameCube details and the
    missing art; the user's own cheat files; the rejected N64 list. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
