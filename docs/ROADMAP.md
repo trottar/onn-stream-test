@@ -98,7 +98,7 @@ As of 2026-11-03; the detail is in `docs/memory/CURRENT.md` and §0.
 | **E — Linux Core Resource Characterization & Optimization** | Optimize and measure the Linux core with PS1-and-below only; select Prototype 2 from evidence | **ACTIVE** — E1 FROZEN; E2 MEASURED; E3 CLOSED (2026-10-09); E4 CLOSED, host side (2026-10-15) |
 | **F — Media Library, VOD & Live TV UX** | Finish local media polish plus substantial Live TV/channel/guide work on Linux | **PLANNED AFTER E** (not started) |
 | **G — Secure Remote Access / Portable Client Foundation** | Overlay/provider abstraction, portable trusted-LAN access, WAN session identity/auth, off-site PS1-and-below validation | **CLOSED at its checkpoint 2026-11-07** (§G9: 9 met / 3 deferred / 2 open); G-A1 … G-A10 and G-A13 (host) in §G4 |
-| **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **OPEN 2026-11-07** — H3 (PS2) first by the user's decision, then H0, then H1 / H2 ; **H7 PrivyParty PLANNED 2026-11-10** (not started) |
+| **H — Extended Emulation & User-Content Import** | Build safe user-content ingestion, then characterize N64, GameCube, and PS2 on the established local/remote foundation | **OPEN 2026-11-07** — H3 (PS2) first by the user's decision, then H0, then H1 / H2 ; **H7 PrivyParty: PC-side preparation started 2026-11-10 (separate repo); hub side not started** |
 | **I — Home Infrastructure / Broader Plugin Expansion** | Home Assistant/devices, cameras/microphones, storage, broader clients and provider expansion | **FUTURE** |
 | **J — Local Intelligence / Voice / Privacy-Aware AI** | Deterministic local automation, small local models, optional user-supplied cloud AI providers, bounded adaptive optimization | **FUTURE** |
 
@@ -2956,6 +2956,10 @@ The user ranks the gaps; the first ranked item is the next parity work.
 
 **Status: PLANNED (2026-11-10) — the last item of Phase H. No work until the user says so ("I might just do it
 next").** Adopted into the roadmap on the user's "Adopt" (2026-11-10); the wording was shown to the user first.
+
+**PC-side preparation started on the user's word (2026-11-10), in a separate repo; the hub side not started.** The PrivyHub repo and the hub's Code sessions are not touched by the PC work; the hub pulls the game repo only when H7's hub side starts.
+
+**Design notes:** `docs/memory/architecture/H7_PRIVYPARTY_DESIGN_NOTES_2026-11-10.md` — the art direction (photo textures on low-polygon models, a fixed camera, gibberish speech with subtitles), one template body with proportion numbers, one shared animation set, the licensing rule and the emulator audit it needs, the PC / hub / drive workflow, what goes ahead on the PC and what waits, the open measurements. **The PC side's kickoff brief:** `docs/memory/handoffs/PRIVYPARTY_PC_KICKOFF_BRIEF_2026-11-10.md`. Real player photos never go into git.
 
 **The idea (the user's):** new games made for PrivyHub at roughly PS2-era host demand. The first is **PrivyParty**,
 a Mario Party-like board game whose mini games are selected emulator games plus PrivyHub's own.

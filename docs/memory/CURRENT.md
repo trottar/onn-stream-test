@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-10
-baseline_commit: 0de0b290 (queue AE + the H7 note; HOME-12R's close uncommitted beside it)
+baseline_commit: da2d580f (queue AF)
 ---
 
 # Current State
@@ -13,8 +13,8 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 
 **Phase H CLOSED at its checkpoint 2026-11-09** on the user's "Close H" (`evidence/H5_CHECKPOINT_2026-11-09.md`).
 **H6 (feature parity) OPEN**: HOME-12 / 12R met B76 / B77 / B79 / B81 / B84-B86; B78 (N64 cheat launch) and B80 (Patches save) not. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
-E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED** (HOME-11; back on after HOME-12 and HOME-12R).
-H7 (PrivyHub-native games; first PrivyParty) PLANNED 2026-11-10 — not started; the user's word starts it (`docs/ROADMAP.md` §H7)
+E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED**.
+H7 (PrivyHub-native games; first PrivyParty): PC-side preparation started 2026-11-10 in a separate repo; the hub side not started — the user's word starts it (`docs/ROADMAP.md` §H7; design notes `architecture/H7_PRIVYPARTY_DESIGN_NOTES_2026-11-10.md`)
 
 ## Current Work Item
 
@@ -90,7 +90,7 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 1. **B:** the N64 cheat launch waits for RetroArch's cheat file; `ps2-patches` on the onn's POST route; the picture
    smaller / better drawn. Then a new APK and C46 / C48 (+ C49 / C50 / PS1 on it).
-2. Then the user's pick: H6's rest or **H7 PrivyParty** (the user's word).
+2. Then the user's pick: H6's rest or H7's hub side.
 3. H6's rest: the PS2 disc change (designed); a second source for PS2 / GameCube details and
    art misses; the user's cheat files; the rejected N64 list. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
