@@ -1,0 +1,13 @@
+M1 CAUGHT (Ran 10 tests in 200.844s FAILED (failures=1)) -- unstable addresses kept (templates a / b)
+M2 CAUGHT (Ran 10 tests in 199.512s FAILED (failures=2)) -- decided with more than one candidate
+M3 CAUGHT (Ran 10 tests in 200.314s FAILED (failures=6)) -- reads of the same memory not merged
+M4 MISSED (Ran 10 tests in 200.259s OK) -- a failed load not seen
+M5 CAUGHT (Ran 10 tests in 200.586s FAILED (failures=1)) -- the winner not strictly the largest
+M6 CAUGHT (Ran 10 tests in 192.181s FAILED (failures=1, errors=1)) -- players not equal at begin
+M7 CAUGHT (Ran 10 tests in 200.295s FAILED (failures=1)) -- every-player-changes ranking ignored
+caught 6 / 7
+RetroArch left after the mutations: 0
+
+M4 again after the 'refused' case was added to the failed-load test (2026-11-11T10:26:31Z):
+M4 CAUGHT (Ran 10 tests FAILED (failures=1)) -- a failed load not seen
+final: caught 7 / 7; RetroArch left: 0

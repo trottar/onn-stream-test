@@ -1,0 +1,37 @@
+[
+ {
+  "id": "N1",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "        if as_is:\n            s.pause()\n            out[\"as_is\"] = True",
+  "new": "        if as_is:\n            out[\"as_is\"] = True",
+  "why": "as-is loads without pausing first"
+ },
+ {
+  "id": "N2",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "    if nw == \"equal\" and len(set(values.values())) == 1:",
+  "new": "    if False:",
+  "why": "none_when equal ignored"
+ },
+ {
+  "id": "N3",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "                \"winner\": json.loads(top) if k == len(results) else \"disagree\",",
+  "new": "                \"winner\": json.loads(top),",
+  "why": "a disagreement hidden"
+ },
+ {
+  "id": "N4",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "        s.pause()                                      # B95: written and saved paused",
+  "new": "        pass                                           # B95: written and saved paused",
+  "why": "make-state saves while running"
+ },
+ {
+  "id": "N5",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "        if \"Failed to load state\" in new:\n                raise ProofError(\"RetroArch failed to load the state\")",
+  "new": "        if False:\n                raise ProofError(\"RetroArch failed to load the state\")",
+  "why": "the failure line ignored (the 0-bytes check remains)"
+ }
+]

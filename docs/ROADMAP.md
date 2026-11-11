@@ -3054,6 +3054,23 @@ hub (the virtual pads, pause and exit from the onn, host cost); the memory addre
 **First step when started (a proof; no board, no graphics):** one SNES game, one save state, one memory-read win rule,
 driven by a script: load state → run a fixed time → read memory → print the winner. Met when the script names the
 right winner from memory values, repeatably. Nothing perceptual is a gate.
+*(Superseded 2026-11-11 by the statement below — queue AI, B95: the tool runs headless with no pads, so a fight is not
+replayed from a state; the line above is kept as written.)*
+
+**The proof's statement (B95, 2026-11-11):** Met on a real game when, read as they stand, the 'end' state names the
+player the TV showed, the 'begin' state names no winner, and — where the user has made one — an 'end' state won by
+another player names that player; the same on 3 loads each. The fixed run with real players is tested later, on the
+stream.
+
+**The hub side's steps so far (2026-11-11):** **B93** `tools/h7_minigame_proof.py` (load a state → run → read memory →
+the winner; proved on a synthetic SNES ROM); **the first real states** (HOME-12V: T88, a 2-player PS1 fight — a "begin"
+state and an "end" state, player 1 won; a second PS1 title named for the 4-player proof); **B94**
+`tools/h7_rule_search.py` — from labelled states, the candidate win rules (a per-player counter, a per-player level that
+empties, a single winner field), "decided" only when a template leaves exactly one (`evidence/B94_H7_RULE_SEARCH_2026-11-11.md`);
+**B95** the tool reads a state as it stands (`--as-is`, no frame run), names "no winner yet", repeats loads and reports
+the agreement (`evidence/B95_H7_STATE_AS_IS_2026-11-11.md`). **Waits:** the real search and proof on T88's states (A's
+H7-P1, unattended; `docs/memory/handoffs/SESSION_B_DONE_2026-11-11AI.md`); the 4-player title; Godot's probe and the game
+repo — both a fetch, on the user's word.
 
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.

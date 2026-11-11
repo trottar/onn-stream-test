@@ -1,0 +1,733 @@
+diff --git a/tools/h7_rule_search.py b/tools/h7_rule_search.py
+new file mode 100644
+index 00000000..683e8fcc
+--- /dev/null
++++ b/tools/h7_rule_search.py
+@@ -0,0 +1,339 @@
++#!/usr/bin/env python3
++"""H7 (B94): from a few labelled save states, find the memory that says who won — candidate rules in B93's rule JSON.
++
++    python3 tools/h7_rule_search.py --content <game> --system ps1|snes --states <states.json> [--players 2] [--loads 3]
++
++states.json: [{"state": "<file>", "label": "begin" | "end", "winner": "P1" | "P2" | ... | null}, ...]  (2 to 4 players)
++
++Each state is loaded PAUSED in a headless RetroArch (B93's session: temp folders, the hub's saves untouched) --loads
++times; its whole main memory is read in 16 KiB chunks; an address that differs between loads of one state is dropped.
++Three templates are searched, each candidate holding in EVERY labelled state:
++  (a) a per-player counter — one field per player at a constant stride; every value <= 31; all equal at "begin"; at
++      "end" the winner's strictly the largest and above its "begin" value;
++  (b) a per-player level that empties — all equal and >= 8 at "begin"; at "end" none above its "begin" value, the
++      winner's strictly the largest and > 0, every loser at 0;
++  (c) a single winner field — constant over "begin"; one value per winner at "end", different winners different
++      values, the "begin" value none of them (needs ends won by at least two players).
++The answer is "decided" only when a template leaves exactly one candidate; otherwise the counts and the state that would
++split them. It never names a rule when more than one fits. Prints one JSON document.
++"""
++from __future__ import annotations
++
++import argparse
++import json
++import re
++import sys
++import time
++from pathlib import Path
++
++import numpy as np
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import h7_minigame_proof as proof  # noqa: E402
++
++MEMORY = {"snes": 0x20000, "ps1": 0x200000}     # the main memory READ_CORE_RAM reads, per system
++CHUNK = 16384                                   # one command answers up to ~21,000 bytes (settled, B94)
++MAX_STRIDE = 0x400
++SMALL = 31
++HIGH = 8
++SHOWN = 10                                      # candidates listed per template (the count is always given)
++
++
++class SearchError(RuntimeError):
++    pass
++
++
++# --- reading ---------------------------------------------------------------------------------------------------------
++LOADING = re.compile(r'\[State\] Loading state ".*", (\d+) bytes\.')
++
++
++def load_paused(s: "proof.Session", state: Path, bound: float = 10.0, settle: float = 1.0) -> None:
++    """Pause, then load the state. RetroArch 1.22.2 logs `[State] Loading state "…", N bytes.` (N > 0 when read) and,
++    on a failure, `Failed to load state from "…"` (seen on a fixture: a corrupt file reads 0 bytes, then fails)."""
++    s.pause()
++    shutil_copy(state, s.state_path())
++    before = len(s.text())
++    s.send("LOAD_STATE_SLOT 0")
++    end = time.monotonic() + bound
++    seen = None
++    while time.monotonic() < end:
++        new = s.text()[before:]
++        if "Failed to load state" in new:
++            raise SearchError("RetroArch failed to load a state")
++        m = LOADING.search(new)
++        if m and seen is None:
++            if int(m.group(1)) == 0:
++                raise SearchError("RetroArch read 0 bytes of a state")
++            seen = time.monotonic()
++        if seen is not None and time.monotonic() - seen >= settle:
++            return
++        time.sleep(0.05)
++    raise SearchError("RetroArch did not report a state loaded")
++
++
++def shutil_copy(src: Path, dst: Path) -> None:
++    import shutil
++    shutil.copyfile(src, dst)
++
++
++def read_memory(s: "proof.Session", size: int) -> bytes:
++    out = bytearray()
++    for a in range(0, size, CHUNK):
++        n = min(CHUNK, size - a)
++        parts = (s.ask(f"READ_CORE_RAM {a:x} {n}", 3.0) or "").split()
++        if len(parts) != n + 2 or parts[2] == "-1":
++            raise SearchError(f"memory not readable at {a:#x}")
++        out += bytes(int(b, 16) for b in parts[2:])
++    return bytes(out)
++
++
++def read_state(content: Path, system: str, state: Path, loads: int = 3) -> tuple[bytes, np.ndarray]:
++    """The state's memory as it stands, and the mask of bytes equal on every load."""
++    import shutil
++    import tempfile
++    if system not in MEMORY:
++        raise SearchError(f"system not supported: {system}")
++    dumps = []
++    for _ in range(loads):
++        work = Path(tempfile.mkdtemp(prefix="h7_search_"))
++        s = proof.Session(content, system, work)
++        try:
++            s.wait_playing()
++            load_paused(s, state)
++            dumps.append(read_memory(s, MEMORY[system]))
++        except proof.ProofError as exc:
++            raise SearchError(str(exc)) from exc
++        finally:
++            s.close()
++            shutil.rmtree(work, ignore_errors=True)
++    arr = np.stack([np.frombuffer(d, dtype=np.uint8) for d in dumps])
++    stable = np.all(arr == arr[0], axis=0)
++    return dumps[0], stable
++
++
++# --- the search ------------------------------------------------------------------------------------------------------
++def _fields(mem: bytes, size: int) -> np.ndarray:
++    b = np.frombuffer(mem, dtype=np.uint8).astype(np.int32)
++    if size == 1:
++        return b
++    return b[:-1] | (b[1:] << 8)
++
++
++def _stable(stable: np.ndarray, size: int) -> np.ndarray:
++    return stable if size == 1 else (stable[:-1] & stable[1:])
++
++
++def _player(w: str | None) -> int | None:
++    return None if w is None else int(str(w).lstrip("Pp")) - 1
++
++
++def search(states: list[dict], players: int) -> dict:
++    """states: [{"label", "winner", "mem": bytes, "stable": bool array}] — the pure search (no emulator)."""
++    begins = [i for i, s in enumerate(states) if s["label"] == "begin"]
++    ends = [(i, _player(s["winner"])) for i, s in enumerate(states) if s["label"] == "end"]
++    if not begins or not ends:
++        raise SearchError("at least one 'begin' and one 'end' state are needed")
++    if any(w is None or not 0 <= w < players for _, w in ends):
++        raise SearchError("every 'end' state needs its winner (P1 … P%d)" % players)
++    winners = sorted({w for _, w in ends})
++    out: dict = {"players": players, "states": [{"label": s["label"], "winner": s["winner"]} for s in states],
++                 "unstable_bytes": int(sum(int((~s["stable"]).sum()) for s in states)), "templates": {}}
++    block: dict[str, list] = {"a": [], "b": []}
++    taken: set[int] = set()
++    for kind in ("a", "b"):
++        found = []
++        for size in (1, 2):
++            V = [_fields(s["mem"], size) for s in states]
++            ok = np.ones(len(V[0]), dtype=bool)
++            for s in states:
++                ok &= _stable(s["stable"], size)
++            if kind == "a":
++                small = ok.copy()
++                for v in V:
++                    small &= v <= SMALL
++                masks = []
++                for k in range(players):
++                    m = small.copy()
++                    for e, w in ends:
++                        if w == k:
++                            for b in begins:
++                                m &= V[e] > V[b]
++                    masks.append(m)
++            else:
++                masks = []
++                for k in range(players):
++                    m = ok.copy()
++                    for b in begins:
++                        m &= V[b] >= HIGH
++                    for e, w in ends:
++                        for b in begins:
++                            m &= V[e] <= V[b]
++                        m &= (V[e] > 0) if w == k else (V[e] == 0)
++                    masks.append(m)
++            j = ends[0][1]
++            seeds = np.nonzero(masks[j])[0]
++            n = len(V[0])
++            for d in range(size, MAX_STRIDE + 1):
++                base = seeds - j * d
++                base = base[(base >= 0) & (base + (players - 1) * d < n)]
++                if not len(base):
++                    continue
++                keep = np.ones(len(base), dtype=bool)
++                for k in range(players):
++                    keep &= masks[k][base + k * d]
++                base = base[keep]
++                if not len(base):
++                    continue
++                vals = [np.stack([V[i][base + k * d] for k in range(players)]) for i in range(len(states))]
++                keep = np.ones(len(base), dtype=bool)
++                for b in begins:
++                    keep &= np.all(vals[b] == vals[b][0], axis=0)
++                for e, w in ends:
++                    others = np.delete(vals[e], w, axis=0)
++                    keep &= np.all(vals[e][w] > others, axis=0)
++                for a in base[keep]:
++                    found.append({"size": size, "base": int(a), "stride": d,
++                                  "values": [[int(vals_i) for vals_i in [V[i][int(a) + k * d] for k in range(players)]]
++                                             for i in range(len(states))]})
++        merged = _merge(found, states, players)
++        merged.sort(key=lambda c: (not c["all_vary"], c["base"] % c["size"] != 0, c["stride"] % 4 != 0, c["stride"],
++                                   c["base"]))
++        block[kind] = merged
++        for c in merged:
++            for k in range(players):
++                taken.update(range(c["base"] + k * c["stride"], c["base"] + k * c["stride"] + c["size"]))
++    for kind, label in (("a", "a per-player counter"), ("b", "a per-player level that empties")):
++        cands = block[kind]
++        out["templates"][kind] = {"name": label, "count": len(cands),
++                                  "candidates": [_rule_of(c, players, kind) for c in cands[:SHOWN]]}
++    out["templates"]["c"] = _single_field(states, begins, ends, winners, taken)
++    return _verdict(out, ends, winners, players)
++
++
++def _merge(found: list[dict], states: list[dict], players: int) -> list[dict]:
++    """Reads of the same memory are one candidate: two candidates whose CHANGING bytes (a byte that differs between the
++    states) are the same addresses are one field read two ways — a 1- and a 2-byte read, or a 2-byte read one byte early
++    (the value × 256). The aligned, wider read is kept. `all_vary`: every player's field changes in some state."""
++    mems = np.stack([np.frombuffer(s["mem"], dtype=np.uint8) for s in states])
++    changing = np.any(mems != mems[0], axis=0)
++    by: dict = {}
++    for c in found:
++        fields = [range(c["base"] + k * c["stride"], c["base"] + k * c["stride"] + c["size"]) for k in range(players)]
++        key = tuple(sorted(a for f in fields for a in f if changing[a]))
++        c = dict(c, all_vary=all(any(changing[a] for a in f) for f in fields))
++        rank = (c["base"] % c["size"] != 0, -c["size"])
++        if key not in by:
++            by[key] = c
++        else:
++            keep, other = (c, by[key]) if rank < (by[key]["base"] % by[key]["size"] != 0, -by[key]["size"]) else (by[key], c)
++            keep = dict(keep, also_read_as=sorted(set(keep.get("also_read_as", [])) | {f"{other['size']}@{other['base']:#x}"}))
++            by[key] = keep
++    return list(by.values())
++
++
++def _rule_of(c: dict, players: int, kind: str) -> dict:
++    rule = {"players": [{"name": f"P{k + 1}", "address": hex(c["base"] + k * c["stride"]), "bytes": c["size"],
++                         "endian": "little"} for k in range(players)],
++            "winner": "max", "memory": "ram", "none_when": "equal"}
++    why = ("the same field per player at stride %#x: equal at every 'begin', the winner's the largest at every 'end'"
++           if kind == "a" else
++           "a level per player at stride %#x: equal and high at every 'begin', the losers at 0 at every 'end'") % c["stride"]
++    return {"rule": rule, "why": why, "values_per_state": c["values"], "every_player_changes": c["all_vary"],
++            **({"also_read_as": c["also_read_as"]} if c.get("also_read_as") else {})}
++
++
++def _single_field(states, begins, ends, winners, taken) -> dict:
++    name = "a single winner field"
++    if len(winners) < 2:
++        return {"name": name, "count": None, "candidates": [],
++                "not_testable": "needs 'end' states won by at least two different players"}
++    cands = []
++    for size in (1, 2):
++        V = [_fields(s["mem"], size) for s in states]
++        ok = np.ones(len(V[0]), dtype=bool)
++        for s in states:
++            ok &= _stable(s["stable"], size)
++        for b in begins[1:]:
++            ok &= V[b] == V[begins[0]]
++        rep = {}
++        for e, w in ends:
++            if w in rep:
++                ok &= V[e] == V[rep[w]]
++            else:
++                rep[w] = e
++        ws = sorted(rep)
++        for x in range(len(ws)):
++            ok &= V[rep[ws[x]]] != V[begins[0]]
++            for y in range(x + 1, len(ws)):
++                ok &= V[rep[ws[x]]] != V[rep[ws[y]]]
++        for a in np.nonzero(ok)[0]:
++            if any(int(a) + i in taken for i in range(size)):
++                continue
++            cands.append({"size": size, "address": int(a),
++                          "values": {f"P{w + 1}": int(V[rep[w]][a]) for w in ws}, "begin": int(V[begins[0]][a])})
++    seen, uniq = set(), []
++    for c in sorted(cands, key=lambda c: (-c["size"], c["address"])):
++        key = (c["address"], json.dumps(c["values"]), c["begin"])
++        if (c["address"], c["begin"]) in seen:
++            continue
++        seen.add((c["address"], c["begin"]))
++        uniq.append(c)
++    uniq.sort(key=lambda c: (c["address"] % c["size"] != 0, c["address"]))
++    return {"name": name, "count": len(uniq), "candidates": [
++        {"rule": {"players": [], "address": hex(c["address"]), "bytes": c["size"], "endian": "little",
++                  "values": c["values"], "none_value": c["begin"], "memory": "ram"},
++         "why": "one value per winner at 'end', another at 'begin'"} for c in uniq[:SHOWN]]}
++
++
++def _verdict(out: dict, ends, winners, players) -> dict:
++    ones = [k for k in ("a", "b", "c") if out["templates"][k].get("count") == 1]
++    if ones:
++        out["decided"] = True
++        out["rule"] = out["templates"][ones[0]]["candidates"][0]["rule"]
++        out["template"] = ones[0]
++        out["also_fits"] = [{"template": k, "rule": out["templates"][k]["candidates"][0]["rule"]} for k in ones[1:]]
++    else:
++        out["decided"] = False
++        unseen = [f"P{k + 1}" for k in range(players) if k not in winners]
++        repeat = [f"P{w + 1}" for w in winners if sum(1 for _, x in ends if x == w) < 2]
++        out["not_decided"] = {
++            "counts": {k: out["templates"][k]["count"] for k in ("a", "b", "c")},
++            "would_split": (f"an 'end' state won by {unseen[0]}" if unseen else
++                            f"a second 'end' state won by {repeat[0]}" if repeat else "another labelled state")}
++    return out
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
++    ap.add_argument("--content", required=True, type=Path)
++    ap.add_argument("--system", required=True, choices=sorted(MEMORY))
++    ap.add_argument("--states", required=True, type=Path)
++    ap.add_argument("--players", type=int)
++    ap.add_argument("--loads", type=int, default=3)
++    ap.add_argument("--time", action="store_true")
++    a = ap.parse_args(argv)
++    try:
++        listed = json.loads(a.states.read_text())
++        named = [_player(s.get("winner")) for s in listed if s.get("winner")]
++        players = a.players or max([1] + [w + 1 for w in named if w is not None])
++        players = max(players, 2)
++        if not 2 <= players <= 4:
++            raise SearchError("2 to 4 players")
++        t0 = time.monotonic()
++        states = []
++        for s in listed:
++            mem, stable = read_state(a.content, a.system, Path(s["state"]), a.loads)
++            states.append({"label": s["label"], "winner": s.get("winner"), "mem": mem, "stable": stable})
++        t1 = time.monotonic()
++        out = search(states, players)
++        if a.time:
++            out["seconds"] = {"read": round(t1 - t0, 2), "search": round(time.monotonic() - t1, 2)}
++        print(json.dumps(out))
++        return 0
++    except (SearchError, proof.ProofError, OSError, ValueError, KeyError) as exc:
++        print(json.dumps({"error": str(exc)}))
++        return 2
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tests/h7_rule_search/fixtures.py b/tests/h7_rule_search/fixtures.py
+new file mode 100644
+index 00000000..9566283e
+--- /dev/null
++++ b/tests/h7_rule_search/fixtures.py
+@@ -0,0 +1,91 @@
++"""B94: synthetic fixtures for the win-rule search (no game, made-up header text only).
++
++Both programs make **noise** — a counter that advances continuously and a xorshift pseudo-random buffer rewritten as it
++runs — and leave alone the areas the tests plant through B93's `--make-state --write`: a **per-player block** (a round
++counter and a level per player, at a constant stride) and **decoys** (a block where player 1 is larger in every state;
++a block that fits begin + a player-1 end but not a player-2 end).
++
++PS1 (a PS-X EXE at 0x80010000): the counter at 0x080000, the xorshift word at 0x080004, the buffer 0x080100-0x0810FF.
++SNES (a LoROM): the frame counter at $0000, the xorshift word at $0002, the buffer $1000-$13FF (one word per frame).
++"""
++import struct
++
++# --- the plan the tests plant (addresses as the read commands take them) ---------------------------------------------
++PS1 = {"block": 0x0C0000, "stride": 0x40, "rounds": 0x08, "level": 0x0C, "size": 2,
++       "decoy_always_p1": 0x0D0000, "decoy_two_states": 0x0E0000, "decoy_stride": 0x20,
++       "noise": [(0x080000, 0x080008), (0x080100, 0x081100)]}
++SNES = {"block": 0x0800, "stride": 0x20, "rounds": 0x04, "level": 0x06, "size": 2,
++        "decoy_always_p1": 0x0A00, "decoy_two_states": 0x0B00, "decoy_stride": 0x10,
++        "noise": [(0x0000, 0x0004), (0x1000, 0x1400)]}
++
++
++def _i(op, rs=0, rt=0, imm=0):
++    return (op << 26) | (rs << 21) | (rt << 16) | (imm & 0xFFFF)
++
++
++def _r(rs, rt, rd, sa, fn):
++    return (rs << 21) | (rt << 16) | (rd << 11) | (sa << 6) | fn
++
++
++def psx_exe() -> bytes:
++    S0, T0, T1, T2, T3 = 16, 8, 9, 10, 11
++    lw = lambda rt, off, b: _i(0x23, b, rt, off)
++    sw = lambda rt, off, b: _i(0x2B, b, rt, off)
++    c = [_i(0x0F, 0, S0, 0x8008),                 # lui s0, 0x8008
++         _i(0x0D, 0, T1, 0x1234), sw(T1, 4, S0)]  # the xorshift seed
++    loop = len(c)
++    c += [lw(T0, 0, S0), 0, _i(0x09, T0, T0, 1), sw(T0, 0, S0),                 # counter += 1
++          lw(T1, 4, S0), 0,
++          _r(0, T1, T2, 13, 0x00), _r(T1, T2, T1, 0, 0x26),                     # x ^= x << 13
++          _r(0, T1, T2, 17, 0x02), _r(T1, T2, T1, 0, 0x26),                     # x ^= x >> 17
++          _r(0, T1, T2, 5, 0x00), _r(T1, T2, T1, 0, 0x26),                      # x ^= x << 5
++          sw(T1, 4, S0),
++          _i(0x0C, T0, T3, 0x3FF), _r(0, T3, T3, 2, 0x00), _r(T3, S0, T3, 0, 0x21),
++          sw(T1, 0x100, T3)]                                                     # buffer[counter & 1023] = x
++    c += [_i(0x04, 0, 0, (loop - (len(c) + 1)) & 0xFFFF), 0]                    # b loop ; nop
++    body = b"".join(struct.pack("<I", w) for w in c).ljust(0x800, b"\0")
++    h = bytearray(0x800)
++    h[0:8] = b"PS-X EXE"
++    struct.pack_into("<IIII", h, 0x10, 0x80010000, 0, 0x80010000, len(body))
++    struct.pack_into("<II", h, 0x30, 0x801FFF00, 0)
++    h[0x4C:0x4C + 16] = b"PRIVYHUB FIXTURE"
++    return bytes(h + body)
++
++
++def snes() -> bytes:
++    code = bytearray(); labels = {}; fix = []
++    def emit(*b): code.extend(b)
++    def label(n): labels[n] = len(code)
++    def branch(op, t): emit(op, 0); fix.append((len(code) - 1, t))
++    emit(0x78, 0x18, 0xFB, 0xC2, 0x30)                       # SEI CLC XCE REP #$30 (16-bit A, X)
++    emit(0xA9, 0x34, 0x12, 0x8F, 0x02, 0x00, 0x7E)           # LDA #$1234 ; STA $7E0002 (seed)
++    label("frame")
++    emit(0xE2, 0x20)                                         # SEP #$20
++    label("vb"); emit(0xAD, 0x12, 0x42); branch(0x10, "vb")
++    label("vbe"); emit(0xAD, 0x12, 0x42); branch(0x30, "vbe")
++    emit(0xC2, 0x20)                                         # REP #$20
++    emit(0xAF, 0x00, 0x00, 0x7E, 0x1A, 0x8F, 0x00, 0x00, 0x7E)   # frame counter += 1
++    # xorshift16: x ^= x << 7 ; x ^= x >> 9 ; x ^= x << 8
++    emit(0xAF, 0x02, 0x00, 0x7E)                             # LDA x
++    for shifts, op in ((7, 0x0A), (9, 0x4A), (8, 0x0A)):
++        emit(0x85, 0x10)                                     # STA $10 (direct page scratch)
++        emit(*([op] * shifts))                               # ASL / LSR × n
++        emit(0x45, 0x10)                                     # EOR $10
++    emit(0x8F, 0x02, 0x00, 0x7E)                             # STA x
++    emit(0x48)                                               # PHA
++    emit(0xAF, 0x00, 0x00, 0x7E, 0x29, 0xFF, 0x01, 0x0A, 0xAA)   # LDA counter ; AND #$01FF ; ASL ; TAX
++    emit(0x68)                                               # PLA
++    emit(0x9F, 0x00, 0x10, 0x7E)                             # STA $7E1000,X
++    branch(0x80, "frame")
++    for at, t in fix:
++        rel = labels[t] - (at + 1); assert -128 <= rel <= 127; code[at] = rel & 0xFF
++    rom = bytearray(b"\xFF" * 0x8000)
++    rom[0:len(code)] = code
++    rom[0x7FC0:0x7FD5] = b"PRIVYHUB FIXTURE".ljust(21)
++    rom[0x7FD5] = 0x20; rom[0x7FD6] = 0; rom[0x7FD7] = 5; rom[0x7FD8] = 0; rom[0x7FD9] = 1
++    for v in (0x7FE4, 0x7FE6, 0x7FE8, 0x7FEA, 0x7FEE, 0x7FF4, 0x7FF8, 0x7FFA, 0x7FFE):
++        rom[v:v + 2] = struct.pack("<H", 0x8000 + labels["frame"])
++    rom[0x7FFC:0x7FFE] = struct.pack("<H", 0x8000)
++    rom[0x7FDC:0x7FE0] = b"\xFF\xFF\x00\x00"; s = sum(rom) & 0xFFFF
++    rom[0x7FDC:0x7FE0] = struct.pack("<HH", s ^ 0xFFFF, s)
++    return bytes(rom)
+diff --git a/tests/h7_rule_search/test_h7_rule_search.py b/tests/h7_rule_search/test_h7_rule_search.py
+new file mode 100644
+index 00000000..63688005
+--- /dev/null
++++ b/tests/h7_rule_search/test_h7_rule_search.py
+@@ -0,0 +1,285 @@
++#!/usr/bin/env python3
++"""B94 (host): the win-rule search on synthetic fixtures (no game).
++
++States are made on `fixtures.py`'s PS-X EXE and SNES ROM — SNES with B93's own `--make-state --write`, one session
++per state at different moments; PS1 in ONE paused session (written, saved, written, saved: the core's own time-varying
++bytes the same in every state — made at different moments they sometimes fit a template by chance, see the record): a planted per-player
++block (a round counter and a level), decoys (a block where P1 is larger in every state; a block that fits begin + a
++P1-won end but not a P2-won end), and noise (the SNES program's frame counter and xorshift buffer; on PS1, whose fixture
++code does not run headless, random bytes written per state). The search reads each state paused, 3 loads, through
++`tools/h7_rule_search.py`'s own reader; RetroArch headless (B61's form). Skipped without RetroArch or a display.
++Temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/h7_rule_search -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import random
++import shutil
++import subprocess
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++
++import numpy as np
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(HERE))
++sys.path.insert(0, str(ROOT / "tools"))
++sys.path.insert(0, str(ROOT / "tests" / "h7_minigame_proof"))
++import fixtures as F  # noqa: E402
++import h7_minigame_proof as proof  # noqa: E402
++import h7_rule_search as search  # noqa: E402
++from test_h7_proof import display_env  # noqa: E402
++
++TOOL = ROOT / "tools" / "h7_rule_search.py"
++PROOF = ROOT / "tools" / "h7_minigame_proof.py"
++ALL = 10 ** 6
++
++TWO = {"begin": {"rounds": (0, 0), "level": (120, 120), "d_counter": (3, 3), "d_level": (100, 100)},
++       "P1": {"rounds": (2, 1), "level": (37, 0), "d_counter": (7, 2), "d_level": (40, 0)},
++       "P2": {"rounds": (1, 2), "level": (0, 55), "d_counter": (6, 4), "d_level": (30, 0)}}
++FOUR = {"begin": {"rounds": (0, 0, 0, 0), "level": (120, 120, 120, 120)},
++        "P3": {"rounds": (1, 0, 2, 1), "level": (0, 0, 60, 0)},
++        "P1": {"rounds": (2, 1, 0, 0), "level": (45, 0, 0, 0)},
++        "P4": {"rounds": (0, 1, 1, 2), "level": (0, 0, 0, 70)}}
++
++
++def u16(v: int) -> str:
++    return v.to_bytes(2, "little").hex()
++
++
++def writes(plan: dict, facts: dict, seed: int, noise: bool) -> list[str]:
++    w = []
++    for k, (r, lv) in enumerate(zip(facts["rounds"], facts["level"])):
++        base = plan["block"] + k * plan["stride"]
++        w += [f"{base + plan['rounds']:#x}={u16(r)}", f"{base + plan['level']:#x}={u16(lv)}"]
++    if "d_counter" in facts:
++        for k, v in enumerate((9, 4)):                                   # P1 larger in every state
++            w.append(f"{plan['decoy_always_p1'] + k * plan['decoy_stride']:#x}={u16(v)}")
++        for k, (c, lv) in enumerate(zip(facts["d_counter"], facts["d_level"])):
++            base = plan["decoy_two_states"] + k * plan["decoy_stride"]
++            w += [f"{base:#x}={u16(c)}", f"{base + 4:#x}={u16(lv)}"]
++    if noise:                                                            # PS1: the fixture's code does not run headless
++        rnd = random.Random(seed)
++        for lo, hi in plan["noise"]:
++            w.append(f"{lo:#x}={bytes(rnd.randrange(256) for _ in range(hi - lo)).hex()}")
++    return w
++
++
++class Base(unittest.TestCase):
++    system = "ps1"
++    plan = F.PS1
++    sets = TWO
++    noise = True
++
++    @classmethod
++    def setUpClass(cls):
++        cls.env = display_env()
++        cls.tmp = Path(tempfile.mkdtemp(prefix="h7_search_test_"))
++        cls.rom = cls.tmp / ("Made Up Fight.exe" if cls.system == "ps1" else "Made Up Fight.sfc")
++        cls.rom.write_bytes(F.psx_exe() if cls.system == "ps1" else F.snes())
++        cls.files, cls.read = {}, {}
++        if cls.noise:     # PS1: every state from one paused session (the core's own time-varying bytes the same in all)
++            old_env = dict(os.environ)
++            os.environ.update(cls.env)
++            s = proof.Session(cls.rom, cls.system, cls.tmp / "make")
++            try:
++                s.wait_playing()
++                time.sleep(0.5)
++                s.pause()
++                for n, (name, facts) in enumerate(cls.sets.items()):
++                    for w in writes(cls.plan, facts, n + 1, cls.noise):
++                        addr, data = w.split("=")
++                        s.send(f"WRITE_CORE_RAM {int(addr, 0):x} " + " ".join(f"{b:02x}" for b in bytes.fromhex(data)))
++                        time.sleep(0.05)
++                    out = cls.tmp / f"{name}.state"
++                    s.save_state(out)
++                    cls.files[name] = out
++            finally:
++                s.close()
++                os.environ.clear(); os.environ.update(old_env)
++        for n, (name, facts) in enumerate(cls.sets.items() if not cls.noise else ()):
++            out = cls.tmp / f"{name}.state"
++            args = [sys.executable, "-I", "-B", str(PROOF), "--content", str(cls.rom), "--system", cls.system,
++                    "--make-state", str(out), "--after", str(0.5 + 0.4 * n)]   # a different moment per state
++            for x in writes(cls.plan, facts, n + 1, cls.noise):
++                args += ["--write", x]
++            r = subprocess.run(args, capture_output=True, text=True, env=cls.env, timeout=120)
++            assert json.loads(r.stdout.strip().splitlines()[-1]).get("state_written"), r.stdout + r.stderr[-800:]
++            cls.files[name] = out
++        old = dict(os.environ)
++        os.environ.update(cls.env)
++        try:
++            for name, path in cls.files.items():
++                mem, stable = search.read_state(cls.rom, cls.system, path, 3)
++                cls.read[name] = (mem, stable)
++        finally:
++            os.environ.clear(); os.environ.update(old)
++
++    @classmethod
++    def tearDownClass(cls):
++        shutil.rmtree(cls.tmp, ignore_errors=True)
++
++    def states(self, *names) -> list[dict]:
++        return [{"label": "begin" if n == "begin" else "end", "winner": None if n == "begin" else n,
++                 "mem": self.read[n][0], "stable": self.read[n][1]} for n in names]
++
++    def planted(self, players: int) -> dict:
++        return [hex(self.plan["block"] + k * self.plan["stride"] + self.plan["rounds"]) for k in range(players)]
++
++
++@unittest.skipUnless(proof.APP.is_file() and display_env(), "RetroArch or a display is absent")
++class PS1TwoPlayers(Base):
++    def test_loads_are_stable(self):
++        for name, (_mem, stable) in self.read.items():
++            self.assertTrue(bool(stable.all()), name)                   # paused loads: every byte the same
++
++    def test_three_states_decide_the_planted_rule(self):
++        out = search.search(self.states("begin", "P1", "P2"), 2)
++        self.assertTrue(out["decided"], out.get("not_decided"))
++        self.assertEqual(out["template"], "a")
++        self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
++        self.assertEqual(out["templates"]["a"]["count"], 1)
++        self.assertEqual(out["templates"]["b"]["count"], 1)               # the planted level also fits, alone
++        level = [hex(self.plan["block"] + k * self.plan["stride"] + self.plan["level"]) for k in range(2)]
++        self.assertEqual([p["address"] for p in out["also_fits"][0]["rule"]["players"]], level)
++
++    def test_begin_and_one_end_is_not_decided_and_includes_the_planted_rule(self):
++        out = search.search(self.states("begin", "P1"), 2)
++        self.assertFalse(out["decided"])
++        self.assertGreater(out["not_decided"]["counts"]["a"], 1)
++        self.assertGreater(out["not_decided"]["counts"]["b"], 1)
++        self.assertIsNone(out["not_decided"]["counts"]["c"])              # not testable with one winner
++        self.assertIn("P2", out["not_decided"]["would_split"])
++        self.assertNotIn("rule", out)
++        search.SHOWN, old = ALL, search.SHOWN
++        try:
++            full = search.search(self.states("begin", "P1"), 2)
++        finally:
++            search.SHOWN = old
++        found = [[p["address"] for p in c["rule"]["players"]] for c in full["templates"]["a"]["candidates"]]
++        self.assertIn(self.planted(2), found)
++        decoy = [hex(self.plan["decoy_two_states"] + k * self.plan["decoy_stride"]) for k in range(2)]
++        self.assertIn(decoy, found)                                       # the decoy fits two states…
++
++    def test_a_decoy_never_ranks_above_the_planted_rule_once_p2_is_in(self):
++        search.SHOWN, old = ALL, search.SHOWN
++        try:
++            out = search.search(self.states("begin", "P1", "P2"), 2)
++        finally:
++            search.SHOWN = old
++        for t in ("a", "b"):
++            addrs = [int(p["address"], 16) for c in out["templates"][t]["candidates"] for p in c["rule"]["players"]]
++            for d in (self.plan["decoy_two_states"], self.plan["decoy_always_p1"]):
++                self.assertFalse(any(d <= a < d + 2 * self.plan["decoy_stride"] for a in addrs), (t, addrs))  # …not three
++
++    def test_the_cli_and_its_time_on_2_mib(self):
++        listed = self.tmp / "states.json"
++        listed.write_text(json.dumps([{"state": str(self.files[n]), "label": "begin" if n == "begin" else "end",
++                                       "winner": None if n == "begin" else n} for n in ("begin", "P1", "P2")]))
++        r = subprocess.run([sys.executable, "-I", "-B", str(TOOL), "--content", str(self.rom), "--system", "ps1",
++                            "--states", str(listed), "--time"], capture_output=True, text=True, env=self.env, timeout=600)
++        out = json.loads(r.stdout.strip().splitlines()[-1])
++        self.assertTrue(out["decided"], out)
++        self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
++        print(f"\nB94 time, PS1 2 MiB, 3 states x 3 loads: {out['seconds']}", file=sys.stderr)
++        self.assertLess(out["seconds"]["search"], 60)
++
++    def test_a_state_that_fails_to_load_is_an_error_never_a_rule(self):
++        import zlib
++        data = os.urandom(10000)
++        comp = zlib.compress(data)
++        cases = {"corrupt": b"#RZIPv\x01#" + os.urandom(4000),                  # read as 0 bytes
++                 "refused": b"#RZIPv\x01#" + (131072).to_bytes(4, "little") + len(data).to_bytes(8, "little")
++                            + len(comp).to_bytes(4, "little") + comp}           # read, then refused by the core
++        for name, raw in cases.items():
++            bad = self.tmp / f"{name}.state"
++            bad.write_bytes(raw)
++            listed = self.tmp / f"{name}.json"
++            listed.write_text(json.dumps([{"state": str(bad), "label": "begin", "winner": None},
++                                          {"state": str(self.files["P1"]), "label": "end", "winner": "P1"}]))
++            r = subprocess.run([sys.executable, "-I", "-B", str(TOOL), "--content", str(self.rom), "--system", "ps1",
++                                "--states", str(listed), "--loads", "1"], capture_output=True, text=True, env=self.env,
++                               timeout=300)
++            out = json.loads(r.stdout.strip().splitlines()[-1])
++            self.assertEqual(r.returncode, 2, name)
++            self.assertIn("error", out, name)
++            self.assertNotIn("rule", out, name)
++            if name == "refused":
++                self.assertIn("failed to load", out["error"])
++
++
++@unittest.skipUnless(proof.APP.is_file() and display_env(), "RetroArch or a display is absent")
++class PS1FourPlayers(Base):
++    sets = FOUR
++
++    def test_the_four_player_set(self):
++        out = search.search(self.states("begin", "P3", "P1"), 4)       # two ends: the counter is not decided…
++        self.assertEqual(out["templates"]["a"]["count"], 2)               # (a half-stride block also fits)
++        self.assertEqual([p["address"] for p in out["templates"]["a"]["candidates"][0]["rule"]["players"]],
++                         self.planted(4))                                 # ranked first (every player's field changes)
++        self.assertTrue(out["decided"])                                   # …the level is: one candidate
++        self.assertEqual(out["template"], "b")
++        self.assertEqual([p["address"] for p in out["rule"]["players"]],
++                         [hex(self.plan["block"] + k * self.plan["stride"] + self.plan["level"]) for k in range(4)])
++        out = search.search(self.states("begin", "P3", "P1", "P4"), 4)  # an end won by a fourth player splits them
++        self.assertTrue(out["decided"], out.get("not_decided"))
++        self.assertEqual((out["template"], out["templates"]["a"]["count"]), ("a", 1))
++        self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(4))
++
++
++@unittest.skipUnless(proof.APP.is_file() and display_env(), "RetroArch or a display is absent")
++class SnesTwoPlayers(Base):
++    system = "snes"
++    plan = F.SNES
++    noise = False                                    # the program's own frame counter and buffer
++
++    def test_the_noise_runs_and_the_planted_rule_is_decided(self):
++        b, e = self.read["begin"][0], self.read["P1"][0]
++        self.assertNotEqual(b[0x1000:0x1400], e[0x1000:0x1400])            # the buffer differs between states
++        out = search.search(self.states("begin", "P1", "P2"), 2)
++        self.assertTrue(out["decided"], out.get("not_decided"))
++        self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
++
++
++class NoEmulator(unittest.TestCase):
++    def mem(self, pairs: dict[int, int], size: int = 4096) -> bytes:
++        m = bytearray(size)
++        for a, v in pairs.items():
++            m[a] = v
++        return bytes(m)
++
++    def test_unstable_addresses_are_dropped(self):
++        def st(label, winner, pairs, unstable=()):
++            s = np.ones(4096, dtype=bool)
++            for a in unstable:
++                s[a] = False
++            return {"label": label, "winner": winner, "mem": self.mem(pairs), "stable": s}
++        planted = {0x100: 0, 0x110: 0}
++        p1 = {0x100: 2, 0x110: 1}
++        p2 = {0x100: 1, 0x110: 2}
++        decoy = {0x200: 5, 0x204: 5}, {0x200: 6, 0x204: 4}, {0x200: 4, 0x204: 6}   # fits all three, but unstable
++        states = [st("begin", None, {**planted, **decoy[0]}, unstable=[0x200]),
++                  st("end", "P1", {**p1, **decoy[1]}), st("end", "P2", {**p2, **decoy[2]})]
++        out = search.search(states, 2)
++        addrs = [[p["address"] for p in c["rule"]["players"]] for c in out["templates"]["a"]["candidates"]]
++        self.assertEqual(addrs, [["0x100", "0x110"]])
++        self.assertTrue(out["decided"])
++        self.assertGreater(out["unstable_bytes"], 0)
++        states[0]["stable"][0x200] = True                                   # stable → it fits as well: two, not decided
++        out = search.search(states, 2)
++        self.assertEqual(out["templates"]["a"]["count"], 2)
++
++    def test_needs_a_begin_and_an_end(self):
++        with self.assertRaises(search.SearchError):
++            search.search([{"label": "end", "winner": "P1", "mem": bytes(16), "stable": np.ones(16, dtype=bool)}], 2)
++
++
++if __name__ == "__main__":
++    unittest.main()

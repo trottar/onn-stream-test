@@ -1,0 +1,393 @@
+diff --git a/tools/h7_minigame_proof.py b/tools/h7_minigame_proof.py
+index ea7a717d..038025dd 100644
+--- a/tools/h7_minigame_proof.py
++++ b/tools/h7_minigame_proof.py
+@@ -3,6 +3,7 @@
+ 
+     python3 tools/h7_minigame_proof.py --content <rom> --system snes --state <file> --seconds 10 --rule <rule.json>
+     python3 tools/h7_minigame_proof.py ... --no-state                      # from boot (a control)
++    python3 tools/h7_minigame_proof.py ... --as-is [--runs 3]               # B95: the state read as it stands
+     python3 tools/h7_minigame_proof.py --content <rom> --system snes --make-state <out> [--after 1.0] [--write 0x0104=01]
+ 
+ RetroArch runs headless in temp folders (the hub's AppImage and cores, its persistent config as the base, the joypad
+@@ -11,7 +12,17 @@ temp states folder and loaded with LOAD_STATE_SLOT 0 (RetroArch's own log line i
+ pause → read each player's value (READ_CORE_RAM / READ_CORE_MEMORY) → QUIT. Prints one JSON line.
+ 
+ The rule (JSON): {"players": [{"name": "P1", "address": "0x0100", "bytes": 2, "endian": "little"}, ...],
+-                  "winner": "max" | "min", "memory": "ram" | "memory"}
++                  "winner": "max" | "min", "memory": "ram" | "memory",
++                  "none_when": "equal" | {"floor": V}}            # B95: "no winner yet", distinct from a tie
++            or B94's single field: {"address": "0x…", "bytes": 1, "values": {"P1": v1, "P2": v2}, "none_value": v0}
++
++B95: --as-is (or --seconds 0) pauses first and loads the state paused: no frame runs before the read (0 frames, measured
++on the fixtures of snes9x, Beetle PSX HW and Mupen64Plus-Next). --runs N repeats the whole load-and-read with a fresh
++RetroArch and reports the agreement ("k of N"); a disagreement is reported ("winner": "disagree"), never hidden.
++
++The proof (B95, replacing B93's): Met on a real game when, read as they stand, the 'end' state names the player the TV
++showed, the 'begin' state names no winner, and — where the user has made one — an 'end' state won by another player
++names that player; the same on 3 loads each. The fixed run with real players is tested later, on the stream.
+ Run with DISPLAY / XAUTHORITY of the companion's session (RetroArch needs a display).
+ """
+ from __future__ import annotations
+@@ -19,6 +30,7 @@ from __future__ import annotations
+ import argparse
+ import json
+ import os
++import re
+ import shutil
+ import signal
+ import socket
+@@ -43,6 +55,17 @@ class ProofError(RuntimeError):
+ 
+ 
+ def parse_rule(rule: dict) -> dict:
++    if rule.get("memory", "ram") not in ("ram", "memory"):
++        raise ProofError("memory is ram or memory")
++    if "address" in rule and not rule.get("players"):            # B95: B94's single winner field
++        n = int(rule.get("bytes", 1))
++        if n not in (1, 2, 4) or not isinstance(rule.get("values"), dict) or len(rule["values"]) < 2:
++            raise ProofError("a single-field rule needs 1, 2 or 4 bytes and a value per winner")
++        return {"field": {"name": "field", "address": int(str(rule["address"]), 0), "bytes": n,
++                          "endian": rule.get("endian", "little")},
++                "values": {str(k): int(v) for k, v in rule["values"].items()},
++                "none_value": None if rule.get("none_value") is None else int(rule["none_value"]),
++                "memory": rule.get("memory", "ram")}
+     players = rule.get("players")
+     if not isinstance(players, list) or len(players) < 2:
+         raise ProofError("the rule needs at least two players")
+@@ -57,9 +80,12 @@ def parse_rule(rule: dict) -> dict:
+                     "endian": p.get("endian", "little")})
+     if rule.get("winner", "max") not in ("max", "min"):
+         raise ProofError("winner is max or min")
+-    if rule.get("memory", "ram") not in ("ram", "memory"):
+-        raise ProofError("memory is ram or memory")
+-    return {"players": out, "winner": rule.get("winner", "max"), "memory": rule.get("memory", "ram")}
++    none_when = rule.get("none_when")
++    if not (none_when is None or none_when == "equal"
++            or (isinstance(none_when, dict) and isinstance(none_when.get("floor"), int))):
++        raise ProofError('none_when is "equal" or {"floor": V}')
++    return {"players": out, "winner": rule.get("winner", "max"), "memory": rule.get("memory", "ram"),
++            "none_when": none_when}
+ 
+ 
+ def decide(values: dict[str, int], winner: str) -> str:
+@@ -68,6 +94,22 @@ def decide(values: dict[str, int], winner: str) -> str:
+     return top[0] if len(top) == 1 else "tie"
+ 
+ 
++def answer(r: dict, values: dict[str, int]) -> tuple[str | None, str | None]:
++    """B95: the winner, or None with the reason "no winner yet" (the rule's none_when / a single field's none_value)."""
++    if "field" in r:
++        v = values["field"]
++        if r["none_value"] is not None and v == r["none_value"]:
++            return None, "no winner yet"
++        hits = [k for k, x in r["values"].items() if x == v]
++        return (hits[0], None) if len(hits) == 1 else ("unknown", "a value no rule names")
++    nw = r.get("none_when")
++    if nw == "equal" and len(set(values.values())) == 1:
++        return None, "no winner yet"
++    if isinstance(nw, dict) and all(v <= nw["floor"] for v in values.values()):
++        return None, "no winner yet"
++    return decide(values, r["winner"]), None
++
++
+ def value_of(answer: str | None, address: int, n: int, endian: str) -> int:
+     """`READ_CORE_RAM <addr> <b1> <b2> …` → the value; `… -1` (no memory there) → ProofError."""
+     parts = (answer or "").split()
+@@ -88,8 +130,10 @@ class Session:
+         self.work = work
+         for d in ("saves", "states", "system", "xdg", "cheats"):
+             (work / d).mkdir(parents=True, exist_ok=True)
+-        self.content = work / content.name
+-        shutil.copyfile(content, self.content)          # a copy: the library's file is only read
++        # B95: the game read in place (RetroArch only reads it; a .cue keeps its tracks beside it; no large copy)
++        self.content = Path(content).resolve()
++        if not self.content.is_file():
++            raise ProofError("the game file is not there")
+         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+         s.bind(("127.0.0.1", 0))
+         self.port = s.getsockname()[1]
+@@ -157,15 +201,27 @@ class Session:
+         d.mkdir(parents=True, exist_ok=True)
+         return d / f"{self.content.stem}.state"
+ 
+-    def load_state(self, state: Path, bound: float = 10.0) -> str:
++    LOADING = re.compile(r'\[State\] Loading state ".*", (\d+) bytes\.')
++
++    def load_state(self, state: Path, bound: float = 10.0, settle: float = 1.0) -> str:
++        """B95: RetroArch 1.22.2 logs `[State] Loading state "…", N bytes.` — N > 0 when the file was read — and on a
++        failure `Failed to load state from "…"`; a load counts when N > 0 and no failure line follows within `settle`."""
+         shutil.copyfile(state, self.state_path())
+         before = len(self.text())
+         self.send("LOAD_STATE_SLOT 0")
+         end = time.monotonic() + bound
++        seen, line = None, ""
+         while time.monotonic() < end:
+-            for line in self.text()[before:].splitlines():
+-                if "[State]" in line and "oad" in line and self.content.stem in line:
+-                    return line.strip()
++            new = self.text()[before:]
++            if "Failed to load state" in new:
++                raise ProofError("RetroArch failed to load the state")
++            m = self.LOADING.search(new)
++            if m and seen is None:
++                if int(m.group(1)) == 0:
++                    raise ProofError("RetroArch read 0 bytes of the state")
++                seen, line = time.monotonic(), m.group(0)
++            if seen is not None and time.monotonic() - seen >= settle:
++                return line
+             time.sleep(0.05)
+         raise ProofError("RetroArch did not report the state loaded")
+ 
+@@ -193,9 +249,15 @@ class Session:
+     def close(self) -> None:
+         try:
+             self.send("QUIT")
+-            self.proc.wait(5)
++            self.proc.wait(1)
+         except Exception:
+             pass
++        if self.proc.poll() is None:                   # B95: a paused RetroArch does not act on QUIT; SIGTERM first
++            try:
++                os.killpg(self.proc.pid, signal.SIGTERM)
++                self.proc.wait(3)
++            except Exception:
++                pass
+         if self.proc.poll() is None:
+             os.killpg(self.proc.pid, signal.SIGKILL)
+             self.proc.wait(5)
+@@ -203,35 +265,68 @@ class Session:
+         self.sock.close()
+ 
+ 
+-def run_proof(content: Path, system: str, state: Path | None, seconds: float, rule: dict) -> dict:
+-    r = parse_rule(rule)
++def run_once(content: Path, system: str, state: Path | None, seconds: float, r: dict, as_is: bool = False) -> dict:
++    """One fresh RetroArch: load (paused first when as-is: no frame runs), run `seconds` unless as-is, pause, read."""
+     work = Path(tempfile.mkdtemp(prefix="h7_proof_"))
+     s = Session(content, system, work)
+     try:
+         s.wait_playing()
+-        out: dict = {"system": system, "seconds": seconds, "state_loaded": False}
++        out: dict = {"system": system, "seconds": 0 if as_is else seconds, "state_loaded": False}
++        if as_is:
++            s.pause()
++            out["as_is"] = True
+         if state is not None:
+             s.load_state(state)
+             out["state_loaded"] = True
+-        time.sleep(seconds)
+-        s.pause()
++        if not as_is:
++            time.sleep(seconds)
++            s.pause()
+         command = "READ_CORE_RAM" if r["memory"] == "ram" else "READ_CORE_MEMORY"
++        fields = [r["field"]] if "field" in r else r["players"]
+         values = {p["name"]: value_of(s.ask(f"{command} {p['address']:x} {p['bytes']}"), p["address"], p["bytes"],
+-                                      p["endian"]) for p in r["players"]}
++                                      p["endian"]) for p in fields}
+         out["values"] = values
+-        out["winner"] = decide(values, r["winner"])
++        winner, reason = answer(r, values)
++        out["winner"] = winner
++        if reason:
++            out["reason"] = reason
+         return out
+     finally:
+         s.close()
+         shutil.rmtree(work, ignore_errors=True)
+ 
+ 
++def run_proof(content: Path, system: str, state: Path | None, seconds: float, rule: dict, as_is: bool = False,
++              runs: int = 1) -> dict:
++    r = parse_rule(rule)
++    as_is = as_is or seconds == 0
++    if runs <= 1:
++        return run_once(content, system, state, seconds, r, as_is)
++    return agree([run_once(content, system, state, seconds, r, as_is) for _ in range(runs)])
++
++
++def agree(results: list[dict]) -> dict:
++    """B95: N runs in one line — the agreed winner only when every run names it; else "disagree"."""
++    names = [json.dumps(x.get("winner")) for x in results]
++    top = max(set(names), key=names.count)
++    k = names.count(top)
++    out = {k2: v for k2, v in results[0].items() if k2 not in ("values", "winner", "reason")}
++    out.update({"runs": len(results), "agreement": f"{k} of {len(results)}",
++                "winner": json.loads(top) if k == len(results) else "disagree",
++                "per_run": [{"winner": x.get("winner"), "values": x.get("values"),
++                             **({"reason": x["reason"]} if x.get("reason") else {})} for x in results]})
++    if k == len(results) and results[0].get("reason"):
++        out["reason"] = results[0]["reason"]
++    return out
++
++
+ def make_state(content: Path, system: str, out: Path, after: float, writes: list[tuple[int, bytes]]) -> dict:
+     work = Path(tempfile.mkdtemp(prefix="h7_state_"))
+     s = Session(content, system, work)
+     try:
+         s.wait_playing()
+         time.sleep(after)
++        s.pause()                                      # B95: written and saved paused — the state holds what was written
+         for address, data in writes:
+             s.send(f"WRITE_CORE_RAM {address:x} " + " ".join(f"{b:02x}" for b in data))
+             time.sleep(0.1)
+@@ -250,6 +345,8 @@ def main(argv: list[str] | None = None) -> int:
+     ap.add_argument("--no-state", action="store_true")
+     ap.add_argument("--seconds", type=float, default=10.0)
+     ap.add_argument("--rule", type=Path)
++    ap.add_argument("--as-is", action="store_true", help="B95: read the state as it stands (no frame run)")
++    ap.add_argument("--runs", type=int, default=1, help="B95: repeat the whole load-and-read; the agreement reported")
+     ap.add_argument("--make-state", type=Path)
+     ap.add_argument("--after", type=float, default=1.0)
+     ap.add_argument("--write", action="append", default=[], help="ADDRESS=HEXBYTES for --make-state, e.g. 0x0104=01")
+@@ -262,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
+         if a.rule is None or (a.state is None and not a.no_state):
+             ap.error("--rule and --state (or --no-state) are needed")
+         print(json.dumps(run_proof(a.content, a.system, None if a.no_state else a.state, a.seconds,
+-                                   json.loads(a.rule.read_text()))))
++                                   json.loads(a.rule.read_text()), a.as_is, a.runs)))
+         return 0
+     except ProofError as exc:
+         print(json.dumps({"error": str(exc)}))
+diff --git a/tests/h7_minigame_proof/test_b95_as_is.py b/tests/h7_minigame_proof/test_b95_as_is.py
+new file mode 100644
+index 00000000..00493699
+--- /dev/null
++++ b/tests/h7_minigame_proof/test_b95_as_is.py
+@@ -0,0 +1,135 @@
++#!/usr/bin/env python3
++"""B95 (host): B93's tool reads a state as it stands — no frame run — and names "no winner yet" apart from a tie.
++
++On B93's counters fixture (two counters that advance every frame, P1 twice as fast in mode 0): states made with the
++tool's own `--make-state` (now written and saved paused) holding begin (equal), P1 ahead, P2 ahead. `--as-is --runs 3`
++must name none / P1 / P2, 3 of 3, with the values exactly as written (any frame run would move them: 0 frames). The
++rule logic and the runs' agreement without an emulator. RetroArch headless (B61's form); skipped without it or a
++display. Temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/h7_minigame_proof -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++from unittest import mock
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++TOOL = ROOT / "tools" / "h7_minigame_proof.py"
++sys.path.insert(0, str(HERE))
++sys.path.insert(0, str(ROOT / "tools"))
++import fixture_counters  # noqa: E402
++import h7_minigame_proof as proof  # noqa: E402
++from test_h7_proof import display_env  # noqa: E402
++
++RULE = {"players": [{"name": "P1", "address": "0x0100", "bytes": 2}, {"name": "P2", "address": "0x0102", "bytes": 2}],
++        "winner": "max", "memory": "ram", "none_when": "equal"}
++STATES = {"begin": (5, 5, None), "P1": (9, 4, "P1"), "P2": (3, 8, "P2")}
++
++
++class Logic(unittest.TestCase):
++    def test_none_when_equal_floor_and_tie(self):
++        r = proof.parse_rule(RULE)
++        self.assertEqual(proof.answer(r, {"P1": 5, "P2": 5}), (None, "no winner yet"))
++        self.assertEqual(proof.answer(r, {"P1": 9, "P2": 4}), ("P1", None))
++        tie = proof.parse_rule({k: v for k, v in RULE.items() if k != "none_when"})
++        self.assertEqual(proof.answer(tie, {"P1": 5, "P2": 5}), ("tie", None))         # B93's answer, unchanged
++        floor = proof.parse_rule({**RULE, "none_when": {"floor": 0}})
++        self.assertEqual(proof.answer(floor, {"P1": 0, "P2": 0}), (None, "no winner yet"))
++        self.assertEqual(proof.answer(floor, {"P1": 3, "P2": 3}), ("tie", None))
++        with self.assertRaises(proof.ProofError):
++            proof.parse_rule({**RULE, "none_when": "same"})
++
++    def test_the_single_field_form(self):
++        r = proof.parse_rule({"address": "0x200", "bytes": 1, "values": {"P1": 1, "P2": 2}, "none_value": 0})
++        self.assertEqual(proof.answer(r, {"field": 0}), (None, "no winner yet"))
++        self.assertEqual(proof.answer(r, {"field": 2}), ("P2", None))
++        self.assertEqual(proof.answer(r, {"field": 7})[0], "unknown")
++
++    def test_a_disagreement_is_reported_not_hidden(self):
++        runs = iter([{"system": "snes", "winner": "P1", "values": {"P1": 2, "P2": 1}},
++                     {"system": "snes", "winner": "P2", "values": {"P1": 1, "P2": 2}},
++                     {"system": "snes", "winner": "P1", "values": {"P1": 2, "P2": 1}}])
++        with mock.patch.object(proof, "run_once", lambda *a, **k: next(runs)):
++            out = proof.run_proof(Path("x"), "snes", Path("s"), 0, RULE, True, 3)
++        self.assertEqual((out["agreement"], out["winner"]), ("2 of 3", "disagree"))
++        self.assertEqual([x["winner"] for x in out["per_run"]], ["P1", "P2", "P1"])
++
++
++@unittest.skipUnless(proof.APP.is_file() and (proof.CORES / "snes9x_libretro.so").is_file() and display_env(),
++                     "RetroArch, snes9x or a display is absent")
++class AsIs(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.env = display_env()
++        cls.tmp = Path(tempfile.mkdtemp(prefix="h7_b95_"))
++        cls.rom = cls.tmp / "Made Up Counters.sfc"
++        cls.rom.write_bytes(fixture_counters.build())
++        cls.rule = cls.tmp / "rule.json"
++        cls.rule.write_text(json.dumps(RULE))
++        cls.states = {}
++        for name, (p1, p2, _w) in STATES.items():
++            out = cls.tmp / f"{name}.state"
++            o = cls.cli("--make-state", out, "--after", "0.5", "--write", f"0x0100={p1.to_bytes(2, 'little').hex()}",
++                        "--write", f"0x0102={p2.to_bytes(2, 'little').hex()}")
++            assert o.get("state_written"), o
++            cls.states[name] = out
++
++    @classmethod
++    def tearDownClass(cls):
++        shutil.rmtree(cls.tmp, ignore_errors=True)
++
++    @classmethod
++    def cli(cls, *args) -> dict:
++        r = subprocess.run([sys.executable, "-I", "-B", str(TOOL), "--content", str(cls.rom), "--system", "snes",
++                            *[str(a) for a in args]], capture_output=True, text=True, env=cls.env, timeout=300)
++        return json.loads(r.stdout.strip().splitlines()[-1])
++
++    def test_as_is_names_none_p1_p2_three_of_three_with_no_frame_run(self):
++        for name, (p1, p2, winner) in STATES.items():
++            out = self.cli("--state", self.states[name], "--as-is", "--runs", "3", "--rule", self.rule)
++            self.assertEqual(out["agreement"], "3 of 3", out)
++            self.assertEqual(out["winner"], winner, out)
++            if winner is None:
++                self.assertEqual(out["reason"], "no winner yet")
++            for run in out["per_run"]:
++                self.assertEqual(run["values"], {"P1": p1, "P2": p2})    # as written: 0 frames ran (bound 0)
++
++    def test_seconds_zero_is_as_is(self):
++        out = self.cli("--state", self.states["P2"], "--seconds", "0", "--rule", self.rule)
++        self.assertTrue(out.get("as_is"))
++        self.assertEqual((out["winner"], out["values"]), ("P2", {"P1": 3, "P2": 8}))
++
++    def test_a_running_read_moves_the_values(self):                      # the control: frames do run without --as-is
++        out = self.cli("--state", self.states["begin"], "--seconds", "0.5", "--rule", self.rule)
++        self.assertGreater(out["values"]["P1"], 5)
++        self.assertEqual(out["winner"], "P1")                             # mode 0: P1 runs at double rate
++
++    def test_a_corrupt_state_is_an_error(self):
++        bad = self.tmp / "bad.state"
++        bad.write_bytes(b"#RZIPv\x01#" + os.urandom(3000))
++        out = self.cli("--state", bad, "--as-is", "--rule", self.rule)
++        self.assertIn("error", out)
++        self.assertNotIn("winner", out)
++
++    def test_a_state_the_core_refuses_is_an_error(self):
++        import zlib                                                      # a well-formed container RetroArch reads (N > 0
++        data = os.urandom(10000)                                        # bytes) that the core then refuses
++        comp = zlib.compress(data)
++        refused = self.tmp / "refused.state"
++        refused.write_bytes(b"#RZIPv\x01#" + (131072).to_bytes(4, "little") + len(data).to_bytes(8, "little")
++                            + len(comp).to_bytes(4, "little") + comp)
++        out = self.cli("--state", refused, "--as-is", "--rule", self.rule)
++        self.assertIn("failed to load", out.get("error", ""), out)
++        self.assertNotIn("winner", out)
++
++if __name__ == "__main__":
++    unittest.main()

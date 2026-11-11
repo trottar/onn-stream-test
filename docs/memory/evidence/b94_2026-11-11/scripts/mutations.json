@@ -1,0 +1,51 @@
+[
+ {
+  "id": "M1",
+  "file": "tools/h7_rule_search.py",
+  "old": "            ok &= _stable(s[\"stable\"], size)\n            if kind == \"a\":",
+  "new": "            pass\n            if kind == \"a\":",
+  "why": "unstable addresses kept (templates a / b)"
+ },
+ {
+  "id": "M2",
+  "file": "tools/h7_rule_search.py",
+  "old": "    ones = [k for k in (\"a\", \"b\", \"c\") if out[\"templates\"][k].get(\"count\") == 1]",
+  "new": "    ones = [k for k in (\"a\", \"b\", \"c\") if (out[\"templates\"][k].get(\"count\") or 0) >= 1]",
+  "why": "decided with more than one candidate"
+ },
+ {
+  "id": "M3",
+  "file": "tools/h7_rule_search.py",
+  "old": "        c = dict(c, all_vary=all(any(changing[a] for a in f) for f in fields))\n",
+  "new": "        c = dict(c, all_vary=all(any(changing[a] for a in f) for f in fields))\n        key = (c[\"base\"], c[\"size\"])\n",
+  "why": "reads of the same memory not merged"
+ },
+ {
+  "id": "M4",
+  "file": "tools/h7_rule_search.py",
+  "old": "        if \"Failed to load state\" in new:",
+  "new": "        if False:",
+  "why": "a failed load not seen"
+ },
+ {
+  "id": "M5",
+  "file": "tools/h7_rule_search.py",
+  "old": "                    keep &= np.all(vals[e][w] > others, axis=0)",
+  "new": "                    keep &= np.all(vals[e][w] >= others, axis=0)",
+  "why": "the winner not strictly the largest"
+ },
+ {
+  "id": "M6",
+  "file": "tools/h7_rule_search.py",
+  "old": "                for b in begins:\n                    keep &= np.all(vals[b] == vals[b][0], axis=0)",
+  "new": "                pass",
+  "why": "players not equal at begin"
+ },
+ {
+  "id": "M7",
+  "file": "tools/h7_rule_search.py",
+  "old": "        c = dict(c, all_vary=all(any(changing[a] for a in f) for f in fields))",
+  "new": "        c = dict(c, all_vary=True)",
+  "why": "every-player-changes ranking ignored"
+ }
+]
