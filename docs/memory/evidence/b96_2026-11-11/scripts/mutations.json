@@ -1,0 +1,65 @@
+[
+ {
+  "id": "M1",
+  "file": "tools/h7_rule_search.py",
+  "old": "            if base(cands[y]) - base(cands[x]) <= WINDOW:",
+  "new": "            if False:",
+  "why": "copies within the window not joined"
+ },
+ {
+  "id": "M2",
+  "file": "tools/h7_rule_search.py",
+  "old": "                    if base(lo) + lo[\"size\"] > base(hi):                    # the reads overlap\n                        union(i, j)",
+  "new": "                    if base(lo) + lo[\"size\"] > base(hi):                    # the reads overlap\n                        pass",
+  "why": "overlapping reads not joined"
+ },
+ {
+  "id": "M3",
+  "file": "tools/h7_rule_search.py",
+  "old": "        rule = min(members, key=lambda c: (base(c) % c[\"size\"] != 0, base(c), -c[\"size\"]))",
+  "new": "        rule = max(members, key=lambda c: (base(c) % c[\"size\"] != 0, base(c), -c[\"size\"]))",
+  "why": "the family's rule not its lowest aligned member"
+ },
+ {
+  "id": "M4",
+  "file": "tools/h7_rule_search.py",
+  "old": "        if not any(j != e and x == w for j, x in ends):",
+  "new": "        if False:",
+  "why": "a fold without another example of its winner run, not skipped"
+ },
+ {
+  "id": "M5",
+  "file": "tools/h7_rule_search.py",
+  "old": "    named = [_names(ctx, e, f[\"rule_member\"]) == w for f in tf]",
+  "new": "    named = [True for f in tf]",
+  "why": "the held-out state not read (every family names the winner)"
+ },
+ {
+  "id": "M6",
+  "file": "tools/h7_rule_search.py",
+  "old": "    if passing and not once and ran and len(epw) >= 2:",
+  "new": "    if passing and ran and len(epw) >= 2:",
+  "why": "strong with a winner seen once"
+ },
+ {
+  "id": "M7",
+  "file": "tools/h7_rule_search.py",
+  "old": "    if passing and not once and ran and len(epw) >= 2:",
+  "new": "    if passing and not once and ran:",
+  "why": "addendum 1: strong with one winner only"
+ },
+ {
+  "id": "M8",
+  "file": "tools/h7_rule_search.py",
+  "old": "C_PLAYER_VALUES = True ",
+  "new": "C_PLAYER_VALUES = False ",
+  "why": "(c) not tightened"
+ },
+ {
+  "id": "M9",
+  "file": "tools/h7_rule_search.py",
+  "old": "    return (not f[\"hinted\"], not f[\"all_vary\"], b % c[\"size\"] != 0, d % 4 != 0, d, b)",
+  "new": "    return (not f[\"hinted\"], not f[\"all_vary\"], b % c[\"size\"] != 0, d % 4 != 0, b)",
+  "why": "the order without the smaller stride"
+ }
+]

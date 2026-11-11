@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-11 — Queue AJ (H7: B96 "decided" by held-out states and families, B97 hints from the game's own cheat list and a level that need not empty): "decided" = "strong" evidence only (two "end" states per winner, a family naming every held-out winner); on fixtures three states → "weak", five → "strong" and the planted rule; 23 of the hub's 116 cached PS1 cheat lists give hints — OPEN (A's H7-P2 on T88's states, unattended; with today's three states it can reach "weak" only; the user's two further 'end' saves make "strong" possible) — `docs/memory/evidence/B96_H7_HELD_OUT_AND_FAMILIES_2026-11-11.md`, `B97_H7_CHEAT_HINTS_AND_LEVEL_2026-11-11.md`
 - 2026-11-11 — H7-P1 (the win-rule search on T88's three real states, unattended): the states checked and copied; the headless load matched the hub; B94's search **NOT DECIDED** (a 8,520 / b 3,084 / c 163,475; would split: a second "end" won by P1) → no proof runs, **nothing erased** (the user's three saves kept); OPEN: one more TV save, or a tie-break among identical-looking candidates — `## 2026-11-11 H7-P1` below
 - 2026-11-11 — Queue AI (H7: B94 the win-rule search, B95 a state read as it stands): from labelled save states the tool finds candidate win rules and says "decided" only when one template leaves exactly one; on fixtures begin + one end is never decided, an end won by the other player decides it; a state loaded paused is read exactly (0 frames); the proof's statement corrected (a state replayed headless does not replay the fight) — OPEN (A's H7-P1 on T88's states, unattended) — `docs/memory/evidence/B94_H7_RULE_SEARCH_2026-11-11.md`, `B95_H7_STATE_AS_IS_2026-11-11.md`
 - 2026-11-11 — HOME-12V (a short check, then H7's first state): APK `ca53df0d…` installed with every property empty (twenty); C58 the changed rows yellow in the mapping list MET → **`ca53df0d…` CONFIRMED, the pin moved**; C59 an SNES cheat from the list matching the game file MET (~2 s) → B90's SNES part met; HOME-12U's two items closed; `GET active-cheats` rows 0 (they were A's old watcher); H7: a 2-player state made at the TV (a PS1 title, the user's pick), the user asked its saves erased after the proof — `## 2026-11-11 HOME-12V` below
@@ -79,6 +80,23 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-11 Queue AJ (B96, B97): "decided" redefined; hints from the cheat list; (b2)
+
+(`docs/memory/evidence/B96_H7_HELD_OUT_AND_FAMILIES_2026-11-11.md`, `B97_H7_CHEAT_HINTS_AND_LEVEL_2026-11-11.md`)
+
+- **"decided" = "strong" only:** every winner seen has two "end" states, two winners or more, and a family (one place
+  in memory, however it is read) names the winner in every held-out state; the top family by the stated order is the
+  answer. "weak" = families hold but a winner was seen once — the tool names the states that would make it strong.
+- **OPEN (A, unattended): H7-P2** — the search on T88's states with the hints from its cached cheat list, the folds and
+  the evidence level (`docs/memory/handoffs/SESSION_B_DONE_2026-11-11AJ.md` §"A — H7-P2"). With the three states the
+  user has saved (begin, one end per winner) the best possible answer is **"weak"**; nothing is erased on "weak".
+- **OPEN (the user, at the TV, when they choose):** one more "end" won by each player (saved over slots 2 and 1 once A
+  holds copies of the current ones) — what "strong" needs.
+- **OPEN (B, proposed):** (b2) — a level whose loser need not be 0 — is the loosest template: on random memory it leaves
+  thousands of families passing every fold; as built it answers when no stricter template is strong. Proposed: let (b2)
+  and directly tested hint pairs answer only when hinted.
+- **Noted:** the hub's SNES cheat lists name no player (no hints for SNES titles today); 23 of 116 PS1 lists give hints.
 
 ## 2026-11-11 H7-P1: the win-rule search on the real states — not decided; nothing erased
 

@@ -1,0 +1,1012 @@
+diff --git a/tools/h7_rule_search.py b/tools/h7_rule_search.py
+index 1d573874..bcb3c8b5 100644
+--- a/tools/h7_rule_search.py
++++ b/tools/h7_rule_search.py
+@@ -2,6 +2,7 @@
+ """H7 (B94): from a few labelled save states, find the memory that says who won — candidate rules in B93's rule JSON.
+ 
+     python3 tools/h7_rule_search.py --content <game> --system ps1|snes --states <states.json> [--players 2] [--loads 3]
++                                    [--hints <cheat list>]
+ 
+ states.json: [{"state": "<file>", "label": "begin" | "end", "winner": "P1" | "P2" | ... | null}, ...]  (2 to 4 players)
+ 
+@@ -20,7 +21,13 @@ identical values in every state within WINDOW bytes) are one family, its rule th
+ "end" state in turn the search runs on the others and each family's rule must name the held-out winner (a fold whose
+ winner has no other example is skipped and counted). Evidence per template: "strong" (every winner seen has two ends,
+ a family passes every fold — the top family is the answer), "weak" (families pass, a winner seen once), "none".
+-"decided" = "strong" only; otherwise the states that would make it strong. Prints one JSON document.
++"decided" = "strong" only; otherwise the states that would make it strong.
++B97 — (b2) a per-player level, the winner's the larger: equal and >= 8 at "begin", none above it at "end", the
++winner's strictly the largest (a loser may be above 0); --hints FILE (a cheat list in the hub's stored form, read by
++tools/h7_cheat_hints.py): a family covering a hinted address for the right player is hinted and ranked first; every
++per-player set of hints (one kind, one width, one stride) is also tested directly as a rule (template h), with its
++values in every state. A hint is evidence, not a verdict: the folds and evidence levels apply as to any family.
++The answer's template order: a hinted top family first, then a, b, c, b2, h. Prints one JSON document.
+ """
+ from __future__ import annotations
+ 
+@@ -117,8 +124,12 @@ def read_state(content: Path, system: str, state: Path, loads: int = 3) -> tuple
+ 
+ 
+ # --- the search ------------------------------------------------------------------------------------------------------
+-TEMPLATES = {"a": "a per-player counter", "b": "a per-player level that empties", "c": "a single winner field"}
+-ORDER = ("a", "b", "c")                         # the answer's template order after "hinted first" (B96)
++TEMPLATES = {"a": "a per-player counter", "b": "a per-player level that empties", "c": "a single winner field",
++             "b2": "a per-player level, the winner's the larger", "h": "a hinted pair, tested directly"}
++ORDER = ("a", "b", "c", "b2", "h")              # the answer's template order after "hinted first" (B96; B97: b2, h)
++SETS_CAP = 200                                  # B97: hinted sets tested directly, at most
++B2_PAIRS = True                                 # B97: (b2) pairs by equal "begin" values (False = the stride loop)
++B2_CAP = 200_000                                # B97 addendum 2: more (b2) candidates than this → not testable
+ WINDOW = 0x100                                  # B96: copies with identical values this close are one family
+ MEMBERS_SHOWN = 5
+ C_PLAYER_VALUES = True                          # B96: (c) tightened; False = B94's (c), for the before / after count
+@@ -157,8 +168,9 @@ class _Ctx:
+         self.win = [_player(s["winner"]) if s["label"] == "end" else None for s in states]
+ 
+ 
+-def search(states: list[dict], players: int) -> dict:
+-    """states: [{"label", "winner", "mem": bytes, "stable": bool array}] — the pure search (no emulator)."""
++def search(states: list[dict], players: int, hints: list[dict] | None = None) -> dict:
++    """states: [{"label", "winner", "mem": bytes, "stable": bool array}] — the pure search (no emulator).
++    hints (B97): h7_cheat_hints' hints [{"player", "address", "bytes", "value", "kind", "code", "pair_group"}]."""
+     begins = [i for i, s in enumerate(states) if s["label"] == "begin"]
+     ends = [(i, _player(s["winner"])) for i, s in enumerate(states) if s["label"] == "end"]
+     if not begins or not ends:
+@@ -166,9 +178,16 @@ def search(states: list[dict], players: int) -> dict:
+     if any(w is None or not 0 <= w < players for _, w in ends):
+         raise SearchError("every 'end' state needs its winner (P1 … P%d)" % players)
+     ctx = _Ctx(states, players)
++    ctx.sets = _hinted_sets(ctx, hints or [])
+     every = list(range(len(states)))
+     full = _run(ctx, every)
+     fams = {k: _families(full[k], k) for k in ORDER}
++    for k in ("a", "b", "b2"):
++        _mark_hinted(fams[k], hints or [], players)
++    for f in fams["h"]:                                   # a set tested directly is hinted by construction
++        f["hinted"] = True
++        f["same_code_name"] = any(c["same_code_name"] for c in f["members"])
++    fams["h"].sort(key=_order)
+     folds = {k: [] for k in ORDER}
+     for e, w in ends:
+         if not any(j != e and x == w for j, x in ends):
+@@ -185,6 +204,7 @@ def search(states: list[dict], players: int) -> dict:
+     epw = {f"P{w + 1}": sum(1 for _, x in ends if x == w) for w in sorted({w for _, w in ends})}
+     for k in ORDER:
+         out["templates"][k] = _report(ctx, k, full[k], fams[k], folds[k], epw, every)
++    out["hinted_sets"] = _sets_report(ctx, fams)
+     return _verdict(out, epw)
+ 
+ 
+@@ -192,13 +212,14 @@ def _run(ctx: _Ctx, idx: list[int]) -> dict:
+     """B94's candidate search on the states `idx` (every template): {template: merged candidates}."""
+     begins = [i for i in idx if ctx.label[i] == "begin"]
+     ends = [(i, ctx.win[i]) for i in idx if ctx.label[i] == "end"]
+-    res = {k: _block(ctx, idx, begins, ends, k) for k in ("a", "b")}
++    res = {k: _block(ctx, idx, begins, ends, k) for k in ("a", "b", "b2")}
+     taken: set[int] = set()
+     for k in ("a", "b"):
+         for c in res[k]:
+             for k2 in range(ctx.players):
+                 taken.update(range(c["base"] + k2 * c["stride"], c["base"] + k2 * c["stride"] + c["size"]))
+     res["c"] = _single(ctx, idx, begins, ends, taken)
++    res["h"] = _sets_holding(ctx, idx, begins, ends)
+     return res
+ 
+ 
+@@ -228,8 +249,20 @@ def _block(ctx: _Ctx, idx, begins, ends, kind) -> list[dict]:
+                 for e, w in ends:
+                     for b in begins:
+                         m &= V[e] <= V[b]
+-                    m &= (V[e] > 0) if w == k else (V[e] == 0)
++                    if kind == "b":
++                        m &= (V[e] > 0) if w == k else (V[e] == 0)
++                    elif w == k:                          # b2: the winner's above 0; a loser may be too (B97)
++                        m &= V[e] > 0
++                    else:                                 # b2: a loser's below its begin (below the winner's ≤ it)
++                        for b in begins:
++                            m &= V[e] < V[b]
+                 masks.append(m)
++        if kind == "b2" and B2_PAIRS:
++            found += _b2_found(V, idx, begins, ends, masks, size, players, B2_CAP - len(found))
++            if len(found) > B2_CAP:
++                return {"not_testable": f"too many (b2) candidates to rank: more than {B2_CAP:,} — the template "
++                                        "cannot decide here"}
++            continue
+         j = ends[0][1]
+         seeds = np.nonzero(masks[j])[0]
+         n = len(V[0])
+@@ -257,6 +290,54 @@ def _block(ctx: _Ctx, idx, begins, ends, kind) -> list[dict]:
+     return _merge(found, ctx.mems[idx], players)
+ 
+ 
++def _b2_found(V, idx, begins, ends, masks, size, players, room: int) -> list[dict]:
++    """(b2) without a loop over every stride: P1 / P2 positions are paired only when their "begin" values are equal
++    (sorted by value, then address; strides size … MAX_STRIDE), then every condition is checked as in the loop.
++    The same candidates as the loop (tested); far fewer element reads where memory is varied."""
++    n = len(V[0])
++    b0 = begins[0]
++    A = np.nonzero(masks[0])[0]
++    B = np.nonzero(masks[1])[0]
++    if not len(A) or not len(B):
++        return []
++    span = np.int64(n + MAX_STRIDE + 2)
++    keyB = V[b0][B].astype(np.int64) * span + B
++    order = np.argsort(keyB, kind="stable")
++    keyB, B = keyB[order], B[order]
++    found = []
++    for c0 in range(0, len(A), 1 << 18):
++        a = A[c0:c0 + (1 << 18)]
++        base_key = V[b0][a].astype(np.int64) * span + a
++        lo = np.searchsorted(keyB, base_key + size)
++        hi = np.searchsorted(keyB, base_key + MAX_STRIDE, side="right")
++        cnt = hi - lo
++        total = int(cnt.sum())
++        if not total:
++            continue
++        start = np.repeat(lo, cnt)
++        offs = np.arange(total) - np.repeat(np.cumsum(cnt) - cnt, cnt)
++        p1 = np.repeat(a, cnt)
++        d = B[start + offs] - p1
++        keep = p1 + (players - 1) * d < n
++        p1, d = p1[keep], d[keep]
++        for k in range(2, players):
++            ok = masks[k][p1 + k * d]
++            p1, d = p1[ok], d[ok]
++        vals = {i: np.stack([V[i][p1 + k * d] for k in range(players)]) for i in idx}
++        keep = np.ones(len(p1), dtype=bool)
++        for b in begins:
++            keep &= np.all(vals[b] == vals[b][0], axis=0)
++        for e, w in ends:
++            others = np.delete(vals[e], w, axis=0)
++            keep &= np.all(vals[e][w] > others, axis=0)
++        if len(found) + int(keep.sum()) > room:          # addendum 2: stop before building more than the cap
++            return found + [None] * (room + 1 - len(found))
++        for x, dd in zip(p1[keep], d[keep]):
++            found.append({"size": size, "base": int(x), "stride": int(dd),
++                          "values": [[int(V[i][int(x) + k * int(dd)]) for k in range(players)] for i in idx]})
++    return found
++
++
+ def _merge(found: list[dict], mems: np.ndarray, players: int) -> list[dict]:
+     """B94: reads of the same memory are one candidate: two candidates whose CHANGING bytes (a byte that differs between
+     the states) are the same addresses are one field read two ways — a 1- and a 2-byte read, or a 2-byte read one byte
+@@ -405,7 +486,8 @@ def _order(f: dict) -> tuple:
+     address."""
+     c = f["rule_member"]
+     b, d = (c["address"], 0) if "address" in c else (c["base"], c["stride"])
+-    return (not f["hinted"], not f["all_vary"], b % c["size"] != 0, d % 4 != 0, d, b)
++    return (not f["hinted"], not f.get("same_code_name", False), not f["all_vary"], b % c["size"] != 0, d % 4 != 0,
++            abs(d), b)
+ 
+ 
+ def _names(ctx: _Ctx, i: int, c: dict) -> int | None:
+@@ -444,7 +526,8 @@ def _rule_of(f: dict, players: int, kind: str) -> dict:
+     c = f["rule_member"]
+     reads = sorted({(n, a) for (_d, n, a) in f["keys"]}, key=lambda r: (r[1], r[0]))
+     common = {"members": len(f["members"]), "member_reads": [f"{n}@{a:#x}" for n, a in reads[:MEMBERS_SHOWN]],
+-              "hinted": f["hinted"]}
++              "hinted": f["hinted"], **({"hinted_by": f["hinted_by"]} if f.get("hinted_by") else {}),
++              **({"same_code_name": f["same_code_name"]} if "same_code_name" in f else {})}
+     if "address" in c:
+         rule = {"players": [], "address": hex(c["address"]), "bytes": c["size"], "endian": "little",
+                 "values": c["values"], "none_value": c["begin"], "memory": "ram"}
+@@ -456,7 +539,11 @@ def _rule_of(f: dict, players: int, kind: str) -> dict:
+             "winner": "max", "memory": "ram", "none_when": "equal"}
+     why = {"a": "the same field per player at stride %#x: equal at every 'begin', the winner's the largest at every "
+                 "'end'",
+-           "b": "a level per player at stride %#x: equal and high at every 'begin', the losers at 0 at every 'end'"}
++           "b": "a level per player at stride %#x: equal and high at every 'begin', the losers at 0 at every 'end'",
++           "b2": "a level per player at stride %#x: equal and high at every 'begin', none above it at 'end', the "
++                 "winner's strictly the largest (a loser may be above 0)",
++           "h": "the cheat list's per-player addresses (stride %#x), read as a rule: equal at every 'begin', the "
++                "winner's the largest at every 'end'"}
+     return {"rule": rule, "why": why.get(kind, "a field per player at stride %#x") % c["stride"],
+             "values_per_state": c["values"], "every_player_changes": f["all_vary"], **common}
+ 
+@@ -534,6 +621,162 @@ def _verdict(out: dict, epw: dict) -> dict:
+     return out
+ 
+ 
++# --- hints (B97) -----------------------------------------------------------------------------------------------------
++def load_hints(path: Path, system: str) -> tuple[list[dict], dict]:
++    """The hints from a cheat list (through h7_cheat_hints) or from that tool's JSON. Unreadable / empty → no hints and
++    the reason; the search then runs exactly as without. The returned info is counts only (no address, no text)."""
++    import h7_cheat_hints as ch
++    res = None
++    try:
++        data = json.loads(Path(path).read_text())
++        if isinstance(data, dict) and isinstance(data.get("hints"), list):
++            res = {"hints": data["hints"], "codes": data.get("codes", 0), "skipped": data.get("skipped", {}),
++                   "unreadable": data.get("unreadable")}
++    except (OSError, UnicodeDecodeError, ValueError):
++        pass
++    if res is None:
++        res = ch.read_hints(path, system)
++    good = []
++    for h in res["hints"]:
++        try:
++            good.append({"player": str(h["player"]), "address": int(str(h["address"]), 0), "bytes": int(h["bytes"]),
++                         "value": h.get("value"), "kind": str(h.get("kind", "other")), "code": h.get("code"),
++                         "pair_group": h.get("pair_group")})
++        except (KeyError, TypeError, ValueError):
++            continue
++    info = {"read": len(good), "codes": res.get("codes", 0),
++            "by_player_kind": ch.counts({"hints": good, "codes": res.get("codes", 0),
++                                         "skipped": res.get("skipped", {})})["by_player_kind"]}
++    if not good:
++        info["why"] = res.get("unreadable") or "no per-player constant RAM write in the list"
++    return good, info
++
++
++def _hint_bytes(hints: list[dict], players: int) -> dict[int, dict[int, list[dict]]]:
++    by: dict = {}
++    for h in hints:
++        k = _player(h["player"])
++        if k is None or not 0 <= k < players:
++            continue
++        a = int(str(h["address"]), 0)
++        for x in range(a, a + int(h["bytes"])):
++            by.setdefault(k, {}).setdefault(x, []).append(h)
++    return by
++
++
++def _mark_hinted(fams: list[dict], hints: list[dict], players: int) -> None:
++    """A family is hinted when one of its member reads covers, for some player k, a byte of a hint for player k."""
++    if not hints:
++        return
++    by = _hint_bytes(hints, players)
++    for f in fams:
++        hit = []
++        for (d, n, base) in f["keys"]:
++            for k in range(players):
++                for x in range(base + k * d, base + k * d + n):
++                    hit += by.get(k, {}).get(x, [])
++        if hit:
++            f["hinted"] = True
++            f["hinted_by"] = sorted({(h["kind"], h["code"]) for h in hit if h.get("code") is not None})
++            f["hinted_by"] = [{"kind": kd, "code": c} for kd, c in f["hinted_by"]]
++    fams.sort(key=_order)
++
++
++def _hinted_sets(ctx: _Ctx, hints: list[dict]) -> list[dict]:
++    """Every choice of one hint per player, the same kind and width, at a constant stride (2 players: every P1 / P2
++    pair of a kind) — at most SETS_CAP, in a stable order (matching code names first)."""
++    players, n = ctx.players, {1: len(ctx.V[0][1]), 2: len(ctx.V[0][2])}
++    by: dict = {}
++    for h in hints:
++        k = _player(h["player"])
++        if k is not None and 0 <= k < players and int(h["bytes"]) in (1, 2):
++            by.setdefault((h["kind"], int(h["bytes"])), {}).setdefault(k, []).append(h)
++    sets, seen = [], set()
++    for (kind, size), per in sorted(by.items()):
++        if len(per) < players:
++            continue
++        for h0 in per[0]:
++            a0 = int(str(h0["address"]), 0)
++            for h1 in per[1]:
++                d = int(str(h1["address"]), 0) - a0
++                if d == 0:
++                    continue
++                chosen = [h0, h1]
++                for k in range(2, players):
++                    nxt = [h for h in per.get(k, []) if int(str(h["address"]), 0) == a0 + k * d]
++                    if not nxt:
++                        break
++                    chosen.append(nxt[0])
++                if len(chosen) < players or (size, a0, d) in seen:
++                    continue
++                if not all(0 <= a0 + k * d < n[size] for k in range(players)):
++                    continue
++                seen.add((size, a0, d))
++                groups = {h.get("pair_group") for h in chosen}
++                sets.append({"size": size, "base": a0, "stride": d, "kind": kind,
++                             "same_code_name": len(groups) == 1 and None not in groups,
++                             "codes": [h.get("code") for h in chosen]})
++    sets.sort(key=lambda s: (not s["same_code_name"], s["kind"], s["base"], s["stride"]))
++    ctx.sets_found = len(sets)
++    return sets[:SETS_CAP]
++
++
++def _set_values(ctx: _Ctx, s: dict, i: int) -> list[int]:
++    V = ctx.V[i][s["size"]]
++    return [int(V[s["base"] + k * s["stride"]]) for k in range(ctx.players)]
++
++
++def _set_failing(ctx: _Ctx, s: dict, idx: list[int]) -> list[int]:
++    """The states where the set, read as a rule (winner max, none_when equal), is wrong; an unstable byte fails all."""
++    ok = ctx.ok[s["size"]]
++    if not all(ok[s["base"] + k * s["stride"]] for k in range(ctx.players)):
++        return list(idx)
++    bad = []
++    for i in idx:
++        v = _set_values(ctx, s, i)
++        if ctx.label[i] == "begin":
++            if len(set(v)) != 1:
++                bad.append(i)
++        else:
++            w = ctx.win[i]
++            if not all(v[w] > x for k, x in enumerate(v) if k != w):
++                bad.append(i)
++    return bad
++
++
++def _sets_holding(ctx: _Ctx, idx, begins, ends) -> list[dict] | dict:
++    if not getattr(ctx, "sets", None):
++        return {"not_testable": "no hints given (or none pairs up per player)"}
++    out = []
++    for s in ctx.sets:
++        if not _set_failing(ctx, s, idx):
++            out.append({"size": s["size"], "base": s["base"], "stride": s["stride"], "kind": s["kind"],
++                        "same_code_name": s["same_code_name"],
++                        "values": [_set_values(ctx, s, i) for i in idx],
++                        "all_vary": all(len({_set_values(ctx, s, i)[k] for i in idx}) > 1 for k in range(ctx.players))})
++    return out
++
++
++def _sets_report(ctx: _Ctx, fams: dict) -> dict:
++    """Every hinted set tested directly, with its values in every state and where it fails (B97)."""
++    sets = getattr(ctx, "sets", None) or []
++    every = list(range(len(ctx.states)))
++    rows = []
++    for s in sets:
++        bad = _set_failing(ctx, s, every)
++        key = (s["stride"], s["size"], s["base"])
++        found_by = [k for k in ("a", "b", "b2") for f in fams[k] if key in f["keys"]]
++        rows.append({"rule": {"players": [{"name": f"P{k + 1}", "address": hex(s["base"] + k * s["stride"]),
++                                           "bytes": s["size"], "endian": "little"} for k in range(ctx.players)],
++                              "winner": "max", "memory": "ram", "none_when": "equal"},
++                     "kind": s["kind"], "same_code_name": s["same_code_name"], "codes": s["codes"],
++                     "values_per_state": [_set_values(ctx, s, i) for i in every],
++                     "holds": not bad, "failing_states": bad, "found_by": sorted(set(found_by))})
++    rows.sort(key=lambda r: (not r["holds"], not r["same_code_name"]))
++    return {"found": getattr(ctx, "sets_found", 0), "tested": len(sets), "cap": SETS_CAP,
++            "hold": sum(r["holds"] for r in rows), "sets": rows[:SHOWN]}
++
++
+ def main(argv: list[str] | None = None) -> int:
+     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+     ap.add_argument("--content", required=True, type=Path)
+@@ -542,6 +785,7 @@ def main(argv: list[str] | None = None) -> int:
+     ap.add_argument("--players", type=int)
+     ap.add_argument("--loads", type=int, default=3)
+     ap.add_argument("--time", action="store_true")
++    ap.add_argument("--hints", type=Path, help="B97: a cheat list (.cht, the hub's stored form) or h7_cheat_hints' JSON")
+     a = ap.parse_args(argv)
+     try:
+         listed = json.loads(a.states.read_text())
+@@ -555,8 +799,11 @@ def main(argv: list[str] | None = None) -> int:
+         for s in listed:
+             mem, stable = read_state(a.content, a.system, Path(s["state"]), a.loads)
+             states.append({"label": s["label"], "winner": s.get("winner"), "mem": mem, "stable": stable})
++        hints, hinfo = load_hints(a.hints, a.system) if a.hints else ([], None)
+         t1 = time.monotonic()
+-        out = search(states, players)
++        out = search(states, players, hints)
++        if hinfo is not None:
++            out["hints"] = hinfo
+         if a.time:
+             out["seconds"] = {"read": round(t1 - t0, 2), "search": round(time.monotonic() - t1, 2)}
+         print(json.dumps(out))
+diff --git a/tools/h7_cheat_hints.py b/tools/h7_cheat_hints.py
+new file mode 100644
+index 00000000..9881ab7f
+--- /dev/null
++++ b/tools/h7_cheat_hints.py
+@@ -0,0 +1,169 @@
++#!/usr/bin/env python3
++"""H7 (B97): hints from a game's own cheat list — the RAM addresses its per-player codes write.
++
++    python3 tools/h7_cheat_hints.py --system ps1|snes --cheats <file.cht> [--counts]
++
++The file is a cheat list in the hub's stored form (RetroArch's `.cht`: `cheatN_desc = "…"`, `cheatN_code = "…"`).
++A code is a hint when its description names ONE player and it writes a constant to RAM:
++  PS1 (GameShark lines `TTAAAAAA VVVV`, written '+'-joined, ':'-joined, or as 4-hex chunks three per line): type 80 →
++      2 bytes, value VVVV; type 30 → 1 byte, value VV; the address AAAAAA & 0x1FFFFF (a RAM offset as the search reads
++      it). Other types are not constant writes (the line skipped). The '$' + 12-hex form is another device's — skipped.
++  SNES (`7E`/`7F` bank, `aaaaaavv`, `aaaaaa:vv` or `aaaaaa=vv`): 1 byte at (bank - 0x7E) * 0x10000 + aaaa; banks
++      00-3F / 80-BF with aaaa < 0x2000 → the low work RAM; Game Genie and ROM banks skipped.
++A value with '?' (chosen by the user) → value null; the address is still a hint.
++The player: "P1", "P 1", "1P", "Player 1", "player one", "1st player" (case-folded); a description naming two different
++players, or none, is skipped (counted). The kind, whole words, level-like first: level {health, energy, life, lives,
++hp, power, vitality, stamina}; tally {round(s), win(s), victory/victories, score, points, ko(s)}; else other.
++
++THE DESCRIPTION TEXT IS USED AT RUN TIME ONLY: the output carries the player, the address, the width, the value, the
++kind, the code's index, its line and a pair group (codes whose descriptions are equal once the player tag is removed
++share a number) — never the text. An unreadable, empty or non-cheat file gives no hints and the reason (never an error).
++"""
++from __future__ import annotations
++
++import argparse
++import collections
++import json
++import re
++import sys
++from pathlib import Path
++
++_CHT = re.compile(r'\s*cheat(\d+)_(desc|code)\s*=\s*"?(.*?)"?\s*$')
++_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "1st": 1, "2nd": 2, "3rd": 3, "4th": 4}
++_PLAYER = re.compile(r"(?<![a-z0-9])(?:p\s?([1-4])|([1-4])\s?p|player\s*([1-4])|player\s+(one|two|three|four)"
++                     r"|(1st|2nd|3rd|4th)\s+player)(?![a-z0-9])")
++LEVEL = ("health", "energy", "life", "lives", "hp", "power", "vitality", "stamina")
++TALLY = ("round", "rounds", "win", "wins", "victory", "victories", "score", "points", "ko", "kos")
++
++
++def players_named(desc: str) -> set[int]:
++    out = set()
++    for m in _PLAYER.finditer(desc.casefold()):
++        g = next(x for x in m.groups() if x)
++        out.add(_WORDS[g] if g in _WORDS else int(g))
++    return out
++
++
++def kind_of(desc: str) -> str:
++    words = set(re.findall(r"[a-z]+", desc.casefold()))
++    if words & set(LEVEL):
++        return "level"
++    if words & set(TALLY):
++        return "tally"
++    return "other"
++
++
++def _stem(desc: str) -> str:
++    return " ".join(re.findall(r"[a-z0-9]+", _PLAYER.sub(" ", desc.casefold())))
++
++
++def _ps1_lines(code: str) -> list[tuple[str, str]] | None:
++    """[(TTAAAAAA, VVVV)] for the three readable forms; None for a form this tool does not read."""
++    if "$" in code:
++        return None
++    tok = re.findall(r"[0-9A-Fa-f?]+", code)
++    if tok and all(len(x) == 4 for x in tok) and len(tok) % 3 == 0:
++        return [(tok[i] + tok[i + 1], tok[i + 2]) for i in range(0, len(tok), 3)]
++    if tok and len(tok) % 2 == 0 and all(len(tok[i]) == 8 and len(tok[i + 1]) == 4 for i in range(0, len(tok), 2)):
++        return [(tok[i], tok[i + 1]) for i in range(0, len(tok), 2)]
++    return None
++
++
++def _ps1_writes(code: str) -> tuple[list[dict], str | None]:
++    lines = _ps1_lines(code)
++    if lines is None:
++        return [], "a form this tool does not read"
++    out = []
++    for n, (a, v) in enumerate(lines):
++        t = a[:2].upper()
++        if t not in ("80", "30") or "?" in a:
++            continue
++        size = 2 if t == "80" else 1
++        value = None if "?" in v else int(v, 16) & (0xFFFF if size == 2 else 0xFF)
++        out.append({"address": int(a[2:], 16) & 0x1FFFFF, "bytes": size, "value": value, "line": n})
++    return out, None if out else "no constant RAM write"
++
++
++def _snes_writes(code: str) -> tuple[list[dict], str | None]:
++    out = []
++    for n, part in enumerate(x for x in re.split(r"[+\s]+", code.strip()) if x):
++        m = re.fullmatch(r"([0-9A-Fa-f]{2})([0-9A-Fa-f]{4})[:=]?([0-9A-Fa-f?]{2})", part)
++        if not m:
++            continue
++        bank, addr = int(m.group(1), 16), int(m.group(2), 16)
++        if bank in (0x7E, 0x7F):
++            ram = (bank - 0x7E) * 0x10000 + addr
++        elif (bank <= 0x3F or 0x80 <= bank <= 0xBF) and addr < 0x2000:
++            ram = addr
++        else:
++            continue
++        value = None if "?" in m.group(3) else int(m.group(3), 16)
++        out.append({"address": ram, "bytes": 1, "value": value, "line": n})
++    return out, None if out else "no constant RAM write"
++
++
++def read_hints(path: Path | str, system: str) -> dict:
++    """{"hints": [...], "codes": n, "skipped": {reason: n}, "unreadable": None | why} — never raises on a bad file."""
++    empty = {"hints": [], "codes": 0, "skipped": {}}
++    try:
++        text = Path(path).read_text(errors="strict")
++    except (OSError, UnicodeDecodeError, ValueError) as exc:
++        return dict(empty, unreadable=f"the file could not be read ({type(exc).__name__})")
++    entries: dict[int, dict] = {}
++    for line in text.splitlines():
++        m = _CHT.match(line)
++        if m:
++            entries.setdefault(int(m.group(1)), {})[m.group(2)] = m.group(3)
++    if not entries:
++        return dict(empty, unreadable="no cheat entries in the file")
++    writes = _ps1_writes if system == "ps1" else _snes_writes
++    hints, skipped, stems = [], collections.Counter(), {}
++    codes = 0
++    for idx in sorted(entries):
++        desc, code = entries[idx].get("desc", ""), entries[idx].get("code", "")
++        if not code.strip():
++            continue
++        codes += 1
++        named = players_named(desc)
++        if not named:
++            skipped["no player"] += 1
++            continue
++        if len(named) > 1:
++            skipped["several players"] += 1
++            continue
++        ws, why = writes(code)
++        if not ws:
++            skipped[why] += 1
++            continue
++        group = stems.setdefault(_stem(desc), len(stems))
++        p, kind = named.pop(), kind_of(desc)
++        for w in ws:
++            hints.append({"player": f"P{p}", "address": hex(w["address"]), "bytes": w["bytes"], "value": w["value"],
++                          "kind": kind, "code": idx, "line": w["line"], "pair_group": group})
++    return {"hints": hints, "codes": codes, "skipped": dict(skipped), "unreadable": None}
++
++
++def counts(res: dict) -> dict:
++    """Counts only (no address): by player and kind — the form a record carries."""
++    by: dict = collections.defaultdict(collections.Counter)
++    for h in res["hints"]:
++        by[h["player"]][h["kind"]] += 1
++    return {"codes": res["codes"], "hint_lines": len(res["hints"]),
++            "codes_hinted": len({h["code"] for h in res["hints"]}),
++            "by_player_kind": {p: dict(c) for p, c in sorted(by.items())}, "skipped": res["skipped"],
++            "unreadable": res.get("unreadable")}
++
++
++def main(argv: list[str] | None = None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
++    ap.add_argument("--system", required=True, choices=("ps1", "snes"))
++    ap.add_argument("--cheats", required=True, type=Path)
++    ap.add_argument("--counts", action="store_true", help="counts by player and kind only (no address)")
++    a = ap.parse_args(argv)
++    res = read_hints(a.cheats, a.system)
++    print(json.dumps(counts(res) if a.counts else res))
++    return 0
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tests/h7_rule_search/fixtures.py b/tests/h7_rule_search/fixtures.py
+index 3ebae9db..93c398c8 100644
+--- a/tests/h7_rule_search/fixtures.py
++++ b/tests/h7_rule_search/fixtures.py
+@@ -95,3 +95,50 @@ def snes() -> bytes:
+     rom[0x7FDC:0x7FE0] = b"\xFF\xFF\x00\x00"; s = sum(rom) & 0xFFFF
+     rom[0x7FDC:0x7FE0] = struct.pack("<HH", s ^ 0xFFFF, s)
+     return bytes(rom)
++
++
++# --- B97: made-up cheat lists in the hub's stored form (RetroArch .cht), every real form found ------------------------
++def cht(system: str) -> str:
++    """Per-player codes at the planted addresses (rounds, level), the score pair (no template fits it), a per-player
++    pair at B94's two-state decoy, codes naming no player, a code for a third thing, a code naming both players, a
++    value to choose, a conditional before a write, and forms this tool does not read. Made-up names only."""
++    if system == "ps1":
++        p = PS1
++        r = [p["block"] + k * p["stride"] + p["rounds"] for k in range(2)]
++        lv = [p["block"] + k * p["stride"] + p["level"] for k in range(2)]
++        sc = [p["score"] + k * p["score_stride"] for k in range(2)]
++        dw = [p["decoy_two_states"] + k * p["decoy_stride"] for k in range(2)]
++        x = lambda t, a, v: f"{t}{a:06X}"[:8] + f"+{v}"
++        codes = [("Clock Held Zorvak", x("80", 0x080010, "0063")),
++                 ("P1 Health Held Zorvak", x("80", lv[0], "0078")),                       # '+' form
++                 ("Player 2 Health Held Zorvak", f"80{lv[1]:06X}:0078"),                   # ':' form
++                 ("P1 Rounds Won", f"80{r[0] >> 16:02X}+{r[0] & 0xFFFF:04X}+0002"),      # 4-hex chunks
++                 ("2P Rounds Won", x("80", r[1], "0002")),
++                 ("P1 Max Score", x("80", sc[0], "0FFF")),
++                 ("P2 Max Score", x("80", sc[1], "0FFF")),
++                 ("P1 Wins", x("80", dw[0], "0009")),
++                 ("P2 Wins", x("80", dw[1], "0009")),
++                 ("P1 Super Speed", x("30", 0x0F9000, "0003")),                         # a third thing (other)
++                 ("P1 & P2 Health Held Zorvak", x("80", lv[0], "0078") + "+" + x("80", lv[1], "0078")),
++                 ("P1 Health Modifier", f"80{lv[0]:06X}+????"),                          # a value to choose
++                 ("P2 Always Win", f"$87{r[1]:06X}0001"),                                # another device's form
++                 ("Zorvak Unlocks (M)", "D00C0000+0000+" + x("80", 0x0F9100, "0001")),
++                 ("P1 Press Select For Health", "D00C0000+0000+" + x("80", lv[0], "0078"))]
++    else:
++        p = SNES
++        r = [p["block"] + k * p["stride"] + p["rounds"] for k in range(2)]
++        lv = [p["block"] + k * p["stride"] + p["level"] for k in range(2)]
++        dw = [p["decoy_two_states"] + k * p["decoy_stride"] for k in range(2)]
++        codes = [("Clock Held Zorvak", "7E0100:63"),
++                 ("P1 Health Held Zorvak", f"7E{lv[0]:04X}78"),                             # PAR aaaaaavv
++                 ("Player 2 Health Held Zorvak", f"7E{lv[1]:04X}:78"),                      # raw aaaaaa:vv
++                 ("P1 Rounds Won", f"7E{r[0]:04X}=02"),                                  # raw aaaaaa=vv
++                 ("2P Rounds Won", f"00{r[1]:04X}:02"),                                  # bank 00, the low work RAM
++                 ("P1 Wins", f"7E{dw[0]:04X}09"),
++                 ("P2 Wins", f"7E{dw[1]:04X}09"),
++                 ("P1 Super Jump", "DD62-3F0F"),                                          # Game Genie (ROM)
++                 ("P1 & P2 Health Held Zorvak", f"7E{lv[0]:04X}78+7E{lv[1]:04X}78")]
++    lines = [f"cheats = {len(codes)}", ""]
++    for i, (d, c) in enumerate(codes):
++        lines += [f'cheat{i}_desc = "{d}"', f'cheat{i}_code = "{c}"', f"cheat{i}_enable = false", ""]
++    return "\n".join(lines)
+diff --git a/tests/h7_rule_search/test_h7_rule_search.py b/tests/h7_rule_search/test_h7_rule_search.py
+index 4ed8d418..4d9a049e 100644
+--- a/tests/h7_rule_search/test_h7_rule_search.py
++++ b/tests/h7_rule_search/test_h7_rule_search.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""B94 + B96 (host): the win-rule search on synthetic fixtures (no game).
++"""B94 + B96 + B97 (host): the win-rule search on synthetic fixtures (no game).
+ 
+ States are made on `fixtures.py`'s PS-X EXE and SNES ROM — SNES with B93's own `--make-state --write`, one session
+ per state at different moments; PS1 in ONE paused session (written, saved, written, saved: the core's own time-varying
+@@ -8,7 +8,8 @@ block (a round counter and a level), decoys (a block where P1 is larger in every
+ P1-won end but not a P2-won end), and noise (the SNES program's frame counter and xorshift buffer; on PS1, whose fixture
+ code does not run headless, random bytes written per state). B96: five and six states (begin; two ends per winner with
+ different planted details; a second begin), a mirror of the planted block, decoys that fit three states and fail a
+-fourth, a single-field decoy, a per-player score pair. The search reads each state paused, 3 loads, through
++fourth, a single-field decoy, a per-player score pair; B97: made-up cheat lists (`fixtures.cht`) as hints, and (b2).
++The search reads each state paused, 3 loads, through
+ `tools/h7_rule_search.py`'s own reader; RetroArch headless (B61's form). Skipped without RetroArch or a display.
+ Temp dirs removed at exit.
+ 
+@@ -164,6 +165,11 @@ class Base(unittest.TestCase):
+         finally:
+             search.SHOWN = old
+ 
++    def hints(self) -> list[dict]:                                      # B97: the made-up cheat list's hints
++        path = self.tmp / f"{self.system}.cht"
++        path.write_text(F.cht(self.system))
++        return search.load_hints(path, self.system)[0]
++
+     @staticmethod
+     def addrs(rules: list[dict]) -> list[list[str]]:
+         return [[p["address"] for p in r["rule"]["players"]] for r in rules]
+@@ -285,17 +291,59 @@ class PS1TwoPlayers(Base):
+             for d in (self.plan["decoy_two_states"], self.plan["decoy_always_p1"]):
+                 self.assertFalse(any(d <= a < d + 2 * self.plan["decoy_stride"] for a in addrs), (t, addrs))  # …not three
+ 
++    def test_hints_rank_the_planted_family_first_with_three_states(self):
++        decoy = [hex(self.plan["decoy_three"] + k * self.plan["decoy_stride"]) for k in range(2)]
++        plain = self.full("begin", "P1", "P2")
++        self.assertEqual(self.addrs(plain["templates"]["a"]["passing"])[0], decoy)           # by the order alone
++        out = self.full("begin", "P1", "P2", hints=self.hints())
++        self.assertEqual(self.addrs(out["templates"]["a"]["passing"])[0], self.planted(2))   # hinted: first
++        self.assertTrue(out["templates"]["a"]["passing"][0]["hinted"])
++        self.assertEqual(self.addrs(out["templates"]["b"]["passing"])[0], self.planted(2, "level"))
++        self.assertFalse(out["decided"])                                                     # still weak
++
++    def test_the_decoy_hint_fails_and_the_score_pair_is_tested_directly(self):
++        dw = [hex(self.plan["decoy_two_states"] + k * self.plan["decoy_stride"]) for k in range(2)]
++        sc = [hex(self.plan["score"] + k * self.plan["score_stride"]) for k in range(2)]
++        out = self.full("begin", "P1", "P2", hints=self.hints())
++        rows = {tuple(p["address"] for p in s["rule"]["players"]): s for s in out["hinted_sets"]["sets"]}
++        self.assertFalse(rows[tuple(dw)]["holds"])
++        self.assertIn(2, rows[tuple(dw)]["failing_states"])                                  # P2's end
++        self.assertNotIn(dw, [a for t in out["templates"].values() for a in self.addrs(t["passing"])])
++        five = self.full("begin", "P1", "P2", "P1b", "P2b", hints=self.hints())
++        rows = {tuple(p["address"] for p in s["rule"]["players"]): s for s in five["hinted_sets"]["sets"]}
++        self.assertTrue(rows[tuple(sc)]["holds"])
++        self.assertEqual(rows[tuple(sc)]["found_by"], [])                                    # no template found it
++        self.assertEqual(rows[tuple(sc)]["values_per_state"][1], [0x02FF, 0x02F0])
++        self.assertTrue(rows[tuple(self.planted(2))]["holds"])
++        self.assertEqual(rows[tuple(self.planted(2))]["found_by"], ["a"])
++        self.assertTrue(five["decided"])
++        self.assertEqual((five["template"], [p["address"] for p in five["rule"]["players"]]), ("a", self.planted(2)))
++
++    def test_b2_finds_the_level_where_the_loser_is_above_0(self):
++        out = self.full("begin", "P1", "P2", "P1b", "P2b")                 # P2b: the loser at 25
++        level = self.planted(2, "level")
++        self.assertIn(level, self.addrs(out["templates"]["b2"]["passing"]))
++        self.assertNotIn(level, self.addrs(out["templates"]["b"]["families"]))
++        self.assertEqual(out["templates"]["b2"]["evidence"]["level"], "strong")
++        self.assertEqual(out["template"], "a")
++
+     def test_the_cli_and_its_time_on_2_mib(self):
+         listed = self.tmp / "states.json"
+         names = ("begin", "P1", "P2", "P1b", "P2b")
+         listed.write_text(json.dumps([{"state": str(self.files[n]), "label": label_of(n)[0], "winner": label_of(n)[1]}
+                                       for n in names]))
++        cht = self.tmp / "cli.cht"
++        cht.write_text(F.cht("ps1"))
+         r = subprocess.run([sys.executable, "-I", "-B", str(TOOL), "--content", str(self.rom), "--system", "ps1",
+-                            "--states", str(listed), "--time"], capture_output=True, text=True, env=self.env, timeout=900)
++                            "--states", str(listed), "--time", "--hints", str(cht)], capture_output=True, text=True,
++                           env=self.env, timeout=900)
+         out = json.loads(r.stdout.strip().splitlines()[-1])
+         self.assertTrue(out["decided"], out)
+         self.assertEqual(out["evidence"], "strong")
+         self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
++        self.assertEqual(out["hints"]["read"], 11)                                          # B97: --hints
++        self.assertTrue(out["templates"]["a"]["passing"][0]["hinted"])
++        self.assertNotIn("Zorvak", r.stdout)
+         print(f"\nB96 time, PS1 2 MiB, 5 states x 3 loads: {out['seconds']}", file=sys.stderr)
+         self.assertLess(out["seconds"]["search"], 60)
+ 
+@@ -362,6 +410,9 @@ class SnesTwoPlayers(Base):
+         self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
+         mirror = hex(self.plan["block"] + self.plan["mirror"] + self.plan["rounds"])
+         self.assertIn(f"2@{mirror}", out["templates"]["a"]["passing"][0]["member_reads"])
++        hinted = self.full("begin", "P1", "P2", hints=self.hints())                    # B97: 1-byte SNES hints
++        self.assertEqual(self.addrs(hinted["templates"]["a"]["passing"])[0], self.planted(2))
++        self.assertTrue(hinted["templates"]["a"]["passing"][0]["hinted"])
+ 
+ 
+ class NoEmulator(unittest.TestCase):
+@@ -455,7 +506,7 @@ class NoEmulator(unittest.TestCase):
+         first = out["templates"]["a"]["passing"][0]["rule"]["players"]
+         self.assertEqual([p["address"] for p in first], ["0x100", "0x110"])            # stride 16 beats stride 2…
+         self.assertEqual(search._order({"hinted": False, "all_vary": True,
+-                                        "rule_member": {"size": 2, "base": 0x801, "stride": 2}})[2:4], (True, True))
++                                        "rule_member": {"size": 2, "base": 0x801, "stride": 2}})[3:5], (True, True))
+         self.assertLess(search._order({"hinted": True, "all_vary": False, "rule_member": {"size": 1, "base": 9, "stride": 3}}),
+                         search._order({"hinted": False, "all_vary": True, "rule_member": {"size": 2, "base": 0, "stride": 4}}))
+ 
+diff --git a/tests/h7_rule_search/test_h7_cheat_hints.py b/tests/h7_rule_search/test_h7_cheat_hints.py
+new file mode 100644
+index 00000000..d2d6e04a
+--- /dev/null
++++ b/tests/h7_rule_search/test_h7_cheat_hints.py
+@@ -0,0 +1,274 @@
++#!/usr/bin/env python3
++"""B97 (host, no emulator): hints from a cheat list in the hub's stored form, and the search's --hints / (b2) on
++made-up memories. The fixtures' cheat lists are made up (`fixtures.cht`); no real list is read. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/h7_rule_search -p 'test_h7_cheat_hints.py' -v
++"""
++from __future__ import annotations
++
++import json
++import re
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++import numpy as np
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(HERE))
++sys.path.insert(0, str(ROOT / "tools"))
++import fixtures as F  # noqa: E402
++import h7_cheat_hints as ch  # noqa: E402
++import h7_rule_search as search  # noqa: E402
++
++HINTS = ROOT / "tools" / "h7_cheat_hints.py"
++VOCABULARY = {"player", "players"}          # the tool's own words (keys, reasons) — not taken from a description
++
++
++def descriptions(text: str) -> list[str]:
++    return re.findall(r'cheat\d+_desc\s*=\s*"(.*?)"', text)
++
++
++class Hints(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.tmp = Path(tempfile.mkdtemp(prefix="h7_hints_test_"))
++
++    @classmethod
++    def tearDownClass(cls):
++        shutil.rmtree(cls.tmp, ignore_errors=True)
++
++    def write(self, name: str, data: str | bytes) -> Path:
++        p = self.tmp / name
++        (p.write_bytes if isinstance(data, bytes) else p.write_text)(data)
++        return p
++
++    def test_ps1_hints_every_readable_form(self):
++        res = ch.read_hints(self.write("ps1.cht", F.cht("ps1")), "ps1")
++        got = {(h["player"], h["address"], h["bytes"], h["kind"], h["value"]) for h in res["hints"]}
++        p = F.PS1
++        r = [hex(p["block"] + k * p["stride"] + p["rounds"]) for k in range(2)]
++        lv = [hex(p["block"] + k * p["stride"] + p["level"]) for k in range(2)]
++        self.assertIn(("P1", lv[0], 2, "level", 120), got)                 # '+' form
++        self.assertIn(("P2", lv[1], 2, "level", 120), got)                 # ':' form, "Player 2"
++        self.assertIn(("P1", r[0], 2, "tally", 2), got)                    # 4-hex chunks
++        self.assertIn(("P2", r[1], 2, "tally", 2), got)                    # "2P"
++        self.assertIn(("P1", "0xf9000", 1, "other", 3), got)               # type 30: 1 byte; a third thing
++        self.assertIn(("P1", lv[0], 2, "level", None), got)                # a value to choose
++        self.assertEqual(res["skipped"], {"no player": 2, "several players": 1, "a form this tool does not read": 1})
++        cond = [h for h in res["hints"] if h["line"] == 1]                 # the write after a condition
++        self.assertEqual([(h["player"], h["address"]) for h in cond], [("P1", lv[0])])
++        groups = {h["code"]: h["pair_group"] for h in res["hints"]}
++        self.assertEqual(groups[3], groups[4])                             # "P1 Rounds Won" / "2P Rounds Won"
++        self.assertNotEqual(groups[1], groups[3])
++
++    def test_snes_hints(self):
++        res = ch.read_hints(self.write("snes.cht", F.cht("snes")), "snes")
++        p = F.SNES
++        got = {(h["player"], h["address"], h["bytes"], h["kind"]) for h in res["hints"]}
++        for k in range(2):
++            self.assertIn((f"P{k + 1}", hex(p["block"] + k * p["stride"] + p["level"]), 1, "level"), got)
++            self.assertIn((f"P{k + 1}", hex(p["block"] + k * p["stride"] + p["rounds"]), 1, "tally"), got)
++        self.assertEqual(res["skipped"]["no constant RAM write"], 1)       # the Game Genie code
++
++    def test_no_description_text_in_any_output(self):
++        for system in ("ps1", "snes"):
++            text = F.cht(system)
++            path = self.write(f"{system}_d.cht", text)
++            words = {w.casefold() for d in descriptions(text) for w in re.findall(r"[A-Za-z]{4,}", d)} - VOCABULARY
++            self.assertTrue(words)
++            for args in ([], ["--counts"]):
++                r = subprocess.run([sys.executable, "-I", "-B", str(HINTS), "--system", system, "--cheats", str(path),
++                                    *args], capture_output=True, text=True, timeout=60)
++                out = r.stdout.casefold()
++                self.assertEqual(r.returncode, 0)
++                for d in descriptions(text):
++                    self.assertNotIn(d.casefold(), out)
++                for w in words:
++                    self.assertNotIn(w, out, (system, args))
++                if args:
++                    self.assertNotIn("0x", out)                             # counts only: no address
++
++    def test_unreadable_or_empty_files_give_no_hints(self):
++        cases = {"empty.cht": "", "garbage.cht": bytes(range(256)) * 8, "not_a_list.cht": "hello\nworld\n"}
++        for name, data in cases.items():
++            res = ch.read_hints(self.write(name, data), "ps1")
++            self.assertEqual(res["hints"], [], name)
++            self.assertTrue(res["unreadable"], name)
++        res = ch.read_hints(self.tmp / "missing.cht", "ps1")
++        self.assertEqual(res["hints"], [])
++        self.assertTrue(res["unreadable"])
++
++
++def st(label, winner, pairs, size=4096):
++    m = bytearray(size)
++    for a, v in pairs.items():
++        m[a] = v
++    return {"label": label, "winner": winner, "mem": bytes(m), "stable": np.ones(size, dtype=bool)}
++
++
++class SearchWithHints(unittest.TestCase):
++    """Made-up memories: a planted counter (0x100 / 0x110), a smaller-stride counter that ranks first by the order
++    (0x200 / 0x208), a level whose loser is above 0 in one end (0x300 / 0x310), a score pair no template finds (0x400 /
++    0x410) and a hinted pair that fails P2's state (0x500 / 0x510)."""
++    FACTS = {"begin": {0x100: (0, 0), 0x200: (0, 0), 0x300: (120, 120), 0x400: (0, 0), 0x500: (3, 3)},
++             "P1": {0x100: (2, 1), 0x200: (3, 1), 0x300: (40, 0), 0x400: (200, 100), 0x500: (7, 2)},
++             "P2": {0x100: (1, 2), 0x200: (1, 3), 0x300: (0, 70), 0x400: (90, 150), 0x500: (6, 4)},
++             "P1b": {0x100: (2, 0), 0x200: (2, 1), 0x300: (90, 30), 0x400: (180, 60), 0x500: (8, 1)},
++             "P2b": {0x100: (0, 2), 0x200: (0, 1), 0x300: (10, 50), 0x400: (40, 250), 0x500: (2, 1)}}
++    STRIDE = {0x100: 0x10, 0x200: 0x8, 0x300: 0x10, 0x400: 0x10, 0x500: 0x10}
++
++    def states(self, *names):
++        out = []
++        for n in names:
++            pairs = {}
++            for base, (x, y) in self.FACTS[n].items():
++                pairs[base], pairs[base + self.STRIDE[base]] = x, y
++            out.append(st(*(("begin", None) if n == "begin" else ("end", n[:2])), pairs))
++        return out
++
++    HINTS = [{"player": "P1", "address": "0x100", "bytes": 1, "value": 2, "kind": "tally", "code": 0, "pair_group": 0},
++             {"player": "P2", "address": "0x110", "bytes": 1, "value": 2, "kind": "tally", "code": 1, "pair_group": 0},
++             {"player": "P1", "address": "0x400", "bytes": 1, "value": 255, "kind": "tally", "code": 2, "pair_group": 1},
++             {"player": "P2", "address": "0x410", "bytes": 1, "value": 255, "kind": "tally", "code": 3, "pair_group": 1},
++             {"player": "P1", "address": "0x500", "bytes": 1, "value": 9, "kind": "tally", "code": 4, "pair_group": 2},
++             {"player": "P2", "address": "0x510", "bytes": 1, "value": 9, "kind": "tally", "code": 5, "pair_group": 2},
++             {"player": "P1", "address": "0x300", "bytes": 1, "value": 120, "kind": "level", "code": 6, "pair_group": 3},
++             {"player": "P2", "address": "0x310", "bytes": 1, "value": 120, "kind": "level", "code": 7, "pair_group": 3}]
++
++    def first(self, out, t):
++        return [p["address"] for p in out["templates"][t]["passing"][0]["rule"]["players"]]
++
++    def test_the_hinted_family_is_ranked_first_with_three_states(self):
++        three = self.states("begin", "P1", "P2")
++        self.assertEqual(self.first(search.search(three, 2), "a"), ["0x200", "0x208"])     # by the order alone
++        out = search.search(three, 2, self.HINTS)
++        self.assertEqual(self.first(out, "a"), ["0x100", "0x110"])                          # the hinted one first
++        self.assertTrue(out["templates"]["a"]["passing"][0]["hinted"])
++        self.assertEqual({h["code"] for h in out["templates"]["a"]["passing"][0]["hinted_by"]}, {0, 1})
++        self.assertFalse(out["decided"])                                                     # still weak: a hint is
++        self.assertEqual(out["evidence"], "weak")                                           # evidence, not a verdict
++
++    def test_a_hinted_pair_no_template_found_is_tested_directly(self):
++        out = search.search(self.states("begin", "P1", "P2", "P1b", "P2b"), 2, self.HINTS)
++        score = [s for s in out["hinted_sets"]["sets"] if [p["address"] for p in s["rule"]["players"]] == ["0x400", "0x410"]]
++        self.assertEqual(len(score), 1)
++        self.assertTrue(score[0]["holds"])
++        self.assertEqual(score[0]["found_by"], [])
++        self.assertEqual(score[0]["values_per_state"], [[0, 0], [200, 100], [90, 150], [180, 60], [40, 250]])
++        for t in ("a", "b", "b2"):
++            self.assertNotIn(["0x400", "0x410"], [[p["address"] for p in f["rule"]["players"]]
++                                                  for f in out["templates"][t]["families"]])
++        self.assertIn(["0x400", "0x410"], [[p["address"] for p in f["rule"]["players"]]
++                                           for f in out["templates"]["h"]["passing"]])
++        self.assertEqual(out["templates"]["h"]["evidence"]["level"], "strong")
++        self.assertEqual((out["template"], [p["address"] for p in out["rule"]["players"]]), ("a", ["0x100", "0x110"]))
++
++    def test_the_decoy_hint_fails_a_state_and_is_not_chosen(self):
++        out = search.search(self.states("begin", "P1", "P2"), 2, self.HINTS)
++        decoy = [s for s in out["hinted_sets"]["sets"] if [p["address"] for p in s["rule"]["players"]] == ["0x500", "0x510"]]
++        self.assertEqual(len(decoy), 1)
++        self.assertFalse(decoy[0]["holds"])
++        self.assertEqual(decoy[0]["failing_states"], [2])                                    # P2's end
++        for t in out["templates"].values():
++            self.assertNotIn(["0x500", "0x510"], [[p["address"] for p in f["rule"]["players"]] for f in t["passing"]])
++
++    def test_b2_holds_where_the_loser_is_above_0(self):
++        out = search.search(self.states("begin", "P1", "P2", "P1b", "P2b"), 2)
++        b2 = [[p["address"] for p in f["rule"]["players"]] for f in out["templates"]["b2"]["passing"]]
++        b = [[p["address"] for p in f["rule"]["players"]] for f in out["templates"]["b"]["families"]]
++        self.assertIn(["0x300", "0x310"], b2)
++        self.assertNotIn(["0x300", "0x310"], b)                                              # (b) needs the loser at 0
++        self.assertEqual(out["templates"]["b2"]["evidence"]["level"], "strong")
++        self.assertEqual(out["template"], "a")                                               # b2 answers after a, b, c
++        out3 = search.search(self.states("begin", "P1", "P2"), 2)
++        self.assertIn(["0x300", "0x310"], [[p["address"] for p in f["rule"]["players"]]
++                                           for f in out3["templates"]["b"]["families"]])     # every b also fits b2
++        self.assertIn(["0x300", "0x310"], [[p["address"] for p in f["rule"]["players"]]
++                                           for f in out3["templates"]["b2"]["families"]])
++
++    def test_the_hinted_b2_family_is_the_answer_when_a_and_b_have_none(self):
++        facts = {n: {0x300: v[0x300]} for n, v in self.FACTS.items()}
++        old = self.FACTS
++        try:
++            self.FACTS = facts
++            out = search.search(self.states("begin", "P1", "P2", "P1b", "P2b"), 2, self.HINTS)
++        finally:
++            self.FACTS = old
++        self.assertTrue(out["decided"])
++        self.assertEqual(out["template"], "b2")
++        self.assertTrue(out["templates"]["b2"]["passing"][0]["hinted"])
++
++    def test_b2_pairs_equal_the_stride_loop(self):                    # addendum 1
++        rng = np.random.default_rng(5)
++        for players, labels in ((2, (("begin", None), ("end", "P1"), ("end", "P2"), ("end", "P1"))),
++                                (4, (("begin", None), ("end", "P1"), ("end", "P3")))):
++            states = []
++            for n, (lab, w) in enumerate(labels):
++                m = rng.integers(0, 256, 0x8000, dtype=np.uint8)
++                lv = [120] * players if lab == "begin" else [0] * players
++                if w:
++                    lv[int(w[1]) - 1] = 50
++                    lv[(int(w[1])) % players] = 20 + n                  # a loser above 0
++                for k in range(players):
++                    m[0x4000 + k * 0x30] = lv[k]
++                states.append({"label": lab, "winner": w, "mem": m.tobytes(), "stable": np.ones(0x8000, dtype=bool)})
++            ctx = search._Ctx(states, players)
++            ctx.sets = []
++            idx = list(range(len(states)))
++            begins = [i for i in idx if ctx.label[i] == "begin"]
++            ends = [(i, ctx.win[i]) for i in idx if ctx.label[i] == "end"]
++            got = {}
++            old = search.B2_PAIRS
++            try:
++                for flag in (True, False):
++                    search.B2_PAIRS = flag
++                    got[flag] = sorted((c["size"], c["base"], c["stride"]) for c in
++                                       search._block(ctx, idx, begins, ends, "b2"))
++            finally:
++                search.B2_PAIRS = old
++            self.assertEqual(got[True], got[False], players)
++            self.assertIn((1, 0x4000, 0x30), got[True])
++
++    def test_b2_over_its_cap_is_not_testable_and_the_rest_unchanged(self):     # addendum 2
++        states = self.states("begin", "P1", "P2", "P1b", "P2b")
++        plain = search.search(states, 2)
++        self.assertGreater(plain["templates"]["b2"]["count"], 0)
++        old = search.B2_CAP
++        try:
++            search.B2_CAP = 0
++            out = search.search(states, 2)
++        finally:
++            search.B2_CAP = old
++        b2 = out["templates"]["b2"]
++        self.assertIn("too many (b2) candidates", b2["not_testable"])
++        self.assertEqual((b2["count"], b2["evidence"]["level"]), (None, "none"))
++        self.assertTrue(all(r["skipped"] for r in b2["folds"]))
++        for k in ("a", "b", "c"):
++            self.assertEqual(json.dumps(out["templates"][k], sort_keys=True),
++                             json.dumps(plain["templates"][k], sort_keys=True))
++        self.assertEqual((out["decided"], out["template"]), (True, "a"))
++
++    def test_no_hints_from_an_unreadable_or_empty_file_and_the_search_as_without(self):
++        tmp = Path(tempfile.mkdtemp(prefix="h7_hints_search_"))
++        try:
++            states = self.states("begin", "P1", "P2", "P1b", "P2b")
++            plain = search.search(states, 2)
++            for name, data in (("empty.cht", b""), ("garbage.cht", bytes(range(256)) * 4)):
++                (tmp / name).write_bytes(data)
++                hints, info = search.load_hints(tmp / name, "ps1")
++                self.assertEqual(hints, [])
++                self.assertEqual(info["read"], 0)
++                self.assertTrue(info["why"])
++                out = search.search(states, 2, hints)
++                self.assertEqual(json.dumps(out, sort_keys=True), json.dumps(plain, sort_keys=True))
++        finally:
++            shutil.rmtree(tmp, ignore_errors=True)
++
++
++if __name__ == "__main__":
++    unittest.main()

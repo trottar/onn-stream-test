@@ -1,0 +1,79 @@
+[
+ {
+  "id": "N1",
+  "file": "tools/h7_rule_search.py",
+  "old": "        if hit:\n            f[\"hinted\"] = True",
+  "new": "        if False:\n            f[\"hinted\"] = True",
+  "why": "a family covering a hinted address not marked"
+ },
+ {
+  "id": "N2",
+  "file": "tools/h7_rule_search.py",
+  "old": "    return (not f[\"hinted\"], not f.get(\"same_code_name\", False),",
+  "new": "    return (False, not f.get(\"same_code_name\", False),",
+  "why": "hinted families not ranked first"
+ },
+ {
+  "id": "N3",
+  "file": "tools/h7_cheat_hints.py",
+  "old": "\"kind\": kind, \"code\": idx,",
+  "new": "\"kind\": kind, \"code\": idx, \"d\": desc,",
+  "why": "the description written to the output"
+ },
+ {
+  "id": "N4",
+  "file": "tools/h7_cheat_hints.py",
+  "old": "        if len(named) > 1:",
+  "new": "        if False:",
+  "why": "a code naming two players taken as a hint"
+ },
+ {
+  "id": "N5",
+  "file": "tools/h7_cheat_hints.py",
+  "old": "        size = 2 if t == \"80\" else 1",
+  "new": "        size = 2",
+  "why": "type 30 read as 2 bytes"
+ },
+ {
+  "id": "N6",
+  "file": "tools/h7_cheat_hints.py",
+  "old": "        return dict(empty, unreadable=f\"the file could not be read ({type(exc).__name__})\")",
+  "new": "        raise",
+  "why": "an unreadable cheat file an error"
+ },
+ {
+  "id": "N7",
+  "file": "tools/h7_rule_search.py",
+  "old": "        if not _set_failing(ctx, s, idx):",
+  "new": "        if True:",
+  "why": "a hinted set kept as a family without holding in every state"
+ },
+ {
+  "id": "N8",
+  "file": "tools/h7_rule_search.py",
+  "old": "                            m &= V[e] < V[b]\n",
+  "new": "                            m &= V[e] == 0\n",
+  "why": "(b2) the loser required at 0 (as b)"
+ },
+ {
+  "id": "N9",
+  "file": "tools/h7_rule_search.py",
+  "old": "        hi = np.searchsorted(keyB, base_key + MAX_STRIDE, side=\"right\")",
+  "new": "        hi = np.searchsorted(keyB, base_key + 0x10, side=\"right\")",
+  "why": "(b2) pairs: strides cut short"
+ },
+ {
+  "id": "N10",
+  "file": "tools/h7_rule_search.py",
+  "old": "ORDER = (\"a\", \"b\", \"c\", \"b2\", \"h\")",
+  "new": "ORDER = (\"b2\", \"h\", \"a\", \"b\", \"c\")",
+  "why": "the loosest templates answer first"
+ },
+ {
+  "id": "N11",
+  "file": "tools/h7_rule_search.py",
+  "old": "            if len(found) > B2_CAP:",
+  "new": "            if False:",
+  "why": "addendum 2: (b2) over its cap kept"
+ }
+]

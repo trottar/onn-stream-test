@@ -1,0 +1,999 @@
+diff --git a/tests/h7_rule_search/fixtures.py b/tests/h7_rule_search/fixtures.py
+index 9566283e..3ebae9db 100644
+--- a/tests/h7_rule_search/fixtures.py
++++ b/tests/h7_rule_search/fixtures.py
+@@ -3,7 +3,8 @@
+ Both programs make **noise** — a counter that advances continuously and a xorshift pseudo-random buffer rewritten as it
+ runs — and leave alone the areas the tests plant through B93's `--make-state --write`: a **per-player block** (a round
+ counter and a level per player, at a constant stride) and **decoys** (a block where player 1 is larger in every state;
+-a block that fits begin + a player-1 end but not a player-2 end).
++a block that fits begin + a player-1 end but not a player-2 end; B96: a mirror of the planted block, decoys that fit three
++states but fail a fourth, a single-field decoy, a per-player score pair).
+ 
+ PS1 (a PS-X EXE at 0x80010000): the counter at 0x080000, the xorshift word at 0x080004, the buffer 0x080100-0x0810FF.
+ SNES (a LoROM): the frame counter at $0000, the xorshift word at $0002, the buffer $1000-$13FF (one word per frame).
+@@ -11,11 +12,16 @@ SNES (a LoROM): the frame counter at $0000, the xorshift word at $0002, the buff
+ import struct
+ 
+ # --- the plan the tests plant (addresses as the read commands take them) ---------------------------------------------
+-PS1 = {"block": 0x0C0000, "stride": 0x40, "rounds": 0x08, "level": 0x0C, "size": 2,
++# B96: "mirror" — a copy of the planted block (the same values); "decoy_three" — a counter (+0) and a level (+4) that fit
++# begin + P1 + P2 and fail P1b; "c_decoy" — a single byte 255 / 0 / 1 that reads P2 at P1b; "score" — a per-player
++# pair above 31 whose high bytes are equal at every end (no template fits it; B97's direct hint test).
++PS1 = {"block": 0x0C0000, "stride": 0x40, "rounds": 0x08, "level": 0x0C, "size": 2, "mirror": 0x100,
+        "decoy_always_p1": 0x0D0000, "decoy_two_states": 0x0E0000, "decoy_stride": 0x20,
++       "decoy_three": 0x0F0000, "c_decoy": 0x0F8000, "score": 0x0E8000, "score_stride": 0x40,
+        "noise": [(0x080000, 0x080008), (0x080100, 0x081100)]}
+-SNES = {"block": 0x0800, "stride": 0x20, "rounds": 0x04, "level": 0x06, "size": 2,
++SNES = {"block": 0x0800, "stride": 0x20, "rounds": 0x04, "level": 0x06, "size": 2, "mirror": 0x80,
+         "decoy_always_p1": 0x0A00, "decoy_two_states": 0x0B00, "decoy_stride": 0x10,
++        "decoy_three": 0x0C00, "c_decoy": 0x0C80, "score": 0x0D00, "score_stride": 0x20,
+         "noise": [(0x0000, 0x0004), (0x1000, 0x1400)]}
+ 
+ 
+diff --git a/tests/h7_rule_search/test_h7_rule_search.py b/tests/h7_rule_search/test_h7_rule_search.py
+index 63688005..4ed8d418 100644
+--- a/tests/h7_rule_search/test_h7_rule_search.py
++++ b/tests/h7_rule_search/test_h7_rule_search.py
+@@ -1,12 +1,14 @@
+ #!/usr/bin/env python3
+-"""B94 (host): the win-rule search on synthetic fixtures (no game).
++"""B94 + B96 (host): the win-rule search on synthetic fixtures (no game).
+ 
+ States are made on `fixtures.py`'s PS-X EXE and SNES ROM — SNES with B93's own `--make-state --write`, one session
+ per state at different moments; PS1 in ONE paused session (written, saved, written, saved: the core's own time-varying
+-bytes the same in every state — made at different moments they sometimes fit a template by chance, see the record): a planted per-player
++bytes the same in every state — made at different moments they sometimes fit a template by chance, see B94's record): a planted per-player
+ block (a round counter and a level), decoys (a block where P1 is larger in every state; a block that fits begin + a
+ P1-won end but not a P2-won end), and noise (the SNES program's frame counter and xorshift buffer; on PS1, whose fixture
+-code does not run headless, random bytes written per state). The search reads each state paused, 3 loads, through
++code does not run headless, random bytes written per state). B96: five and six states (begin; two ends per winner with
++different planted details; a second begin), a mirror of the planted block, decoys that fit three states and fail a
++fourth, a single-field decoy, a per-player score pair. The search reads each state paused, 3 loads, through
+ `tools/h7_rule_search.py`'s own reader; RetroArch headless (B61's form). Skipped without RetroArch or a display.
+ Temp dirs removed at exit.
+ 
+@@ -41,12 +43,25 @@ TOOL = ROOT / "tools" / "h7_rule_search.py"
+ PROOF = ROOT / "tools" / "h7_minigame_proof.py"
+ ALL = 10 ** 6
+ 
+-TWO = {"begin": {"rounds": (0, 0), "level": (120, 120), "d_counter": (3, 3), "d_level": (100, 100)},
+-       "P1": {"rounds": (2, 1), "level": (37, 0), "d_counter": (7, 2), "d_level": (40, 0)},
+-       "P2": {"rounds": (1, 2), "level": (0, 55), "d_counter": (6, 4), "d_level": (30, 0)}}
++# the planted facts per state; "d_*" the decoys (2 players only): d_counter / d_level fit begin + P1 and fail P2 (B94);
++# t_counter / t_level fit begin + P1 + P2 and fail P1b; c_single 255 / 0 / 1 reads P2 at P1b; score: no template fits
++TWO = {"begin": {"rounds": (0, 0), "level": (120, 120), "d_counter": (3, 3), "d_level": (100, 100),
++                 "t_counter": (0, 0), "t_level": (90, 90), "c_single": 255, "score": (0, 0)},
++       "P1": {"rounds": (2, 1), "level": (37, 0), "d_counter": (7, 2), "d_level": (40, 0),
++              "t_counter": (3, 1), "t_level": (20, 0), "c_single": 0, "score": (0x02FF, 0x02F0)},
++       "P2": {"rounds": (1, 2), "level": (0, 55), "d_counter": (6, 4), "d_level": (30, 0),
++              "t_counter": (1, 3), "t_level": (0, 20), "c_single": 1, "score": (0x0310, 0x0320)},
++       "P1b": {"rounds": (2, 0), "level": (80, 0), "d_counter": (5, 1), "d_level": (50, 0),
++               "t_counter": (1, 3), "t_level": (0, 20), "c_single": 1, "score": (0x0480, 0x0470)},
++       "P2b": {"rounds": (0, 2), "level": (25, 90), "d_counter": (2, 5), "d_level": (0, 60),
++               "t_counter": (0, 3), "t_level": (0, 30), "c_single": 1, "score": (0x0510, 0x05A0)},
++       "begin2": {"rounds": (0, 0), "level": (120, 120), "d_counter": (3, 3), "d_level": (100, 100),
++                  "t_counter": (0, 0), "t_level": (90, 90), "c_single": 255, "score": (0, 0)}}
+ FOUR = {"begin": {"rounds": (0, 0, 0, 0), "level": (120, 120, 120, 120)},
+         "P3": {"rounds": (1, 0, 2, 1), "level": (0, 0, 60, 0)},
+         "P1": {"rounds": (2, 1, 0, 0), "level": (45, 0, 0, 0)},
++        "P3b": {"rounds": (0, 1, 2, 0), "level": (0, 0, 40, 0)},
++        "P1b": {"rounds": (2, 0, 1, 1), "level": (90, 0, 0, 0)},
+         "P4": {"rounds": (0, 1, 1, 2), "level": (0, 0, 0, 70)}}
+ 
+ 
+@@ -57,14 +72,19 @@ def u16(v: int) -> str:
+ def writes(plan: dict, facts: dict, seed: int, noise: bool) -> list[str]:
+     w = []
+     for k, (r, lv) in enumerate(zip(facts["rounds"], facts["level"])):
+-        base = plan["block"] + k * plan["stride"]
+-        w += [f"{base + plan['rounds']:#x}={u16(r)}", f"{base + plan['level']:#x}={u16(lv)}"]
++        for at in (plan["block"], plan["block"] + plan["mirror"]):           # B96: the block and its mirror
++            base = at + k * plan["stride"]
++            w += [f"{base + plan['rounds']:#x}={u16(r)}", f"{base + plan['level']:#x}={u16(lv)}"]
+     if "d_counter" in facts:
+         for k, v in enumerate((9, 4)):                                   # P1 larger in every state
+             w.append(f"{plan['decoy_always_p1'] + k * plan['decoy_stride']:#x}={u16(v)}")
+-        for k, (c, lv) in enumerate(zip(facts["d_counter"], facts["d_level"])):
+-            base = plan["decoy_two_states"] + k * plan["decoy_stride"]
+-            w += [f"{base:#x}={u16(c)}", f"{base + 4:#x}={u16(lv)}"]
++        for name, at in (("d", plan["decoy_two_states"]), ("t", plan["decoy_three"])):
++            for k, (c, lv) in enumerate(zip(facts[f"{name}_counter"], facts[f"{name}_level"])):
++                base = at + k * plan["decoy_stride"]
++                w += [f"{base:#x}={u16(c)}", f"{base + 4:#x}={u16(lv)}"]
++        w.append(f"{plan['c_decoy']:#x}={facts['c_single']:02x}")
++        for k, v in enumerate(facts["score"]):
++            w.append(f"{plan['score'] + k * plan['score_stride']:#x}={u16(v)}")
+     if noise:                                                            # PS1: the fixture's code does not run headless
+         rnd = random.Random(seed)
+         for lo, hi in plan["noise"]:
+@@ -72,6 +92,10 @@ def writes(plan: dict, facts: dict, seed: int, noise: bool) -> list[str]:
+     return w
+ 
+ 
++def label_of(name: str) -> tuple[str, str | None]:
++    return ("begin", None) if name.startswith("begin") else ("end", name[:2])
++
++
+ class Base(unittest.TestCase):
+     system = "ps1"
+     plan = F.PS1
+@@ -127,11 +151,22 @@ class Base(unittest.TestCase):
+         shutil.rmtree(cls.tmp, ignore_errors=True)
+ 
+     def states(self, *names) -> list[dict]:
+-        return [{"label": "begin" if n == "begin" else "end", "winner": None if n == "begin" else n,
+-                 "mem": self.read[n][0], "stable": self.read[n][1]} for n in names]
++        return [{"label": label_of(n)[0], "winner": label_of(n)[1], "mem": self.read[n][0], "stable": self.read[n][1]}
++                for n in names]
++
++    def planted(self, players: int, field: str = "rounds") -> list[str]:
++        return [hex(self.plan["block"] + k * self.plan["stride"] + self.plan[field]) for k in range(players)]
++
++    def full(self, *names, players: int = 2, **kw) -> dict:
++        search.SHOWN, old = ALL, search.SHOWN
++        try:
++            return search.search(self.states(*names), players, **kw)
++        finally:
++            search.SHOWN = old
+ 
+-    def planted(self, players: int) -> dict:
+-        return [hex(self.plan["block"] + k * self.plan["stride"] + self.plan["rounds"]) for k in range(players)]
++    @staticmethod
++    def addrs(rules: list[dict]) -> list[list[str]]:
++        return [[p["address"] for p in r["rule"]["players"]] for r in rules]
+ 
+ 
+ @unittest.skipUnless(proof.APP.is_file() and display_env(), "RetroArch or a display is absent")
+@@ -140,15 +175,94 @@ class PS1TwoPlayers(Base):
+         for name, (_mem, stable) in self.read.items():
+             self.assertTrue(bool(stable.all()), name)                   # paused loads: every byte the same
+ 
+-    def test_three_states_decide_the_planted_rule(self):
+-        out = search.search(self.states("begin", "P1", "P2"), 2)
++    def test_three_states_are_weak_and_the_planted_family_passes(self):
++        out = self.full("begin", "P1", "P2")
++        a = out["templates"]["a"]
++        self.assertFalse(out["decided"])
++        self.assertEqual(out["evidence"], "weak")
++        self.assertEqual(a["evidence"]["level"], "weak")
++        self.assertEqual((a["evidence"]["folds_run"], a["evidence"]["folds_skipped"]), (0, 2))
++        self.assertEqual(a["evidence"]["would_make_strong"], "one more 'end' won by P1 and one more 'end' won by P2")
++        self.assertEqual(out["not_decided"]["would_make_strong"], a["evidence"]["would_make_strong"])
++        self.assertIn(self.planted(2), self.addrs(a["passing"]))          # the planted family among those passing
++        self.assertIn(self.planted(2, "level"), self.addrs(out["templates"]["b"]["passing"]))
++        self.assertNotIn("rule", out)
++        decoy = [hex(self.plan["decoy_three"] + k * self.plan["decoy_stride"]) for k in range(2)]
++        self.assertEqual(self.addrs(a["passing"])[0], decoy)              # by the order alone, the decoy ranks first
++
++    def test_three_states_keep_b94s_content(self):
++        out = self.full("begin", "P1", "P2")                            # B94: the planted rule among the candidates
++        found = [r for f in out["templates"]["a"]["families"] for r in [f["rule"]]]
++        self.assertIn(self.planted(2), self.addrs([{"rule": r} for r in found]))
++        self.assertGreaterEqual(out["templates"]["a"]["count"], out["templates"]["a"]["families_found"])
++
++    def test_five_states_are_strong_the_planted_family_the_answer(self):
++        out = self.full("begin", "P1", "P2", "P1b", "P2b")
++        a = out["templates"]["a"]
+         self.assertTrue(out["decided"], out.get("not_decided"))
+-        self.assertEqual(out["template"], "a")
++        self.assertEqual((out["evidence"], out["template"]), ("strong", "a"))
++        self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
++        self.assertEqual((a["evidence"]["level"], a["evidence"]["folds_run"], a["evidence"]["folds_skipped"]),
++                         ("strong", 4, 0))
++        self.assertIsNone(a["evidence"]["would_make_strong"])
++        top = a["passing"][0]
++        mirror = hex(self.plan["block"] + self.plan["mirror"] + self.plan["rounds"])
++        self.assertIn(f"2@{mirror}", top["member_reads"])                 # the mirror in the planted family…
++        self.assertGreaterEqual(top["members"], 2)
++        self.assertNotIn([mirror, hex(int(mirror, 16) + self.plan["stride"])], self.addrs(a["families"]))  # …counted once
++        for t in ("a", "b"):                                               # the decoys not on all five states…
++            addrs = [int(x, 16) for r in self.addrs(out["templates"][t]["families"]) for x in r]
++            for d in (self.plan["decoy_three"], self.plan["decoy_two_states"], self.plan["decoy_always_p1"]):
++                self.assertFalse(any(d <= x < d + 2 * self.plan["decoy_stride"] for x in addrs), (t, addrs))
++        fold = next(r for r in a["folds"] if r["held_out"] == 3)          # …and failing the fold that holds out P1b
++        decoy = [hex(self.plan["decoy_three"] + k * self.plan["decoy_stride"]) for k in range(2)]
++        self.assertIn(decoy, [[p["address"] for p in r["players"]] for r in fold["did_not_name_first"]])
++        lvl = next(r for r in out["templates"]["b"]["folds"] if r["held_out"] == 3)
++        self.assertIn([hex(int(x, 16) + 4) for x in decoy], [[p["address"] for p in r["players"]]
++                                                              for r in lvl["did_not_name_first"]])
++
++    def test_six_states_with_a_second_begin(self):
++        out = self.full("begin", "P1", "P2", "P1b", "P2b", "begin2")
++        self.assertTrue(out["decided"])
+         self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
+-        self.assertEqual(out["templates"]["a"]["count"], 1)
+-        self.assertEqual(out["templates"]["b"]["count"], 1)               # the planted level also fits, alone
+-        level = [hex(self.plan["block"] + k * self.plan["stride"] + self.plan["level"]) for k in range(2)]
+-        self.assertEqual([p["address"] for p in out["also_fits"][0]["rule"]["players"]], level)
++
++    def test_a_fold_without_another_example_is_skipped_and_counted(self):
++        out = self.full("begin", "P1", "P1b", "P2")
++        a = out["templates"]["a"]
++        self.assertEqual((a["evidence"]["folds_run"], a["evidence"]["folds_skipped"]), (2, 1))
++        skipped = [r for r in a["folds"] if r["skipped"]]
++        self.assertEqual((skipped[0]["winner"], skipped[0]["why"]), ("P2", "no other 'end' won by P2"))
++        self.assertEqual(a["evidence"]["level"], "weak")
++        self.assertIn("P2", a["evidence"]["words"])
++        self.assertEqual(a["evidence"]["would_make_strong"], "one more 'end' won by P2")
++        self.assertFalse(out["decided"])
++
++    def test_one_winner_only_is_never_strong(self):                    # addendum 1
++        out = self.full("begin", "P1", "P1b")
++        self.assertFalse(out["decided"])
++        self.assertNotEqual(out["templates"]["a"]["evidence"]["level"], "strong")
++        self.assertIn("won by P2", out["not_decided"]["would_make_strong"])
++
++    def test_template_c_tightened_counts_before_and_after(self):
++        old = search.C_PLAYER_VALUES
++        try:
++            search.C_PLAYER_VALUES = False
++            before = self.full("begin", "P1", "P2")["templates"]["c"]["count"]
++        finally:
++            search.C_PLAYER_VALUES = old
++        out = self.full("begin", "P1", "P2")
++        after = out["templates"]["c"]["count"]
++        print(f"\nB96 (c) on the PS1 fixture, begin + P1 + P2: {before} candidates before, {after} after", file=sys.stderr)
++        self.assertLess(after, before)
++        c = [f["rule"] for f in out["templates"]["c"]["families"]]
++        hit = [r for r in c if r["address"] == hex(self.plan["c_decoy"])]
++        self.assertTrue(hit)                                               # the single-field decoy fits three states
++        self.assertEqual(hit[0]["values"], {"P1": 0, "P2": 1})
++        self.assertEqual(hit[0]["none_value"], 255)
++        five = self.full("begin", "P1", "P2", "P1b", "P2b")
++        fold = next(r for r in five["templates"]["c"]["folds"] if r["held_out"] == 3)
++        self.assertIn(hex(self.plan["c_decoy"]), [r["address"] for r in fold["did_not_name_first"]])
++        self.assertNotIn(hex(self.plan["c_decoy"]), [f["rule"]["address"] for f in five["templates"]["c"]["families"]])
+ 
+     def test_begin_and_one_end_is_not_decided_and_includes_the_planted_rule(self):
+         out = search.search(self.states("begin", "P1"), 2)
+@@ -158,37 +272,31 @@ class PS1TwoPlayers(Base):
+         self.assertIsNone(out["not_decided"]["counts"]["c"])              # not testable with one winner
+         self.assertIn("P2", out["not_decided"]["would_split"])
+         self.assertNotIn("rule", out)
+-        search.SHOWN, old = ALL, search.SHOWN
+-        try:
+-            full = search.search(self.states("begin", "P1"), 2)
+-        finally:
+-            search.SHOWN = old
+-        found = [[p["address"] for p in c["rule"]["players"]] for c in full["templates"]["a"]["candidates"]]
++        full = self.full("begin", "P1")
++        found = self.addrs(full["templates"]["a"]["families"])
+         self.assertIn(self.planted(2), found)
+         decoy = [hex(self.plan["decoy_two_states"] + k * self.plan["decoy_stride"]) for k in range(2)]
+         self.assertIn(decoy, found)                                       # the decoy fits two states…
+ 
+     def test_a_decoy_never_ranks_above_the_planted_rule_once_p2_is_in(self):
+-        search.SHOWN, old = ALL, search.SHOWN
+-        try:
+-            out = search.search(self.states("begin", "P1", "P2"), 2)
+-        finally:
+-            search.SHOWN = old
++        out = self.full("begin", "P1", "P2")
+         for t in ("a", "b"):
+-            addrs = [int(p["address"], 16) for c in out["templates"][t]["candidates"] for p in c["rule"]["players"]]
++            addrs = [int(x, 16) for r in self.addrs(out["templates"][t]["families"]) for x in r]
+             for d in (self.plan["decoy_two_states"], self.plan["decoy_always_p1"]):
+                 self.assertFalse(any(d <= a < d + 2 * self.plan["decoy_stride"] for a in addrs), (t, addrs))  # …not three
+ 
+     def test_the_cli_and_its_time_on_2_mib(self):
+         listed = self.tmp / "states.json"
+-        listed.write_text(json.dumps([{"state": str(self.files[n]), "label": "begin" if n == "begin" else "end",
+-                                       "winner": None if n == "begin" else n} for n in ("begin", "P1", "P2")]))
++        names = ("begin", "P1", "P2", "P1b", "P2b")
++        listed.write_text(json.dumps([{"state": str(self.files[n]), "label": label_of(n)[0], "winner": label_of(n)[1]}
++                                      for n in names]))
+         r = subprocess.run([sys.executable, "-I", "-B", str(TOOL), "--content", str(self.rom), "--system", "ps1",
+-                            "--states", str(listed), "--time"], capture_output=True, text=True, env=self.env, timeout=600)
++                            "--states", str(listed), "--time"], capture_output=True, text=True, env=self.env, timeout=900)
+         out = json.loads(r.stdout.strip().splitlines()[-1])
+         self.assertTrue(out["decided"], out)
++        self.assertEqual(out["evidence"], "strong")
+         self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
+-        print(f"\nB94 time, PS1 2 MiB, 3 states x 3 loads: {out['seconds']}", file=sys.stderr)
++        print(f"\nB96 time, PS1 2 MiB, 5 states x 3 loads: {out['seconds']}", file=sys.stderr)
+         self.assertLess(out["seconds"]["search"], 60)
+ 
+     def test_a_state_that_fails_to_load_is_an_error_never_a_rule(self):
+@@ -220,18 +328,21 @@ class PS1FourPlayers(Base):
+     sets = FOUR
+ 
+     def test_the_four_player_set(self):
+-        out = search.search(self.states("begin", "P3", "P1"), 4)       # two ends: the counter is not decided…
+-        self.assertEqual(out["templates"]["a"]["count"], 2)               # (a half-stride block also fits)
+-        self.assertEqual([p["address"] for p in out["templates"]["a"]["candidates"][0]["rule"]["players"]],
+-                         self.planted(4))                                 # ranked first (every player's field changes)
+-        self.assertTrue(out["decided"])                                   # …the level is: one candidate
+-        self.assertEqual(out["template"], "b")
+-        self.assertEqual([p["address"] for p in out["rule"]["players"]],
+-                         [hex(self.plan["block"] + k * self.plan["stride"] + self.plan["level"]) for k in range(4)])
+-        out = search.search(self.states("begin", "P3", "P1", "P4"), 4)  # an end won by a fourth player splits them
++        out = self.full("begin", "P3", "P1", players=4)                  # each winner once: weak
++        self.assertFalse(out["decided"])
++        self.assertEqual(out["templates"]["a"]["evidence"]["level"], "weak")
++        self.assertEqual(self.addrs(out["templates"]["a"]["passing"])[0], self.planted(4))   # ranked first
++        self.assertIn(self.planted(4, "level"), self.addrs(out["templates"]["b"]["passing"]))
++        self.assertEqual(out["templates"]["a"]["evidence"]["would_make_strong"],
++                         "one more 'end' won by P1 and one more 'end' won by P3")
++        out = self.full("begin", "P3", "P1", "P3b", "P1b", players=4)    # two ends per winner seen: strong
+         self.assertTrue(out["decided"], out.get("not_decided"))
+-        self.assertEqual((out["template"], out["templates"]["a"]["count"]), ("a", 1))
++        self.assertEqual(out["template"], "a")
+         self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(4))
++        out = self.full("begin", "P3", "P1", "P3b", "P1b", "P4", players=4)   # a winner seen once again: weak
++        self.assertFalse(out["decided"])
++        self.assertEqual(out["templates"]["a"]["evidence"]["would_make_strong"], "one more 'end' won by P4")
++        self.assertEqual(out["templates"]["a"]["evidence"]["folds_skipped"], 1)
+ 
+ 
+ @unittest.skipUnless(proof.APP.is_file() and display_env(), "RetroArch or a display is absent")
+@@ -240,12 +351,17 @@ class SnesTwoPlayers(Base):
+     plan = F.SNES
+     noise = False                                    # the program's own frame counter and buffer
+ 
+-    def test_the_noise_runs_and_the_planted_rule_is_decided(self):
++    def test_the_noise_runs_and_five_states_decide_the_planted_rule(self):
+         b, e = self.read["begin"][0], self.read["P1"][0]
+         self.assertNotEqual(b[0x1000:0x1400], e[0x1000:0x1400])            # the buffer differs between states
+-        out = search.search(self.states("begin", "P1", "P2"), 2)
++        three = self.full("begin", "P1", "P2")
++        self.assertEqual(three["evidence"], "weak")
++        self.assertIn(self.planted(2), self.addrs(three["templates"]["a"]["passing"]))
++        out = self.full("begin", "P1", "P2", "P1b", "P2b", "begin2")
+         self.assertTrue(out["decided"], out.get("not_decided"))
+         self.assertEqual([p["address"] for p in out["rule"]["players"]], self.planted(2))
++        mirror = hex(self.plan["block"] + self.plan["mirror"] + self.plan["rounds"])
++        self.assertIn(f"2@{mirror}", out["templates"]["a"]["passing"][0]["member_reads"])
+ 
+ 
+ class NoEmulator(unittest.TestCase):
+@@ -255,27 +371,107 @@ class NoEmulator(unittest.TestCase):
+             m[a] = v
+         return bytes(m)
+ 
++    def st(self, label, winner, pairs, unstable=(), size=4096):
++        s = np.ones(size, dtype=bool)
++        for a in unstable:
++            s[a] = False
++        return {"label": label, "winner": winner, "mem": self.mem(pairs, size), "stable": s}
++
+     def test_unstable_addresses_are_dropped(self):
+-        def st(label, winner, pairs, unstable=()):
+-            s = np.ones(4096, dtype=bool)
+-            for a in unstable:
+-                s[a] = False
+-            return {"label": label, "winner": winner, "mem": self.mem(pairs), "stable": s}
+         planted = {0x100: 0, 0x110: 0}
+         p1 = {0x100: 2, 0x110: 1}
+         p2 = {0x100: 1, 0x110: 2}
+         decoy = {0x200: 5, 0x204: 5}, {0x200: 6, 0x204: 4}, {0x200: 4, 0x204: 6}   # fits all three, but unstable
+-        states = [st("begin", None, {**planted, **decoy[0]}, unstable=[0x200]),
+-                  st("end", "P1", {**p1, **decoy[1]}), st("end", "P2", {**p2, **decoy[2]})]
++        states = [self.st("begin", None, {**planted, **decoy[0]}, unstable=[0x200]),
++                  self.st("end", "P1", {**p1, **decoy[1]}), self.st("end", "P2", {**p2, **decoy[2]})]
+         out = search.search(states, 2)
+-        addrs = [[p["address"] for p in c["rule"]["players"]] for c in out["templates"]["a"]["candidates"]]
++        addrs = [[p["address"] for p in c["rule"]["players"]] for c in out["templates"]["a"]["families"]]
+         self.assertEqual(addrs, [["0x100", "0x110"]])
+-        self.assertTrue(out["decided"])
++        self.assertEqual(out["evidence"], "weak")
+         self.assertGreater(out["unstable_bytes"], 0)
+-        states[0]["stable"][0x200] = True                                   # stable → it fits as well: two, not decided
++        states[0]["stable"][0x200] = True                                   # stable → it fits as well: two
+         out = search.search(states, 2)
+         self.assertEqual(out["templates"]["a"]["count"], 2)
+ 
++    def five(self, extra: dict[str, dict[int, int]]) -> list[dict]:
++        facts = {"begin": (0, 0), "P1": (2, 1), "P2": (1, 2), "P1b": (2, 0), "P2b": (0, 2)}
++        out = []
++        for n, (x, y) in facts.items():
++            pairs = {0x100: x, 0x110: y, **extra.get(n, {})}
++            out.append(self.st(*(("begin", None) if n == "begin" else ("end", n[:2])), pairs))
++        return out
++
++    def test_the_window_joins_a_copy_at_0x100_and_not_at_0x101(self):
++        facts = {"begin": (0, 0), "P1": (2, 1), "P2": (1, 2), "P1b": (2, 0), "P2b": (0, 2)}
++        for off, joined in ((search.WINDOW, True), (search.WINDOW + 1, False)):
++            extra = {n: {0x100 + off: x, 0x110 + off: y} for n, (x, y) in facts.items()}
++            out = search.search(self.five(extra), 2)
++            fams = out["templates"]["a"]["families"]
++            first = fams[0]
++            self.assertEqual([p["address"] for p in first["rule"]["players"]], ["0x100", "0x110"])  # the lowest: rule
++            copy = f"2@{0x100 + off:#x}"
++            own = [f for f in fams if f["rule"]["players"][0]["address"] == hex(0x100 + off)]
++            if joined:
++                self.assertIn(copy, first["member_reads"])
++                self.assertEqual(first["members"], 2)
++                self.assertEqual(own, [])
++            else:
++                self.assertNotIn(copy, first["member_reads"])
++                self.assertEqual(first["members"], 1)
++                self.assertEqual(len(own), 1)                                         # its own family
++
++    def test_a_copy_with_other_values_is_another_family(self):
++        facts = {"begin": (0, 0), "P1": (3, 1), "P2": (1, 2), "P1b": (2, 0), "P2b": (0, 2)}   # P1's end differs
++        extra = {n: {0x140: x, 0x150: y} for n, (x, y) in facts.items()}
++        fams = search.search(self.five(extra), 2)["templates"]["a"]["families"]
++        self.assertNotIn("2@0x140", fams[0]["member_reads"])
++        self.assertTrue([f for f in fams if f["rule"]["players"][0]["address"] == "0x140"])
++
++    def test_overlapping_reads_are_one_family(self):
++        out = search.search(self.five({}), 2)
++        fam = out["templates"]["a"]["families"]
++        self.assertEqual(len(fam), 1)
++        self.assertEqual(fam[0]["rule"]["players"][0]["bytes"], 2)                    # the wider read at one base
++        self.assertIn("1@0x100", fam[0]["member_reads"])
++        self.assertTrue(out["decided"])
++
++    def test_overlapping_reads_whose_both_bytes_change_are_one_family(self):
++        facts = {"begin": (0x3C78, 0x3C78), "P1": (0x2050, 0), "P2": (0, 0x1460), "P1b": (0x1010, 0), "P2b": (0, 0x2222)}
++        states = []
++        for n, (x, y) in facts.items():
++            pairs = {0x100: x & 0xFF, 0x101: x >> 8, 0x110: y & 0xFF, 0x111: y >> 8}
++            states.append(self.st(*(("begin", None) if n == "begin" else ("end", n[:2])), pairs))
++        b = search.search(states, 2)["templates"]["b"]
++        self.assertGreaterEqual(b["count"], 3)                                         # B94's merge keeps three reads
++        self.assertEqual(b["families_found"], 1)                                       # B96: one place, one family
++        self.assertEqual(b["families"][0]["rule"]["players"][0], {"name": "P1", "address": "0x100", "bytes": 2,
++                                                                   "endian": "little"})
++        self.assertIn("1@0x101", b["families"][0]["member_reads"])
++
++    def test_the_order_and_the_template_order(self):
++        facts = {"begin": (0, 0), "P1": (2, 1), "P2": (1, 2), "P1b": (2, 0), "P2b": (0, 2)}
++        extra = {n: {0x801: x, 0x803: y} for n, (x, y) in facts.items()}                # unaligned, stride 2
++        out = search.search(self.five(extra), 2)
++        first = out["templates"]["a"]["passing"][0]["rule"]["players"]
++        self.assertEqual([p["address"] for p in first], ["0x100", "0x110"])            # stride 16 beats stride 2…
++        self.assertEqual(search._order({"hinted": False, "all_vary": True,
++                                        "rule_member": {"size": 2, "base": 0x801, "stride": 2}})[2:4], (True, True))
++        self.assertLess(search._order({"hinted": True, "all_vary": False, "rule_member": {"size": 1, "base": 9, "stride": 3}}),
++                        search._order({"hinted": False, "all_vary": True, "rule_member": {"size": 2, "base": 0, "stride": 4}}))
++
++    def test_folds_on_random_2_mib_time(self):
++        rng = np.random.default_rng(7)
++        n = 0x200000
++        states = [{"label": lab, "winner": w, "mem": rng.integers(0, 256, n, dtype=np.uint8).tobytes(),
++                   "stable": np.ones(n, dtype=bool)}
++                  for lab, w in (("begin", None), ("end", "P1"), ("end", "P2"), ("end", "P1"), ("end", "P2"))]
++        t0 = time.monotonic()
++        out = search.search(states, 2)
++        took = time.monotonic() - t0
++        print(f"\nB96 time, the pure search with 4 folds, random 2 MiB x 5 states: {took:.2f} s", file=sys.stderr)
++        self.assertLess(took, 60)
++        self.assertEqual(len(out["templates"]["a"]["folds"]), 4)
++
+     def test_needs_a_begin_and_an_end(self):
+         with self.assertRaises(search.SearchError):
+             search.search([{"label": "end", "winner": "P1", "mem": bytes(16), "stable": np.ones(16, dtype=bool)}], 2)
+diff --git a/tools/h7_rule_search.py b/tools/h7_rule_search.py
+index 683e8fcc..1d573874 100644
+--- a/tools/h7_rule_search.py
++++ b/tools/h7_rule_search.py
+@@ -13,9 +13,14 @@ Three templates are searched, each candidate holding in EVERY labelled state:
+   (b) a per-player level that empties — all equal and >= 8 at "begin"; at "end" none above its "begin" value, the
+       winner's strictly the largest and > 0, every loser at 0;
+   (c) a single winner field — constant over "begin"; one value per winner at "end", different winners different
+-      values, the "begin" value none of them (needs ends won by at least two players).
+-The answer is "decided" only when a template leaves exactly one candidate; otherwise the counts and the state that would
+-split them. It never names a rule when more than one fits. Prints one JSON document.
++      values, the "begin" value none of them (needs ends won by at least two players); B96: the values a player number
++      or flag (index from 0, number from 1, or bit flag — one scheme), the "begin" value none of the scheme's.
++B96 — families and held-out folds: candidates that are one place read another way (an overlapping read; a copy with
++identical values in every state within WINDOW bytes) are one family, its rule the lowest aligned member. For every
++"end" state in turn the search runs on the others and each family's rule must name the held-out winner (a fold whose
++winner has no other example is skipped and counted). Evidence per template: "strong" (every winner seen has two ends,
++a family passes every fold — the top family is the answer), "weak" (families pass, a winner seen once), "none".
++"decided" = "strong" only; otherwise the states that would make it strong. Prints one JSON document.
+ """
+ from __future__ import annotations
+ 
+@@ -112,6 +117,14 @@ def read_state(content: Path, system: str, state: Path, loads: int = 3) -> tuple
+ 
+ 
+ # --- the search ------------------------------------------------------------------------------------------------------
++TEMPLATES = {"a": "a per-player counter", "b": "a per-player level that empties", "c": "a single winner field"}
++ORDER = ("a", "b", "c")                         # the answer's template order after "hinted first" (B96)
++WINDOW = 0x100                                  # B96: copies with identical values this close are one family
++MEMBERS_SHOWN = 5
++C_PLAYER_VALUES = True                          # B96: (c) tightened; False = B94's (c), for the before / after count
++SCHEMES = (("index from 0", lambda k: k), ("number from 1", lambda k: k + 1), ("bit flag", lambda k: 1 << k))
++
++
+ def _fields(mem: bytes, size: int) -> np.ndarray:
+     b = np.frombuffer(mem, dtype=np.uint8).astype(np.int32)
+     if size == 1:
+@@ -127,6 +140,23 @@ def _player(w: str | None) -> int | None:
+     return None if w is None else int(str(w).lstrip("Pp")) - 1
+ 
+ 
++class _Ctx:
++    """The labelled states read once: fields per width, the stable mask over every state and every load."""
++
++    def __init__(self, states: list[dict], players: int):
++        self.states, self.players = states, players
++        self.V = [{1: _fields(s["mem"], 1), 2: _fields(s["mem"], 2)} for s in states]
++        self.ok = {}
++        for size in (1, 2):
++            ok = np.ones(len(self.V[0][size]), dtype=bool)
++            for s in states:
++                ok &= _stable(s["stable"], size)
++            self.ok[size] = ok
++        self.mems = np.stack([np.frombuffer(s["mem"], dtype=np.uint8) for s in states])
++        self.label = [s["label"] for s in states]
++        self.win = [_player(s["winner"]) if s["label"] == "end" else None for s in states]
++
++
+ def search(states: list[dict], players: int) -> dict:
+     """states: [{"label", "winner", "mem": bytes, "stable": bool array}] — the pure search (no emulator)."""
+     begins = [i for i, s in enumerate(states) if s["label"] == "begin"]
+@@ -135,86 +165,102 @@ def search(states: list[dict], players: int) -> dict:
+         raise SearchError("at least one 'begin' and one 'end' state are needed")
+     if any(w is None or not 0 <= w < players for _, w in ends):
+         raise SearchError("every 'end' state needs its winner (P1 … P%d)" % players)
+-    winners = sorted({w for _, w in ends})
++    ctx = _Ctx(states, players)
++    every = list(range(len(states)))
++    full = _run(ctx, every)
++    fams = {k: _families(full[k], k) for k in ORDER}
++    folds = {k: [] for k in ORDER}
++    for e, w in ends:
++        if not any(j != e and x == w for j, x in ends):
++            for k in ORDER:
++                folds[k].append({"held_out": e, "winner": f"P{w + 1}", "skipped": True,
++                                 "why": f"no other 'end' won by P{w + 1}"})
++            continue
++        train = [i for i in every if i != e]
++        tc = _run(ctx, train)
++        for k in ORDER:
++            folds[k].append(_fold(ctx, k, e, w, train, tc[k], fams[k]))
+     out: dict = {"players": players, "states": [{"label": s["label"], "winner": s["winner"]} for s in states],
+                  "unstable_bytes": int(sum(int((~s["stable"]).sum()) for s in states)), "templates": {}}
+-    block: dict[str, list] = {"a": [], "b": []}
++    epw = {f"P{w + 1}": sum(1 for _, x in ends if x == w) for w in sorted({w for _, w in ends})}
++    for k in ORDER:
++        out["templates"][k] = _report(ctx, k, full[k], fams[k], folds[k], epw, every)
++    return _verdict(out, epw)
++
++
++def _run(ctx: _Ctx, idx: list[int]) -> dict:
++    """B94's candidate search on the states `idx` (every template): {template: merged candidates}."""
++    begins = [i for i in idx if ctx.label[i] == "begin"]
++    ends = [(i, ctx.win[i]) for i in idx if ctx.label[i] == "end"]
++    res = {k: _block(ctx, idx, begins, ends, k) for k in ("a", "b")}
+     taken: set[int] = set()
+-    for kind in ("a", "b"):
+-        found = []
+-        for size in (1, 2):
+-            V = [_fields(s["mem"], size) for s in states]
+-            ok = np.ones(len(V[0]), dtype=bool)
+-            for s in states:
+-                ok &= _stable(s["stable"], size)
+-            if kind == "a":
+-                small = ok.copy()
+-                for v in V:
+-                    small &= v <= SMALL
+-                masks = []
+-                for k in range(players):
+-                    m = small.copy()
+-                    for e, w in ends:
+-                        if w == k:
+-                            for b in begins:
+-                                m &= V[e] > V[b]
+-                    masks.append(m)
+-            else:
+-                masks = []
+-                for k in range(players):
+-                    m = ok.copy()
+-                    for b in begins:
+-                        m &= V[b] >= HIGH
+-                    for e, w in ends:
++    for k in ("a", "b"):
++        for c in res[k]:
++            for k2 in range(ctx.players):
++                taken.update(range(c["base"] + k2 * c["stride"], c["base"] + k2 * c["stride"] + c["size"]))
++    res["c"] = _single(ctx, idx, begins, ends, taken)
++    return res
++
++
++def _block(ctx: _Ctx, idx, begins, ends, kind) -> list[dict]:
++    players, found = ctx.players, []
++    for size in (1, 2):
++        V = [ctx.V[i][size] for i in range(len(ctx.states))]
++        ok = ctx.ok[size]
++        if kind == "a":
++            small = ok.copy()
++            for i in idx:
++                small &= V[i] <= SMALL
++            masks = []
++            for k in range(players):
++                m = small.copy()
++                for e, w in ends:
++                    if w == k:
+                         for b in begins:
+-                            m &= V[e] <= V[b]
+-                        m &= (V[e] > 0) if w == k else (V[e] == 0)
+-                    masks.append(m)
+-            j = ends[0][1]
+-            seeds = np.nonzero(masks[j])[0]
+-            n = len(V[0])
+-            for d in range(size, MAX_STRIDE + 1):
+-                base = seeds - j * d
+-                base = base[(base >= 0) & (base + (players - 1) * d < n)]
+-                if not len(base):
+-                    continue
+-                keep = np.ones(len(base), dtype=bool)
+-                for k in range(players):
+-                    keep &= masks[k][base + k * d]
+-                base = base[keep]
+-                if not len(base):
+-                    continue
+-                vals = [np.stack([V[i][base + k * d] for k in range(players)]) for i in range(len(states))]
+-                keep = np.ones(len(base), dtype=bool)
++                            m &= V[e] > V[b]
++                masks.append(m)
++        else:
++            masks = []
++            for k in range(players):
++                m = ok.copy()
+                 for b in begins:
+-                    keep &= np.all(vals[b] == vals[b][0], axis=0)
++                    m &= V[b] >= HIGH
+                 for e, w in ends:
+-                    others = np.delete(vals[e], w, axis=0)
+-                    keep &= np.all(vals[e][w] > others, axis=0)
+-                for a in base[keep]:
+-                    found.append({"size": size, "base": int(a), "stride": d,
+-                                  "values": [[int(vals_i) for vals_i in [V[i][int(a) + k * d] for k in range(players)]]
+-                                             for i in range(len(states))]})
+-        merged = _merge(found, states, players)
+-        merged.sort(key=lambda c: (not c["all_vary"], c["base"] % c["size"] != 0, c["stride"] % 4 != 0, c["stride"],
+-                                   c["base"]))
+-        block[kind] = merged
+-        for c in merged:
++                    for b in begins:
++                        m &= V[e] <= V[b]
++                    m &= (V[e] > 0) if w == k else (V[e] == 0)
++                masks.append(m)
++        j = ends[0][1]
++        seeds = np.nonzero(masks[j])[0]
++        n = len(V[0])
++        for d in range(size, MAX_STRIDE + 1):
++            base = seeds - j * d
++            base = base[(base >= 0) & (base + (players - 1) * d < n)]
++            if not len(base):
++                continue
++            keep = np.ones(len(base), dtype=bool)
+             for k in range(players):
+-                taken.update(range(c["base"] + k * c["stride"], c["base"] + k * c["stride"] + c["size"]))
+-    for kind, label in (("a", "a per-player counter"), ("b", "a per-player level that empties")):
+-        cands = block[kind]
+-        out["templates"][kind] = {"name": label, "count": len(cands),
+-                                  "candidates": [_rule_of(c, players, kind) for c in cands[:SHOWN]]}
+-    out["templates"]["c"] = _single_field(states, begins, ends, winners, taken)
+-    return _verdict(out, ends, winners, players)
+-
+-
+-def _merge(found: list[dict], states: list[dict], players: int) -> list[dict]:
+-    """Reads of the same memory are one candidate: two candidates whose CHANGING bytes (a byte that differs between the
+-    states) are the same addresses are one field read two ways — a 1- and a 2-byte read, or a 2-byte read one byte early
+-    (the value × 256). The aligned, wider read is kept. `all_vary`: every player's field changes in some state."""
+-    mems = np.stack([np.frombuffer(s["mem"], dtype=np.uint8) for s in states])
++                keep &= masks[k][base + k * d]
++            base = base[keep]
++            if not len(base):
++                continue
++            vals = {i: np.stack([V[i][base + k * d] for k in range(players)]) for i in idx}
++            keep = np.ones(len(base), dtype=bool)
++            for b in begins:
++                keep &= np.all(vals[b] == vals[b][0], axis=0)
++            for e, w in ends:
++                others = np.delete(vals[e], w, axis=0)
++                keep &= np.all(vals[e][w] > others, axis=0)
++            for a in base[keep]:
++                found.append({"size": size, "base": int(a), "stride": d,
++                              "values": [[int(V[i][int(a) + k * d]) for k in range(players)] for i in idx]})
++    return _merge(found, ctx.mems[idx], players)
++
++
++def _merge(found: list[dict], mems: np.ndarray, players: int) -> list[dict]:
++    """B94: reads of the same memory are one candidate: two candidates whose CHANGING bytes (a byte that differs between
++    the states) are the same addresses are one field read two ways — a 1- and a 2-byte read, or a 2-byte read one byte
++    early (the value × 256). The aligned, wider read is kept. `all_vary`: every player's field changes in some state."""
+     changing = np.any(mems != mems[0], axis=0)
+     by: dict = {}
+     for c in found:
+@@ -231,28 +277,16 @@ def _merge(found: list[dict], states: list[dict], players: int) -> list[dict]:
+     return list(by.values())
+ 
+ 
+-def _rule_of(c: dict, players: int, kind: str) -> dict:
+-    rule = {"players": [{"name": f"P{k + 1}", "address": hex(c["base"] + k * c["stride"]), "bytes": c["size"],
+-                         "endian": "little"} for k in range(players)],
+-            "winner": "max", "memory": "ram", "none_when": "equal"}
+-    why = ("the same field per player at stride %#x: equal at every 'begin', the winner's the largest at every 'end'"
+-           if kind == "a" else
+-           "a level per player at stride %#x: equal and high at every 'begin', the losers at 0 at every 'end'") % c["stride"]
+-    return {"rule": rule, "why": why, "values_per_state": c["values"], "every_player_changes": c["all_vary"],
+-            **({"also_read_as": c["also_read_as"]} if c.get("also_read_as") else {})}
+-
+-
+-def _single_field(states, begins, ends, winners, taken) -> dict:
+-    name = "a single winner field"
++def _single(ctx: _Ctx, idx, begins, ends, taken) -> dict:
++    """(c): constant over "begin"; one value per winner at "end"; B96: the values a player number or flag (one scheme
++    for every seen winner), the "begin" value none of the scheme's values. {"not_testable"} with fewer than 2 winners."""
++    winners = sorted({w for _, w in ends})
+     if len(winners) < 2:
+-        return {"name": name, "count": None, "candidates": [],
+-                "not_testable": "needs 'end' states won by at least two different players"}
+-    cands = []
++        return {"not_testable": "needs 'end' states won by at least two different players"}
++    players, cands = ctx.players, []
+     for size in (1, 2):
+-        V = [_fields(s["mem"], size) for s in states]
+-        ok = np.ones(len(V[0]), dtype=bool)
+-        for s in states:
+-            ok &= _stable(s["stable"], size)
++        V = [ctx.V[i][size] for i in range(len(ctx.states))]
++        ok = ctx.ok[size].copy()
+         for b in begins[1:]:
+             ok &= V[b] == V[begins[0]]
+         rep = {}
+@@ -266,40 +300,237 @@ def _single_field(states, begins, ends, winners, taken) -> dict:
+             ok &= V[rep[ws[x]]] != V[begins[0]]
+             for y in range(x + 1, len(ws)):
+                 ok &= V[rep[ws[x]]] != V[rep[ws[y]]]
++        scheme = np.full(len(ok), -1, dtype=np.int8)
++        if C_PLAYER_VALUES:
++            for si, (_name, f) in enumerate(SCHEMES):
++                m = ok.copy()
++                for w in ws:
++                    m &= V[rep[w]] == f(w)
++                for k in range(players):
++                    m &= V[begins[0]] != f(k)
++                scheme[m & (scheme < 0)] = si
++            ok &= scheme >= 0
+         for a in np.nonzero(ok)[0]:
+             if any(int(a) + i in taken for i in range(size)):
+                 continue
+-            cands.append({"size": size, "address": int(a),
+-                          "values": {f"P{w + 1}": int(V[rep[w]][a]) for w in ws}, "begin": int(V[begins[0]][a])})
++            si = int(scheme[a])
++            values = ({f"P{k + 1}": SCHEMES[si][1](k) for k in range(players)} if si >= 0 else
++                      {f"P{w + 1}": int(V[rep[w]][a]) for w in ws})
++            cands.append({"size": size, "address": int(a), "values": values, "begin": int(V[begins[0]][a]),
++                          "scheme": SCHEMES[si][0] if si >= 0 else None,
++                          "series": tuple(int(V[i][a]) for i in idx)})
+     seen, uniq = set(), []
+     for c in sorted(cands, key=lambda c: (-c["size"], c["address"])):
+-        key = (c["address"], json.dumps(c["values"]), c["begin"])
+         if (c["address"], c["begin"]) in seen:
+             continue
+         seen.add((c["address"], c["begin"]))
+         uniq.append(c)
+-    uniq.sort(key=lambda c: (c["address"] % c["size"] != 0, c["address"]))
+-    return {"name": name, "count": len(uniq), "candidates": [
+-        {"rule": {"players": [], "address": hex(c["address"]), "bytes": c["size"], "endian": "little",
+-                  "values": c["values"], "none_value": c["begin"], "memory": "ram"},
+-         "why": "one value per winner at 'end', another at 'begin'"} for c in uniq[:SHOWN]]}
++    return {"cands": uniq}
++
++
++# --- families and folds (B96) ----------------------------------------------------------------------------------------
++def _cands(res) -> list[dict]:
++    return res.get("cands", []) if isinstance(res, dict) else res
++
++
++def _keys(c: dict) -> set:
++    """Every read a candidate stands for: (stride, width, address) — (c) has stride 0."""
++    if "address" in c:
++        return {(0, c["size"], c["address"])}
++    ks = {(c["stride"], c["size"], c["base"])}
++    for r in c.get("also_read_as", []):
++        n, a = r.split("@")
++        ks.add((c["stride"], int(n), int(a, 16)))
++    return ks
++
++
++def _families(res, kind: str) -> list[dict]:
++    """Candidates linked when they are one place read another way: (1) an overlapping read (the same stride, P1's
++    fields overlapping, bases at most 1 byte apart); (2) a copy (the same stride and width, identical values for every
++    player in every labelled state, bases at most WINDOW apart). A family = a connected set; its rule = the lowest
++    aligned member (at one base the wider read)."""
++    cands = _cands(res)
++    if not cands:
++        return []
++    single = "address" in cands[0]
++    base = (lambda c: c["address"]) if single else (lambda c: c["base"])
++    stride = (lambda c: 0) if single else (lambda c: c["stride"])
++    parent = list(range(len(cands)))
++
++    def find(x):
++        while parent[x] != x:
++            parent[x] = parent[parent[x]]
++            x = parent[x]
++        return x
++
++    def union(x, y):
++        x, y = find(x), find(y)
++        if x != y:
++            parent[max(x, y)] = min(x, y)
++
++    at: dict = {}
++    for i, c in enumerate(cands):
++        at.setdefault((stride(c), base(c)), []).append(i)
++    for i, c in enumerate(cands):
++        for d in (-1, 0, 1):
++            for j in at.get((stride(c), base(c) + d), ()):
++                if j != i:
++                    lo, hi = (c, cands[j]) if base(c) <= base(cands[j]) else (cands[j], c)
++                    if base(lo) + lo["size"] > base(hi):                    # the reads overlap
++                        union(i, j)
++    groups: dict = {}
++    for i, c in enumerate(cands):
++        sig = (stride(c), c["size"], c["series"] if single else json.dumps(c["values"]))
++        groups.setdefault(sig, []).append(i)
++    for members in groups.values():
++        members.sort(key=lambda i: base(cands[i]))
++        for x, y in zip(members, members[1:]):
++            if base(cands[y]) - base(cands[x]) <= WINDOW:
++                union(x, y)
++    fam: dict = {}
++    for i in range(len(cands)):
++        fam.setdefault(find(i), []).append(cands[i])
++    out = []
++    for members in fam.values():
++        rule = min(members, key=lambda c: (base(c) % c["size"] != 0, base(c), -c["size"]))
++        keys = set().union(*(_keys(c) for c in members))
++        out.append({"rule_member": rule, "members": members, "keys": keys, "hinted": False,
++                    "all_vary": True if single else any(c["all_vary"] for c in members)})
++    out.sort(key=_order)
++    return out
+ 
+ 
+-def _verdict(out: dict, ends, winners, players) -> dict:
+-    ones = [k for k in ("a", "b", "c") if out["templates"][k].get("count") == 1]
+-    if ones:
++def _order(f: dict) -> tuple:
++    """B96's order: hinted first, every player's field changing, aligned, stride a multiple of 4, smaller stride, lower
++    address."""
++    c = f["rule_member"]
++    b, d = (c["address"], 0) if "address" in c else (c["base"], c["stride"])
++    return (not f["hinted"], not f["all_vary"], b % c["size"] != 0, d % 4 != 0, d, b)
++
++
++def _names(ctx: _Ctx, i: int, c: dict) -> int | None:
++    """The player a rule names in state i (B93's reading): the field strictly the largest; (c) the value given to one
++    winner. None when it names nobody."""
++    V = ctx.V[i][c["size"]]
++    if "address" in c:
++        hits = [int(k.lstrip("P")) - 1 for k, v in c["values"].items() if v == int(V[c["address"]])]
++        return hits[0] if len(hits) == 1 else None
++    vals = [int(V[c["base"] + k * c["stride"]]) for k in range(ctx.players)]
++    top = max(vals)
++    return vals.index(top) if vals.count(top) == 1 else None
++
++
++def _fold(ctx: _Ctx, kind: str, e: int, w: int, train: list[int], res, fams: list[dict]) -> dict:
++    row = {"held_out": e, "winner": f"P{w + 1}", "skipped": False}
++    if isinstance(res, dict) and "not_testable" in res:
++        row.update(skipped=True, why="the template is not testable on the other states")
++        return row
++    tf = _families(res, kind)
++    owner = {}
++    for n, f in enumerate(tf):
++        for key in f["keys"]:
++            owner[key] = n
++    named = [_names(ctx, e, f["rule_member"]) == w for f in tf]
++    for f in fams:
++        n = next((owner[key] for key in f["keys"] if key in owner), None)
++        f.setdefault("fold_results", []).append(n is not None and named[n])
++    missed = [f for f, ok in zip(tf, named) if not ok]
++    row.update(training_families=len(tf), named_the_winner=sum(named), did_not_name=len(missed),
++               did_not_name_first=[_rule_of(f, ctx.players, kind)["rule"] for f in missed[:SHOWN]])
++    return row
++
++
++def _rule_of(f: dict, players: int, kind: str) -> dict:
++    c = f["rule_member"]
++    reads = sorted({(n, a) for (_d, n, a) in f["keys"]}, key=lambda r: (r[1], r[0]))
++    common = {"members": len(f["members"]), "member_reads": [f"{n}@{a:#x}" for n, a in reads[:MEMBERS_SHOWN]],
++              "hinted": f["hinted"]}
++    if "address" in c:
++        rule = {"players": [], "address": hex(c["address"]), "bytes": c["size"], "endian": "little",
++                "values": c["values"], "none_value": c["begin"], "memory": "ram"}
++        why = ("one value per winner at 'end' (%s), another at 'begin'" % c["scheme"] if c.get("scheme") else
++               "one value per winner at 'end', another at 'begin'")
++        return {"rule": rule, "why": why, "values_per_state": list(c["series"]), **common}
++    rule = {"players": [{"name": f"P{k + 1}", "address": hex(c["base"] + k * c["stride"]), "bytes": c["size"],
++                         "endian": "little"} for k in range(players)],
++            "winner": "max", "memory": "ram", "none_when": "equal"}
++    why = {"a": "the same field per player at stride %#x: equal at every 'begin', the winner's the largest at every "
++                "'end'",
++           "b": "a level per player at stride %#x: equal and high at every 'begin', the losers at 0 at every 'end'"}
++    return {"rule": rule, "why": why.get(kind, "a field per player at stride %#x") % c["stride"],
++            "values_per_state": c["values"], "every_player_changes": f["all_vary"], **common}
++
++
++def _report(ctx: _Ctx, kind: str, res, fams: list[dict], folds: list[dict], epw: dict, every: list[int]) -> dict:
++    name = TEMPLATES[kind]
++    ran = [r for r in folds if not r["skipped"]]
++    skipped = [r for r in folds if r["skipped"]]
++    if isinstance(res, dict) and "not_testable" in res:
++        return {"name": name, "count": None, "families_found": None, "families": [], "passing_count": 0,
++                "passing": [], "candidates": [], "not_testable": res["not_testable"], "folds": folds,
++                "evidence": {"level": "none", "words": "none: " + res["not_testable"], "ends_per_winner": epw,
++                             "folds_run": 0, "folds_skipped": len(folds),
++                             "would_make_strong": _more(epw, ctx.players)}}
++    for f in fams:
++        f["passes"] = all(f.get("fold_results", []))
++    passing = [f for f in fams if f["passes"]]
++    once = [p for p, n in epw.items() if n < 2]
++    if passing and not once and ran and len(epw) >= 2:          # addendum 1: two different winners seen
++        level = "strong"
++        words = (f"strong: every winner seen has at least two 'end' states; {len(passing)} famil"
++                 f"{'y passes' if len(passing) == 1 else 'ies pass'} all {len(ran)} folds; the answer is the top one")
++    elif passing:
++        level = "weak"
++        why = (f"{' and '.join(once)} {'was' if len(once) == 1 else 'were'} seen winning only once" if once else
++               "only one player was seen winning")
++        words = (f"weak: {len(passing)} famil{'y holds' if len(passing) == 1 else 'ies hold'} in every state, but "
++                 f"{why} — {len(skipped)} fold{'' if len(skipped) == 1 else 's'} skipped (no other example of that "
++                 f"winner), {len(ran)} run")
++    else:
++        level = "none"
++        words = "none: no family holds in every state and every fold"
++    rules = [_rule_of(f, ctx.players, kind) for f in fams[:SHOWN]]
++    for r, f in zip(rules, fams):
++        r["passes_every_fold"] = f["passes"]
++    return {"name": name, "count": len(_cands(res)), "families_found": len(fams), "families": rules,
++            "passing_count": len(passing),
++            "passing": [dict(_rule_of(f, ctx.players, kind), passes_every_fold=True) for f in passing[:SHOWN]],
++            "candidates": rules, "folds": folds,
++            "evidence": {"level": level, "words": words, "ends_per_winner": epw, "folds_run": len(ran),
++                         "folds_skipped": len(skipped),
++                         "would_make_strong": None if level == "strong" else _more(epw, ctx.players)}}
++
++
++def _more(epw: dict, players: int) -> str:
++    """The states that would make the evidence strong, in the user's terms."""
++    need = []
++    if len(epw) < 2:
++        unseen = next(f"P{k + 1}" for k in range(players) if f"P{k + 1}" not in epw)
++        need.append(f"an 'end' won by {unseen} and another one won by {unseen}")
++    need += [f"one more 'end' won by {p}" for p, n in epw.items() if n < 2]
++    if not need:
++        return "another labelled state (every winner already has two 'end' states)"
++    return " and ".join(need)
++
++
++def _verdict(out: dict, epw: dict) -> dict:
++    t = out["templates"]
++    strong = [k for k in ORDER if t[k]["evidence"]["level"] == "strong"]
++    strong.sort(key=lambda k: (not t[k]["passing"][0].get("hinted"), ORDER.index(k)))
++    levels = [t[k]["evidence"]["level"] for k in ORDER]
++    out["evidence"] = "strong" if "strong" in levels else "weak" if "weak" in levels else "none"
++    if strong:
+         out["decided"] = True
+-        out["rule"] = out["templates"][ones[0]]["candidates"][0]["rule"]
+-        out["template"] = ones[0]
+-        out["also_fits"] = [{"template": k, "rule": out["templates"][k]["candidates"][0]["rule"]} for k in ones[1:]]
++        out["rule"] = t[strong[0]]["passing"][0]["rule"]
++        out["template"] = strong[0]
++        out["also_fits"] = [{"template": k, "rule": t[k]["passing"][0]["rule"]} for k in strong[1:]]
+     else:
+         out["decided"] = False
+-        unseen = [f"P{k + 1}" for k in range(players) if k not in winners]
+-        repeat = [f"P{w + 1}" for w in winners if sum(1 for _, x in ends if x == w) < 2]
+-        out["not_decided"] = {
+-            "counts": {k: out["templates"][k]["count"] for k in ("a", "b", "c")},
+-            "would_split": (f"an 'end' state won by {unseen[0]}" if unseen else
+-                            f"a second 'end' state won by {repeat[0]}" if repeat else "another labelled state")}
++        more = _more(epw, out["players"])
++        out["not_decided"] = {"passing": {k: t[k]["passing_count"] for k in ORDER},
++                              "counts": {k: t[k]["count"] for k in ORDER},
++                              "evidence": {k: t[k]["evidence"]["level"] for k in ORDER},
++                              "would_make_strong": more, "would_split": more}
+     return out
+ 
+ 

@@ -3080,6 +3080,18 @@ among identical-looking candidates, then H7-P1 again; then the same read at the 
 4-player title; a stricter single-field template; N64's search; Godot's probe and the game repo — both a fetch, on the
 user's word (`docs/memory/evidence/H7_P1_2026-11-11.md`).
 
+**The first real search's result, and "decided" redefined (queue AJ, 2026-11-11):** on a real game thousands of
+address pairs fit three states (H7-P1), so "exactly one candidate" can never be met. **B96:** candidates that are one
+place in memory read several ways are one family; a rule must name the winner in states it never saw (each "end" held
+out in turn); **"decided" = "strong" evidence only** — two "end" states per winner, two winners or more, a family passing
+every fold, the top one by the stated order the answer; "weak" names the states that would make it strong. **B97:** the
+game's own cheat list gives hints — the RAM addresses its per-player codes write (`tools/h7_cheat_hints.py`; 23 of 116
+cached PS1 lists, none of the SNES lists) — ranked first and tested directly, never a verdict on their own; a level
+template whose loser need not be 0 (a fight stopped by the clock). On fixtures: three states "weak", five "strong" and
+the planted rule. **Next:** A's H7-P2 (unattended) on T88's states with the hints — "weak" at best with today's three
+states; the user's two further "end" saves make "strong" possible; then the proof and, on the user's word, the erase.
+(`evidence/B96_H7_HELD_OUT_AND_FAMILIES_2026-11-11.md`, `evidence/B97_H7_CHEAT_HINTS_AND_LEVEL_2026-11-11.md`)
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

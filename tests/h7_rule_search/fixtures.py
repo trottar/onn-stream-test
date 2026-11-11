@@ -3,7 +3,8 @@
 Both programs make **noise** — a counter that advances continuously and a xorshift pseudo-random buffer rewritten as it
 runs — and leave alone the areas the tests plant through B93's `--make-state --write`: a **per-player block** (a round
 counter and a level per player, at a constant stride) and **decoys** (a block where player 1 is larger in every state;
-a block that fits begin + a player-1 end but not a player-2 end).
+a block that fits begin + a player-1 end but not a player-2 end; B96: a mirror of the planted block, decoys that fit three
+states but fail a fourth, a single-field decoy, a per-player score pair).
 
 PS1 (a PS-X EXE at 0x80010000): the counter at 0x080000, the xorshift word at 0x080004, the buffer 0x080100-0x0810FF.
 SNES (a LoROM): the frame counter at $0000, the xorshift word at $0002, the buffer $1000-$13FF (one word per frame).
@@ -11,11 +12,16 @@ SNES (a LoROM): the frame counter at $0000, the xorshift word at $0002, the buff
 import struct
 
 # --- the plan the tests plant (addresses as the read commands take them) ---------------------------------------------
-PS1 = {"block": 0x0C0000, "stride": 0x40, "rounds": 0x08, "level": 0x0C, "size": 2,
+# B96: "mirror" — a copy of the planted block (the same values); "decoy_three" — a counter (+0) and a level (+4) that fit
+# begin + P1 + P2 and fail P1b; "c_decoy" — a single byte 255 / 0 / 1 that reads P2 at P1b; "score" — a per-player
+# pair above 31 whose high bytes are equal at every end (no template fits it; B97's direct hint test).
+PS1 = {"block": 0x0C0000, "stride": 0x40, "rounds": 0x08, "level": 0x0C, "size": 2, "mirror": 0x100,
        "decoy_always_p1": 0x0D0000, "decoy_two_states": 0x0E0000, "decoy_stride": 0x20,
+       "decoy_three": 0x0F0000, "c_decoy": 0x0F8000, "score": 0x0E8000, "score_stride": 0x40,
        "noise": [(0x080000, 0x080008), (0x080100, 0x081100)]}
-SNES = {"block": 0x0800, "stride": 0x20, "rounds": 0x04, "level": 0x06, "size": 2,
+SNES = {"block": 0x0800, "stride": 0x20, "rounds": 0x04, "level": 0x06, "size": 2, "mirror": 0x80,
         "decoy_always_p1": 0x0A00, "decoy_two_states": 0x0B00, "decoy_stride": 0x10,
+        "decoy_three": 0x0C00, "c_decoy": 0x0C80, "score": 0x0D00, "score_stride": 0x20,
         "noise": [(0x0000, 0x0004), (0x1000, 0x1400)]}
 
 
@@ -89,3 +95,50 @@ def snes() -> bytes:
     rom[0x7FDC:0x7FE0] = b"\xFF\xFF\x00\x00"; s = sum(rom) & 0xFFFF
     rom[0x7FDC:0x7FE0] = struct.pack("<HH", s ^ 0xFFFF, s)
     return bytes(rom)
+
+
+# --- B97: made-up cheat lists in the hub's stored form (RetroArch .cht), every real form found ------------------------
+def cht(system: str) -> str:
+    """Per-player codes at the planted addresses (rounds, level), the score pair (no template fits it), a per-player
+    pair at B94's two-state decoy, codes naming no player, a code for a third thing, a code naming both players, a
+    value to choose, a conditional before a write, and forms this tool does not read. Made-up names only."""
+    if system == "ps1":
+        p = PS1
+        r = [p["block"] + k * p["stride"] + p["rounds"] for k in range(2)]
+        lv = [p["block"] + k * p["stride"] + p["level"] for k in range(2)]
+        sc = [p["score"] + k * p["score_stride"] for k in range(2)]
+        dw = [p["decoy_two_states"] + k * p["decoy_stride"] for k in range(2)]
+        x = lambda t, a, v: f"{t}{a:06X}"[:8] + f"+{v}"
+        codes = [("Clock Held Zorvak", x("80", 0x080010, "0063")),
+                 ("P1 Health Held Zorvak", x("80", lv[0], "0078")),                       # '+' form
+                 ("Player 2 Health Held Zorvak", f"80{lv[1]:06X}:0078"),                   # ':' form
+                 ("P1 Rounds Won", f"80{r[0] >> 16:02X}+{r[0] & 0xFFFF:04X}+0002"),      # 4-hex chunks
+                 ("2P Rounds Won", x("80", r[1], "0002")),
+                 ("P1 Max Score", x("80", sc[0], "0FFF")),
+                 ("P2 Max Score", x("80", sc[1], "0FFF")),
+                 ("P1 Wins", x("80", dw[0], "0009")),
+                 ("P2 Wins", x("80", dw[1], "0009")),
+                 ("P1 Super Speed", x("30", 0x0F9000, "0003")),                         # a third thing (other)
+                 ("P1 & P2 Health Held Zorvak", x("80", lv[0], "0078") + "+" + x("80", lv[1], "0078")),
+                 ("P1 Health Modifier", f"80{lv[0]:06X}+????"),                          # a value to choose
+                 ("P2 Always Win", f"$87{r[1]:06X}0001"),                                # another device's form
+                 ("Zorvak Unlocks (M)", "D00C0000+0000+" + x("80", 0x0F9100, "0001")),
+                 ("P1 Press Select For Health", "D00C0000+0000+" + x("80", lv[0], "0078"))]
+    else:
+        p = SNES
+        r = [p["block"] + k * p["stride"] + p["rounds"] for k in range(2)]
+        lv = [p["block"] + k * p["stride"] + p["level"] for k in range(2)]
+        dw = [p["decoy_two_states"] + k * p["decoy_stride"] for k in range(2)]
+        codes = [("Clock Held Zorvak", "7E0100:63"),
+                 ("P1 Health Held Zorvak", f"7E{lv[0]:04X}78"),                             # PAR aaaaaavv
+                 ("Player 2 Health Held Zorvak", f"7E{lv[1]:04X}:78"),                      # raw aaaaaa:vv
+                 ("P1 Rounds Won", f"7E{r[0]:04X}=02"),                                  # raw aaaaaa=vv
+                 ("2P Rounds Won", f"00{r[1]:04X}:02"),                                  # bank 00, the low work RAM
+                 ("P1 Wins", f"7E{dw[0]:04X}09"),
+                 ("P2 Wins", f"7E{dw[1]:04X}09"),
+                 ("P1 Super Jump", "DD62-3F0F"),                                          # Game Genie (ROM)
+                 ("P1 & P2 Health Held Zorvak", f"7E{lv[0]:04X}78+7E{lv[1]:04X}78")]
+    lines = [f"cheats = {len(codes)}", ""]
+    for i, (d, c) in enumerate(codes):
+        lines += [f'cheat{i}_desc = "{d}"', f'cheat{i}_code = "{c}"', f"cheat{i}_enable = false", ""]
+    return "\n".join(lines)
