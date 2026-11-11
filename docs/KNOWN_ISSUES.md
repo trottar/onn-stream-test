@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-11 — HOME-12U (HOME-12's fourth sitting): APK `218d9a82…` installed with every property empty (twenty); C54 the picker's PS1 cheat, C55 PS2 Patches… (ticked, Save 200), C56 the picture beside the rows ("Looks almost perfect") MET → **`218d9a82…` CONFIRMED, the pin moved**; **C46 the N64 cheat MET in ~2 s** (HOME-12T ~107 s) → B90 / B87 met; **C57 an SNES cheat NOT MET** (staged where snes9x reads, loaded and reported on; the effect not seen); the user's new requirement: changed rows yellow in the list too; HOME-12T's two items closed — `## 2026-11-11 HOME-12U` below
 - 2026-11-11 — Queue AG (B90, B91; HOME-12T's two findings): B90 the cheat launch without walking the list — settled headless: RetroArch applies a loaded file's enabled cheats with no command on all three cores (`apply_cheats_after_load`); the hub now stages only the session's cheats, enabled, and verifies in ≤ 2k + 4 pulses (≤ 1.13 s on every fixture size vs today's 93-513 s); SNES cheats never loaded on the hub (snes9x reads `Snes9x/`, the hub staged `bsnes/`) — fixed; a launch whose client has hung up stops the game (`launch_orphaned`) (`PRIVYHUB_CHEAT_STAGED=0` = today); B91 the mapping picture beside the rows, its labels at the rows' text size (34 px vs B89's ~11 px); APK `218d9a82…` built, NOT installed — OPEN (A's HOME-12 fourth sitting) — `## 2026-11-11 Queue AG` below
 - 2026-11-10 — HOME-12T (HOME-12's third sitting): APK `3f21e2c6…` installed with every property empty (twenty); C51 the picker's PS1 cheat MET, C52 PS2 Patches → Widescreen → Save MET (**B88 met** — the onn's POST 200, stored, applied), **C53 the picture NOT MET** ("much better" drawn, labels too small to read from the couch) → **`3f21e2c6…` NOT CONFIRMED, `85220f99…` reinstalled**; **C46 the N64 cheat NOT MET** — B87's file name and wait worked on the real title, but the launch took ~107 s, past the onn's 60-s wait → B87 not confirmed; two items OPEN for B — `## 2026-11-10 HOME-12T` below
 - 2026-11-10 — Queue AF (B87-B89, HOME-12R's three findings): B87 the N64 cheat launch — the real cause settled headless: RetroArch looks for the cheat file under the content's name with one more dot-suffix stripped, and a title with a dot inside its name never got its cheats (every RetroArch system); plus a cheat pulse sent before the N64 core runs is lost — the hub now stages RetroArch's name and waits for RetroArch's evidence (`PRIVYHUB_CHEAT_READY=0` = today); B88 `ps2-patches` on the onn's POST and **a contract test of all 46 client calls through the hub's real HTTP server** (before 45 / 46 served, now 46 / 46); B89 the mapping picture redrawn, a fifth of the screen's height, rendered off the device; APK `3f21e2c6…` built, NOT installed — OPEN (A's HOME-12 third sitting) — `## 2026-11-10 Queue AF` below
@@ -74,6 +75,25 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-11 HOME-12U: the cheat launch in seconds and the picture readable — 218d9a82… CONFIRMED; the SNES cheat's effect and the list's yellow OPEN
+
+(`docs/memory/evidence/HOME_12U_PARITY_2026-11-11.md`, `docs/memory/evidence/home12u_2026-11-11/`)
+
+- **Closed from HOME-12T's list:** **the N64 cheat launch's length** — the staged path answered T81's launch in ~2 s
+  (`activation_mode` "staged", 2 pulses ≤ 8, `activation_verified` true, no `launch_orphaned`; "Game started and cheats
+  worked great"); **the picture's size** — beside the rows, readable from the couch ("Looks almost perfect").
+- **CONFIRMED on the onn:** `218d9a82…` — the cheat picker, PS2 Patches…, the mapping picture (HOME-12's three
+  requirements and B80's screen) now ship.
+- **OPEN (client) — the list's yellow (the user's requirement, C56):** "the buttons that are changed are yellow on the
+  controller image but also in the list they should be".
+- **OPEN (hub / core) — the SNES cheat's effect (C57):** B90 stages SNES cheats where snes9x reads them; RetroArch
+  loaded the file, applied it and reported the pick on, the hub verified it — but the effect was not seen ("I was not
+  invincible"). The picked code is a ROM-address `address:value` line; whether snes9x's core takes that form, or the
+  code fails on its own, is unsettled. `activation_verified` reads RetroArch's state, not the core's.
+- **Small (seen in passing):** the onn polls `GET active-cheats` during a game and gets 400 every second (POST-only);
+  `activation_mode` / `activation_pulses` are only on `POST active-cheats`, not the status route.
+- **The 60-second rule:** no launch without cheats on the hub's rows has come near it (longest 4 s, GameCube).
 
 ## 2026-11-11 Queue AG (B90, B91): the cheat launch without the walk, no game left running at a hang-up, the picture beside the rows — OPEN (A's HOME-12 fourth sitting)
 

@@ -91,7 +91,12 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | B5_CLIENT_WIFI_LOCK.md | b-series | APPLIED | client `wifi_lock`, off (property empty); in `fcd924c2…` |
 | B6_INPUT_HOLD_TRIGGER.md | b-series | APPLIED | `INPUT_HOLD_B6`: implied by line 10 |
 | B7_CLIENT_STALL_SIGNAL.md | b-series | APPLIED | host `STALL_SIGNAL`: implied by line 10; client half in `fcd924c2…` |
+| B80_PS2_PATCHES.md | b-series | APPLIED | host part live since queue AC; client part (Patches…) in `218d9a82…`, CONFIRMED 2026-11-11 (HOME-12U) |
+| B84_CHEAT_PICKER.md | b-series | APPLIED | client, in `218d9a82…`, CONFIRMED 2026-11-11 (HOME-12U) |
+| B86_MAPPING_PICTURE.md | b-series | APPLIED | client, in `218d9a82…` (redrawn by B89, placed by B91), CONFIRMED 2026-11-11 (HOME-12U) |
+| B89_MAPPING_PICTURE_REDRAWN.md | b-series | APPLIED | client, in `218d9a82…` (placed beside the rows by B91), CONFIRMED 2026-11-11 (HOME-12U) |
 | B8_HOLD_STALL_OWNERSHIP.md | b-series | APPLIED | `INPUT_HOLD_B8`: implied by line 10 |
+| B91_MAPPING_PICTURE_BESIDE_ROWS.md | b-series | APPLIED | client, in `218d9a82…`, CONFIRMED 2026-11-11 (HOME-12U) |
 | B9_STALL_THRESHOLD_AND_REWIND_CORES.md | b-series | APPLIED | the `STALL_SIGNAL` / `INPUT_HOLD_REWIND` values: line 10 |
 | CL-B1_DECODER_REPORT_BODY.md | cl-b | APPLIED | — |
 | CL-B2_IDENTITY_APK_HASH.md | cl-b | APPLIED | APK pin, since replaced (`fcd924c2…` today) |
@@ -106,6 +111,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | HOME-7_APK_PIN.md | cl-b | APPLIED | APK pin `9aa00ba2…` (queue T), CONFIRMED 2026-11-08 |
 | HOME-9_APK_PIN.md | cl-b | APPLIED | APK pin `5f72af4b…` (queue X), CONFIRMED 2026-11-09 |
 | HOME-11_APK_PIN.md | cl-b | APPLIED | APK pin `85220f99…` (queue AA), CONFIRMED 2026-11-09 |
+| HOME-12U_APK_PIN.md | cl-b | APPLIED | APK pin `218d9a82…` (queue AG), CONFIRMED 2026-11-11 |
 | D-BASE-C5A_IDR_REJECTION_COUNTERS.md | d-base | APPLIED | D-BASE (closed) |
 | D-BASE-P10_AUDIO_REDUNDANCY.md | d-base | APPLIED | D-BASE (closed) |
 | D-BASE-P1_STALE_THRESHOLD_PROBE_KNOB.md | d-base | APPLIED | D-BASE (closed) |

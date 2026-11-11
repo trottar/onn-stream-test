@@ -12,16 +12,15 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 ## Active Objective
 
 **Phase H CLOSED at its checkpoint 2026-11-09** on the user's "Close H" (`evidence/H5_CHECKPOINT_2026-11-09.md`).
-**H6 (feature parity) OPEN**: HOME-12 / 12R / 12T met B76 / B77 / B79-B81 / B84 / B85 / B88; not B78 / B87 (N64 cheat launch) or B89's size. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
-E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED**.
+**H6 (feature parity) OPEN**: HOME-12 … 12U met B76-B81 / B84-B91 but B90's SNES cheats; the list's yellow next. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
+E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`218d9a82…` CONFIRMED**.
 H7 (PrivyHub-native games; first PrivyParty): PC-side preparation started 2026-11-10 in a separate repo; the hub side not started — the user's word starts it (`docs/ROADMAP.md` §H7; design notes `architecture/H7_PRIVYPARTY_DESIGN_NOTES_2026-11-10.md`)
 
 ## Current Work Item
 
-- **HOME-12T DONE** (`evidence/HOME_12T_PARITY_2026-11-10.md`): (a) C51 PS1 cheat met, C52 PS2 widescreen met, **C53
-  not met** (the labels too small) → **`3f21e2c6…` NOT CONFIRMED**, `85220f99…` reinstalled;
-  (b) **C46 not met** (the launch ~107 s, the onn waits 60 s) → B87 not confirmed; B88 met. Two items for B
-  (`KNOWN_ISSUES.md` HOME-12T).
+- **HOME-12U DONE** (`evidence/HOME_12U_PARITY_2026-11-11.md`): (a) C54 / C55 / C56 met → **`218d9a82…` CONFIRMED**,
+  pin moved; (b) C46 met in ~2 s → B90 / B87 met; C57 SNES cheat not met (loaded, no effect). For B: the list's yellow,
+  the SNES effect (`KNOWN_ISSUES.md` HOME-12U).
 
 ## Verified State
 
@@ -58,8 +57,8 @@ line 15 writes one redacted row per movie range request and a retrying client's 
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`85220f99…` CONFIRMED** on the onn (HOME-11), pinned in the three places; back on at HOME-12T's close.
-  Tried, NOT CONFIRMED: `de6682db…`, `c801caab…`, `3f21e2c6…` (HOME-12 / 12R / 12T).
+- APK **`218d9a82…` CONFIRMED** on the onn (HOME-12U, queue AG), pinned in the three places; `85220f99…` (HOME-11)
+  in `home12u_previous/`. Not confirmed: `de6682db…`, `c801caab…`, `3f21e2c6…`.
 - The twenty client properties are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
@@ -90,8 +89,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 ## Next Action
 
 1. **The user's pick:** the rest of H6, or H7's hub side (the user's word).
-2. H6's rest, HOME-12T's items first (**B:** the N64 cheat pick under 60 s on T81; the picture larger; a new APK,
-   C46 / C53); then the PS2 disc change (designed); a second source for PS2 / GameCube details, art misses; the
+2. H6's rest, HOME-12U's items first (**B:** the list's yellow; the SNES cheat's effect; a new APK, C56 / C57);
+   then the PS2 disc change (designed); a second source for PS2 / GameCube details, art misses; the
    user's cheat files; the rejected N64 list. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,

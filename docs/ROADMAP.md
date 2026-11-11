@@ -2962,6 +2962,17 @@ mapping picture beside the rows, its labels at the rows' text size (`evidence/B9
 APK `218d9a82…` pinned, NOT installed. **Next (A):** HOME-12's fourth sitting — (a) the APK's cells C54 / C55 / C56,
 (b) the hub's C46 with the launch's seconds (`docs/memory/handoffs/SESSION_B_DONE_2026-11-11AG.md`).
 
+**HOME-12U (2026-11-11, HOME-12's fourth sitting; APK `218d9a82…` CONFIRMED, the pin moved):** the first parity
+queue's boxes as they stand — [x] B76 art / details (C44); [x] B77 Input Profiles (C45); [x] B81 drop-in folders;
+[x] B79 GameCube cheats (C47); [x] B84 the picker and [x] B85 the cleaned lists (C54); [x] B80 PS2 widescreen / B88 the
+POST route (C52, C55); [x] B86 / B89 / B91 the mapping picture (C56, readable; the list's yellow still to do);
+[x] B78 / B87 / B90 N64 cheats (C46: ~2 s, the effect seen); [ ] B90's SNES cheats — staged and loaded, the effect not
+seen (C57). The client boxes now ship on the CONFIRMED app. **Next (B):** the changed rows yellow in the mapping list
+(the user's requirement); the SNES cheat's effect settled on the bench (the code's form vs the core); then a new APK
+and those two cells. **What stays open in H6:** the PS2 disc change (designed); a second source for PS2 / GameCube
+details and the art misses (PS2 15, GameCube 3); the rejected N64 list; Mods and GameCube discs (deferred); the user's
+own cheat files (the folders ready) (`docs/memory/evidence/HOME_12U_PARITY_2026-11-11.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,
