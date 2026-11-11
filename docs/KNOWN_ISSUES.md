@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-11 — H7-P1 (the win-rule search on T88's three real states, unattended): the states checked and copied; the headless load matched the hub; B94's search **NOT DECIDED** (a 8,520 / b 3,084 / c 163,475; would split: a second "end" won by P1) → no proof runs, **nothing erased** (the user's three saves kept); OPEN: one more TV save, or a tie-break among identical-looking candidates — `## 2026-11-11 H7-P1` below
 - 2026-11-11 — Queue AI (H7: B94 the win-rule search, B95 a state read as it stands): from labelled save states the tool finds candidate win rules and says "decided" only when one template leaves exactly one; on fixtures begin + one end is never decided, an end won by the other player decides it; a state loaded paused is read exactly (0 frames); the proof's statement corrected (a state replayed headless does not replay the fight) — OPEN (A's H7-P1 on T88's states, unattended) — `docs/memory/evidence/B94_H7_RULE_SEARCH_2026-11-11.md`, `B95_H7_STATE_AS_IS_2026-11-11.md`
 - 2026-11-11 — HOME-12V (a short check, then H7's first state): APK `ca53df0d…` installed with every property empty (twenty); C58 the changed rows yellow in the mapping list MET → **`ca53df0d…` CONFIRMED, the pin moved**; C59 an SNES cheat from the list matching the game file MET (~2 s) → B90's SNES part met; HOME-12U's two items closed; `GET active-cheats` rows 0 (they were A's old watcher); H7: a 2-player state made at the TV (a PS1 title, the user's pick), the user asked its saves erased after the proof — `## 2026-11-11 HOME-12V` below
 - 2026-11-11 — Queue AH (B92; HOME-12U's three items): the mapping list's changed rows yellow (B92, APK `ca53df0d…` built, NOT installed); the SNES cheat's miss is not the hub — snes9x applies every code form the lists use (bench) — a TV check with a cheat from the list that matches the game file; the `GET active-cheats` 400s were A's own watcher, not the onn — OPEN (A's HOME-12V short check) — `docs/memory/evidence/B92_MAPPING_LIST_CHANGED_ROWS_2026-11-11.md`
@@ -78,6 +79,20 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-11 H7-P1: the win-rule search on the real states — not decided; nothing erased
+
+(`docs/memory/evidence/H7_P1_2026-11-11.md`, `docs/memory/evidence/h7p1_2026-11-11/`)
+
+- **The search on T88's three states (begin / end P1 / end P2) is not decided:** (a) 8,520, (b) 3,084, (c) 163,475
+  candidates; `would_split`: "a second 'end' state won by P1". No rule → no `--as-is` proof runs.
+- **OPEN (the user, at the TV):** one more save — LOAD the "begin" slot, play the fight, player 1 wins, SAVE into an
+  empty slot — then H7-P1 again with four states.
+- **OPEN (B, optional):** (b)'s top candidates repeat one health-like pattern (255 / 255 at begin, the loser 0 at each
+  end) at several addresses / widths; a tie-break among identical-looking candidates could decide without a new save.
+- **OPEN (the user's request, HOME-12V):** erase T88's proof saves (slots 1-3) — not done: the search did not decide.
+- **Noted:** the headless PS1 session prints the same "firmware missing" line as the hub's own PS1 launches (no PS1 BIOS
+  in either system folder); its core options differ from the hub's game file in one key (the render scale).
 
 ## 2026-11-11 HOME-12V: the list's yellow and the SNES cheat met — ca53df0d… CONFIRMED; H7's first state made
 

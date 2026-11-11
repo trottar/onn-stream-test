@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **HOME-12V DONE** (`evidence/HOME_12V_PARITY_2026-11-11.md`): C58 the list's yellow met → **`ca53df0d…` CONFIRMED**,
-  pin moved; C59 an SNES cheat met → B90's SNES part met. H7: a 2-player PS1 state made (the user's pick), player 1 won.
+- **H7-P1 DONE** (`evidence/H7_P1_2026-11-11.md`): the win-rule search on T88's 3 real states **not decided** (a 8,520 /
+  b 3,084 / c 163,475; splits on a 2nd P1 end) → no proof; the user's saves kept. HOME-12V before it: `ca53df0d…` CONFIRMED.
 
 ## Verified State
 
@@ -87,8 +87,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 (the user: "then into h7"):** B — find the winner's memory addresses from the 2-player state pair; then A
-   runs B93's tool from the "begin" state 3 times (player 1 must win) and erases the two saves (the user's request).
+1. **H7:** the user's one TV save (LOAD T88's "begin" slot, player 1 wins, SAVE to slot 4) or B's tie-break among
+   look-alike candidates; then H7-P1 again (proof, then the saves erased on the user's request).
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 

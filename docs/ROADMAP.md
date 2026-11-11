@@ -3072,6 +3072,14 @@ the agreement (`evidence/B95_H7_STATE_AS_IS_2026-11-11.md`). **Waits:** the real
 H7-P1, unattended; `docs/memory/handoffs/SESSION_B_DONE_2026-11-11AI.md`); the 4-player title; Godot's probe and the game
 repo — both a fetch, on the user's word.
 
+**H7-P1 (2026-11-11, the first real search, unattended):** T88's three states (begin, end P1, end P2) read headless —
+the load matched the hub; B94's search **not decided** (a 8,520 / b 3,084 / c 163,475; it would split on a second "end"
+won by P1) → **the first real proof: not decided**; no proof runs; the user's three saves kept (nothing erased).
+**Waits:** the user's one more TV save (the "begin" slot loaded, player 1 wins, saved to an empty slot) or a B tie-break
+among identical-looking candidates, then H7-P1 again; then the same read at the end of a fight played on the stream; the
+4-player title; a stricter single-field template; N64's search; Godot's probe and the game repo — both a fetch, on the
+user's word (`docs/memory/evidence/H7_P1_2026-11-11.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 
