@@ -1,0 +1,44 @@
+[
+ {
+  "id": "P1",
+  "file": "tools/h7_rule_search.py",
+  "old": "    if k in (\"a\", \"b\", \"h\") or top.get(\"hinted\"):",
+  "new": "    if True:",
+  "why": "every strong answer accepted (b2 / c decide)"
+ },
+ {
+  "id": "P2",
+  "file": "tools/h7_rule_search.py",
+  "old": "    if k in (\"a\", \"b\", \"h\") or top.get(\"hinted\"):",
+  "new": "    if k in (\"a\", \"b\", \"h\"):",
+  "why": "a hinted (b2) family not accepted"
+ },
+ {
+  "id": "P3",
+  "file": "tools/h7_rule_search.py",
+  "old": "        out[\"ranking_pick\"] = first[\"passing_count\"] > 1",
+  "new": "        out[\"ranking_pick\"] = first[\"passing_count\"] >= 1",
+  "why": "a unique fit called a ranking pick"
+ },
+ {
+  "id": "P4",
+  "file": "tools/h7_rule_search.py",
+  "old": "    if ACCEPT_LOOSE:\n        return _verdict_loose(out, epw)",
+  "new": "    if False:\n        return _verdict_loose(out, epw)",
+  "why": "--accept-loose ignored"
+ },
+ {
+  "id": "P5",
+  "file": "tools/h7_rule_search.py",
+  "old": "        out[\"not_accepted\"] = not_accepted\n",
+  "new": "        out[\"not_accepted\"] = []\n",
+  "why": "the answers not accepted not reported"
+ },
+ {
+  "id": "P6",
+  "file": "tools/h7_rule_search.py",
+  "old": "        first = accepted[0]",
+  "new": "        first = accepted[-1]",
+  "why": "the accepted answer not the first by the order"
+ }
+]

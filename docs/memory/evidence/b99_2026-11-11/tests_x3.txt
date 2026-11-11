@@ -1,0 +1,9 @@
+B99 tests, 3 runs, 2026-11-11T21:13:43Z, a work copy of the B99 snapshot, TMPDIR on the main disk
+run 1: Ran 15 tests in 19.978s OK 
+run 2: Ran 15 tests in 19.983s OK 
+run 3: Ran 15 tests in 20.071s OK 
+tests/client_contract: Ran 5 tests in 2.905s FAILED (failures=1) 
+tests/b90_cheat_staged: Ran 10 tests in 69.307s OK 
+RetroArch left: 2 (B98's batch may run beside this one)
+x3 DONE
+note (B): tests/client_contract failed here because this runner did not copy PrivyHub/ into its work copy (the contract scans the onn's source under PrivyHub/app/src/main/java); run again on a copy of the same snapshot with PrivyHub/ (about 21:15Z): Ran 5 tests OK; on the tree: Ran 5 tests OK. The 2 RetroArch processes counted are one headless session (an AppImage's two processes) of B98's batch, running beside this one from its own work copy (b98_x3_*); this suite runs none (a fake).

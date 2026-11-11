@@ -1,0 +1,319 @@
+diff --git a/tests/h7_rule_search/test_h7_rule_search.py b/tests/h7_rule_search/test_h7_rule_search.py
+index 4d9a049e..a5f37cd7 100644
+--- a/tests/h7_rule_search/test_h7_rule_search.py
++++ b/tests/h7_rule_search/test_h7_rule_search.py
+@@ -327,6 +327,19 @@ class PS1TwoPlayers(Base):
+         self.assertEqual(out["templates"]["b2"]["evidence"]["level"], "strong")
+         self.assertEqual(out["template"], "a")
+ 
++    def test_b98_accept_loose_is_b97_byte_for_byte_and_the_ranking_pick(self):
++        import test_b98_acceptance as b98
++        old = b98.b97_search()
++        if old is None:
++            self.skipTest("git or B97's commit is absent")
++        hints = self.hints()
++        cases = [(self.states(*names), 2, h) for names in (("begin", "P1", "P2"), ("begin", "P1", "P2", "P1b", "P2b"))
++                 for h in (None, hints)]
++        b98.loose_equal(self, old, cases)
++        out = search.search(self.states("begin", "P1", "P2", "P1b", "P2b"), 2)          # B98's own answer
++        self.assertTrue(out["accepted"])
++        self.assertEqual(out["ranking_pick"], out["templates"][out["template"]]["passing_count"] > 1)
++
+     def test_the_cli_and_its_time_on_2_mib(self):
+         listed = self.tmp / "states.json"
+         names = ("begin", "P1", "P2", "P1b", "P2b")
+diff --git a/tools/h7_rule_search.py b/tools/h7_rule_search.py
+index bcb3c8b5..49edc722 100644
+--- a/tools/h7_rule_search.py
++++ b/tools/h7_rule_search.py
+@@ -27,7 +27,11 @@ winner's strictly the largest (a loser may be above 0); --hints FILE (a cheat li
+ tools/h7_cheat_hints.py): a family covering a hinted address for the right player is hinted and ranked first; every
+ per-player set of hints (one kind, one width, one stride) is also tested directly as a rule (template h), with its
+ values in every state. A hint is evidence, not a verdict: the folds and evidence levels apply as to any family.
+-The answer's template order: a hinted top family first, then a, b, c, b2, h. Prints one JSON document.
++The answer's template order: a hinted top family first, then a, b, c, b2, h.
++B98 — acceptance: a strong answer decides only when its template is a or b, its family is hinted, or it is a hinted
++set (h); a (b2) or (c) answer is listed under not_accepted with its level and the reason in words. With a decided
++answer, ranking_pick says whether its template had more than one family passing every fold (and the count).
++--accept-loose (tests and study only) restores B97's answer exactly. Prints one JSON document.
+ """
+ from __future__ import annotations
+ 
+@@ -130,6 +134,7 @@ ORDER = ("a", "b", "c", "b2", "h")              # the answer's template order af
+ SETS_CAP = 200                                  # B97: hinted sets tested directly, at most
+ B2_PAIRS = True                                 # B97: (b2) pairs by equal "begin" values (False = the stride loop)
+ B2_CAP = 200_000                                # B97 addendum 2: more (b2) candidates than this → not testable
++ACCEPT_LOOSE = False                            # B98: True = B97's answer, unfiltered (--accept-loose; tests and study)
+ WINDOW = 0x100                                  # B96: copies with identical values this close are one family
+ MEMBERS_SHOWN = 5
+ C_PLAYER_VALUES = True                          # B96: (c) tightened; False = B94's (c), for the before / after count
+@@ -600,7 +605,64 @@ def _more(epw: dict, players: int) -> str:
+     return " and ".join(need)
+ 
+ 
++WHY_NOT = {"b2": "(b2), a level whose loser may be above 0, is the loosest template: strong evidence alone does not "
++                 "decide it unless the game's cheat list points at the family",
++           "c": "(c), a single field, fits memory that merely follows the outcome; it never decides on its own"}
++
++
++def _accepts(k: str, top: dict) -> tuple[bool, str | None]:
++    """B98: an answer decides when its template is a or b, or its family is hinted, or it is a hinted set (h)."""
++    if k in ("a", "b", "h") or top.get("hinted"):
++        return True, None
++    return False, WHY_NOT.get(k, f"({k}) does not decide on its own")
++
++
+ def _verdict(out: dict, epw: dict) -> dict:
++    if ACCEPT_LOOSE:
++        return _verdict_loose(out, epw)
++    t = out["templates"]
++    strong = [k for k in ORDER if t[k]["evidence"]["level"] == "strong"]
++    strong.sort(key=lambda k: (not t[k]["passing"][0].get("hinted"), ORDER.index(k)))
++    levels = [t[k]["evidence"]["level"] for k in ORDER]
++    out["evidence"] = "strong" if "strong" in levels else "weak" if "weak" in levels else "none"
++    answers = []
++    for k in strong:
++        top = t[k]["passing"][0]
++        ok, why = _accepts(k, top)
++        answers.append({"template": k, "level": "strong", "hinted": bool(top.get("hinted")),
++                        "passing_count": t[k]["passing_count"], "accepted": ok,
++                        **({"why_not": why} if why else {}), "rule": top["rule"]})
++    accepted = [x for x in answers if x["accepted"]]
++    not_accepted = [x for x in answers if not x["accepted"]]
++    if accepted:
++        first = accepted[0]
++        out["decided"] = True
++        out["accepted"] = True
++        out["rule"] = first["rule"]
++        out["template"] = first["template"]
++        out["ranking_pick"] = first["passing_count"] > 1
++        out["ranking_pick_count"] = first["passing_count"]
++        if out["ranking_pick"]:
++            out["ranking_pick_words"] = (f"strong by order, not a unique fit: {first['passing_count']} families of "
++                                         f"template {first['template']} pass every fold; the rule is the top one")
++        out["also_fits"] = [{"template": x["template"], "rule": x["rule"]} for x in accepted[1:]]
++        out["not_accepted"] = not_accepted
++    else:
++        out["decided"] = False
++        out["accepted"] = False
++        more = _more(epw, out["players"])
++        out["not_decided"] = {"passing": {k: t[k]["passing_count"] for k in ORDER},
++                              "counts": {k: t[k]["count"] for k in ORDER},
++                              "evidence": {k: t[k]["evidence"]["level"] for k in ORDER},
++                              "would_make_strong": more, "would_split": more, "not_accepted": not_accepted}
++        if not_accepted:
++            out["not_decided"]["why"] = ("strong only in templates that do not decide on their own: "
++                                         + "; ".join(x["why_not"] for x in not_accepted))
++    return out
++
++
++def _verdict_loose(out: dict, epw: dict) -> dict:
++    """B97's answer exactly (--accept-loose: tests and study only)."""
+     t = out["templates"]
+     strong = [k for k in ORDER if t[k]["evidence"]["level"] == "strong"]
+     strong.sort(key=lambda k: (not t[k]["passing"][0].get("hinted"), ORDER.index(k)))
+@@ -786,7 +848,12 @@ def main(argv: list[str] | None = None) -> int:
+     ap.add_argument("--loads", type=int, default=3)
+     ap.add_argument("--time", action="store_true")
+     ap.add_argument("--hints", type=Path, help="B97: a cheat list (.cht, the hub's stored form) or h7_cheat_hints' JSON")
++    ap.add_argument("--accept-loose", action="store_true",
++                    help="B98: B97's answer, unfiltered — a (b2) or (c) answer may decide (tests and study only)")
+     a = ap.parse_args(argv)
++    global ACCEPT_LOOSE
++    if a.accept_loose:
++        ACCEPT_LOOSE = True
+     try:
+         listed = json.loads(a.states.read_text())
+         named = [_player(s.get("winner")) for s in listed if s.get("winner")]
+diff --git a/tests/h7_rule_search/test_b98_acceptance.py b/tests/h7_rule_search/test_b98_acceptance.py
+new file mode 100644
+index 00000000..f11276e8
+--- /dev/null
++++ b/tests/h7_rule_search/test_b98_acceptance.py
+@@ -0,0 +1,186 @@
++#!/usr/bin/env python3
++"""B98 (host, no emulator): the acceptance rule in the search — a strong answer decides only when its template is a or
++b, its family is hinted, or it is a hinted set (h); (b2) and (c) answers are listed as not accepted, with the reason.
++`--accept-loose` gives B97's output byte for byte (B97's search read from its commit with `git show`; skipped without
++git). Made-up memories only; temp dirs removed.
++
++    python3 -m unittest discover -s tests/h7_rule_search -p 'test_b98_acceptance.py' -v
++"""
++from __future__ import annotations
++
++import importlib.util
++import json
++import os
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++import numpy as np
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(HERE))
++sys.path.insert(0, str(ROOT / "tools"))
++import h7_rule_search as search  # noqa: E402
++import test_h7_cheat_hints as hint_tests  # noqa: E402  (a module, so its tests are not collected twice)
++
++B97_COMMIT = "a5383e3b"          # queue AJ: B96 + B97's search, the version --accept-loose must equal
++
++
++def b97_search():
++    """B97's tools/h7_rule_search.py as a module, read from its commit; None without git or the commit."""
++    try:
++        repo = os.environ.get("H7_GIT_REPO") or str(ROOT)       # a test work copy is not a git repo: its runner says where
++        text = subprocess.run(["git", "-C", repo, "show", f"{B97_COMMIT}:tools/h7_rule_search.py"],
++                              capture_output=True, text=True, timeout=60, check=True).stdout
++    except (OSError, subprocess.SubprocessError):
++        return None
++    tmp = Path(tempfile.mkdtemp(prefix="b98_b97_"))
++    try:
++        path = tmp / "h7_rule_search_b97.py"
++        path.write_text(text)
++        spec = importlib.util.spec_from_file_location("h7_rule_search_b97", path)
++        mod = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(mod)
++        return mod
++    finally:
++        shutil.rmtree(tmp, ignore_errors=True)
++
++
++def loose_equal(test: unittest.TestCase, old, cases):
++    """Each case (states, players, hints): B97's output and this search's with ACCEPT_LOOSE, as JSON, equal."""
++    prev = search.ACCEPT_LOOSE
++    try:
++        search.ACCEPT_LOOSE = True
++        for n, (states, players, hints) in enumerate(cases):
++            a = json.dumps(old.search(states, players, hints))
++            b = json.dumps(search.search(states, players, hints))
++            test.assertEqual(a, b, n)
++    finally:
++        search.ACCEPT_LOOSE = prev
++
++
++def st(label, winner, pairs, size=4096):
++    m = bytearray(size)
++    for a, v in pairs.items():
++        m[a] = v
++    return {"label": label, "winner": winner, "mem": bytes(m), "stable": np.ones(size, dtype=bool)}
++
++
++NAMES = ("begin", "P1", "P2", "P1b", "P2b")
++# H7-P3's shape: a counter (a), a level that empties (b), a single field (c), a level whose loser stays above 0 (b2),
++# a pair no template finds that the cheat list names (h)
++SHAPE = {0x100: [(0, 0), (2, 1), (1, 2), (2, 0), (0, 2)],
++         0x200: [(120, 120), (40, 0), (0, 70), (90, 0), (0, 50)],
++         0x300: [255, 0, 1, 0, 1],
++         0x400: [(100, 100), (60, 30), (20, 80), (90, 10), (40, 70)],
++         0x500: [(0, 0), (140, 70), (133, 140), (140, 100), (110, 140)]}
++HINTS = [{"player": "P1", "address": "0x500", "bytes": 1, "value": 140, "kind": "level", "code": 0, "pair_group": 0},
++         {"player": "P2", "address": "0x510", "bytes": 1, "value": 140, "kind": "level", "code": 1, "pair_group": 0}]
++
++
++def states(keep=tuple(SHAPE)):
++    out = []
++    for i, n in enumerate(NAMES):
++        pairs = {}
++        for base in keep:
++            v = SHAPE[base][i]
++            if isinstance(v, tuple):
++                pairs[base], pairs[base + 0x10] = v
++            else:
++                pairs[base] = v
++        out.append(st(*(("begin", None) if n == "begin" else ("end", n[:2])), pairs))
++    return out
++
++
++def addrs(rule):
++    return [p["address"] for p in rule["players"]] if rule.get("players") else [rule["address"]]
++
++
++class Acceptance(unittest.TestCase):
++    def test_h7_p3s_shape_answers_the_hinted_set(self):
++        out = search.search(states(), 2, HINTS)
++        levels = {k: out["templates"][k]["evidence"]["level"] for k in ("a", "b", "c", "b2", "h")}
++        self.assertEqual(set(levels.values()), {"strong"}, levels)
++        self.assertTrue(out["decided"])
++        self.assertTrue(out["accepted"])
++        self.assertEqual(out["template"], "h")
++        self.assertEqual(addrs(out["rule"]), ["0x500", "0x510"])
++        self.assertFalse(out["ranking_pick"])
++        self.assertEqual(out["ranking_pick_count"], 1)
++        self.assertEqual([x["template"] for x in out["also_fits"]], ["a", "b"])
++        na = {x["template"]: x for x in out["not_accepted"]}
++        self.assertEqual(set(na), {"c", "b2"})
++        for k in ("c", "b2"):
++            self.assertEqual((na[k]["level"], na[k]["accepted"]), ("strong", False))
++            self.assertIn(f"({k})", na[k]["why_not"])
++
++    def test_only_b2_strong_without_hints_is_not_decided(self):
++        out = search.search(states((0x400,)), 2)
++        self.assertEqual(out["templates"]["b2"]["evidence"]["level"], "strong")
++        self.assertFalse(out["decided"])
++        self.assertFalse(out["accepted"])
++        self.assertNotIn("rule", out)
++        self.assertEqual([x["template"] for x in out["not_decided"]["not_accepted"]], ["b2"])
++        self.assertIn("loosest", out["not_decided"]["why"])
++
++    def test_c_alone_strong_is_not_accepted(self):
++        out = search.search(states((0x300,)), 2)
++        self.assertEqual(out["templates"]["c"]["evidence"]["level"], "strong")
++        self.assertFalse(out["decided"])
++        self.assertEqual([x["template"] for x in out["not_decided"]["not_accepted"]], ["c"])
++        self.assertIn("single field", out["not_decided"]["why"])
++
++    def test_a_hinted_b2_family_still_decides(self):
++        hints = [dict(h, address=a) for h, a in zip(HINTS, ("0x400", "0x410"))]
++        out = search.search(states((0x400,)), 2, hints)
++        self.assertTrue(out["decided"])
++        self.assertEqual(out["template"], "b2")                    # hinted: accepted, and first by the order
++        self.assertEqual(addrs(out["rule"]), ["0x400", "0x410"])
++
++    def test_a_ranking_pick_is_said(self):
++        two = {0x100: SHAPE[0x100], 0x600: [(0, 0), (3, 1), (1, 3), (3, 0), (0, 3)]}   # two counters pass
++        out = search.search([st(*(("begin", None) if n == "begin" else ("end", n[:2])),
++                                {**{b: v[i][0] for b, v in two.items()},
++                                 **{b + 0x10: v[i][1] for b, v in two.items()}}) for i, n in enumerate(NAMES)], 2)
++        self.assertEqual(out["template"], "a")
++        self.assertGreater(out["templates"]["a"]["passing_count"], 1)
++        self.assertTrue(out["ranking_pick"])
++        self.assertEqual(out["ranking_pick_count"], out["templates"]["a"]["passing_count"])
++        self.assertIn("not a unique fit", out["ranking_pick_words"])
++
++    def test_accept_loose_restores_b97s_answer(self):
++        prev = search.ACCEPT_LOOSE
++        try:
++            search.ACCEPT_LOOSE = True
++            out = search.search(states((0x400,)), 2)
++        finally:
++            search.ACCEPT_LOOSE = prev
++        self.assertTrue(out["decided"])
++        self.assertEqual(out["template"], "b2")
++        self.assertNotIn("accepted", out)
++
++    def test_the_cli_flag(self):
++        r = subprocess.run([sys.executable, "-I", "-B", str(ROOT / "tools/h7_rule_search.py"), "--help"],
++                           capture_output=True, text=True, timeout=60)
++        self.assertIn("--accept-loose", r.stdout)
++
++
++@unittest.skipUnless(b97_search() is not None, "git or B97's commit is absent")
++class LooseIsB97ByteForByte(unittest.TestCase):
++    def test_on_b97s_made_up_memories(self):
++        old = b97_search()
++        f = hint_tests.SearchWithHints()
++        cases = []
++        for names in (("begin", "P1", "P2"), ("begin", "P1", "P2", "P1b", "P2b")):
++            for hints in (None, hint_tests.SearchWithHints.HINTS):
++                cases.append((f.states(*names), 2, hints))
++        cases += [(states(), 2, HINTS), (states(), 2, None), (states((0x400,)), 2, None), (states((0x300,)), 2, None)]
++        loose_equal(self, old, cases)
++
++
++if __name__ == "__main__":
++    unittest.main()

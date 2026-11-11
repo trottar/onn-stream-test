@@ -142,6 +142,12 @@ import disc_swap as _disc_swap  # noqa: E402
 # B85: the cheat list cleaned for the TV (PRIVYHUB_CHEAT_CLEAN=0 = today's raw list; read per request)
 import cheat_clean as _cheat_clean  # noqa: E402
 
+# B99: H7's live read (GET h7-read: who is ahead in the running game, by a kept rule), only with PRIVYHUB_H7=1.
+# Absent / 0 = today: nothing imported, the action unknown, no rules folder looked at.
+_h7_live = None
+if (os.environ.get("PRIVYHUB_H7") or "").strip() == "1":
+    import h7_live_read as _h7_live
+
 # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
 # Absent = today: nothing imported.
 _import_marks = None
@@ -3457,6 +3463,13 @@ class GamesPlugin:
                     )
 
             return payload
+
+        # B99: H7's live read (PRIVYHUB_H7=1 only; the hub's own route for A's watcher, not a client call)
+        if action == "h7-read" and _h7_live is not None:
+            reader = getattr(self, "_h7_live_reader", None)
+            if reader is None:
+                reader = self._h7_live_reader = _h7_live.LiveRead(self._emulator, self._emulator._project_path)
+            return reader.read()
 
         raise ValueError(
             f"Unknown Games plugin action: {action}"

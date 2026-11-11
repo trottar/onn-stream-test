@@ -27,7 +27,11 @@ winner's strictly the largest (a loser may be above 0); --hints FILE (a cheat li
 tools/h7_cheat_hints.py): a family covering a hinted address for the right player is hinted and ranked first; every
 per-player set of hints (one kind, one width, one stride) is also tested directly as a rule (template h), with its
 values in every state. A hint is evidence, not a verdict: the folds and evidence levels apply as to any family.
-The answer's template order: a hinted top family first, then a, b, c, b2, h. Prints one JSON document.
+The answer's template order: a hinted top family first, then a, b, c, b2, h.
+B98 — acceptance: a strong answer decides only when its template is a or b, its family is hinted, or it is a hinted
+set (h); a (b2) or (c) answer is listed under not_accepted with its level and the reason in words. With a decided
+answer, ranking_pick says whether its template had more than one family passing every fold (and the count).
+--accept-loose (tests and study only) restores B97's answer exactly. Prints one JSON document.
 """
 from __future__ import annotations
 
@@ -130,6 +134,7 @@ ORDER = ("a", "b", "c", "b2", "h")              # the answer's template order af
 SETS_CAP = 200                                  # B97: hinted sets tested directly, at most
 B2_PAIRS = True                                 # B97: (b2) pairs by equal "begin" values (False = the stride loop)
 B2_CAP = 200_000                                # B97 addendum 2: more (b2) candidates than this → not testable
+ACCEPT_LOOSE = False                            # B98: True = B97's answer, unfiltered (--accept-loose; tests and study)
 WINDOW = 0x100                                  # B96: copies with identical values this close are one family
 MEMBERS_SHOWN = 5
 C_PLAYER_VALUES = True                          # B96: (c) tightened; False = B94's (c), for the before / after count
@@ -600,7 +605,64 @@ def _more(epw: dict, players: int) -> str:
     return " and ".join(need)
 
 
+WHY_NOT = {"b2": "(b2), a level whose loser may be above 0, is the loosest template: strong evidence alone does not "
+                 "decide it unless the game's cheat list points at the family",
+           "c": "(c), a single field, fits memory that merely follows the outcome; it never decides on its own"}
+
+
+def _accepts(k: str, top: dict) -> tuple[bool, str | None]:
+    """B98: an answer decides when its template is a or b, or its family is hinted, or it is a hinted set (h)."""
+    if k in ("a", "b", "h") or top.get("hinted"):
+        return True, None
+    return False, WHY_NOT.get(k, f"({k}) does not decide on its own")
+
+
 def _verdict(out: dict, epw: dict) -> dict:
+    if ACCEPT_LOOSE:
+        return _verdict_loose(out, epw)
+    t = out["templates"]
+    strong = [k for k in ORDER if t[k]["evidence"]["level"] == "strong"]
+    strong.sort(key=lambda k: (not t[k]["passing"][0].get("hinted"), ORDER.index(k)))
+    levels = [t[k]["evidence"]["level"] for k in ORDER]
+    out["evidence"] = "strong" if "strong" in levels else "weak" if "weak" in levels else "none"
+    answers = []
+    for k in strong:
+        top = t[k]["passing"][0]
+        ok, why = _accepts(k, top)
+        answers.append({"template": k, "level": "strong", "hinted": bool(top.get("hinted")),
+                        "passing_count": t[k]["passing_count"], "accepted": ok,
+                        **({"why_not": why} if why else {}), "rule": top["rule"]})
+    accepted = [x for x in answers if x["accepted"]]
+    not_accepted = [x for x in answers if not x["accepted"]]
+    if accepted:
+        first = accepted[0]
+        out["decided"] = True
+        out["accepted"] = True
+        out["rule"] = first["rule"]
+        out["template"] = first["template"]
+        out["ranking_pick"] = first["passing_count"] > 1
+        out["ranking_pick_count"] = first["passing_count"]
+        if out["ranking_pick"]:
+            out["ranking_pick_words"] = (f"strong by order, not a unique fit: {first['passing_count']} families of "
+                                         f"template {first['template']} pass every fold; the rule is the top one")
+        out["also_fits"] = [{"template": x["template"], "rule": x["rule"]} for x in accepted[1:]]
+        out["not_accepted"] = not_accepted
+    else:
+        out["decided"] = False
+        out["accepted"] = False
+        more = _more(epw, out["players"])
+        out["not_decided"] = {"passing": {k: t[k]["passing_count"] for k in ORDER},
+                              "counts": {k: t[k]["count"] for k in ORDER},
+                              "evidence": {k: t[k]["evidence"]["level"] for k in ORDER},
+                              "would_make_strong": more, "would_split": more, "not_accepted": not_accepted}
+        if not_accepted:
+            out["not_decided"]["why"] = ("strong only in templates that do not decide on their own: "
+                                         + "; ".join(x["why_not"] for x in not_accepted))
+    return out
+
+
+def _verdict_loose(out: dict, epw: dict) -> dict:
+    """B97's answer exactly (--accept-loose: tests and study only)."""
     t = out["templates"]
     strong = [k for k in ORDER if t[k]["evidence"]["level"] == "strong"]
     strong.sort(key=lambda k: (not t[k]["passing"][0].get("hinted"), ORDER.index(k)))
@@ -786,7 +848,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--loads", type=int, default=3)
     ap.add_argument("--time", action="store_true")
     ap.add_argument("--hints", type=Path, help="B97: a cheat list (.cht, the hub's stored form) or h7_cheat_hints' JSON")
+    ap.add_argument("--accept-loose", action="store_true",
+                    help="B98: B97's answer, unfiltered — a (b2) or (c) answer may decide (tests and study only)")
     a = ap.parse_args(argv)
+    global ACCEPT_LOOSE
+    if a.accept_loose:
+        ACCEPT_LOOSE = True
     try:
         listed = json.loads(a.states.read_text())
         named = [_player(s.get("winner")) for s in listed if s.get("winner")]

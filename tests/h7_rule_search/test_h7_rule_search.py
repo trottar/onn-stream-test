@@ -327,6 +327,19 @@ class PS1TwoPlayers(Base):
         self.assertEqual(out["templates"]["b2"]["evidence"]["level"], "strong")
         self.assertEqual(out["template"], "a")
 
+    def test_b98_accept_loose_is_b97_byte_for_byte_and_the_ranking_pick(self):
+        import test_b98_acceptance as b98
+        old = b98.b97_search()
+        if old is None:
+            self.skipTest("git or B97's commit is absent")
+        hints = self.hints()
+        cases = [(self.states(*names), 2, h) for names in (("begin", "P1", "P2"), ("begin", "P1", "P2", "P1b", "P2b"))
+                 for h in (None, hints)]
+        b98.loose_equal(self, old, cases)
+        out = search.search(self.states("begin", "P1", "P2", "P1b", "P2b"), 2)          # B98's own answer
+        self.assertTrue(out["accepted"])
+        self.assertEqual(out["ranking_pick"], out["templates"][out["template"]]["passing_count"] > 1)
+
     def test_the_cli_and_its_time_on_2_mib(self):
         listed = self.tmp / "states.json"
         names = ("begin", "P1", "P2", "P1b", "P2b")

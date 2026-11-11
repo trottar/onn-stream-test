@@ -1,0 +1,72 @@
+[
+ {
+  "id": "Q1",
+  "file": "companion/plugins/games.py",
+  "old": "        if action == \"h7-read\" and _h7_live is not None:",
+  "new": "        if action == \"h7-read\":",
+  "why": "the route present without the flag"
+ },
+ {
+  "id": "Q2",
+  "file": "companion/h7_live_read.py",
+  "old": "now - self._last[0] < FLOOR:",
+  "new": "now - self._last[0] < 0:",
+  "why": "no floor between reads"
+ },
+ {
+  "id": "Q3",
+  "file": "companion/h7_live_read.py",
+  "old": "            paused = status.upper().startswith(\"GET_STATUS PAUSED\")\n",
+  "new": "            paused = status.upper().startswith(\"GET_STATUS PAUSED\")\n            emu._retroarch_network_request(\"PAUSE_TOGGLE\", expect_response=False)\n",
+  "why": "a read that sends a pause"
+ },
+ {
+  "id": "Q4",
+  "file": "companion/h7_live_read.py",
+  "old": "                        or int(parts[1], 16) != f[\"address\"]):",
+  "new": "                        ):",
+  "why": "an answer to another address read as memory"
+ },
+ {
+  "id": "Q5",
+  "file": "companion/h7_live_read.py",
+  "old": "                if len(parts) >= 3 and parts[0] == word and parts[2] == \"-1\":",
+  "new": "                if False:",
+  "why": "memory the core does not have not said plainly"
+ },
+ {
+  "id": "Q6",
+  "file": "companion/h7_live_read.py",
+  "old": "READ_BOUND = 0.6 ",
+  "new": "READ_BOUND = 5.0 ",
+  "why": "the read not bounded well under a second"
+ },
+ {
+  "id": "Q7",
+  "file": "companion/h7_live_read.py",
+  "old": "            with path.open(\"a\", encoding=\"utf-8\") as fh:",
+  "new": "            with open(os.devnull, \"a\", encoding=\"utf-8\") as fh:",
+  "why": "no h7_reads row"
+ },
+ {
+  "id": "Q8",
+  "file": "companion/h7_live_read.py",
+  "old": "    if nw == \"equal\" and len(set(values.values())) == 1:",
+  "new": "    if False:",
+  "why": "equal not \"no winner yet\""
+ },
+ {
+  "id": "Q9",
+  "file": "companion/h7_live_read.py",
+  "old": "    return Path(override).expanduser() if override else Path.home() / \"privyhub_h7\" / \"rules\"",
+  "new": "    return Path.home() / \"privyhub_h7\" / \"rules\"",
+  "why": "PRIVYHUB_H7_RULES ignored"
+ },
+ {
+  "id": "Q10",
+  "file": "companion/h7_live_read.py",
+  "old": "        if kind == \"pcsx2\":",
+  "new": "        if False:",
+  "why": "a PS2 session read as RetroArch"
+ }
+]

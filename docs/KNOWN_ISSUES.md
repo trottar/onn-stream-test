@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-11 — Queue AK (H7: B98 the acceptance rule in the search, B99 the live read behind PRIVYHUB_H7=1): a (b2) or (c) answer no longer decides; `GET /plugins/games/h7-read` reads the kept rule from the running game (values, leader, "no winner yet"), changing nothing; on fixtures a read once a second leaves the frames unchanged (SNES 3,603 / 3,600, PS1 3,603 / 3,601 per 60 s) — OPEN (A's H7-L1 at the TV, ~10 min) — `docs/memory/evidence/B98_H7_ACCEPTANCE_IN_SEARCH_2026-11-11.md`, `B99_H7_LIVE_READ_2026-11-11.md`
 - 2026-11-11 — H7-P3 (five states on T88: the user's two mid-fight saves added, unattended): evidence **"strong"**, decided, template h — **the game's cheat list's per-player pair reads who is ahead** in all five saves, mid-fight included; accepted; the proof met (5 × 3 of 3) → **T88's slots 1-3 erased** (the user's request; checked copies of all five kept); OPEN: the same read on a fight played on the stream (the independent check) — `## 2026-11-11 H7-P3` below
 - 2026-11-11 — H7-P2 (the search with folds and cheat-list hints on T88's three states, unattended): the user's three saves held as checked copies off their slots; evidence **"weak"** (each winner seen once), not decided → no proof, **nothing erased**; the game's cheat list points at one per-player level pair that reads right in all three saves; OPEN: two more TV saves (a 2nd P1 end into slot 2, a 2nd P2 end into slot 1) for "strong" — `## 2026-11-11 H7-P2` below
 - 2026-11-11 — Queue AJ (H7: B96 "decided" by held-out states and families, B97 hints from the game's own cheat list and a level that need not empty): "decided" = "strong" evidence only (two "end" states per winner, a family naming every held-out winner); on fixtures three states → "weak", five → "strong" and the planted rule; 23 of the hub's 116 cached PS1 cheat lists give hints — OPEN (A's H7-P2 on T88's states, unattended; with today's three states it can reach "weak" only; the user's two further 'end' saves make "strong" possible) — `docs/memory/evidence/B96_H7_HELD_OUT_AND_FAMILIES_2026-11-11.md`, `B97_H7_CHEAT_HINTS_AND_LEVEL_2026-11-11.md`
@@ -82,6 +83,23 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-11 Queue AK (B98, B99): acceptance in the search; the live read behind its flag
+
+(`docs/memory/evidence/B98_H7_ACCEPTANCE_IN_SEARCH_2026-11-11.md`, `B99_H7_LIVE_READ_2026-11-11.md`)
+
+- **B98:** the search's `decided` needs an accepted answer — template a or b, a hinted family, or a hinted set; (b2) and
+  (c) answers are listed as not accepted with the reason; `ranking_pick` says when the answer was one of several
+  families passing every fold.
+- **B99 (built, not adopted):** `PRIVYHUB_H7=1` → `GET /plugins/games/h7-read` (PS1, SNES, N64): the kept rule
+  (`~/privyhub_h7/rules/<game id>.json`) read from the running game — GET_STATUS and READ_CORE_* only, bounded at
+  0.6 s, one read per 0.25 s, a row per read in `logs/games/h7_reads.jsonl`. Absent / 0 = today (byte for byte).
+- **OPEN (A, attended, ~10 min at the TV): H7-L1** — T88's rule read while the user plays the fight on the stream, the
+  read's leader set beside the user's at three pauses and a knockout (`docs/memory/handoffs/SESSION_B_DONE_2026-11-11AK.md`).
+- **Noted:** the hub launches a game paused (the stream's start resumes it); the read says `paused: true` until then.
+  N64's read form answers on the core, but no N64 value's byte order is anchored (the synthetic ROM leaves RDRAM empty).
+- **Noted (B98):** in H7-P3, (b2) read "strong" with 1 of 4 folds run (its training sets over the cap); harmless now
+  (a non-hinted (b2) never decides), but a fold skipped as "not testable" still lets a template read "strong".
 
 ## 2026-11-11 H7-P3: the cheat list's pair is "who is ahead" — strong, decided, proved; T88's proof slots erased
 

@@ -3110,6 +3110,16 @@ yet seen). **Open (B's notes):** (b2) and hinted pairs to answer only when hinte
 also pass here — the hinted pair answers by B97's order. **Next after T88:** the 4-player title; the user's candidates
 are in `runtime/h7_minigame_candidates.md` (git-ignored) (`docs/memory/evidence/H7_P3_2026-11-11.md`).
 
+**T88's rule and the live read (queue AK, 2026-11-11):** **H7-P3's rule** — the game's cheat-list pair, one 2-byte level
+per player, the larger leads, equal → "no winner yet" — decided from five saves and read back 3 of 3 from each. **B98:**
+the search itself now refuses a (b2) or (c) answer unless the cheat list points at it, and says when the answer was a
+pick among several. **B99, behind `PRIVYHUB_H7=1`:** `GET /plugins/games/h7-read` reads the kept rule from the game the
+hub is running (PS1, SNES, N64) — the values, the leader, "no winner yet" — changing nothing; on fixtures a read once a
+second leaves the frames unchanged and answers in one frame. **Waits:** the live check at the TV (A's H7-L1: the read
+beside the user's own view at three pauses and a knockout, the stream's rows unchanged); a timed stop (a mini game's
+fixed time, then the read); the 4-player title; PS2's read through PINE; N64's rule search (`evidence/B98_H7_ACCEPTANCE_IN_SEARCH_2026-11-11.md`,
+`evidence/B99_H7_LIVE_READ_2026-11-11.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 
