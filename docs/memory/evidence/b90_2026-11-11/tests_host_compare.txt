@@ -1,0 +1,10 @@
+Queue AG — every host suite on full exports of HEAD (d1df1f86, /tmp/b_q21ag_base) and of HEAD + b90 (the final
+tree, /tmp/b_q21ag_after_b90; B91 has no host part), run_host.sh (queue AC's), TMPDIR on the main disk, no
+PRIVYHUB_* in the process, docs/CHEATS.md copied into both; the suites' logs/ moved (not deleted) to ~/.cache/b_q21ag_tmp/.
+- suites: HEAD 75, after 76; only after: [('tests/b90_cheat_staged', 'Ran 10 tests OK')]
+- shared suites with a different result line (times aside): none
+- failing in both: ['tests/input_hold_b8', 'tools/test_adaptive_bitrate_live.py', 'tools/test_c3_f1_recovery_restart.py', 'tools/test_c3_l4_nft_night.py', 'tools/test_cl_b1_decoder_report_body.py', 'tools/test_e1_remote.py', 'tools/test_fec_xor8_2.py']
+- failing after only: []
+- tests/art_systems: HEAD 'Ran 120 tests OK', after 'Ran 120 tests OK'; tests/session_identity: 'Ran 88 tests OK' / 'Ran 88 tests OK'
+- the first pass (before the four art_systems cases were pinned and the service's lookups fixed) showed art_systems
+  4 failures and session_identity 3; both fixed, this is the final pass.

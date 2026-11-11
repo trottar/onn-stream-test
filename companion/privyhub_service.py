@@ -62,6 +62,8 @@ from storage_presence import (
     lexical_absolute_path,
 )
 
+import launch_orphan as _launch_orphan  # B90: a launch answered to a client that has gone
+
 from plugins import (
     PLUGINS,
     shutdown_plugins,
@@ -2484,6 +2486,7 @@ class PrivyHubRequestHandler(
                     )
                     return
 
+                _launch_t0 = __import__("time").monotonic()   # B90: the launch's wait, from the request
                 try:
                     if json_request_handler is not None:
                         request_payload, _ = self._read_json_body(
@@ -2543,6 +2546,23 @@ class PrivyHubRequestHandler(
                             "error": str(exc),
                         },
                     )
+                    return
+
+                # B90: a launch whose client has gone (closed, its 60-s wait passed, or the answer unwritable) is not
+                # left running unseen: the plugin's own Stop, one launch_orphaned row (PRIVYHUB_CHEAT_STAGED=0: today)
+                # (looked up, as B35's gate, so the handler also runs where it is executed outside this module)
+                if (plugin_id == "games" and action == "launch"
+                        and (_orphan := globals().get("_launch_orphan")) is not None and _orphan.enabled()):
+                    orphaned = _orphan.reason(self.connection, __import__("time").monotonic() - _launch_t0)
+                    if orphaned is None:
+                        try:
+                            self._send_json(200, payload)
+                            return
+                        except (BrokenPipeError, ConnectionResetError):
+                            orphaned = "answer_failed"
+                    self.close_connection = True
+                    plugin.launch_orphaned(orphaned, round(__import__("time").monotonic() - _launch_t0, 3),
+                                           payload.get("pid") if isinstance(payload, dict) else None)
                     return
 
                 self._send_json(

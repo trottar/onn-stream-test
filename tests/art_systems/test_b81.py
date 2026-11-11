@@ -75,7 +75,8 @@ class RetroArchDropIns(unittest.TestCase):
     def test_launched_as_a_database_file(self):
         root = ps1_project(user={"mine.cht": USER_CHT})
         m = manager(root)
-        rt, session = m._prepare_cheat_runtime(PS1, Path("/nowhere/Made Up (USA).chd"), 1, [1])
+        with mock.patch.dict(os.environ, {"PRIVYHUB_CHEAT_STAGED": "0"}):   # B90: this case checks today's whole-file staging
+            rt, session = m._prepare_cheat_runtime(PS1, Path("/nowhere/Made Up (USA).chd"), 1, [1])
         staged = rt / "Beetle PSX HW" / "Made Up (USA).cht"
         self.assertEqual(staged.read_bytes(), USER_CHT)
         self.assertEqual((session["source_filename"], session["enabled_cheat_indexes"]), ("mine.cht", [1]))

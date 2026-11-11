@@ -4368,6 +4368,36 @@ class GamesPlugin:
         except Exception:
             pass
 
+    def launch_orphaned(self, reason: str, seconds: float, pid: Any = None) -> dict[str, Any]:
+        """B90: the launch's client has gone before its answer: the game it started is stopped by the onn's own Stop
+        path (never a game started since), and one `launch_orphaned` row is written."""
+        stopped = False
+        error = None
+        emulator = self._emulator
+        with emulator.lock:   # the check and the emulator's stop as one step: never a game a later launch started
+            process = getattr(emulator, "process", None)
+            same = (process is not None and process.poll() is None
+                    and (pid is None or getattr(process, "pid", None) == pid))
+            if same:
+                try:
+                    result = emulator.stop()   # the onn's Stop: RetroArch's save flush, its graceful close
+                    stopped = bool(result.get("stopped")) if isinstance(result, dict) else False
+                except Exception as exc:   # the row is still written
+                    error = type(exc).__name__
+        if same:   # the rest of the onn's Stop path, outside the emulator's lock
+            for step in (self._recovery.session_ended, self._adaptive_bitrate_session_ended,
+                         self._native_stream.end_game_session):
+                try:
+                    step()
+                except Exception as exc:
+                    error = error or type(exc).__name__
+        row: dict[str, Any] = {"reason": reason, "seconds": seconds, "stopped": stopped,
+                               "game_running_was_this_launch": same}
+        if error:
+            row["error"] = error
+        self._recovery._log("launch_orphaned", **row)
+        return row
+
     def handle_post(
         self,
         action: str,

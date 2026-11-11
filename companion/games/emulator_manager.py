@@ -4030,6 +4030,11 @@ class EmulatorManager:
 
     def _cheat_core_library_name(self, system_id: str) -> str | None:
         name = self.CHEAT_CORE_LIBRARY_NAMES.get(system_id)
+        # B90: RetroArch looks under the library name of the core it runs: snes9x is "Snes9x" (PRIVYHUB_CHEAT_STAGED=0:
+        # today's "bsnes" folder, which snes9x never reads)
+        if (system_id == "snes" and name is not None and self._cheat_staged_on()
+                and (os.environ.get("PRIVYHUB_SNES_CORE") or "").strip() == "snes9x"):
+            return "Snes9x"
         if (name is None and _n64 is not None and system_id == _n64.SYSTEM_ID
                 and (os.environ.get("PRIVYHUB_N64_CHEATS") or "").strip() != "0"):
             return self.N64_CHEAT_CORE_LIBRARY_NAME
@@ -4918,8 +4923,18 @@ class EmulatorManager:
         target.relative_to(root.resolve())
         temporary = target.with_name(target.name + ".tmp")
 
+        # B90: on a measured core with picks, only the session's cheats, each enabled (else today's whole file)
+        staged_build: dict[str, Any] | None = None
+        if (self._cheat_staged_on() and core_library_name in self.CHEAT_STAGED_CORES
+                and enabled_indexes is not None and len(list(enabled_indexes)) > 0):
+            try:
+                staged_build = self._staged_cheat_file(parsed["raw"], list(enabled_indexes))
+            except (ValueError, TypeError, UnicodeDecodeError):
+                staged_build = None   # the profile storage below refuses the picks with today's message
+        staged_bytes = staged_build["bytes"] if staged_build is not None else parsed["raw"]
+
         try:
-            temporary.write_bytes(parsed["raw"])
+            temporary.write_bytes(staged_bytes)
             temporary.replace(target)
         except OSError as exc:
             try:
@@ -4932,7 +4947,12 @@ class EmulatorManager:
             ) from exc
 
         staged_sha = hashlib.sha256(target.read_bytes()).hexdigest().upper()
-        if staged_sha != str(source_record["sha256"]).upper():
+        if staged_build is not None:   # B90: the staged bytes against what was built; the source was verified on read
+            if staged_sha != staged_build["session"]["staged"]["sha256"]:
+                self._cleanup_cheat_runtime()
+                raise EmulatorError("Staged cheat source failed SHA-256 verification")
+            staged_sha = str(source_record["sha256"]).upper()
+        elif staged_sha != str(source_record["sha256"]).upper():
             self._cleanup_cheat_runtime()
             raise EmulatorError("Staged cheat source failed SHA-256 verification")
 
@@ -4942,7 +4962,7 @@ class EmulatorManager:
         if retroarch_name is not None:
             try:
                 (target_dir / f"{retroarch_name}.cht").resolve().relative_to(root.resolve())
-                (target_dir / f"{retroarch_name}.cht").write_bytes(parsed["raw"])
+                (target_dir / f"{retroarch_name}.cht").write_bytes(staged_bytes)
             except (OSError, ValueError) as exc:
                 self._cleanup_cheat_runtime()
                 raise EmulatorError(f"Unable to stage cheat source: {exc}") from exc
@@ -4974,6 +4994,8 @@ class EmulatorManager:
                 "isolated_cheat_profile_launch_required"
             ),
         }
+        if staged_build is not None:
+            session.update(staged_build["session"])
         return root, session
 
     def active_cheats(self) -> dict[str, Any]:
@@ -5164,6 +5186,99 @@ class EmulatorManager:
             if time.monotonic() >= deadline:
                 raise EmulatorError(self.CHEAT_NOT_READY)
 
+    # B90: only the session's cheats staged, each enabled; RetroArch applies them at load (apply_cheats_after_load) and
+    # the hub verifies from RetroArch's own evidence instead of walking the list (PRIVYHUB_CHEAT_STAGED=0: today)
+    CHEAT_STAGED_ENV = "PRIVYHUB_CHEAT_STAGED"
+    CHEAT_STAGED_CORES = frozenset({"Mupen64Plus-Next", "Snes9x", "Beetle PSX HW"})   # measured headless (B90)
+    CHEAT_STAGED_CONFIG_LINES = 'apply_cheats_after_load = "true"\n'
+    CHEAT_STAGED_BOUND_SECONDS = 10.0
+    CHEAT_STAGED_PULSE_GAP_SECONDS = 0.1
+    CHEAT_STAGED_RESEND_SECONDS = 0.5
+    _CHEAT_STAGED_LINE_RE = re.compile(r"\[Cheats\] Cheat #(\d+): (.*): (on|off)\s*$", re.IGNORECASE)
+
+    @classmethod
+    def _cheat_staged_on(cls) -> bool:
+        return str(os.environ.get(cls.CHEAT_STAGED_ENV, "")).strip() != "0"
+
+    @classmethod
+    def _staged_cheat_file(cls, raw: bytes, indexes: list[int]) -> dict[str, Any]:
+        """The source's entries at `indexes` only, in the source's order, renumbered 0..k-1, every key copied as read,
+        each enabled. ValueError when an index is not a distinct entry of the file."""
+        wanted = sorted(int(i) for i in indexes)
+        if not wanted or len(set(wanted)) != len(wanted) or any(isinstance(i, bool) for i in indexes):
+            raise ValueError("no distinct picks")
+        keys: dict[int, list[tuple[str, str]]] = {}
+        for line in raw.decode("utf-8-sig").splitlines():
+            match = cls._CHEAT_KEY_RE.match(line)
+            if match:
+                keys.setdefault(int(match.group(1)), []).append((match.group(2), match.group(3)))
+        if any(i not in keys for i in wanted):
+            raise ValueError("a pick is not in the file")
+        out = [f"cheats = {len(wanted)}", ""]
+        descriptions: list[str] = []
+        for j, i in enumerate(wanted):
+            pairs = [(k, v) for k, v in keys[i] if k.lower() != "enable"]
+            out += [f"cheat{j}_{k} = {v}" for k, v in pairs]
+            out += [f"cheat{j}_enable = true", ""]
+            descriptions.append(next((cls._cheat_scalar_text(v) for k, v in pairs if k.lower() == "desc"), ""))
+        data = ("\n".join(out) + "\n").encode("utf-8")
+        return {"bytes": data,
+                "session": {"staged": {"count": len(wanted), "source_indexes": wanted, "descriptions": descriptions,
+                                       "sha256": hashlib.sha256(data).hexdigest().upper()}}}
+
+    def _verify_staged_cheats(self, session: dict[str, Any], desired: list[int]) -> dict[str, Any]:
+        """RetroArch's `Applying cheat changes.` after its cheat-file line (the apply at load), then every staged cheat
+        reported `on` by an index pulse's answer: at most 2k + 4 paced pulses within the bound. Raises on a miss."""
+        staged = session["staged"]
+        count = int(staged["count"])
+        descriptions = [str(d).strip() for d in staged["descriptions"]]
+        deadline = time.monotonic() + self.CHEAT_STAGED_BOUND_SECONDS
+        apply_line = ""
+        while not apply_line:
+            lines = self._retroarch_session_log_since(0)
+            loaded = next((n for n, line in enumerate(lines) if "Load game-specific cheatfile" in line), None)
+            if loaded is not None:
+                apply_line = next((line for line in lines[loaded:] if "Applying cheat changes" in line), "")
+            if not apply_line:
+                if time.monotonic() >= deadline:
+                    raise EmulatorError("RetroArch did not apply the staged cheats at load")
+                time.sleep(0.05)
+        seen: dict[int, str] = {}
+        pulses = 0
+        while len(seen) < count:
+            if pulses >= 2 * count + 4 or time.monotonic() >= deadline:
+                raise EmulatorError("RetroArch did not report every staged cheat")
+            offset = self._retroarch_session_log_position()
+            self._retroarch_network_request("CHEAT_INDEX_PLUS", expect_response=False, retries=1)
+            pulses += 1
+            resend_at = time.monotonic() + self.CHEAT_STAGED_RESEND_SECONDS
+            answer = None
+            while answer is None and time.monotonic() < resend_at:
+                for line in self._retroarch_session_log_since(offset):
+                    found = self._CHEAT_STAGED_LINE_RE.search(line.strip())
+                    if found:
+                        answer = (line, found)
+                        break
+                if answer is None:
+                    time.sleep(0.02)
+            if answer is not None:
+                line, found = answer
+                j = int(found.group(1))
+                if j >= count or found.group(2).strip().casefold() != descriptions[j].casefold():
+                    raise EmulatorError("RetroArch's cheat list does not match the staged file")
+                if found.group(3).lower() != "on":
+                    raise EmulatorError("RetroArch reports a staged cheat off")
+                seen[j] = line
+            time.sleep(self.CHEAT_STAGED_PULSE_GAP_SECONDS)
+        session["activation_available"] = True
+        session["activation_locked_reason"] = None
+        session["activation_verified"] = True
+        session["active_enabled_cheat_indexes"] = list(desired)
+        session["activation_verification_lines"] = [apply_line] + [seen[j] for j in range(count)]
+        session["activation_mode"] = "staged"
+        session["activation_pulses"] = pulses
+        return dict(session)
+
     def _apply_active_cheat_profile(self) -> dict[str, Any]:
         session = self._active_cheat_session
         if not isinstance(session, dict):
@@ -5195,6 +5310,19 @@ class EmulatorManager:
                     self._force_stop_process(process)
                 self._refresh_process()
                 raise
+
+        if isinstance(session.get("staged"), dict) and self._cheat_staged_on():   # B90: no walk, no toggle
+            try:
+                return self._verify_staged_cheats(session, desired)
+            except Exception as exc:
+                session["activation_available"] = False
+                session["activation_verified"] = False
+                session["activation_error"] = str(exc)
+                process = self.process
+                if process is not None and process.poll() is None:
+                    self._force_stop_process(process)
+                self._refresh_process()
+                raise EmulatorError("Cheat profile activation failed closed: " + str(exc)) from exc
 
         self.pause()
         toggled_indexes: list[int] = []
@@ -5395,6 +5523,11 @@ class EmulatorManager:
                 "\n\n# PrivyHub A7.3 session-only cheat database\n"
                 + f'cheat_database_path = "{cheat_path}"\n'
             )
+            # B90: a staged session's cheats (each enabled) applied by RetroArch at load; exactly one assignment
+            if isinstance((cheat_session or {}).get("staged"), dict) and self._cheat_staged_on():
+                base_text = re.sub(r"(?m)^[ \t]*apply_cheats_after_load[ \t]*=.*\n?", "", base_text)
+                override_text = re.sub(r"(?m)^[ \t]*apply_cheats_after_load[ \t]*=.*\n?", "", override_text)
+                cheat_override += self.CHEAT_STAGED_CONFIG_LINES
 
         cheat_storage_override = ""
         expected_storage_settings: dict[str, str] = {}

@@ -26,7 +26,7 @@ sys.path.insert(0, str(ART))
 import _tmp_cleanup  # noqa: E402,F401
 import test_b85 as b85  # noqa: E402
 
-FLAGS = b85.FLAGS
+FLAGS = {**b85.FLAGS, "PRIVYHUB_CHEAT_STAGED": "0"}   # B90: this suite pins the walk; tests/b90_cheat_staged the rest
 OFF = {**FLAGS, "PRIVYHUB_CHEAT_READY": "0"}
 DOTTED = "Made Up v1.1 (USA).v64"                  # a title whose name holds a dot (RetroArch: "Made Up v1.cht")
 ROWS = [(f"Made Up Cheat {i}", f"8010{i:04X} 0001") for i in range(6)]

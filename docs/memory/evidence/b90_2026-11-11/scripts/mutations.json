@@ -1,0 +1,65 @@
+[
+ {
+  "id": "M1",
+  "file": "companion/games/emulator_manager.py",
+  "old": "            out += [f\"cheat{j}_enable = true\", \"\"]",
+  "new": "            out += [f\"cheat{j}_enable = false\", \"\"]",
+  "why": "the staged cheats written off"
+ },
+ {
+  "id": "M2",
+  "file": "companion/games/emulator_manager.py",
+  "old": "                cheat_override += self.CHEAT_STAGED_CONFIG_LINES",
+  "new": "                pass",
+  "why": "no apply-at-load line in the session config"
+ },
+ {
+  "id": "M3",
+  "file": "companion/games/emulator_manager.py",
+  "old": "                staged_build = self._staged_cheat_file(parsed[\"raw\"], list(enabled_indexes))",
+  "new": "                staged_build = self._staged_cheat_file(parsed[\"raw\"], list(range(int(source_record[\"cheat_count\"]))))",
+  "why": "the whole list staged, every cheat enabled"
+ },
+ {
+  "id": "M4",
+  "file": "companion/games/emulator_manager.py",
+  "old": "            return \"Snes9x\"\n",
+  "new": "            return name\n",
+  "why": "SNES staged under today's folder"
+ },
+ {
+  "id": "M5",
+  "file": "companion/launch_orphan.py",
+  "old": "    if client_gone(conn):\n        return \"client_closed\"",
+  "new": "    if False:\n        return \"client_closed\"",
+  "why": "a closed client not seen"
+ },
+ {
+  "id": "M6",
+  "file": "companion/plugins/games.py",
+  "old": "                    result = emulator.stop()   # the onn's Stop: RetroArch's save flush, its graceful close",
+  "new": "                    result = {}",
+  "why": "the orphaned game not stopped"
+ },
+ {
+  "id": "M7",
+  "file": "companion/games/emulator_manager.py",
+  "old": "        if isinstance(session.get(\"staged\"), dict) and self._cheat_staged_on():   # B90: no walk, no toggle",
+  "new": "        if False:",
+  "why": "today's walk on a staged session"
+ },
+ {
+  "id": "M8",
+  "file": "companion/games/emulator_manager.py",
+  "old": "                    raise EmulatorError(\"RetroArch did not apply the staged cheats at load\")",
+  "new": "                    apply_line = \"assumed\"",
+  "why": "the apply line not required"
+ },
+ {
+  "id": "M9",
+  "file": "companion/games/emulator_manager.py",
+  "old": "            if pulses >= 2 * count + 4 or time.monotonic() >= deadline:",
+  "new": "            if time.monotonic() >= deadline:",
+  "why": "no pulse bound (the walk's lap allowed)"
+ }
+]

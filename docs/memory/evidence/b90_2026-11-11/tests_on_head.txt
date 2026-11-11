@@ -1,0 +1,20 @@
+tests/b90_cheat_staged on HEAD's code (/tmp/b_q21ag_head_tests: HEAD's companion/ tools/ tests/ + the B90 test dir), 2026-11-11T02:59:44Z
+test_the_onns_launch_call_is_in_the_contract (test_b90.ContractListed.test_the_onns_launch_call_is_in_the_contract) ... ok
+test_a_client_that_hangs_up_leaves_no_game_running (test_b90.HangUp.test_a_client_that_hangs_up_leaves_no_game_running) ... FAIL
+test_the_knob_zero_leaves_it_running_as_today (test_b90.HangUp.test_the_knob_zero_leaves_it_running_as_today) ... ok
+test_a_2092_entry_list_one_pick (test_b90.Staged.test_a_2092_entry_list_one_pick) ... FAIL
+test_a_2092_entry_list_three_picks_with_parts_and_the_last_entry (test_b90.Staged.test_a_2092_entry_list_three_picks_with_parts_and_the_last_entry) ... FAIL
+test_a_cheat_never_reported_stops_within_the_pulse_bound (test_b90.Staged.test_a_cheat_never_reported_stops_within_the_pulse_bound) ... FAIL
+test_a_retroarch_that_does_not_apply_at_load_fails_closed (test_b90.Staged.test_a_retroarch_that_does_not_apply_at_load_fails_closed) ... FAIL
+test_the_staged_files_contents (test_b90.Staged.test_the_staged_files_contents) ... FAIL
+test_snes_staged_under_the_running_cores_name (test_b90.TodayAndTheKnob.test_snes_staged_under_the_running_cores_name) ... FAIL
+test_the_knob_zero_is_todays_walk_and_config (test_b90.TodayAndTheKnob.test_the_knob_zero_is_todays_walk_and_config) ... ok
+AssertionError: True is not false : {'elapsed': 11.14, 'session': {'enabled_cheat_indexes': [2, 30], 'activation_verified': True, 'activation_mode': None, 'activation_pulses': None, 'staged': None, 'activation_verification_lines': ['[INFO] [Cheats] Cheat #2: M
+AssertionError: None != 'staged'
+AssertionError: None != 'staged'
+AssertionError: 'did not report every staged cheat' not found in 'Cheat profile activation failed closed: Unable to select requested cheat index'
+AssertionError: 200 != 503 : {'status': 200, 'error': None, 'elapsed': 1.26, 'session': {'enabled_cheat_indexes': [2, 50], 'activation_verified': True, 'activation_mode': None, 'activation_pulses': None, 'staged': None, 'activation_verification_lines': ['[INFO
+AssertionError: None != 'staged'
+AssertionError: 503 != 200 : {'status': 503, 'error': 'cheats not ready — the game did not finish loading', 'elapsed': 10.18, 'session': {'enabled_cheat_indexes': None, 'activation_verified': None, 'activation_mode': None, 'activation_pulses': None, 'staged'
+Ran 10 tests in 87.062s
+FAILED (failures=7)

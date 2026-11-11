@@ -137,7 +137,8 @@ class Manager(unittest.TestCase):
 
     def test_staged_for_the_n64_core(self):
         content = Path("/nowhere/Alpha Racer (USA).z64")
-        root, session = self.m._prepare_cheat_runtime(GAME, content, 0, [0])
+        with mock.patch.dict(os.environ, {"PRIVYHUB_CHEAT_STAGED": "0"}):   # B90: this case checks today's whole-file staging
+            root, session = self.m._prepare_cheat_runtime(GAME, content, 0, [0])
         staged = root / "Mupen64Plus-Next" / "Alpha Racer (USA).cht"
         self.assertTrue(staged.is_file())
         self.assertEqual(staged.read_bytes(), (self.root / json.loads(

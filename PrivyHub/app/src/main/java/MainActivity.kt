@@ -11745,14 +11745,20 @@ class MainActivity : AppCompatActivity() {
             }
         val pictureView =
             if (editorDefault != null) com.safeiot.privyhub.streaming.ControllerPictureView(this) else null
-        if (pictureView != null) {
+        // B91: on a wide screen the picture sits beside the rows (left pane, outside their scroll), its labels at the
+        // rows' text size; on a tall one it stays above them (B89)
+        val editorPlan =
+            if (pictureView != null) com.safeiot.privyhub.streaming.MappingEditorLayout.plan(
+                resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels, resources.displayMetrics.density
+            ) else null
+        val pictureLegend =
+            if (pictureView != null) TextView(this).apply {
+                text = com.safeiot.privyhub.streaming.MappingPicture.LEGEND
+                setPadding(8, 4, 8, 16)
+            } else null
+        if (pictureView != null && editorPlan?.beside != true) {
             container.addView(pictureView)
-            container.addView(
-                TextView(this).apply {
-                    text = com.safeiot.privyhub.streaming.MappingPicture.LEGEND
-                    setPadding(8, 4, 8, 16)
-                }
-            )
+            container.addView(pictureLegend)
         }
         fun editorSourceLabel(source: String): String =
             if (pictureView != null) com.safeiot.privyhub.streaming.MappingPicture.padLabel(source)
@@ -11850,7 +11856,7 @@ class MainActivity : AppCompatActivity() {
                             target
                         )
                     textSize =
-                        17f
+                        com.safeiot.privyhub.streaming.MappingEditorLayout.ROW_TEXT_SP   // B91: 17 sp, one constant
                 }
 
             val currentLabel =
@@ -11927,13 +11933,39 @@ class MainActivity : AppCompatActivity() {
                 )
             }
 
+        // B91: the two panes — the picture and its legend on the left, the rows' scroll on the right
+        val editorView: View =
+            if (pictureView != null && editorPlan != null && editorPlan.beside) {
+                pictureView.beside(editorPlan.labelTextPx)
+                android.widget.LinearLayout(this).apply {
+                    orientation = android.widget.LinearLayout.HORIZONTAL
+                    val left = android.widget.LinearLayout(this@MainActivity).apply {
+                        orientation = android.widget.LinearLayout.VERTICAL
+                        setPadding(com.safeiot.privyhub.streaming.MappingEditorLayout.PAD_H,
+                                   com.safeiot.privyhub.streaming.MappingEditorLayout.PAD_V, 0, 0)
+                        addView(pictureView, android.widget.LinearLayout.LayoutParams(
+                            editorPlan.pictureW, editorPlan.pictureH))
+                        addView(pictureLegend)
+                    }
+                    addView(left, android.widget.LinearLayout.LayoutParams(
+                        editorPlan.leftW + com.safeiot.privyhub.streaming.MappingEditorLayout.PAD_H,
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT))
+                    addView(scroll, android.widget.LinearLayout.LayoutParams(
+                        0, android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1f).apply {
+                        leftMargin = com.safeiot.privyhub.streaming.MappingEditorLayout.GAP_PX
+                    })
+                }
+            } else {
+                scroll
+            }
+
         val dialog =
             AlertDialog.Builder(this)
                 .setTitle(
                     "${profile.optString("name", "Input Profile")} - $playerLabel"
                 )
                 .setView(
-                    scroll
+                    editorView
                 )
                 .setPositiveButton(
                     "Save",
@@ -12281,6 +12313,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         dialog.show()
+        // B91: the dialog made wide enough for the two panes (92 % of the screen)
+        if (editorPlan != null && editorPlan.beside && editorView !== scroll) {
+            dialog.window?.setLayout(editorPlan.dialogW, editorPlan.dialogH)
+        }
     }
 
     private fun saveInputProfileMapping(

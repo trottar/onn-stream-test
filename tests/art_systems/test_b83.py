@@ -348,8 +348,8 @@ class B78N64CheatsThroughThePlugin(unittest.TestCase):
         r, attempts, _ = run(root, {"PRIVYHUB_N64": "1"}, "seed_n64_cheats")
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
         self.assertEqual((json.loads(r.stdout.strip().splitlines()[-1])["games_with_cheats"], attempts), (1, 0))
-        r, attempts, _ = run(root, FLAGS, "cheats", {"id": gid, "kind": "retroarch",
-                                                     "launch": "cheat_source=0&cheat_indexes=0"})
+        r, attempts, _ = run(root, {**FLAGS, "PRIVYHUB_CHEAT_STAGED": "0"}, "cheats", {"id": gid, "kind": "retroarch",
+                                                     "launch": "cheat_source=0&cheat_indexes=0"})   # B90: this case checks today's whole-file staging
         out = out_of(r)
         self.assertEqual([e["description"] for e in out["catalog"]["sources"][0]["entries"]], ["Made Up Lives"])
         self.assertEqual((out["active"], out["cheat_apply"], attempts), (True, 1, 0))   # RetroArch: no launch_kind
@@ -431,8 +431,8 @@ class B81DropInsThroughThePlugin(unittest.TestCase):
         listed = out_of(run(root, FLAGS, "cheats", {"id": gid})[0])["catalog"]
         user = [s for s in listed["sources"] if s.get("provider") == "user"]
         self.assertEqual([(s["filename"], s["cheat_count"]) for s in user], [("mine.cht", 2)])
-        r, attempts, _ = run(root, FLAGS, "cheats", {
-            "id": gid, "kind": "retroarch", "launch": f"cheat_source={user[0]['source_index']}&cheat_indexes=1"})
+        r, attempts, _ = run(root, {**FLAGS, "PRIVYHUB_CHEAT_STAGED": "0"}, "cheats", {
+            "id": gid, "kind": "retroarch", "launch": f"cheat_source={user[0]['source_index']}&cheat_indexes=1"})   # B90: this case checks today's whole-file staging
         out = out_of(r)
         self.assertEqual((out["active"], out["cheat_apply"], attempts), (True, 1, 0))   # RetroArch: no launch_kind
         self.assertTrue(out["popen"][0][0].endswith("RetroArch-Linux-x86_64.AppImage"), out["popen"])

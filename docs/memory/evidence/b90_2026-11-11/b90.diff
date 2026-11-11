@@ -1,0 +1,746 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index e0528ffc..14031c9d 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -4030,6 +4030,11 @@ class EmulatorManager:
+ 
+     def _cheat_core_library_name(self, system_id: str) -> str | None:
+         name = self.CHEAT_CORE_LIBRARY_NAMES.get(system_id)
++        # B90: RetroArch looks under the library name of the core it runs: snes9x is "Snes9x" (PRIVYHUB_CHEAT_STAGED=0:
++        # today's "bsnes" folder, which snes9x never reads)
++        if (system_id == "snes" and name is not None and self._cheat_staged_on()
++                and (os.environ.get("PRIVYHUB_SNES_CORE") or "").strip() == "snes9x"):
++            return "Snes9x"
+         if (name is None and _n64 is not None and system_id == _n64.SYSTEM_ID
+                 and (os.environ.get("PRIVYHUB_N64_CHEATS") or "").strip() != "0"):
+             return self.N64_CHEAT_CORE_LIBRARY_NAME
+@@ -4918,8 +4923,18 @@ class EmulatorManager:
+         target.relative_to(root.resolve())
+         temporary = target.with_name(target.name + ".tmp")
+ 
++        # B90: on a measured core with picks, only the session's cheats, each enabled (else today's whole file)
++        staged_build: dict[str, Any] | None = None
++        if (self._cheat_staged_on() and core_library_name in self.CHEAT_STAGED_CORES
++                and enabled_indexes is not None and len(list(enabled_indexes)) > 0):
++            try:
++                staged_build = self._staged_cheat_file(parsed["raw"], list(enabled_indexes))
++            except (ValueError, TypeError, UnicodeDecodeError):
++                staged_build = None   # the profile storage below refuses the picks with today's message
++        staged_bytes = staged_build["bytes"] if staged_build is not None else parsed["raw"]
++
+         try:
+-            temporary.write_bytes(parsed["raw"])
++            temporary.write_bytes(staged_bytes)
+             temporary.replace(target)
+         except OSError as exc:
+             try:
+@@ -4932,7 +4947,12 @@ class EmulatorManager:
+             ) from exc
+ 
+         staged_sha = hashlib.sha256(target.read_bytes()).hexdigest().upper()
+-        if staged_sha != str(source_record["sha256"]).upper():
++        if staged_build is not None:   # B90: the staged bytes against what was built; the source was verified on read
++            if staged_sha != staged_build["session"]["staged"]["sha256"]:
++                self._cleanup_cheat_runtime()
++                raise EmulatorError("Staged cheat source failed SHA-256 verification")
++            staged_sha = str(source_record["sha256"]).upper()
++        elif staged_sha != str(source_record["sha256"]).upper():
+             self._cleanup_cheat_runtime()
+             raise EmulatorError("Staged cheat source failed SHA-256 verification")
+ 
+@@ -4942,7 +4962,7 @@ class EmulatorManager:
+         if retroarch_name is not None:
+             try:
+                 (target_dir / f"{retroarch_name}.cht").resolve().relative_to(root.resolve())
+-                (target_dir / f"{retroarch_name}.cht").write_bytes(parsed["raw"])
++                (target_dir / f"{retroarch_name}.cht").write_bytes(staged_bytes)
+             except (OSError, ValueError) as exc:
+                 self._cleanup_cheat_runtime()
+                 raise EmulatorError(f"Unable to stage cheat source: {exc}") from exc
+@@ -4974,6 +4994,8 @@ class EmulatorManager:
+                 "isolated_cheat_profile_launch_required"
+             ),
+         }
++        if staged_build is not None:
++            session.update(staged_build["session"])
+         return root, session
+ 
+     def active_cheats(self) -> dict[str, Any]:
+@@ -5164,6 +5186,99 @@ class EmulatorManager:
+             if time.monotonic() >= deadline:
+                 raise EmulatorError(self.CHEAT_NOT_READY)
+ 
++    # B90: only the session's cheats staged, each enabled; RetroArch applies them at load (apply_cheats_after_load) and
++    # the hub verifies from RetroArch's own evidence instead of walking the list (PRIVYHUB_CHEAT_STAGED=0: today)
++    CHEAT_STAGED_ENV = "PRIVYHUB_CHEAT_STAGED"
++    CHEAT_STAGED_CORES = frozenset({"Mupen64Plus-Next", "Snes9x", "Beetle PSX HW"})   # measured headless (B90)
++    CHEAT_STAGED_CONFIG_LINES = 'apply_cheats_after_load = "true"\n'
++    CHEAT_STAGED_BOUND_SECONDS = 10.0
++    CHEAT_STAGED_PULSE_GAP_SECONDS = 0.1
++    CHEAT_STAGED_RESEND_SECONDS = 0.5
++    _CHEAT_STAGED_LINE_RE = re.compile(r"\[Cheats\] Cheat #(\d+): (.*): (on|off)\s*$", re.IGNORECASE)
++
++    @classmethod
++    def _cheat_staged_on(cls) -> bool:
++        return str(os.environ.get(cls.CHEAT_STAGED_ENV, "")).strip() != "0"
++
++    @classmethod
++    def _staged_cheat_file(cls, raw: bytes, indexes: list[int]) -> dict[str, Any]:
++        """The source's entries at `indexes` only, in the source's order, renumbered 0..k-1, every key copied as read,
++        each enabled. ValueError when an index is not a distinct entry of the file."""
++        wanted = sorted(int(i) for i in indexes)
++        if not wanted or len(set(wanted)) != len(wanted) or any(isinstance(i, bool) for i in indexes):
++            raise ValueError("no distinct picks")
++        keys: dict[int, list[tuple[str, str]]] = {}
++        for line in raw.decode("utf-8-sig").splitlines():
++            match = cls._CHEAT_KEY_RE.match(line)
++            if match:
++                keys.setdefault(int(match.group(1)), []).append((match.group(2), match.group(3)))
++        if any(i not in keys for i in wanted):
++            raise ValueError("a pick is not in the file")
++        out = [f"cheats = {len(wanted)}", ""]
++        descriptions: list[str] = []
++        for j, i in enumerate(wanted):
++            pairs = [(k, v) for k, v in keys[i] if k.lower() != "enable"]
++            out += [f"cheat{j}_{k} = {v}" for k, v in pairs]
++            out += [f"cheat{j}_enable = true", ""]
++            descriptions.append(next((cls._cheat_scalar_text(v) for k, v in pairs if k.lower() == "desc"), ""))
++        data = ("\n".join(out) + "\n").encode("utf-8")
++        return {"bytes": data,
++                "session": {"staged": {"count": len(wanted), "source_indexes": wanted, "descriptions": descriptions,
++                                       "sha256": hashlib.sha256(data).hexdigest().upper()}}}
++
++    def _verify_staged_cheats(self, session: dict[str, Any], desired: list[int]) -> dict[str, Any]:
++        """RetroArch's `Applying cheat changes.` after its cheat-file line (the apply at load), then every staged cheat
++        reported `on` by an index pulse's answer: at most 2k + 4 paced pulses within the bound. Raises on a miss."""
++        staged = session["staged"]
++        count = int(staged["count"])
++        descriptions = [str(d).strip() for d in staged["descriptions"]]
++        deadline = time.monotonic() + self.CHEAT_STAGED_BOUND_SECONDS
++        apply_line = ""
++        while not apply_line:
++            lines = self._retroarch_session_log_since(0)
++            loaded = next((n for n, line in enumerate(lines) if "Load game-specific cheatfile" in line), None)
++            if loaded is not None:
++                apply_line = next((line for line in lines[loaded:] if "Applying cheat changes" in line), "")
++            if not apply_line:
++                if time.monotonic() >= deadline:
++                    raise EmulatorError("RetroArch did not apply the staged cheats at load")
++                time.sleep(0.05)
++        seen: dict[int, str] = {}
++        pulses = 0
++        while len(seen) < count:
++            if pulses >= 2 * count + 4 or time.monotonic() >= deadline:
++                raise EmulatorError("RetroArch did not report every staged cheat")
++            offset = self._retroarch_session_log_position()
++            self._retroarch_network_request("CHEAT_INDEX_PLUS", expect_response=False, retries=1)
++            pulses += 1
++            resend_at = time.monotonic() + self.CHEAT_STAGED_RESEND_SECONDS
++            answer = None
++            while answer is None and time.monotonic() < resend_at:
++                for line in self._retroarch_session_log_since(offset):
++                    found = self._CHEAT_STAGED_LINE_RE.search(line.strip())
++                    if found:
++                        answer = (line, found)
++                        break
++                if answer is None:
++                    time.sleep(0.02)
++            if answer is not None:
++                line, found = answer
++                j = int(found.group(1))
++                if j >= count or found.group(2).strip().casefold() != descriptions[j].casefold():
++                    raise EmulatorError("RetroArch's cheat list does not match the staged file")
++                if found.group(3).lower() != "on":
++                    raise EmulatorError("RetroArch reports a staged cheat off")
++                seen[j] = line
++            time.sleep(self.CHEAT_STAGED_PULSE_GAP_SECONDS)
++        session["activation_available"] = True
++        session["activation_locked_reason"] = None
++        session["activation_verified"] = True
++        session["active_enabled_cheat_indexes"] = list(desired)
++        session["activation_verification_lines"] = [apply_line] + [seen[j] for j in range(count)]
++        session["activation_mode"] = "staged"
++        session["activation_pulses"] = pulses
++        return dict(session)
++
+     def _apply_active_cheat_profile(self) -> dict[str, Any]:
+         session = self._active_cheat_session
+         if not isinstance(session, dict):
+@@ -5196,6 +5311,19 @@ class EmulatorManager:
+                 self._refresh_process()
+                 raise
+ 
++        if isinstance(session.get("staged"), dict) and self._cheat_staged_on():   # B90: no walk, no toggle
++            try:
++                return self._verify_staged_cheats(session, desired)
++            except Exception as exc:
++                session["activation_available"] = False
++                session["activation_verified"] = False
++                session["activation_error"] = str(exc)
++                process = self.process
++                if process is not None and process.poll() is None:
++                    self._force_stop_process(process)
++                self._refresh_process()
++                raise EmulatorError("Cheat profile activation failed closed: " + str(exc)) from exc
++
+         self.pause()
+         toggled_indexes: list[int] = []
+         verification_lines: list[str] = []
+@@ -5395,6 +5523,11 @@ class EmulatorManager:
+                 "\n\n# PrivyHub A7.3 session-only cheat database\n"
+                 + f'cheat_database_path = "{cheat_path}"\n'
+             )
++            # B90: a staged session's cheats (each enabled) applied by RetroArch at load; exactly one assignment
++            if isinstance((cheat_session or {}).get("staged"), dict) and self._cheat_staged_on():
++                base_text = re.sub(r"(?m)^[ \t]*apply_cheats_after_load[ \t]*=.*\n?", "", base_text)
++                override_text = re.sub(r"(?m)^[ \t]*apply_cheats_after_load[ \t]*=.*\n?", "", override_text)
++                cheat_override += self.CHEAT_STAGED_CONFIG_LINES
+ 
+         cheat_storage_override = ""
+         expected_storage_settings: dict[str, str] = {}
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 74f02352..cf4b1d37 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4368,6 +4368,36 @@ class GamesPlugin:
+         except Exception:
+             pass
+ 
++    def launch_orphaned(self, reason: str, seconds: float, pid: Any = None) -> dict[str, Any]:
++        """B90: the launch's client has gone before its answer: the game it started is stopped by the onn's own Stop
++        path (never a game started since), and one `launch_orphaned` row is written."""
++        stopped = False
++        error = None
++        emulator = self._emulator
++        with emulator.lock:   # the check and the emulator's stop as one step: never a game a later launch started
++            process = getattr(emulator, "process", None)
++            same = (process is not None and process.poll() is None
++                    and (pid is None or getattr(process, "pid", None) == pid))
++            if same:
++                try:
++                    result = emulator.stop()   # the onn's Stop: RetroArch's save flush, its graceful close
++                    stopped = bool(result.get("stopped")) if isinstance(result, dict) else False
++                except Exception as exc:   # the row is still written
++                    error = type(exc).__name__
++        if same:   # the rest of the onn's Stop path, outside the emulator's lock
++            for step in (self._recovery.session_ended, self._adaptive_bitrate_session_ended,
++                         self._native_stream.end_game_session):
++                try:
++                    step()
++                except Exception as exc:
++                    error = error or type(exc).__name__
++        row: dict[str, Any] = {"reason": reason, "seconds": seconds, "stopped": stopped,
++                               "game_running_was_this_launch": same}
++        if error:
++            row["error"] = error
++        self._recovery._log("launch_orphaned", **row)
++        return row
++
+     def handle_post(
+         self,
+         action: str,
+diff --git a/companion/privyhub_service.py b/companion/privyhub_service.py
+index b33b65a9..da1318c0 100644
+--- a/companion/privyhub_service.py
++++ b/companion/privyhub_service.py
+@@ -62,6 +62,8 @@ from storage_presence import (
+     lexical_absolute_path,
+ )
+ 
++import launch_orphan as _launch_orphan  # B90: a launch answered to a client that has gone
++
+ from plugins import (
+     PLUGINS,
+     shutdown_plugins,
+@@ -2484,6 +2486,7 @@ class PrivyHubRequestHandler(
+                     )
+                     return
+ 
++                _launch_t0 = __import__("time").monotonic()   # B90: the launch's wait, from the request
+                 try:
+                     if json_request_handler is not None:
+                         request_payload, _ = self._read_json_body(
+@@ -2545,6 +2548,23 @@ class PrivyHubRequestHandler(
+                     )
+                     return
+ 
++                # B90: a launch whose client has gone (closed, its 60-s wait passed, or the answer unwritable) is not
++                # left running unseen: the plugin's own Stop, one launch_orphaned row (PRIVYHUB_CHEAT_STAGED=0: today)
++                # (looked up, as B35's gate, so the handler also runs where it is executed outside this module)
++                if (plugin_id == "games" and action == "launch"
++                        and (_orphan := globals().get("_launch_orphan")) is not None and _orphan.enabled()):
++                    orphaned = _orphan.reason(self.connection, __import__("time").monotonic() - _launch_t0)
++                    if orphaned is None:
++                        try:
++                            self._send_json(200, payload)
++                            return
++                        except (BrokenPipeError, ConnectionResetError):
++                            orphaned = "answer_failed"
++                    self.close_connection = True
++                    plugin.launch_orphaned(orphaned, round(__import__("time").monotonic() - _launch_t0, 3),
++                                           payload.get("pid") if isinstance(payload, dict) else None)
++                    return
++
+                 self._send_json(
+                     200,
+                     payload,
+diff --git a/tests/art_systems/test_b78.py b/tests/art_systems/test_b78.py
+index 09992c14..087e1f37 100644
+--- a/tests/art_systems/test_b78.py
++++ b/tests/art_systems/test_b78.py
+@@ -137,7 +137,8 @@ class Manager(unittest.TestCase):
+ 
+     def test_staged_for_the_n64_core(self):
+         content = Path("/nowhere/Alpha Racer (USA).z64")
+-        root, session = self.m._prepare_cheat_runtime(GAME, content, 0, [0])
++        with mock.patch.dict(os.environ, {"PRIVYHUB_CHEAT_STAGED": "0"}):   # B90: this case checks today's whole-file staging
++            root, session = self.m._prepare_cheat_runtime(GAME, content, 0, [0])
+         staged = root / "Mupen64Plus-Next" / "Alpha Racer (USA).cht"
+         self.assertTrue(staged.is_file())
+         self.assertEqual(staged.read_bytes(), (self.root / json.loads(
+diff --git a/tests/art_systems/test_b81.py b/tests/art_systems/test_b81.py
+index 12d7b1bd..46203c62 100644
+--- a/tests/art_systems/test_b81.py
++++ b/tests/art_systems/test_b81.py
+@@ -75,7 +75,8 @@ class RetroArchDropIns(unittest.TestCase):
+     def test_launched_as_a_database_file(self):
+         root = ps1_project(user={"mine.cht": USER_CHT})
+         m = manager(root)
+-        rt, session = m._prepare_cheat_runtime(PS1, Path("/nowhere/Made Up (USA).chd"), 1, [1])
++        with mock.patch.dict(os.environ, {"PRIVYHUB_CHEAT_STAGED": "0"}):   # B90: this case checks today's whole-file staging
++            rt, session = m._prepare_cheat_runtime(PS1, Path("/nowhere/Made Up (USA).chd"), 1, [1])
+         staged = rt / "Beetle PSX HW" / "Made Up (USA).cht"
+         self.assertEqual(staged.read_bytes(), USER_CHT)
+         self.assertEqual((session["source_filename"], session["enabled_cheat_indexes"]), ("mine.cht", [1]))
+diff --git a/tests/art_systems/test_b83.py b/tests/art_systems/test_b83.py
+index 301e9e3d..c0c9e3aa 100644
+--- a/tests/art_systems/test_b83.py
++++ b/tests/art_systems/test_b83.py
+@@ -348,8 +348,8 @@ class B78N64CheatsThroughThePlugin(unittest.TestCase):
+         r, attempts, _ = run(root, {"PRIVYHUB_N64": "1"}, "seed_n64_cheats")
+         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+         self.assertEqual((json.loads(r.stdout.strip().splitlines()[-1])["games_with_cheats"], attempts), (1, 0))
+-        r, attempts, _ = run(root, FLAGS, "cheats", {"id": gid, "kind": "retroarch",
+-                                                     "launch": "cheat_source=0&cheat_indexes=0"})
++        r, attempts, _ = run(root, {**FLAGS, "PRIVYHUB_CHEAT_STAGED": "0"}, "cheats", {"id": gid, "kind": "retroarch",
++                                                     "launch": "cheat_source=0&cheat_indexes=0"})   # B90: this case checks today's whole-file staging
+         out = out_of(r)
+         self.assertEqual([e["description"] for e in out["catalog"]["sources"][0]["entries"]], ["Made Up Lives"])
+         self.assertEqual((out["active"], out["cheat_apply"], attempts), (True, 1, 0))   # RetroArch: no launch_kind
+@@ -431,8 +431,8 @@ class B81DropInsThroughThePlugin(unittest.TestCase):
+         listed = out_of(run(root, FLAGS, "cheats", {"id": gid})[0])["catalog"]
+         user = [s for s in listed["sources"] if s.get("provider") == "user"]
+         self.assertEqual([(s["filename"], s["cheat_count"]) for s in user], [("mine.cht", 2)])
+-        r, attempts, _ = run(root, FLAGS, "cheats", {
+-            "id": gid, "kind": "retroarch", "launch": f"cheat_source={user[0]['source_index']}&cheat_indexes=1"})
++        r, attempts, _ = run(root, {**FLAGS, "PRIVYHUB_CHEAT_STAGED": "0"}, "cheats", {
++            "id": gid, "kind": "retroarch", "launch": f"cheat_source={user[0]['source_index']}&cheat_indexes=1"})   # B90: this case checks today's whole-file staging
+         out = out_of(r)
+         self.assertEqual((out["active"], out["cheat_apply"], attempts), (True, 1, 0))   # RetroArch: no launch_kind
+         self.assertTrue(out["popen"][0][0].endswith("RetroArch-Linux-x86_64.AppImage"), out["popen"])
+diff --git a/tests/b87_cheat_ready/test_b87.py b/tests/b87_cheat_ready/test_b87.py
+index 80c087b9..a7deee7d 100644
+--- a/tests/b87_cheat_ready/test_b87.py
++++ b/tests/b87_cheat_ready/test_b87.py
+@@ -26,7 +26,7 @@ sys.path.insert(0, str(ART))
+ import _tmp_cleanup  # noqa: E402,F401
+ import test_b85 as b85  # noqa: E402
+ 
+-FLAGS = b85.FLAGS
++FLAGS = {**b85.FLAGS, "PRIVYHUB_CHEAT_STAGED": "0"}   # B90: this suite pins the walk; tests/b90_cheat_staged the rest
+ OFF = {**FLAGS, "PRIVYHUB_CHEAT_READY": "0"}
+ DOTTED = "Made Up v1.1 (USA).v64"                  # a title whose name holds a dot (RetroArch: "Made Up v1.cht")
+ ROWS = [(f"Made Up Cheat {i}", f"8010{i:04X} 0001") for i in range(6)]
+diff --git a/companion/launch_orphan.py b/companion/launch_orphan.py
+new file mode 100644
+index 00000000..e1c81730
+--- /dev/null
++++ b/companion/launch_orphan.py
+@@ -0,0 +1,38 @@
++"""B90: a game launch answered to a client that has gone.
++
++The onn waits 60 s for the launch's answer (its control read timeout). When the launch returns after the client has
++closed its connection, or after that wait, or the answer cannot be written, nobody will ever see the game: the hub stops
++it (the plugin's own Stop path) and writes one `launch_orphaned` row. PRIVYHUB_CHEAT_STAGED=0: today's answer path.
++"""
++
++from __future__ import annotations
++
++import os
++import select
++import socket
++
++CLIENT_WAIT_SECONDS = 60.0     # the onn's CONTROL_READ_TIMEOUT_MS
++
++
++def enabled() -> bool:
++    return str(os.environ.get("PRIVYHUB_CHEAT_STAGED", "")).strip() != "0"
++
++
++def client_gone(conn: socket.socket) -> bool:
++    """True when the peer has closed its side: the socket reads as ready and a peek returns nothing (or fails)."""
++    try:
++        ready, _w, _x = select.select([conn], [], [], 0)
++        if not ready:
++            return False
++        return conn.recv(1, socket.MSG_PEEK) == b""
++    except (OSError, ValueError):
++        return True
++
++
++def reason(conn: socket.socket, elapsed_s: float) -> str | None:
++    """Why the launch's answer would reach nobody, or None to answer as today."""
++    if client_gone(conn):
++        return "client_closed"
++    if elapsed_s >= CLIENT_WAIT_SECONDS:
++        return "client_wait_passed"
++    return None
+diff --git a/tests/b90_cheat_staged/test_b90.py b/tests/b90_cheat_staged/test_b90.py
+new file mode 100644
+index 00000000..d2acc2b6
+--- /dev/null
++++ b/tests/b90_cheat_staged/test_b90.py
+@@ -0,0 +1,343 @@
++#!/usr/bin/env python3
++"""B90 (host): the cheat launch without walking the list, and no game left running when the onn has hung up.
++
++Every case goes through **the companion's real HTTP server on loopback** (tests/client_contract's form): a child
++`python3 -I` on B85's / B87's fixture tree (its own companion/), the companion's own `privyhub_service` handler on a
++`ThreadingHTTPServer` at 127.0.0.1:0, and the onn's call `POST /plugins/games/launch?id=…&cheat_source=0&cheat_indexes=…`
++sent by an HTTP client in the child. RetroArch is B87's fake on loopback (a thread on the UDP command port the hub
++configured, writing RetroArch's own log lines into the hub's game log), **extended to apply at load**: it reads the
++session config, loads the cheat file only under RetroArch's own name and folder, and with `apply_cheats_after_load` on
++marks the file's enabled cheats on and logs `Applying cheat changes.`; pulses before its core "runs" are lost.
++No emulator, no network beyond loopback; made-up titles, names and codes; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/b90_cheat_staged -v
++"""
++
++from __future__ import annotations
++
++import json
++import os
++import re
++import subprocess
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "art_systems"))
++sys.path.insert(0, str(ROOT / "tests" / "b87_cheat_ready"))
++import _tmp_cleanup  # noqa: E402,F401
++import test_b85 as b85  # noqa: E402
++import test_b87 as b87  # noqa: E402
++
++FLAGS = {**b85.FLAGS, "PRIVYHUB_SNES_CORE": "snes9x"}         # the hub's own SNES core
++OFF = {**FLAGS, "PRIVYHUB_CHEAT_STAGED": "0"}
++SNES_TITLE = ("snes", "Golf Hotel (USA)")
++
++
++def rows(n: int) -> list[tuple[str, str]]:
++    """B85's twelve shapes (a "must be on" code, parts, a heading, a conditional…) then made-up plain cheats."""
++    return list(b85.N64_ROWS) + [(f"Made Up Cheat {i}", f"8030{(2 * i) & 0xFFFF:04X} 0001") for i in range(12, n)]
++
++
++CHILD = r'''
++import json, os, re, socket, subprocess, sys, threading, time, types, urllib.request, urllib.error
++from pathlib import Path
++root = Path(sys.argv[1]).resolve()
++args = json.loads(sys.argv[2])
++_connect = socket.socket.connect
++def _guard(self, addr, *a, **k):
++    if isinstance(addr, tuple) and addr[0] not in ("127.0.0.1", "localhost", "::1"):
++        raise OSError("network beyond loopback blocked by the test")
++    return _connect(self, addr, *a, **k)
++socket.socket.connect = _guard
++def _run(cmd, *a, **k):
++    return types.SimpleNamespace(returncode=1, stdout=b"" if not k.get("text") else "", stderr="")
++subprocess.run = _run
++sys.path.insert(0, str(root / "companion"))
++import privyhub_service as svc
++from plugins import PLUGINS
++from games import emulator_manager as em
++g = PLUGINS["games"]
++g._metadata_reconcile_thread.join(120)
++m = g._emulator
++class Inert:
++    def __getattr__(self, name): return Inert()
++    def __call__(self, *a, **k): return {}
++    def __bool__(self): return False
++g._native_stream = Inert()
++events = {"toggles": 0, "pulses": 0, "lost": 0, "loaded": False, "applied_at_load": 0, "folder": None, "save_files": 0}
++class FakeRetroArch:
++    def __init__(self, cmd, **kw):
++        self.pid = 999999999; self.returncode = None; self.stdin = None
++        self.out = kw.get("stdout"); self.content = Path(cmd[-1]); self.t0 = time.monotonic()
++        self.paused = False; self.cursor = 0; self.on = {}; self.stop = False
++        text = (root / "data/games/retroarch/config/privyhub-session.cfg").read_text()
++        events["config_apply_lines"] = len(re.findall(r'(?m)^apply_cheats_after_load = "true"$', text))
++        self.apply = events["config_apply_lines"] == 1 and not args.get("ignore_apply")
++        db = Path(re.search(r'cheat_database_path = "([^"]+)"', text).group(1))
++        stem = self.content.stem
++        ra_name = Path(stem).stem if "." in stem else stem          # RetroArch's own rule (B87, measured)
++        self.names, self.enabled, self.file = {}, {}, None
++        for folder in ("Mupen64Plus-Next", "Beetle PSX HW", "Snes9x"):   # the cores' library names (B90, measured)
++            if (db / folder / f"{ra_name}.cht").is_file():
++                self.file = db / folder / f"{ra_name}.cht"; events["folder"] = folder
++        if self.file is not None:
++            body = self.file.read_text()
++            events["staged_file"] = body
++            for line in body.splitlines():
++                mm = re.match(r'cheat(\d+)_desc = "(.*)"', line)
++                if mm: self.names[int(mm.group(1))] = mm.group(2)
++                mm = re.match(r'cheat(\d+)_enable = (\w+)', line)
++                if mm: self.enabled[int(mm.group(1))] = mm.group(2) == "true"
++        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        self.sock.bind(("127.0.0.1", int(m._network_cmd_port)))
++        self.sock.settimeout(0.05)
++        threading.Thread(target=self.serve, daemon=True).start()
++    def log(self, line):
++        self.out.write(line + "\n"); self.out.flush()
++    def serve(self):
++        load_at = args.get("load_at")
++        while not self.stop:
++            now = time.monotonic() - self.t0
++            if load_at is not None and not events["loaded"] and now >= load_at and self.names:
++                events["loaded"] = True
++                self.log('[INFO] [Cheats] Load game-specific cheatfile: "<fixture>".')
++                if self.apply:
++                    self.on = {i: True for i, e in self.enabled.items() if e}
++                    events["applied_at_load"] = len(self.on)
++                    self.log("[INFO] [Cheats] Applying cheat changes.")
++            try:
++                data, addr = self.sock.recvfrom(4096)
++            except OSError:
++                continue
++            c = data.decode().strip()
++            running = now >= args.get("run_at", 0.0)
++            if c == "GET_STATUS":
++                self.sock.sendto(f"GET_STATUS {'PAUSED' if self.paused else 'PLAYING'} n64,fixture,crc32=0".encode(), addr)
++            elif c == "PAUSE_TOGGLE":
++                self.paused = not self.paused
++            elif c == "SAVE_FILES":
++                events["save_files"] += 1
++                self.sock.sendto(b"SAVE_FILES OK", addr)
++            elif c == "CHEAT_INDEX_PLUS":
++                events["pulses"] += 1
++                if not (running and events["loaded"]):
++                    events["lost"] += 1
++                    continue
++                if not args.get("stuck_cursor"):
++                    self.cursor = (self.cursor + 1) % len(self.names)
++                st = "on" if self.on.get(self.cursor) else "off"
++                self.log(f"[INFO] [Cheats] Cheat #{self.cursor}: {self.names[self.cursor]}: {st}")
++            elif c == "CHEAT_TOGGLE":
++                events["toggles"] += 1
++                self.on[self.cursor] = not self.on.get(self.cursor)
++                self.log("[INFO] [Cheats] Applying cheat changes.")
++    def poll(self): return self.returncode
++    def wait(self, timeout=None):
++        self.returncode = 0; self.stop = True; return 0
++    def terminate(self): self.returncode = -15; self.stop = True
++    def kill(self): self.returncode = -9; self.stop = True
++em.subprocess.Popen = FakeRetroArch
++from http.server import ThreadingHTTPServer
++httpd = ThreadingHTTPServer(("127.0.0.1", 0), svc.PrivyHubRequestHandler)
++threading.Thread(target=httpd.serve_forever, daemon=True).start()
++port = httpd.server_address[1]
++out = {}
++def call(method, path, timeout=120):
++    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", method=method, data=b"" if method == "POST" else None)
++    try:
++        with urllib.request.urlopen(req, timeout=timeout) as r:
++            return r.status, json.loads(r.read().decode())
++    except urllib.error.HTTPError as e:
++        return e.code, json.loads(e.read().decode() or "{}")
++path = f"/plugins/games/launch?id={args['id']}&cheat_source=0&cheat_indexes={args['picks']}"
++t = time.monotonic()
++if args.get("hang_up_after") is None:
++    status, body = call("POST", path)
++    out["status"], out["error"] = status, body.get("error")
++    s = body.get("cheat_session") or {}
++else:                                   # the onn gives up: its socket closed before the launch answers
++    c = socket.create_connection(("127.0.0.1", port))
++    c.sendall(f"POST {path} HTTP/1.1\r\nHost: hub\r\nContent-Length: 0\r\n\r\n".encode())
++    time.sleep(args["hang_up_after"])
++    c.close()
++    deadline = time.monotonic() + 60
++    while time.monotonic() < deadline and m.process is None:
++        time.sleep(0.05)
++    with m.lock:                         # the launch's own lock: held until the launch returns
++        pass
++    log = root / "logs/games/native_stream_recovery.log"
++    settle = time.monotonic() + args.get("settle", 8.0)
++    while time.monotonic() < settle and not (log.is_file() and '"launch_orphaned"' in log.read_text()):
++        time.sleep(0.05)
++    time.sleep(0.3)
++    s = m._active_cheat_session or {}
++out["elapsed"] = round(time.monotonic() - t, 2)
++out["session"] = {k: s.get(k) for k in ("enabled_cheat_indexes", "activation_verified", "activation_mode",
++                                        "activation_pulses", "staged", "activation_verification_lines")}
++out["events"] = events
++st, body = call("GET", "/plugins/games/status")
++out["status_read"] = {"code": st, "active": body.get("active")}
++log = root / "logs/games/native_stream_recovery.log"
++out["orphan_rows"] = [json.loads(l) for l in log.read_text().splitlines()
++                      if '"launch_orphaned"' in l] if log.is_file() else []
++httpd.shutdown()
++print(json.dumps(out))
++'''
++
++
++def tree(n_rows: int = 2092):
++    """B87's tree (B85's titles, a dotted N64 title), the N64 title's list made `n_rows` long, a SNES list, the
++    snes9x core file the hub runs."""
++    root, ids, _dotted = b87.tree()
++    rel_of = {g[2]: g[3] for g in b85.b83.b82.scan(root, FLAGS)["games"]}
++    ids[SNES_TITLE] = next(g[2] for g in b85.b83.b82.scan(root, FLAGS)["games"] if (g[0], g[1]) == SNES_TITLE)
++    b85.manifest(root, [("n64", ids[b85.N64_TITLE], rel_of[ids[b85.N64_TITLE]], b85.cht(rows(n_rows))),
++                        ("ps1", ids[b85.PS1_TITLE], rel_of[ids[b85.PS1_TITLE]], b85.cht(b85.PS1_ROWS)),
++                        ("snes", ids[SNES_TITLE], rel_of[ids[SNES_TITLE]],
++                         b85.cht([("Made Up Lives", "7E0100:09"), ("Made Up Time", "7E0102:63")]))])
++    (root / b85.b83.CORES / "snes9x_libretro.so").write_bytes(b"\x7fELF")
++    return root, ids
++
++
++def launch(root: Path, env: dict, gid: str, picks: str, **fake) -> dict:
++    child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    child_env.update(env)
++    xdg = root / "xdg"
++    xdg.mkdir(exist_ok=True)
++    child_env.update({"XDG_CONFIG_HOME": str(xdg), "HOME": str(xdg)})
++    r = subprocess.run([sys.executable, "-I", "-B", "-c", CHILD, str(root), json.dumps({"id": gid, "picks": picks, **fake})],
++                       cwd=root, env=child_env, capture_output=True, text=True, timeout=900)
++    assert r.returncode == 0, r.stderr[-3000:]
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++def todays_walk(desired: list[int], length: int) -> int:
++    """Today's answered pulses on the fake: the ready probe's one, then per pick the forward walk to it and a full lap
++    back to it."""
++    cursor, answered = 1, 1
++    for p in desired:
++        answered += ((p - cursor - 1) % length) + 1 + length
++        cursor = p
++    return answered
++
++
++class Staged(unittest.TestCase):
++    def check_staged(self, picks: str, n_rows: int = 2092):
++        root, ids = tree(n_rows)
++        out = launch(root, FLAGS, ids[b85.N64_TITLE], picks, load_at=0.05, run_at=0.6)
++        self.assertEqual(out["status"], 200, out)
++        s = out["session"]
++        self.assertTrue(s["activation_verified"])
++        self.assertEqual(s["activation_mode"], "staged")
++        desired = s["enabled_cheat_indexes"]
++        k = len(desired)
++        self.assertEqual(s["staged"]["source_indexes"], desired)
++        ev = out["events"]
++        self.assertEqual(ev["toggles"], 0)                                   # no toggle, no walk
++        self.assertEqual(ev["applied_at_load"], k)
++        self.assertEqual(ev["config_apply_lines"], 1)
++        self.assertLessEqual(ev["pulses"] - ev["lost"], 1 + 2 * k + 4)        # the count, not time alone
++        self.assertLessEqual(s["activation_pulses"], 2 * k + 4)
++        self.assertTrue(out["status_read"]["active"])
++        self.assertEqual(out["orphan_rows"], [])
++        return out, desired
++
++    def test_a_2092_entry_list_one_pick(self):
++        out, desired = self.check_staged("2000")
++        self.assertEqual(desired, [2, 2000])                                   # the pick + B85's "must be on" code
++        self.assertLess(out["elapsed"], 15.0)
++
++    def test_a_2092_entry_list_three_picks_with_parts_and_the_last_entry(self):
++        out, desired = self.check_staged("0,5,2091")
++        self.assertEqual(desired, [0, 2, 5, 6, 2091])
++        self.assertLess(out["elapsed"], 15.0)
++
++    def test_the_staged_files_contents(self):
++        out, desired = self.check_staged("5,1500", n_rows=1600)
++        body = out["events"]["staged_file"]
++        src = rows(1600)
++        want = [f"cheats = {len(desired)}", ""]
++        for j, i in enumerate(desired):
++            want += [f'cheat{j}_desc = "{src[i][0]}"', f'cheat{j}_code = "{src[i][1]}"', f"cheat{j}_enable = true", ""]
++        self.assertEqual(body, "\n".join(want) + "\n")
++        self.assertEqual(out["session"]["staged"]["descriptions"], [src[i][0] for i in desired])
++
++
++    def test_a_retroarch_that_does_not_apply_at_load_fails_closed(self):
++        root, ids = tree(100)
++        out = launch(root, FLAGS, ids[b85.N64_TITLE], "50", load_at=0.05, run_at=0.0, ignore_apply=True)
++        self.assertEqual(out["status"], 503, out)
++        self.assertIn("did not apply the staged cheats at load", out["error"])
++        self.assertFalse(out["status_read"]["active"])                        # stopped, never left running
++        self.assertEqual(out["events"]["toggles"], 0)
++
++
++    def test_a_cheat_never_reported_stops_within_the_pulse_bound(self):
++        root, ids = tree(100)
++        out = launch(root, FLAGS, ids[b85.N64_TITLE], "50", load_at=0.05, run_at=0.0, stuck_cursor=True)
++        self.assertEqual(out["status"], 503, out)
++        self.assertIn("did not report every staged cheat", out["error"])
++        k = 2                                                                  # the pick + its "must be on" code
++        self.assertLessEqual(out["events"]["pulses"] - out["events"]["lost"], 1 + 2 * k + 4)   # bounded, not timed out
++        self.assertFalse(out["status_read"]["active"])
++
++
++class TodayAndTheKnob(unittest.TestCase):
++    def test_the_knob_zero_is_todays_walk_and_config(self):
++        root, ids = tree(40)
++        out = launch(root, OFF, ids[b85.N64_TITLE], "30", load_at=0.05, run_at=0.0)
++        self.assertEqual(out["status"], 200, out)
++        s = out["session"]
++        self.assertTrue(s["activation_verified"])
++        self.assertIsNone(s["activation_mode"])
++        self.assertIsNone(s["staged"])
++        ev = out["events"]
++        self.assertEqual(ev["config_apply_lines"], 0)
++        self.assertEqual(ev["applied_at_load"], 0)
++        self.assertEqual(ev["toggles"], len(s["enabled_cheat_indexes"]))
++        self.assertEqual(ev["pulses"] - ev["lost"], todays_walk(s["enabled_cheat_indexes"], 40))
++        self.assertIn("cheat0_enable = false", ev["staged_file"])            # today's whole file, all off
++        self.assertEqual(ev["staged_file"].count("_desc ="), 40)
++
++    def test_snes_staged_under_the_running_cores_name(self):
++        root, ids = tree(20)
++        on = launch(root, FLAGS, ids[SNES_TITLE], "1", load_at=0.05, run_at=0.0)
++        self.assertEqual(on["status"], 200, on)
++        self.assertEqual(on["events"]["folder"], "Snes9x")
++        self.assertTrue(on["session"]["activation_verified"])
++        off = launch(tree(20)[0], OFF, ids[SNES_TITLE], "1", load_at=0.05, run_at=0.0)
++        self.assertIsNone(off["events"]["folder"])                          # today: under bsnes, never read…
++        self.assertIn("cheats not ready", off["error"])                       # …B87's plain error, the game stopped
++        self.assertFalse(off["status_read"]["active"])
++
++
++class HangUp(unittest.TestCase):
++    def test_a_client_that_hangs_up_leaves_no_game_running(self):
++        root, ids = tree(40)
++        out = launch(root, FLAGS, ids[b85.N64_TITLE], "30", load_at=0.05, run_at=1.5, hang_up_after=0.3)
++        self.assertFalse(out["status_read"]["active"], out)                 # the onn's next status read: no game
++        self.assertEqual(len(out["orphan_rows"]), 1, out)
++        row = out["orphan_rows"][0]
++        self.assertEqual((row["reason"], row["stopped"]), ("client_closed", True))
++        self.assertGreaterEqual(out["events"]["save_files"], 1)              # the onn's own Stop path (the save flush)
++
++    def test_the_knob_zero_leaves_it_running_as_today(self):
++        root, ids = tree(40)
++        out = launch(root, OFF, ids[b85.N64_TITLE], "30", load_at=0.05, run_at=1.5, hang_up_after=0.3)
++        self.assertTrue(out["status_read"]["active"], out)
++        self.assertEqual(out["orphan_rows"], [])
++
++
++class ContractListed(unittest.TestCase):
++    def test_the_onns_launch_call_is_in_the_contract(self):
++        calls = json.loads((ROOT / "tests/client_contract/calls.json").read_text())["calls"]
++        launch_call = [c for c in calls if c["path"] == "/plugins/games/launch"]
++        self.assertEqual([c["method"] for c in launch_call], ["POST"])
++        self.assertTrue({"id", "cheat_source", "cheat_indexes"} <= set(launch_call[0]["params"]))
++
++
++if __name__ == "__main__":
++    unittest.main()

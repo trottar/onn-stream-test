@@ -219,6 +219,119 @@ object MappingPicture {
     /** B86's map of each control's place (x, y as fractions of the picture), now the centres of B89's boxes. */
     val LAYOUT: Map<String, Pair<Float, Float>> = BOXES.associate { it.id to (it.cx to it.cy / ASPECT) }
 
+    // --- B91: the picture beside the rows, its labels at the rows' text size, boxes never overlapping -----------------
+
+    /** The controller's share of the beside view's width, its top margin, and the view's height / width (B91). */
+    const val CONTROLLER_SHARE = 0.86f
+    const val BESIDE_TOP = 0.05f
+    const val BESIDE_ASPECT = 0.74f
+
+    /** Where each control's label sits when it fits there (controller width units): B89's box centres, the triggers'
+     *  and shoulders' spread apart in their shapes, the D-pad arrows at the arms' ends, Select's under it and Start's
+     *  above it, the stick directions further out. */
+    val ANCHORS: Map<String, Pair<Float, Float>> = run {
+        val a = LinkedHashMap<String, Pair<Float, Float>>()
+        for (b in BOXES) a[b.id] = b.cx to b.cy
+        a["up"] = 0.24f to 0.225f; a["down"] = 0.24f to 0.375f; a["left"] = 0.165f to 0.30f; a["right"] = 0.315f to 0.30f
+        a["l2"] = 0.23f to 0.035f; a["r2"] = 0.77f to 0.035f; a["l"] = 0.23f to 0.105f; a["r"] = 0.77f to 0.105f
+        a["select"] = 0.41f to 0.283f; a["start"] = 0.575f to 0.205f                       // Select under, Start above
+        for ((stick, cx) in listOf("left" to 0.37f, "right" to 0.63f)) {
+            a["${stick}_stick_up"] = cx to 0.325f; a["${stick}_stick_down"] = cx to 0.495f
+            a["${stick}_stick_left"] = (cx - 0.095f) to 0.41f; a["${stick}_stick_right"] = (cx + 0.095f) to 0.41f
+        }
+        a
+    }
+
+    /** The shape a label belongs to (its own shape may lie under it; any other control's may not). */
+    fun shapeOf(id: String): String = when {
+        id in setOf("up", "down", "left", "right") -> "dpad"
+        id.startsWith("left_stick_") -> "l3"
+        id.startsWith("right_stick_") -> "r3"
+        else -> id
+    }
+
+    /** Each control shape's bounds (controller width units). */
+    val SHAPE_BOUNDS: Map<String, Box> = SHAPES.mapNotNull {
+        when (it) {
+            is Shape.RoundRect -> Box(it.id, it.x, it.y, it.w, it.h)
+            is Shape.Circle -> Box(it.id, it.cx - it.r, it.cy - it.r, 2 * it.r, 2 * it.r)
+            is Shape.Cross -> Box(it.id, it.cx - it.arm, it.cy - it.arm, 2 * it.arm, 2 * it.arm)
+            else -> null
+        }
+    }.associateBy { it.id }
+
+    /** A label as drawn: its box in the view's pixels, its control's point, and whether a leader line joins them. */
+    data class Placed(val id: String, val text: String, val box: Box, val ax: Float, val ay: Float,
+                      val leader: Boolean, val changed: Boolean)
+
+    /** The beside view's height for a view `w` px wide. */
+    fun besideHeight(w: Int): Int = (w * BESIDE_ASPECT).toInt()
+
+    /** The controller's scale and offset (px) in a beside view `w` px wide. */
+    fun besideScale(w: Float): Float = CONTROLLER_SHARE * w
+    fun besideLeft(w: Float): Float = (1f - CONTROLLER_SHARE) / 2f * w
+    fun besideTop(w: Float): Float = BESIDE_TOP * w
+
+    /** B91's placement: every label at `textPx`, boxes = text width + ½ text height, 1.3 text heights tall. Pass 1 puts
+     *  each at its control when it overlaps no placed box and no other control's shape; pass 2 moves the rest outward
+     *  (rings of ¼ text height, 16 directions, the outward one first) to the first free place inside the view, with a
+     *  leader. `measure` is the drawing font's width of a text at `textPx`. Never returns overlapping boxes: a label
+     *  with no free place is left out (the tests require none is). */
+    fun placeLabels(viewW: Float, viewH: Float, textPx: Float, mapping: Map<String, String>, default: Map<String, String>,
+                    measure: (String) -> Float): List<Placed> =
+        placeLabelTexts(viewW, viewH, textPx, shortLabels(mapping), changed(mapping, default), measure)
+
+    /** [placeLabels] for given texts per control and the changed set (stick directions drawn only when changed). */
+    fun placeLabelTexts(viewW: Float, viewH: Float, textPx: Float, labels: Map<String, String>, changed: Set<String>,
+                        measure: (String) -> Float): List<Placed> {
+        val k = besideScale(viewW); val ox = besideLeft(viewW); val oy = besideTop(viewW)
+        val shapes = SHAPE_BOUNDS.mapValues { (_, b) -> Box(b.id, ox + b.x * k, oy + b.y * k, b.w * k, b.h * k) }
+        val h = 1.3f * textPx
+        val order = listOf("a", "b", "x", "y", "l", "r", "l2", "r2", "up", "down", "left", "right", "select", "start",
+                           "l3", "r3") + ANCHORS.keys.filter { it.contains("stick") }
+        val todo = order.filter { id -> labels[id] != null && !(id.contains("stick") && id !in changed) }
+        val placed = mutableListOf<Placed>()
+        val later = mutableListOf<String>()
+        fun boxAt(id: String, cx: Float, cy: Float, w: Float) = Box(id, cx - w / 2, cy - h / 2, w, h)
+        fun free(b: Box, id: String): Boolean =
+            b.x >= 0f && b.y >= 0f && b.x + b.w <= viewW && b.y + b.h <= viewH &&
+                placed.none { it.box.overlaps(b) } &&
+                shapes.none { (sid, sb) -> sid != shapeOf(id) && sb.overlaps(b) }
+        for (id in todo) {
+            val text = labels.getValue(id)
+            val (u, v) = ANCHORS.getValue(id)
+            val ax = ox + u * k; val ay = oy + v * k
+            val b = boxAt(id, ax, ay, measure(text) + 0.5f * textPx)
+            if (free(b, id)) placed += Placed(id, text, b, ax, ay, false, id in changed) else later += id
+        }
+        val cx0 = ox + 0.5f * k; val cy0 = oy + 0.33f * k
+        for (id in later) {
+            val text = labels.getValue(id)
+            val (u, v) = ANCHORS.getValue(id)
+            val ax = ox + u * k; val ay = oy + v * k
+            val w = measure(text) + 0.5f * textPx
+            val out = Math.atan2((ay - cy0).toDouble(), (ax - cx0).toDouble())
+            val dirs = (0 until 16).map { it * Math.PI / 8 }
+                .sortedBy { d -> Math.abs(Math.IEEEremainder(d - out, 2 * Math.PI)) }
+            var found: Box? = null
+            var r = 0.25f * textPx
+            val maxR = viewW + viewH
+            while (found == null && r <= maxR) {
+                for (d in dirs) {
+                    val b = boxAt(id, ax + r * Math.cos(d).toFloat(), ay + r * Math.sin(d).toFloat(), w)
+                    if (free(b, id)) { found = b; break }
+                }
+                r += 0.25f * textPx
+            }
+            if (found != null) placed += Placed(id, text, found, ax, ay, true, id in changed)
+        }
+        return placed
+    }
+
+    /** The point of `b` nearest (x, y): where a leader line meets its box. */
+    fun nearest(b: Box, x: Float, y: Float): Pair<Float, Float> =
+        x.coerceIn(b.x, b.x + b.w) to y.coerceIn(b.y, b.y + b.h)
+
     fun parse(value: String?): Boolean = value?.trim().let { it != "0" && it != "off" }
 
     fun fromSystem(): Boolean =

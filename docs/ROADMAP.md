@@ -2954,6 +2954,14 @@ the picture larger, readable from the couch; then a new APK and C46 / C53 again
 source) and the art misses (PS2 15, GameCube 3); the rejected N64 list; the PS2 disc change (designed); Mods and
 GameCube discs (deferred); the user's own cheat files (the folders ready).
 
+**Queue AG (2026-11-11; HOME-12T's two findings; built, applied to the tree uncommitted, nothing adopted):** **B90**
+the cheat launch without walking the list — only the session's cheats staged, enabled, applied by RetroArch at load and
+verified in a handful of pulses (≤ 1.13 s on 2,092-entry fixtures, three cores), SNES cheats staged where snes9x reads
+them, and no game left running when the onn hangs up (`evidence/B90_CHEAT_STAGED_ENABLED_2026-11-11.md`); **B91** the
+mapping picture beside the rows, its labels at the rows' text size (`evidence/B91_MAPPING_PICTURE_BESIDE_ROWS_2026-11-11.md`).
+APK `218d9a82…` pinned, NOT installed. **Next (A):** HOME-12's fourth sitting — (a) the APK's cells C54 / C55 / C56,
+(b) the hub's C46 with the launch's seconds (`docs/memory/handoffs/SESSION_B_DONE_2026-11-11AG.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,
