@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-11 — H7-P3 (five states on T88: the user's two mid-fight saves added, unattended): evidence **"strong"**, decided, template h — **the game's cheat list's per-player pair reads who is ahead** in all five saves, mid-fight included; accepted; the proof met (5 × 3 of 3) → **T88's slots 1-3 erased** (the user's request; checked copies of all five kept); OPEN: the same read on a fight played on the stream (the independent check) — `## 2026-11-11 H7-P3` below
 - 2026-11-11 — H7-P2 (the search with folds and cheat-list hints on T88's three states, unattended): the user's three saves held as checked copies off their slots; evidence **"weak"** (each winner seen once), not decided → no proof, **nothing erased**; the game's cheat list points at one per-player level pair that reads right in all three saves; OPEN: two more TV saves (a 2nd P1 end into slot 2, a 2nd P2 end into slot 1) for "strong" — `## 2026-11-11 H7-P2` below
 - 2026-11-11 — Queue AJ (H7: B96 "decided" by held-out states and families, B97 hints from the game's own cheat list and a level that need not empty): "decided" = "strong" evidence only (two "end" states per winner, a family naming every held-out winner); on fixtures three states → "weak", five → "strong" and the planted rule; 23 of the hub's 116 cached PS1 cheat lists give hints — OPEN (A's H7-P2 on T88's states, unattended; with today's three states it can reach "weak" only; the user's two further 'end' saves make "strong" possible) — `docs/memory/evidence/B96_H7_HELD_OUT_AND_FAMILIES_2026-11-11.md`, `B97_H7_CHEAT_HINTS_AND_LEVEL_2026-11-11.md`
 - 2026-11-11 — H7-P1 (the win-rule search on T88's three real states, unattended): the states checked and copied; the headless load matched the hub; B94's search **NOT DECIDED** (a 8,520 / b 3,084 / c 163,475; would split: a second "end" won by P1) → no proof runs, **nothing erased** (the user's three saves kept); OPEN: one more TV save, or a tie-break among identical-looking candidates — `## 2026-11-11 H7-P1` below
@@ -81,6 +82,25 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-11 H7-P3: the cheat list's pair is "who is ahead" — strong, decided, proved; T88's proof slots erased
+
+(`docs/memory/evidence/H7_P3_2026-11-11.md`, `docs/memory/evidence/h7p3_2026-11-11/`)
+
+- **Decided:** with the user's two mid-fight saves ("slot 2: player 1 ahead", "slot 1: player 2 ahead") the search on
+  five states is **"strong"**, template h, the hinted pair (P1 0xa961e / P2 0xaaeaa) — accepted by the pre-registered
+  rule. It reads 0 / 0 at begin, 140 / 70 and 133 / 140 where each player won, **140 / 100 and 110 / 140 mid-fight** —
+  the leader higher every time. The proof met: 5 states × 3 of 3.
+- **Erased:** T88's slots 1, 2 and 3 (state + picture; the hub has no slot delete) on the user's HOME-12V request; the
+  listing reads them empty; slot 9, the Continue copy and every other game's saves unchanged. **Checked copies of all
+  five saves and `rule.json`** stay in the kept folder on the hub's own disk. The hub's slot index still names the three
+  files (the listing passes over them; the next SAVE rewrites an entry).
+- **OPEN (not shown yet):** the same read on a fight played on the stream — the independent check (the leader sits at
+  exactly 140 in all four "end" saves, so the number falling for both players across a fight is not yet seen; a
+  finished fight's loser is not at 0).
+- **OPEN (B's notes, carried):** (b2) and hinted pairs to answer only when hinted ((b2) here: 29,382 families, 1 of 4
+  folds run); some non-hinted (a), (b) and (c) families also pass all four folds — the hinted pair is the answer by
+  B97's order.
 
 ## 2026-11-11 H7-P2: the hinted pair reads right, the evidence weak — not decided; nothing erased
 

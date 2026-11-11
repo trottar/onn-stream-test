@@ -3100,6 +3100,16 @@ into slot 1 — copies kept) → H7-P2 with five states → the proof → the er
 to answer only when hinted; a fight played on the stream as the independent check. **The user's mini-game candidates:**
 `runtime/h7_minigame_candidates.md` (git-ignored; titles stay out of git) (`docs/memory/evidence/H7_P2_2026-11-11.md`).
 
+**H7-P3 (2026-11-11, unattended) — the first real rule, decided:** with the user's two mid-fight saves (P1 ahead in
+slot 2, P2 ahead in slot 1) the search on five states is **"strong"**, template h — **the game's cheat list's per-player
+pair reads who is ahead** in every save (0 / 0 at begin; the leader higher at both finished fights and both mid-fight
+saves); accepted by the pre-registered rule; the proof met (5 states × 3 of 3); T88's proof slots 1-3 erased on the
+user's word, checked copies of all five kept. **What it does not yet show:** the same read on a fight played on the
+stream — the independent check (the leader sits at 140 in every "end" save; a falling number for both players is not
+yet seen). **Open (B's notes):** (b2) and hinted pairs to answer only when hinted; non-hinted (a) / (b) / (c) families
+also pass here — the hinted pair answers by B97's order. **Next after T88:** the 4-player title; the user's candidates
+are in `runtime/h7_minigame_candidates.md` (git-ignored) (`docs/memory/evidence/H7_P3_2026-11-11.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

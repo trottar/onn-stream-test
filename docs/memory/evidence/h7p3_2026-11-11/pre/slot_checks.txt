@@ -1,0 +1,9 @@
+# T88's slots (the hub's slot index and the files), read 2026-11-11T20:28:25Z — names and paths off the repo; H7-P2's close 2026-11-11T20:15:00Z
+slot 3: 2026-11-11T08:03:38Z 1,678,205 B sha256 361e4007a678…; the index agrees True; newer than H7-P2's close False; = its kept copy (begin.state, 361e4007a678…) True; named in the user's words False -> OK (unchanged; = begin.state)
+slot 2: 2026-11-11T20:24:28Z 2,015,821 B sha256 45dc8522c000…; the index agrees True; newer than H7-P2's close True; = its kept copy (end_p1.state, a0efb49b9101…) False; named in the user's words True -> OK (a new save, named: 'slot 2: player 1 ahead')
+slot 1: 2026-11-11T20:25:13Z 2,004,527 B sha256 183f40711858…; the index agrees True; newer than H7-P2's close True; = its kept copy (end_p2.state, ef011ec5277b…) False; named in the user's words True -> OK (a new save, named: 'slot 1: player 2 ahead')
+also T88 slot 9 (the hub's scratch slot, B55 / rewind_cores: 'not 1-3 (the user's)'; not a user slot): 2026-11-11T20:23:37Z 1,839,185 B sha256 8c3f93b43205… (not inputs; not touched)
+also T88 the Continue copy: 2026-11-11T20:25:13Z 2,004,527 B sha256 183f40711858… (not inputs; not touched)
+the Continue copy = slot 1 now (the last save made): True
+no other user slot (1-3) for T88 in the index: True
+result: all safe — five states
