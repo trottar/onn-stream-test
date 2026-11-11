@@ -3092,6 +3092,14 @@ the planted rule. **Next:** A's H7-P2 (unattended) on T88's states with the hint
 states; the user's two further "end" saves make "strong" possible; then the proof and, on the user's word, the erase.
 (`evidence/B96_H7_HELD_OUT_AND_FAMILIES_2026-11-11.md`, `evidence/B97_H7_CHEAT_HINTS_AND_LEVEL_2026-11-11.md`)
 
+**H7-P2 (2026-11-11, unattended):** the user's three T88 saves held as checked copies off their slots; the search with
+folds and the cheat-list hints on three states — **"weak", not decided** (each winner seen once); **the game's cheat list
+points at one per-player level** that reads equal before the fight and the winner's higher at each end (template h, the
+only hinted pair that holds); no proof, nothing erased. **Waits:** the user's two more "end" saves (P1 into slot 2, P2
+into slot 1 — copies kept) → H7-P2 with five states → the proof → the erase. **Open (B's notes):** (b2) and hinted pairs
+to answer only when hinted; a fight played on the stream as the independent check. **The user's mini-game candidates:**
+`runtime/h7_minigame_candidates.md` (git-ignored; titles stay out of git) (`docs/memory/evidence/H7_P2_2026-11-11.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

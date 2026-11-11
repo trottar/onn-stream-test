@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-11 — H7-P2 (the search with folds and cheat-list hints on T88's three states, unattended): the user's three saves held as checked copies off their slots; evidence **"weak"** (each winner seen once), not decided → no proof, **nothing erased**; the game's cheat list points at one per-player level pair that reads right in all three saves; OPEN: two more TV saves (a 2nd P1 end into slot 2, a 2nd P2 end into slot 1) for "strong" — `## 2026-11-11 H7-P2` below
 - 2026-11-11 — Queue AJ (H7: B96 "decided" by held-out states and families, B97 hints from the game's own cheat list and a level that need not empty): "decided" = "strong" evidence only (two "end" states per winner, a family naming every held-out winner); on fixtures three states → "weak", five → "strong" and the planted rule; 23 of the hub's 116 cached PS1 cheat lists give hints — OPEN (A's H7-P2 on T88's states, unattended; with today's three states it can reach "weak" only; the user's two further 'end' saves make "strong" possible) — `docs/memory/evidence/B96_H7_HELD_OUT_AND_FAMILIES_2026-11-11.md`, `B97_H7_CHEAT_HINTS_AND_LEVEL_2026-11-11.md`
 - 2026-11-11 — H7-P1 (the win-rule search on T88's three real states, unattended): the states checked and copied; the headless load matched the hub; B94's search **NOT DECIDED** (a 8,520 / b 3,084 / c 163,475; would split: a second "end" won by P1) → no proof runs, **nothing erased** (the user's three saves kept); OPEN: one more TV save, or a tie-break among identical-looking candidates — `## 2026-11-11 H7-P1` below
 - 2026-11-11 — Queue AI (H7: B94 the win-rule search, B95 a state read as it stands): from labelled save states the tool finds candidate win rules and says "decided" only when one template leaves exactly one; on fixtures begin + one end is never decided, an end won by the other player decides it; a state loaded paused is read exactly (0 frames); the proof's statement corrected (a state replayed headless does not replay the fight) — OPEN (A's H7-P1 on T88's states, unattended) — `docs/memory/evidence/B94_H7_RULE_SEARCH_2026-11-11.md`, `B95_H7_STATE_AS_IS_2026-11-11.md`
@@ -80,6 +81,22 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-11 H7-P2: the hinted pair reads right, the evidence weak — not decided; nothing erased
+
+(`docs/memory/evidence/H7_P2_2026-11-11.md`, `docs/memory/evidence/h7p2_2026-11-11/`)
+
+- **The user's three saves are held as checked copies** (the kept folder on the hub's own disk, read back by hash); the
+  user may save over slots 2 and 1.
+- **What the cheat list points at:** one per-player level (0 / 0 before the fight; 140 / 70 where P1 won; 133 / 140
+  where P2 won) — the only hinted pair that holds; template (h) 1 passing family, but **"weak"**: each winner seen once,
+  so no held-out check.
+- **OPEN (the user, at the TV, no Code needed):** LOAD slot 3, let P1 win, SAVE into slot 2; LOAD slot 3, let P2 win, SAVE
+  into slot 1; then the read line naming both → H7-P2 again with five states (then the proof, and the erase the user asked
+  for).
+- **OPEN (B's notes):** (b2) and hinted pairs to answer only when hinted ((b2) here: over 200,000 candidates, unrankable);
+  a fight played on the stream as the independent check of any rule.
+- **Still OPEN:** the erase of T88's proof slots (the user's request, HOME-12V) — waits for a decided, proved rule.
 
 ## 2026-11-11 Queue AJ (B96, B97): "decided" redefined; hints from the cheat list; (b2)
 
