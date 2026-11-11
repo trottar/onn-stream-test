@@ -2973,6 +2973,12 @@ and those two cells. **What stays open in H6:** the PS2 disc change (designed); 
 details and the art misses (PS2 15, GameCube 3); the rejected N64 list; Mods and GameCube discs (deferred); the user's
 own cheat files (the folders ready) (`docs/memory/evidence/HOME_12U_PARITY_2026-11-11.md`).
 
+**Queue AH (2026-11-11; H6's last quick fixes, the user: "H6 only has a few quick fixes so let's do that then into
+h7"):** **B92** the mapping list's changed rows yellow, as on the picture (APK `ca53df0d…` pinned, NOT installed); the
+SNES cheat's miss settled as not the hub's (every SNES code form applies on the bench); the `GET active-cheats` 400s were
+A's watcher. **Next (A):** HOME-12V, a short check — C58 the list's yellow (the APK), C59 an SNES cheat from the matching
+list (the hub) (`docs/memory/handoffs/SESSION_B_DONE_2026-11-11AH.md`). Then H7's hub side.
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,
@@ -2990,6 +2996,12 @@ The user ranks the gaps; the first ranked item is the next parity work.
 next").** Adopted into the roadmap on the user's "Adopt" (2026-11-10); the wording was shown to the user first.
 
 **PC-side preparation started on the user's word (2026-11-10), in a separate repo; the hub side not started.** The PrivyHub repo and the hub's Code sessions are not touched by the PC work; the hub pulls the game repo only when H7's hub side starts.
+
+**The hub side begun (2026-11-11, the user: "H6 only has a few quick fixes so let's do that then into h7"):**
+RetroArch's read-memory command answered on every core in use (B90 / B92 benches); **B93** `tools/h7_minigame_proof.py`
+— the first step as a tool (load a state → run a fixed time → read memory → the winner), met on a synthetic SNES ROM
+(3 / 3 each way; `evidence/B93_H7_MINIGAME_PROOF_2026-11-11.md`). **Waits for the user:** which SNES game for the real
+proof, its state made at the TV, its score addresses; Godot on the hub and the game repo (fetches, on the user's word).
 
 **Design notes:** `docs/memory/architecture/H7_PRIVYPARTY_DESIGN_NOTES_2026-11-10.md` — the art direction (photo textures on low-polygon models, a fixed camera, gibberish speech with subtitles), one template body with proportion numbers, one shared animation set, the licensing rule and the emulator audit it needs, the PC / hub / drive workflow, what goes ahead on the PC and what waits, the open measurements. **The PC side's kickoff brief:** `docs/memory/handoffs/PRIVYPARTY_PC_KICKOFF_BRIEF_2026-11-10.md`. Real player photos never go into git.
 

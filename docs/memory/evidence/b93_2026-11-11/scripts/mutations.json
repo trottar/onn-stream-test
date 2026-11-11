@@ -1,0 +1,30 @@
+[
+ {
+  "id": "H1",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "    best = (max if winner == \"max\" else min)(values.values())",
+  "new": "    best = min(values.values())",
+  "why": "the rule's direction ignored"
+ },
+ {
+  "id": "H2",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "        self.send(\"LOAD_STATE_SLOT 0\")",
+  "new": "        pass",
+  "why": "the state never loaded"
+ },
+ {
+  "id": "H3",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "    if len(parts) < 3 or parts[2] == \"-1\" or len(parts) < 2 + n:",
+  "new": "    if len(parts) < 3:",
+  "why": "a missing-memory answer not refused"
+ },
+ {
+  "id": "H4",
+  "file": "tools/h7_minigame_proof.py",
+  "old": "        time.sleep(seconds)\n",
+  "new": "        pass\n",
+  "why": "no fixed run time"
+ }
+]

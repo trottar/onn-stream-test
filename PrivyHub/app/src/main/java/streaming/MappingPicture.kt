@@ -69,6 +69,15 @@ object MappingPicture {
         return now.keys.filter { now[it] != before[it] }.toSet()
     }
 
+    /** B92: the editor's rows (targets) whose control differs from the default mapping — shown yellow in the list, as
+     *  the picture highlights them. A blank control counts as changed when the default has one. */
+    const val CHANGED_COLOR = 0xFFFFC107.toInt()
+
+    fun changedRows(mapping: Map<String, String>, default: Map<String, String>): Set<String> {
+        fun norm(v: String?) = v?.trim()?.lowercase().orEmpty()
+        return (mapping.keys + default.keys).filter { norm(mapping[it]) != norm(default[it]) }.toSet()
+    }
+
     // --- B89: the picture's geometry, in one place (the view, the SVG and the off-device render all draw this) -----
 
     /** The picture's height / width. Every shape below is in "width units": x in 0..1, y in 0..ASPECT. */

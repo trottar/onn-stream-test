@@ -11989,6 +11989,11 @@ class MainActivity : AppCompatActivity() {
 
             val invalid =
                 invalidTargets()
+            // B92: the rows changed from the default (only with the picture on)
+            val changedRows =
+                if (pictureView != null) com.safeiot.privyhub.streaming.MappingPicture.changedRows(
+                    working, editorDefault ?: emptyMap()
+                ) else emptySet()
 
             for (target in targets) {
 
@@ -12032,6 +12037,17 @@ class MainActivity : AppCompatActivity() {
                     )
                     changeButton.setTextColor(
                         0xFFFF5252.toInt()
+                    )
+                } else if (pictureView != null && target in changedRows) {
+                    // B92: a changed row yellow in the list too, as on the picture (red rows above win)
+                    targetLabel.setTextColor(com.safeiot.privyhub.streaming.MappingPicture.CHANGED_COLOR)
+                    currentLabel.setTextColor(
+                        defaultCurrentColors[target]
+                            ?: currentLabel.textColors
+                    )
+                    changeButton.setTextColor(
+                        defaultButtonColors[target]
+                            ?: changeButton.textColors
                     )
                 } else {
                     targetLabel.setTextColor(
