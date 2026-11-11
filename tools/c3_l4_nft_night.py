@@ -137,7 +137,9 @@ PKG = "com.safeiot.privyhub"
 # (kept at PrivyHub/app/build/home11_previous/app-debug.apk).
 # HOME-12U (CONFIRMED 2026-11-11): queue AG's APK replaced HOME-11's 85220f99f92f893968647c185ed98e17456fe9e9bc9cc7bdb550c7c735c04864
 # (kept at PrivyHub/app/build/home12u_previous/app-debug.apk).
-ADOPTED_APK_SHA256 = "218d9a82d564e0d63e8bc6cd5b8e9de95bddb033e8f6d0635dd870e19f62cd53"
+# HOME-12V (CONFIRMED 2026-11-11): queue AH's APK replaced HOME-12U's 218d9a82d564e0d63e8bc6cd5b8e9de95bddb033e8f6d0635dd870e19f62cd53
+# (kept at PrivyHub/app/build/home12v_previous/app-debug.apk).
+ADOPTED_APK_SHA256 = "ca53df0dac787607af749492393b5f343e3df775cd4581d44342a1a81ecd590d"
 REFERENCE_PROFILE = "native_game_720p60_reference"
 MODE_ENV = "PRIVYHUB_ADAPTIVE_BITRATE_MODE"
 # C3-L4-D1 (2026-10-01): live is the companion's default through the systemd drop-in

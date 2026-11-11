@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-11 — HOME-12V (a short check, then H7's first state): APK `ca53df0d…` installed with every property empty (twenty); C58 the changed rows yellow in the mapping list MET → **`ca53df0d…` CONFIRMED, the pin moved**; C59 an SNES cheat from the list matching the game file MET (~2 s) → B90's SNES part met; HOME-12U's two items closed; `GET active-cheats` rows 0 (they were A's old watcher); H7: a 2-player state made at the TV (a PS1 title, the user's pick), the user asked its saves erased after the proof — `## 2026-11-11 HOME-12V` below
 - 2026-11-11 — Queue AH (B92; HOME-12U's three items): the mapping list's changed rows yellow (B92, APK `ca53df0d…` built, NOT installed); the SNES cheat's miss is not the hub — snes9x applies every code form the lists use (bench) — a TV check with a cheat from the list that matches the game file; the `GET active-cheats` 400s were A's own watcher, not the onn — OPEN (A's HOME-12V short check) — `docs/memory/evidence/B92_MAPPING_LIST_CHANGED_ROWS_2026-11-11.md`
 - 2026-11-11 — HOME-12U (HOME-12's fourth sitting): APK `218d9a82…` installed with every property empty (twenty); C54 the picker's PS1 cheat, C55 PS2 Patches… (ticked, Save 200), C56 the picture beside the rows ("Looks almost perfect") MET → **`218d9a82…` CONFIRMED, the pin moved**; **C46 the N64 cheat MET in ~2 s** (HOME-12T ~107 s) → B90 / B87 met; **C57 an SNES cheat NOT MET** (staged where snes9x reads, loaded and reported on; the effect not seen); the user's new requirement: changed rows yellow in the list too; HOME-12T's two items closed — `## 2026-11-11 HOME-12U` below
 - 2026-11-11 — Queue AG (B90, B91; HOME-12T's two findings): B90 the cheat launch without walking the list — settled headless: RetroArch applies a loaded file's enabled cheats with no command on all three cores (`apply_cheats_after_load`); the hub now stages only the session's cheats, enabled, and verifies in ≤ 2k + 4 pulses (≤ 1.13 s on every fixture size vs today's 93-513 s); SNES cheats never loaded on the hub (snes9x reads `Snes9x/`, the hub staged `bsnes/`) — fixed; a launch whose client has hung up stops the game (`launch_orphaned`) (`PRIVYHUB_CHEAT_STAGED=0` = today); B91 the mapping picture beside the rows, its labels at the rows' text size (34 px vs B89's ~11 px); APK `218d9a82…` built, NOT installed — OPEN (A's HOME-12 fourth sitting) — `## 2026-11-11 Queue AG` below
@@ -76,6 +77,21 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-11 HOME-12V: the list's yellow and the SNES cheat met — ca53df0d… CONFIRMED; H7's first state made
+
+(`docs/memory/evidence/HOME_12V_PARITY_2026-11-11.md`, `docs/memory/evidence/home12v_2026-11-11/`)
+
+- **Closed from HOME-12U's list:** **the list's yellow** — the changed buttons' rows yellow in the list as on the
+  picture ("Looks great"; B92 on the CONFIRMED app); **the SNES cheat's effect** — a RAM Pro Action Replay code from the
+  list that matches the game file worked ("Yep cheat worked"; B90's SNES part met); **the `GET active-cheats` rows** — 0
+  this sitting with A's watcher on POST (they were A's own old watcher, not the onn).
+- **HOME-12U's C56 note closed:** the user, to Cowork, "Letters were great."
+- **Still open (H6):** `activation_verified` reads RetroArch's flag, not the core's (no core check built; a code the core
+  drops would still read "verified"); the PS2 disc change (designed); a second source for PS2 / GameCube details and the
+  art misses; the user's own cheat files.
+- **OPEN (H7, the user's request):** erase the two save states the user made for the proof (slots 2 and 3 of the
+  2-player title) once the proof no longer needs them.
 
 ## 2026-11-11 HOME-12U: the cheat launch in seconds and the picture readable — 218d9a82… CONFIRMED; the SNES cheat's effect and the list's yellow OPEN
 

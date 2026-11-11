@@ -264,11 +264,11 @@ class OnlySubset(unittest.TestCase):
 
 
 class AdoptedApk(unittest.TestCase):
-    """HOME-12U (2026-11-11: queue AG's APK CONFIRMED; HOME-11 (2026-11-09: queue AA's), HOME-9 (2026-11-09: queue X's), HOME-7 (2026-11-08: queue T's), HOME-4+ (2026-11-08: queue O's), HOME-3 (2026-11-07: queue N's), HOME-2 (2026-11-06: queue M's), TRIP-PREP (2026-10-29: CL-B14's APK back, the loss guard out) and CL-B16, CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
+    """HOME-12V (2026-11-11: queue AH's APK CONFIRMED; HOME-12U (2026-11-11: queue AG's), HOME-11 (2026-11-09: queue AA's), HOME-9 (2026-11-09: queue X's), HOME-7 (2026-11-08: queue T's), HOME-4+ (2026-11-08: queue O's), HOME-3 (2026-11-07: queue N's), HOME-2 (2026-11-06: queue M's), TRIP-PREP (2026-10-29: CL-B14's APK back, the loss guard out) and CL-B16, CL-B15, CL-B14, CL-B13, CL-B12, CL-B11, CL-B10, BENCH-R3, BENCH-R2, CL-B7, CL-B5, CL-B4, CL-B3, CL-B2 and CL-B1 before it): the preflight checks the CONFIRMED APK."""
 
-    def test_the_preflight_expects_the_home12u_queue_ag_apk(self):
+    def test_the_preflight_expects_the_home12v_queue_ah_apk(self):
         self.assertEqual(h.ADOPTED_APK_SHA256,
-                         "218d9a82d564e0d63e8bc6cd5b8e9de95bddb033e8f6d0635dd870e19f62cd53")
+                         "ca53df0dac787607af749492393b5f343e3df775cd4581d44342a1a81ecd590d")
 
 
 

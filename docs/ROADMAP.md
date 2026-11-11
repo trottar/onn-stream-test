@@ -2979,6 +2979,13 @@ SNES cheat's miss settled as not the hub's (every SNES code form applies on the 
 A's watcher. **Next (A):** HOME-12V, a short check — C58 the list's yellow (the APK), C59 an SNES cheat from the matching
 list (the hub) (`docs/memory/handoffs/SESSION_B_DONE_2026-11-11AH.md`). Then H7's hub side.
 
+**HOME-12V (2026-11-11, a short check; APK `ca53df0d…` CONFIRMED, the pin moved):** [x] B92 the changed rows yellow
+in the mapping list (C58); [x] B90's SNES cheats (C59, a RAM code from the matching list). **The first parity queue's
+boxes are all met** (B76-B81, B84-B92). **What stays open in H6:** the PS2 disc change (designed); a second source for
+PS2 / GameCube details and the art misses (PS2 15, GameCube 3); the rejected N64 list; the user's own cheat files (the
+folders ready); `activation_verified` reading RetroArch's flag, not the core's; Mods and GameCube discs (deferred)
+(`docs/memory/evidence/HOME_12V_PARITY_2026-11-11.md`).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,
@@ -2992,8 +2999,10 @@ The user ranks the gaps; the first ranked item is the next parity work.
 
 ## H7 — PrivyHub-native games; first: PrivyParty
 
-**Status: PLANNED (2026-11-10) — the last item of Phase H. No work until the user says so ("I might just do it
-next").** Adopted into the roadmap on the user's "Adopt" (2026-11-10); the wording was shown to the user first.
+**Status: OPEN — the hub side begun on the user's word 2026-11-11** (B93's proof tool; the first real state made at
+HOME-12V, a 2-player PS1 title; the winner's memory addresses still to find). Before that: PLANNED (2026-11-10) — the
+last item of Phase H. No work until the user says so ("I might just do it
+next"). Adopted into the roadmap on the user's "Adopt" (2026-11-10); the wording was shown to the user first.
 
 **PC-side preparation started on the user's word (2026-11-10), in a separate repo; the hub side not started.** The PrivyHub repo and the hub's Code sessions are not touched by the PC work; the hub pulls the game repo only when H7's hub side starts.
 
@@ -3002,6 +3011,13 @@ RetroArch's read-memory command answered on every core in use (B90 / B92 benches
 — the first step as a tool (load a state → run a fixed time → read memory → the winner), met on a synthetic SNES ROM
 (3 / 3 each way; `evidence/B93_H7_MINIGAME_PROOF_2026-11-11.md`). **Waits for the user:** which SNES game for the real
 proof, its state made at the TV, its score addresses; Godot on the hub and the game repo (fetches, on the user's word).
+
+**HOME-12V (2026-11-11, on the user's word at the TV):** the first real state made — **a PS1 title, the user's pick
+(not SNES)**, VS mode, 2 players: a "begin" state just before a fight and an "end" state after it; **player 1 won**.
+The user's plan: that title is **the 2-player proof**, a second PS1 title the **4-player proof**. **What the real proof
+still lacks:** the memory address(es) that decide the winner (rounds / health per player) — a search between the begin
+and end states, to be designed; then the tool from the begin state, 3 runs, the winner player 1. Then the two saves
+erased (the user's request). (`docs/memory/evidence/HOME_12V_PARITY_2026-11-11.md` §"The optional H7 step".)
 
 **Design notes:** `docs/memory/architecture/H7_PRIVYPARTY_DESIGN_NOTES_2026-11-10.md` — the art direction (photo textures on low-polygon models, a fixed camera, gibberish speech with subtitles), one template body with proportion numbers, one shared animation set, the licensing rule and the emulator audit it needs, the PC / hub / drive workflow, what goes ahead on the PC and what waits, the open measurements. **The PC side's kickoff brief:** `docs/memory/handoffs/PRIVYPARTY_PC_KICKOFF_BRIEF_2026-11-10.md`. Real player photos never go into git.
 

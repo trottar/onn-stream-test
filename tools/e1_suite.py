@@ -100,7 +100,10 @@ PKG = "com.safeiot.privyhub"
 # HOME-12U (installed 2026-11-11, CONFIRMED 2026-11-11): queue AG's APK (B5 ... + B74 + B80's client part + B84 the cheat
 # picker + B86 / B89 / B91 the mapping picture beside the rows); C54 / C55 / C56 met with every property empty (twenty);
 # the previous CONFIRMED APK was 85220f99... (HOME-11), kept at home12u_previous/
-EXPECT_APK = "218d9a82d564e0d63e8bc6cd5b8e9de95bddb033e8f6d0635dd870e19f62cd53"
+# HOME-12V (installed 2026-11-11, CONFIRMED 2026-11-11): queue AH's APK (queue AG's + B92 the changed rows yellow in the
+# mapping list); C58 met with every property empty (twenty); the previous CONFIRMED APK was 218d9a82... (HOME-12U), kept
+# at home12v_previous/
+EXPECT_APK = "ca53df0dac787607af749492393b5f343e3df775cd4581d44342a1a81ecd590d"
 LIVE = "PRIVYHUB_ADAPTIVE_BITRATE_MODE=live"
 # E3-S6A (adopted 2026-10-07): the cached guide index through its own drop-in, epg-index.conf; the adopted environ
 # is exactly these two names, at every precondition and teardown
