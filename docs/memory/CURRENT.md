@@ -1,6 +1,6 @@
 ---
 memory_schema: 1
-as_of: 2026-11-10
+as_of: 2026-11-11
 baseline_commit: da2d580f (queue AF)
 ---
 
@@ -12,15 +12,16 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 ## Active Objective
 
 **Phase H CLOSED at its checkpoint 2026-11-09** on the user's "Close H" (`evidence/H5_CHECKPOINT_2026-11-09.md`).
-**H6 (feature parity) OPEN**: HOME-12 / 12R met B76 / B77 / B79 / B81 / B84-B86; B78 (N64 cheat launch) and B80 (Patches save) not. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
+**H6 (feature parity) OPEN**: HOME-12 / 12R / 12T met B76 / B77 / B79-B81 / B84 / B85 / B88; not B78 / B87 (N64 cheat launch) or B89's size. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
 E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`85220f99…` CONFIRMED**.
 H7 (PrivyHub-native games; first PrivyParty): PC-side preparation started 2026-11-10 in a separate repo; the hub side not started — the user's word starts it (`docs/ROADMAP.md` §H7; design notes `architecture/H7_PRIVYPARTY_DESIGN_NOTES_2026-11-10.md`)
 
 ## Current Work Item
 
-- **HOME-12R DONE** (`evidence/HOME_12R_PARITY_2026-11-10.md`): C49 picker, C47, C50, the PS1 check met; C46 not run
-  (the N64 cheat launch fails on the hub), C48 not met (the Patches Save: POST vs GET) → **`c801caab…` NOT CONFIRMED**,
-  `85220f99…` reinstalled. Three items for B (`KNOWN_ISSUES.md` HOME-12R).
+- **HOME-12T DONE** (`evidence/HOME_12T_PARITY_2026-11-10.md`): (a) C51 PS1 cheat met, C52 PS2 widescreen met, **C53
+  not met** (the labels too small) → **`3f21e2c6…` NOT CONFIRMED**, `85220f99…` reinstalled;
+  (b) **C46 not met** (the launch ~107 s, the onn waits 60 s) → B87 not confirmed; B88 met. Two items for B
+  (`KNOWN_ISSUES.md` HOME-12T).
 
 ## Verified State
 
@@ -57,8 +58,8 @@ line 15 writes one redacted row per movie range request and a retrying client's 
 the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions; `docs/REMOTE_TRUST.md` has the G lines.
 
 **The client.**
-- APK **`85220f99…` CONFIRMED** on the onn (HOME-11), pinned in the three places; back on at HOME-12R's close.
-  Tried, NOT CONFIRMED: `de6682db…` (HOME-12), `c801caab…` (HOME-12R; `home12r_installed/`).
+- APK **`85220f99…` CONFIRMED** on the onn (HOME-11), pinned in the three places; back on at HOME-12T's close.
+  Tried, NOT CONFIRMED: `de6682db…`, `c801caab…`, `3f21e2c6…` (HOME-12 / 12R / 12T).
 - The twenty client properties are empty. One device is paired, with `identity_v2` on.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
@@ -88,11 +89,10 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **B:** the N64 cheat launch waits for RetroArch's cheat file; `ps2-patches` on the onn's POST route; the picture
-   smaller / better drawn. Then a new APK and C46 / C48 (+ C49 / C50 / PS1 on it).
-2. Then the user's pick: H6's rest or H7's hub side.
-3. H6's rest: the PS2 disc change (designed); a second source for PS2 / GameCube details and
-   art misses; the user's cheat files; the rejected N64 list. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
+1. **The user's pick:** the rest of H6, or H7's hub side (the user's word).
+2. H6's rest, HOME-12T's items first (**B:** the N64 cheat pick under 60 s on T81; the picture larger; a new APK,
+   C46 / C53); then the PS2 disc change (designed); a second source for PS2 / GameCube details, art misses; the
+   user's cheat files; the rejected N64 list. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

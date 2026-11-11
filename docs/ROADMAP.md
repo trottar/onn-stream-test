@@ -2941,6 +2941,19 @@ test — all 46 client calls through the hub's real HTTP server (`evidence/B88_P
 APK `3f21e2c6…` pinned, NOT installed. **Next (A):** HOME-12's third sitting — (a) the APK's cells C51 / C52 / C53,
 (b) the hub's C46 (`docs/memory/handoffs/SESSION_B_DONE_2026-11-10AF.md`).
 
+**HOME-12T (2026-11-10, HOME-12's third sitting; APK `3f21e2c6…` NOT CONFIRMED, `85220f99…` back on):** the first
+parity queue's boxes as they stand — [x] B76 art / details (C44); [x] B77 Input Profiles (C45); [x] B81 drop-in folders;
+[x] B79 GameCube cheats (C47, HOME-12R); [x] B84 the picker and [x] B85 the cleaned lists (C51, a PS1 cheat again);
+[x] B80 PS2 widescreen / B88 the POST route (C52: saved, read back, "It's widescreen"); [ ] B86 / B89 the mapping
+picture — the drawing met, **the size not** ("hard to read unless up close", C53); [ ] B78 / B87 N64 cheats — the
+cheat file now loads, but the launch takes ~107 s walking T81's 677-entry list and the onn gives up at 60 s (C46). The
+client-side boxes (B80's screen, B84, B86 / B89) are met at the TV but ship only when an APK is CONFIRMED. **Next (B):**
+the N64 cheat selection without walking the list (under 60 s on T81, and no game left running when the onn hangs up);
+the picture larger, readable from the couch; then a new APK and C46 / C53 again
+(`docs/memory/evidence/HOME_12T_PARITY_2026-11-10.md`). **What stays open in H6:** PS2 / GameCube details (a second
+source) and the art misses (PS2 15, GameCube 3); the rejected N64 list; the PS2 disc change (designed); Mods and
+GameCube discs (deferred); the user's own cheat files (the folders ready).
+
 **Deferred:** Mods on N64 / GameCube; GameCube two-disc titles; "NEW"; the PS2 disc change's build (designed).
 
 **Not parity gaps (no system has them):** play time, fast-forward / slow motion, screenshots, a rewind button,

@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-10 — HOME-12T (HOME-12's third sitting): APK `3f21e2c6…` installed with every property empty (twenty); C51 the picker's PS1 cheat MET, C52 PS2 Patches → Widescreen → Save MET (**B88 met** — the onn's POST 200, stored, applied), **C53 the picture NOT MET** ("much better" drawn, labels too small to read from the couch) → **`3f21e2c6…` NOT CONFIRMED, `85220f99…` reinstalled**; **C46 the N64 cheat NOT MET** — B87's file name and wait worked on the real title, but the launch took ~107 s, past the onn's 60-s wait → B87 not confirmed; two items OPEN for B — `## 2026-11-10 HOME-12T` below
 - 2026-11-10 — Queue AF (B87-B89, HOME-12R's three findings): B87 the N64 cheat launch — the real cause settled headless: RetroArch looks for the cheat file under the content's name with one more dot-suffix stripped, and a title with a dot inside its name never got its cheats (every RetroArch system); plus a cheat pulse sent before the N64 core runs is lost — the hub now stages RetroArch's name and waits for RetroArch's evidence (`PRIVYHUB_CHEAT_READY=0` = today); B88 `ps2-patches` on the onn's POST and **a contract test of all 46 client calls through the hub's real HTTP server** (before 45 / 46 served, now 46 / 46); B89 the mapping picture redrawn, a fifth of the screen's height, rendered off the device; APK `3f21e2c6…` built, NOT installed — OPEN (A's HOME-12 third sitting) — `## 2026-11-10 Queue AF` below
 - 2026-11-10 — HOME-12R (HOME-12 resumed): APK `c801caab…` installed with every property empty (twenty); C49 the cheat picker MET on its first real run (Launch at the top, the sections and counts, the filter), C47 a GameCube cheat MET, C50 the mapping picture MET ("Much clearer"; "a big poorly drawn controller"), the PS1 check MET; **C46 not run — the N64 cheat launch failed on the hub** (RetroArch had not loaded the cheat file when the hub toggled), **C48 not met — the onn's Patches Save is a POST the hub only takes as GET** → **`c801caab…` NOT CONFIRMED, `85220f99…` reinstalled**; HOME-12's three requirements met at the TV but not on the confirmed APK; three items OPEN for B — `## 2026-11-10 HOME-12R` below
 - 2026-11-10 — Queue AE (B84-B86, HOME-12's three requirements): B84 the cheat picker as PrivyHub's own screen (Launch / Cancel at the top — Left from any row, Start on a pad; a filter; sections with counts; paging); B85 every system's cheat list cleaned on the hub (lone cartridge triggers hidden, "must be on" codes applied with any pick, "Player 1", parts folded, repeats shown as variants; heading rows no longer make 8 N64 and 1 SNES lists fail); B86 the mapping editor's controller picture and one set of letters; APK `c801caab…` built, NOT installed; nothing adopted — OPEN (A's HOME-12 resumed: C49, C46-C48, C50) — `## 2026-11-10 Queue AE` below
@@ -72,6 +73,26 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-10 HOME-12T: the PS1 cheat and PS2 widescreen work; the picture too small, the N64 cheat launch too slow — 3f21e2c6… NOT CONFIRMED; two items OPEN
+
+(`docs/memory/evidence/HOME_12T_PARITY_2026-11-10.md`, `docs/memory/evidence/home12t_2026-11-10/`)
+
+- **Closed from HOME-12R's list — PS2 Patches… Save (B88):** the onn's `POST ps2-patches` → 200, `ps2_patches.on`
+  `ws` read back, the game started in widescreen ("It's widescreen"). The hub half is live and met; the onn's Patches…
+  screen ships only in an APK not yet CONFIRMED.
+- **Met again:** the picker launching a PS1 cheat (C51; RetroArch-verified, "Yes cheat works").
+- **OPEN (hub) — the N64 cheat launch, now its length (replaces HOME-12R's "the cheat file not loaded"):** B87's two
+  fixes worked on T81 (`Load game-specific cheatfile` present; the ready probe answered; the picks `on`, read back,
+  `activation_verified` true), but the hub selects each cheat by stepping RetroArch's index one answered pulse at a time
+  round T81's 677-entry list (each pick enables two indexes) — ~2,000 steps, the launch answered after ~107 s; the onn's
+  launch call waits 60 s and had hung up, so the TV stayed on "Launching" and the game ran on unseen until stopped.
+  Needed: a selection that does not walk the list, under 60 s on T81 with margin; the hub not leaving a game running
+  when the onn hangs up mid-launch. Blocks B87 / B78 (C46).
+- **OPEN (client) — the picture's size (B89):** the drawing answered ("looks much better"); at a fifth of the screen's
+  height the labels are "hard to read unless up close". Larger, readable from the couch, the rows still visible.
+- `85220f99…` stays CONFIRMED (reinstalled at the close). HOME-12's three requirements and B80's widescreen screen stay
+  met at the TV but not on the confirmed APK.
 
 ## 2026-11-10 Queue AF (B87-B89): the N64 cheat launch, the PS2 Patches route + the client contract, the picture redrawn — OPEN (A's HOME-12 third sitting)
 

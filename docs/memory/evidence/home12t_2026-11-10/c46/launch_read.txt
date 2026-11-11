@@ -1,0 +1,8 @@
+# T81's cheat launch, read on the hub (labels; counts; no title, code name or path)
+game log: 2183 lines; 'Load game-specific cheatfile' at line 59; 'Cheat #' lines 2039; 'Applying cheat changes' 2; lines ending ': on' 5 (indexes Cheat #0 Cheat #6 )
+the order: content load 41, cheat file 59, dynarec init 123, first 'Cheat #' line 125 (the B87 ready probe answered), index 0 on at 803, index 6 on at 1488, read back 2159 / 2165
+game log created 00:00:35Z; launch answered 200 at 00:02:22Z (~107 s); the response write then failed: BrokenPipeError (the onn had closed the request), logged as a 500 at 00:02:23Z
+client: the launch is httpPost with CONTROL_READ_TIMEOUT_MS = 60_000
+hub status after: active true, paused true, cheat_session enabled indexes 0 and 6 (the enabler + the user's pick), activation_verified true; no native-stream-start (the onn never got the answer)
+staged: 2 files (Mupen64Plus-Next dir), 677 cheats each (the stem's name and RetroArch's name)
+the game stopped by A through the hub's own stop route at 00:03:32Z -> 200; nothing running after; cheat_runtime cleaned
