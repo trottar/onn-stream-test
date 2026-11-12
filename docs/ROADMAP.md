@@ -3158,6 +3158,26 @@ side shows in a round light and the post-match tally (independent of the charact
 character; the "begin" save never reaches a fight. **What waits:** Cowork's look at the frames; real fights with other
 characters captured from the stream; the labelling; the model (`docs/memory/evidence/H7_V1_2026-11-12.md`).
 
+**The result from the game's own end screen (queue AM, 2026-11-12):** the user's word — "I don't need automatic scoring
+at all, I just need to know who got 1-4 in a game or who won"; the end found from labelled pictures by the tool itself,
+no hand-drawn boxes, because it has to work for dozens of games. **B102, the learner** (`tools/h7_endscreen.py`): from
+labelled runs it finds the screen's still part, the part that tells the outcomes apart, and a reference per outcome;
+reads a picture as the screen → which outcome, or `unknown` (never a guess) → else `other`; ends after 3 agreeing reads
+a second apart, only after the start was seen; a small shift / scale search. **On the user's game's frames (H7-V1's,
+Cowork's labels):** the start, the P1 end and the P2 end told apart on the held-out halves (576 / 576), **0 fight frames
+read as the screen**; the outcome part found by itself is one 124-pixel patch where the tally sits; a read ~1 ms;
+pictures moved up to 8 px or rescaled 0.95-1.08 still read (with the search), and every miss reads `unknown`.
+**B103, the mini game's two calls behind `PRIVYHUB_H7=1`:** `POST h7-start` loads the kept start (B101's load step
+alone; PS1 / SNES; `?load=0` on any system) and starts a watcher; `GET h7-result` says `watching` / `ended` with the
+side. The watcher reads the game's window in process once a second (settled the cheapest: ~12 ms, no frame lost,
+nothing written; RetroArch's own screenshot lost 120 PS1 frames a minute and writes a file each time) and sends nothing
+to the game. Absent / 0 = today, byte for byte (`docs/memory/evidence/B102_H7_END_SCREEN_LEARNER_2026-11-12.md`,
+`B103_H7_START_AND_RESULT_2026-11-12.md`). **What waits:** **the live check** — A's H7-V2 at the TV, three matches with
+other characters and one with the same character on both sides (`docs/memory/handoffs/SESSION_B_DONE_2026-11-12AM.md`);
+**more games** (each needs its own labelled runs: a start and each end); **four-player placements**, which need each
+place read on its own (one class per winning side is not 1-4); **a draw** (never shown — it reads `unknown`); **the onn's
+"mini game over" picture** (the onn showing the result).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

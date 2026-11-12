@@ -146,9 +146,11 @@ import cheat_clean as _cheat_clean  # noqa: E402
 # Absent / 0 = today: nothing imported, the action unknown, no rules folder looked at.
 _h7_live = None
 _h7_contest = None
+_h7_minigame = None
 if (os.environ.get("PRIVYHUB_H7") or "").strip() == "1":
     import h7_live_read as _h7_live
     import h7_contest as _h7_contest          # B101: the timed contest (the same flag)
+    import h7_minigame as _h7_minigame        # B103: the mini game's start and result (the same flag)
 
 # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
 # Absent = today: nothing imported.
@@ -3474,6 +3476,10 @@ class GamesPlugin:
         if action == "h7-contest" and _h7_contest is not None:
             return self._h7_contest_runner().status()
 
+        # B103: the mini game's result, read from the game's own end screen (PRIVYHUB_H7=1 only)
+        if action == "h7-result" and _h7_minigame is not None:
+            return self._h7_minigame_runner().result()
+
         raise ValueError(
             f"Unknown Games plugin action: {action}"
         )
@@ -3491,6 +3497,14 @@ class GamesPlugin:
         if runner is None:
             runner = self._h7_contest_obj = _h7_contest.Contest(self._emulator, self._h7_reader(), self._native_stream,
                                                                 self._emulator._project_path)
+        return runner
+
+    def _h7_minigame_runner(self):
+        """B103: one mini-game watcher per plugin (PRIVYHUB_H7=1 only)."""
+        runner = getattr(self, "_h7_minigame_obj", None)
+        if runner is None:
+            runner = self._h7_minigame_obj = _h7_minigame.MiniGame(self._emulator, self._native_stream,
+                                                                   self._emulator._project_path)
         return runner
 
     def _find_game_by_id(
@@ -4331,6 +4345,10 @@ class GamesPlugin:
         # B101: start a timed contest (PRIVYHUB_H7=1 only)
         if action == "h7-contest" and _h7_contest is not None:
             return self._h7_contest_runner().start(self._first(parse_qs(raw_query), "seconds"))
+
+        # B103: the mini game's start — B101's load step alone, then the watcher (PRIVYHUB_H7=1 only)
+        if action == "h7-start" and _h7_minigame is not None:
+            return self._h7_minigame_runner().start(self._first(parse_qs(raw_query), "load"))
 
         return self.handle_post(action, raw_query)
 

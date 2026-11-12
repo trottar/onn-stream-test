@@ -1,0 +1,79 @@
+[
+ {
+  "id": "N1",
+  "file": "companion/plugins/games.py",
+  "old": "_h7_minigame = None\n",
+  "new": "import h7_minigame as _h7_minigame\n",
+  "why": "the routes exist without the flag"
+ },
+ {
+  "id": "N2",
+  "file": "companion/h7_minigame.py",
+  "old": "        if load:\n            ended.start_loaded()\n",
+  "new": "        ended.start_loaded()\n",
+  "why": "the start taken as seen without a load"
+ },
+ {
+  "id": "N3",
+  "file": "companion/h7_minigame.py",
+  "old": "                done = ended.feed(r[\"class\"])\n",
+  "new": "                done = ended.feed(r[\"class\"]) or (r[\"class\"] if r[\"class\"] in ended.ends and ended.seen_start else None)\n",
+  "why": "one end read ends it (K ignored)"
+ },
+ {
+  "id": "N4",
+  "file": "companion/h7_minigame.py",
+  "old": "                if r[\"class\"] == endscreen().UNKNOWN and last_class != endscreen().UNKNOWN:\n",
+  "new": "                if r[\"class\"] == endscreen().UNKNOWN:\n",
+  "why": "a row per unknown read, not per change"
+ },
+ {
+  "id": "N5",
+  "file": "companion/h7_minigame.py",
+  "old": "                    self._row({\"step\": \"picture_failed\", \"game\": game, \"why\": str(exc)[:200]})\n                    continue\n",
+  "new": "                    self._row({\"step\": \"picture_failed\", \"game\": game, \"why\": str(exc)[:200]})\n                    return\n",
+  "why": "a failed picture stops the watch"
+ },
+ {
+  "id": "N6",
+  "file": "companion/h7_minigame.py",
+  "old": "                if now != game:\n",
+  "new": "                if now is None and False:\n",
+  "why": "the game's stop not noticed"
+ },
+ {
+  "id": "N7",
+  "file": "companion/h7_minigame.py",
+  "old": "                if done:\n                    self._row({\"step\": \"ended\"",
+  "new": "                if done:\n                    self._emu._retroarch_network_request(\"GET_STATUS\", expect_response=True, timeout=0.5, retries=1)\n                    self._row({\"step\": \"ended\"",
+  "why": "a command sent to the game at the end"
+ },
+ {
+  "id": "N8",
+  "file": "companion/h7_minigame.py",
+  "old": "                self._refused(\"a mini game is already being watched\")\n        try:\n",
+  "new": "                pass\n        try:\n",
+  "why": "a second start loads before it is refused"
+ },
+ {
+  "id": "N9",
+  "file": "companion/h7_minigame.py",
+  "old": "        load = text != \"0\"\n",
+  "new": "        load = True\n",
+  "why": "load=0 still loads"
+ },
+ {
+  "id": "N10",
+  "file": "companion/h7_minigame.py",
+  "old": "        if not self._stream_up():\n",
+  "new": "        if False:\n",
+  "why": "the stream not checked"
+ },
+ {
+  "id": "N11",
+  "file": "companion/h7_minigame.py",
+  "old": "    def _row(self, fields: dict) -> None:\n        self._owner._row(fields)\n",
+  "new": "    def _row(self, fields: dict) -> None:\n        contest.Contest._row(self, fields)\n",
+  "why": "the load's rows go to B101's log"
+ }
+]

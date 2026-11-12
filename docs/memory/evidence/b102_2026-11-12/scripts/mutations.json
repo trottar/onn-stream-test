@@ -1,0 +1,13 @@
+[
+ {"id": "M1", "file": "tools/h7_endscreen.py", "old": "STEADY = 6.0 ", "new": "STEADY = 60.0 ", "why": "steady too loose: the moving banner enters the screen mask"},
+ {"id": "M2", "file": "tools/h7_endscreen.py", "old": "    screen_mask = union.std(axis=0) < STEADY\n", "new": "    screen_mask = union.std(axis=0) >= 0\n", "why": "the screen mask is every pixel"},
+ {"id": "M3", "file": "tools/h7_endscreen.py", "old": "        return (c if ok else UNKNOWN), {", "new": "        return c, {", "why": "a screen no class is close to is guessed as the nearest"},
+ {"id": "M4", "file": "tools/h7_endscreen.py", "old": "        if self.run >= self.k:\n", "new": "        if self.run >= 1:\n", "why": "one read ends it (K ignored)"},
+ {"id": "M5", "file": "tools/h7_endscreen.py", "old": "            elif cls in self.ends and self.seen_start:\n", "new": "            elif cls in self.ends:\n", "why": "an end counts before the start was seen"},
+ {"id": "M6", "file": "tools/h7_endscreen.py", "old": "        if thr is not None and search and (not screen or cls == UNKNOWN):", "new": "        if False:", "why": "no alignment search"},
+ {"id": "M7", "file": "tools/h7_endscreen.py", "old": "                sel = sel[:cut] if half == \"first\" else sel[cut:]\n", "new": "                sel = sel[:cut]\n", "why": "the second half is the first half (scored on what was learnt)"},
+ {"id": "M8", "file": "tools/h7_endscreen.py", "old": "    if hashlib.sha256(data).hexdigest() != spec.get(\"arrays_sha256\"):\n", "new": "    if False:\n", "why": "a changed arrays file is not refused"},
+ {"id": "M9", "file": "tools/h7_endscreen.py", "old": "    if not aspect:\n        return img\n", "new": "    if True:\n        return img\n", "why": "a window's bars are not cut"},
+ {"id": "M10", "file": "tools/h7_endscreen.py", "old": "            \"threshold\": round(own + SAFETY * gap, 3) if gap > 0 else None,", "new": "            \"threshold\": round(foreign + SAFETY * gap, 3) if gap > 0 else None,", "why": "thresholds past the foreign side of the gap"},
+ {"id": "M11", "file": "tools/h7_endscreen.py", "old": "    outcome_mask = within & (apart > DIFFER)\n", "new": "    outcome_mask = apart > DIFFER / 8\n", "why": "the outcome mask not limited to steady pixels (and a loose difference)"}
+]
