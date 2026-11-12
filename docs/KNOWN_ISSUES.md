@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-12 — H7-L1 (the live read beside the user's eyes, T88's 2-player fight on the stream, PRIVYHUB_H7=1 for the sitting only): **MET** — at every pause the read's leader was the user's (140 / 110 P1, 110 / 110 even, 110 / 80 P1) and at the knockout 140 / 102 → P1; the stream not disturbed (442 reads, 0 errors, median 38 ms); L0 not run (no Continue: A's stage-1 error) and L5 not run (a menu); OPEN: a timed stop reading the leader when a clock ends; the number never reaches 0 at a knockout — `## 2026-11-12 H7-L1` below
 - 2026-11-11 — Queue AK (H7: B98 the acceptance rule in the search, B99 the live read behind PRIVYHUB_H7=1): a (b2) or (c) answer no longer decides; `GET /plugins/games/h7-read` reads the kept rule from the running game (values, leader, "no winner yet"), changing nothing; on fixtures a read once a second leaves the frames unchanged (SNES 3,603 / 3,600, PS1 3,603 / 3,601 per 60 s) — OPEN (A's H7-L1 at the TV, ~10 min) — `docs/memory/evidence/B98_H7_ACCEPTANCE_IN_SEARCH_2026-11-11.md`, `B99_H7_LIVE_READ_2026-11-11.md`
 - 2026-11-11 — H7-P3 (five states on T88: the user's two mid-fight saves added, unattended): evidence **"strong"**, decided, template h — **the game's cheat list's per-player pair reads who is ahead** in all five saves, mid-fight included; accepted; the proof met (5 × 3 of 3) → **T88's slots 1-3 erased** (the user's request; checked copies of all five kept); OPEN: the same read on a fight played on the stream (the independent check) — `## 2026-11-11 H7-P3` below
 - 2026-11-11 — H7-P2 (the search with folds and cheat-list hints on T88's three states, unattended): the user's three saves held as checked copies off their slots; evidence **"weak"** (each winner seen once), not decided → no proof, **nothing erased**; the game's cheat list points at one per-player level pair that reads right in all three saves; OPEN: two more TV saves (a 2nd P1 end into slot 2, a 2nd P2 end into slot 1) for "strong" — `## 2026-11-11 H7-P2` below
@@ -83,6 +84,22 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-12 H7-L1: the live read names the leader in a fight being played — MET; the flag off
+
+(`docs/memory/evidence/H7_L1_2026-11-12.md`, `docs/memory/evidence/h7l1_2026-11-12/`)
+
+- **MET:** T88's rule (H7-P3) read once a second through B99's route while the user played; at three pauses the read's
+  leader was the user's (140 / 110 P1; 110 / 110 when the user said "equal"; 110 / 80 P1) and at the match's knockout
+  140 / 102 → P1, the winner. Round 2 read P2 ahead to 20 / 140 (P2 won it); each new round read 140 / 140 → "no winner
+  yet". The stream's rows as a normal session's; 442 reads, 0 errors, `read_ms` median 38.2, worst 53.4. The bench flag
+  removed at the close (eighteen lines).
+- **Not run:** L0 (the Continue read) — A's stage-1 error: the onn's Continue needs one of slots 1-3 (H7-P3 erased
+  T88's), and stage 1 checked RetroArch's own state file instead; L5 — the game went to a menu after the match.
+- **OPEN (seen):** the number never reaches 0 at a knockout (round losers at 80, 20, 102): it orders the players at every
+  moment but is not the bar's value at a round's end — enough for "who is ahead when time is up", not for "knocked out".
+- **OPEN (what waits):** a timed stop that reads the leader when a clock ends; the 4-player title; B's notes — a fold
+  skipped as "not testable" should not pass, an N64 fixture whose code lands in memory, a lighter read path.
 
 ## 2026-11-11 Queue AK (B98, B99): acceptance in the search; the live read behind its flag
 

@@ -3120,6 +3120,15 @@ beside the user's own view at three pauses and a knockout, the stream's rows unc
 fixed time, then the read); the 4-player title; PS2's read through PINE; N64's rule search (`evidence/B98_H7_ACCEPTANCE_IN_SEARCH_2026-11-11.md`,
 `evidence/B99_H7_LIVE_READ_2026-11-11.md`).
 
+**H7-L1 (2026-11-12, attended) — the live check, MET:** B99's read behind `PRIVYHUB_H7=1` for one sitting; the user
+played T88's 2-player fight on the stream and at three pauses said who was ahead — the read named the same leader each
+time (140 / 110, 110 / 110 even, 110 / 80), and the match's winner at the knockout (140 / 102); new rounds read equal;
+the stream undisturbed (442 reads, 0 errors, median 38 ms). The first H7 rule is checked on a fight it never saw. Not
+run: the Continue read (no Continue after H7-P3's erase) and the new-round cell (a menu). **Seen:** the number never
+reaches 0 at a knockout — right for "who is ahead", not for "knocked out". **What waits:** a timed stop that reads the
+leader when a clock ends; the 4-player title; B's three notes — a fold skipped as "not testable" should not pass, an N64
+fixture whose code lands in memory, a lighter read path for faster reads (`docs/memory/evidence/H7_L1_2026-11-12.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 
