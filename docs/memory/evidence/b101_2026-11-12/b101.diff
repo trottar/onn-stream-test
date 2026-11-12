@@ -1,0 +1,700 @@
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 5d52b0d3..459fbbd8 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -145,8 +145,10 @@ import cheat_clean as _cheat_clean  # noqa: E402
+ # B99: H7's live read (GET h7-read: who is ahead in the running game, by a kept rule), only with PRIVYHUB_H7=1.
+ # Absent / 0 = today: nothing imported, the action unknown, no rules folder looked at.
+ _h7_live = None
++_h7_contest = None
+ if (os.environ.get("PRIVYHUB_H7") or "").strip() == "1":
+     import h7_live_read as _h7_live
++    import h7_contest as _h7_contest          # B101: the timed contest (the same flag)
+ 
+ # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
+ # Absent = today: nothing imported.
+@@ -3466,15 +3468,31 @@ class GamesPlugin:
+ 
+         # B99: H7's live read (PRIVYHUB_H7=1 only; the hub's own route for A's watcher, not a client call)
+         if action == "h7-read" and _h7_live is not None:
+-            reader = getattr(self, "_h7_live_reader", None)
+-            if reader is None:
+-                reader = self._h7_live_reader = _h7_live.LiveRead(self._emulator, self._emulator._project_path)
+-            return reader.read()
++            return self._h7_reader().read()
++
++        # B101: the timed contest's state or last outcome (PRIVYHUB_H7=1 only)
++        if action == "h7-contest" and _h7_contest is not None:
++            return self._h7_contest_runner().status()
+ 
+         raise ValueError(
+             f"Unknown Games plugin action: {action}"
+         )
+ 
++    def _h7_reader(self):
++        """B99 / B101: one live reader per plugin (PRIVYHUB_H7=1 only)."""
++        reader = getattr(self, "_h7_live_reader", None)
++        if reader is None:
++            reader = self._h7_live_reader = _h7_live.LiveRead(self._emulator, self._emulator._project_path)
++        return reader
++
++    def _h7_contest_runner(self):
++        """B101: one contest runner per plugin (PRIVYHUB_H7=1 only)."""
++        runner = getattr(self, "_h7_contest_obj", None)
++        if runner is None:
++            runner = self._h7_contest_obj = _h7_contest.Contest(self._emulator, self._h7_reader(), self._native_stream,
++                                                                self._emulator._project_path)
++        return runner
++
+     def _find_game_by_id(
+         self,
+         game_id: str,
+@@ -4310,6 +4328,10 @@ class GamesPlugin:
+             except NativeStreamError as exc:
+                 raise RuntimeError(str(exc)) from exc
+ 
++        # B101: start a timed contest (PRIVYHUB_H7=1 only)
++        if action == "h7-contest" and _h7_contest is not None:
++            return self._h7_contest_runner().start(self._first(parse_qs(raw_query), "seconds"))
++
+         return self.handle_post(action, raw_query)
+ 
+     def handle_decoder_session_log(
+diff --git a/companion/h7_contest.py b/companion/h7_contest.py
+new file mode 100644
+index 00000000..f97bad01
+--- /dev/null
++++ b/companion/h7_contest.py
+@@ -0,0 +1,279 @@
++"""B101 (H7): the timed contest — a kept state loaded into the running game, a fixed time, the leader when it ends.
++
++Only with PRIVYHUB_H7=1 (`plugins/games.py` imports this module then; absent / 0 = today: neither route exists).
++`POST /plugins/games/h7-contest?seconds=N` (5 <= N <= 300): for the running RetroArch game (PS1 or SNES) with a rule
++(B99's `<rules folder>/<game id>.json`) and a state beside it (`<game id>.state`) while the stream is up: the state is
++loaded into the running game through scratch slot 8 (`<stem>.state8` in the core's state folder, removed after;
++RetroArch's own load line required), the contest arms when the values first differ from the state's own (the bars
++filling; at most ARM_WAIT s), runs N seconds with a read every second (`samples`), and at "time is up" reads once more:
++the leader is the winner. The game is never paused, saved, written or cheated; it ends running (the onn cannot resume
++a pause it did not ask for — B101's record). `GET /plugins/games/h7-contest` → the running contest or the last outcome.
++One row per step in logs/games/h7_contests.jsonl.
++"""
++from __future__ import annotations
++
++import json
++import os
++import re
++import shutil
++import threading
++import time
++from pathlib import Path
++from typing import Any
++
++import h7_live_read as live
++
++MIN_SECONDS, MAX_SECONDS = 5, 300
++SCRATCH_SLOT = 8               # never the user's 1-3, the hub's 0, the rewind's 9 or the recovery's .state.recovery
++LOCK_WAIT = 2.0                # s: the manager's lock for the load (the hub's own LOAD holds it the same way)
++LOAD_LINE_WAIT = 1.5           # s: RetroArch's load line (settled: 32-34 ms)
++ARM_WAIT = 20.0                # s: the values must leave the state's own within this
++ARM_POLL = 0.25                # s
++SAMPLE_EVERY = 1.0             # s
++LOG_RELATIVE = "logs/games/h7_contests.jsonl"
++CORE_FOLDERS = {"mednafen_psx_hw_libretro": "Beetle PSX HW", "mednafen_psx_libretro": "Beetle PSX",
++                "snes9x_libretro": "Snes9x", "bsnes_libretro": "bsnes"}          # RetroArch's per-core state folders
++LOADING = re.compile(r'\[State\] Loading state ".*", (\d+) bytes\.')
++SYSTEMS = ("ps1", "snes")
++
++
++class Ended(Exception):
++    """The contest ends without an answer (the game stopped, the stream stopped)."""
++
++
++class Contest:
++    def __init__(self, emulator: Any, reader: "live.LiveRead", native_stream: Any, project_path,
++                 environ=os.environ, clock=time.monotonic):
++        self._emu = emulator
++        self._reader = reader
++        self._stream = native_stream
++        self._project_path = project_path
++        self._environ = environ
++        self._clock = clock
++        self._lock = threading.Lock()
++        self._current: dict | None = None        # the running contest's state, or the last outcome
++
++    # --- the routes ----------------------------------------------------------------------------------------------
++    def status(self) -> dict:
++        with self._lock:
++            if self._current is None:
++                return {"ok": True, "contest": None}
++            out = json.loads(json.dumps(self._current))
++        if out.get("state") in ("arming", "running") and out.get("t0") is not None:
++            out["elapsed_s"] = round(self._clock() - out["t0"], 1)
++        out.pop("t0", None)
++        return {"ok": True, "contest": out}
++
++    def start(self, seconds_text: str) -> dict:
++        try:
++            seconds = int(str(seconds_text).strip())
++        except ValueError:
++            raise ValueError(f"seconds must be a whole number from {MIN_SECONDS} to {MAX_SECONDS}") from None
++        if not MIN_SECONDS <= seconds <= MAX_SECONDS:
++            raise ValueError(f"seconds must be a whole number from {MIN_SECONDS} to {MAX_SECONDS}")
++        with self._lock:
++            if self._current is not None and self._current.get("state") in ("loading", "arming", "running"):
++                self._refused("a contest is already running")
++            previous, self._current = self._current, {"state": "loading", "seconds": seconds}
++        try:
++            game, system, rule, state, folder, stem = self._checks()
++            loaded = self._load(game, state, folder, stem)
++        except Exception:
++            with self._lock:
++                self._current = previous                    # a refused start leaves the last outcome as it was
++            raise
++        own = self._reader._read(game, rule)
++        with self._lock:
++            self._current = {"state": "arming", "seconds": seconds, "game": game, "t0": self._clock(),
++                             "load_line_ms": loaded, "state_values": own["values"], "samples": []}
++        threading.Thread(target=self._run, args=(game, rule, seconds, own["values"]), daemon=True,
++                         name="h7-contest").start()
++        return {"ok": True, "contest": "started", "game": game, "seconds": seconds, "load_line_ms": loaded,
++                "state_values": own["values"]}
++
++    # --- (1) the checks --------------------------------------------------------------------------------------------
++    def _refused(self, why: str):
++        self._row({"step": "refused", "why": why})
++        raise ValueError(why)
++
++    def _checks(self):
++        try:
++            game, system, kind = self._reader._running()
++        except RuntimeError as exc:
++            self._refused(str(exc))
++        if game is None:
++            self._refused("no game is running")
++        if kind in ("pcsx2", "dolphin"):
++            self._refused("not supported yet")
++        if system == "n64":
++            self._refused("not supported yet — a state cannot be loaded into a running N64 game")
++        if system not in SYSTEMS:
++            self._refused("not supported yet")
++        try:
++            rule = self._reader._rule(game)
++        except ValueError as exc:
++            self._refused(str(exc))
++        state = live.rules_folder(self._environ) / f"{game}.state"
++        if not state.is_file() or state.stat().st_size <= 0:
++            self._refused("no state for this game's contest")
++        try:
++            active = bool((self._stream.status() or {}).get("active"))
++        except Exception:
++            active = False
++        if not active:
++            self._refused("the stream is not up")
++        core = self._core_file(system)
++        folder_name = CORE_FOLDERS.get(core[:-len(".so")] if core.endswith(".so") else core)
++        if folder_name is None:
++            self._refused("not supported yet with this game's core")
++        stem = self._emu._active_state_stem()
++        folder = self._emu._state_root() / folder_name
++        return game, system, rule, state, folder, stem
++
++    def _core_file(self, system: str) -> str:
++        if system == "snes":
++            snes = (self._environ.get("PRIVYHUB_SNES_CORE") or "").strip()
++            if snes:
++                return f"{snes}_libretro.so"
++        core = str(self._emu._runtime_details()["core_status"].get(system, {}).get("core", ""))
++        return re.sub(r"\.(dll|dylib)$", ".so", core)
++
++    # --- (2) the load ------------------------------------------------------------------------------------------------
++    def _load(self, game: str, state: Path, folder: Path, stem: str) -> float:
++        emu = self._emu
++        scratch = folder / f"{stem}.state{SCRATCH_SLOT}"
++        if not emu.lock.acquire(timeout=LOCK_WAIT):
++            self._refused("the game is busy (a save or a load); try again")
++        try:
++            if scratch.exists():
++                self._refused("a scratch state is already in the game's state folder; not loaded")
++            folder.mkdir(parents=True, exist_ok=True)
++            try:
++                shutil.copyfile(state, scratch)
++                offset = emu._retroarch_session_log_position()
++                t0 = self._clock()
++                try:
++                    answer = emu._retroarch_network_request(f"LOAD_STATE_SLOT {SCRATCH_SLOT}", expect_response=True,
++                                                            timeout=2.0, retries=1)
++                except RuntimeError:
++                    answer = None
++                ok, line_ms = False, None
++                if answer and answer.upper().startswith(f"LOAD_STATE_SLOT {SCRATCH_SLOT}"):
++                    end = self._clock() + LOAD_LINE_WAIT
++                    while self._clock() < end:
++                        text = "\n".join(emu._retroarch_session_log_since(offset))
++                        if "failed to load state" in text.casefold():
++                            break
++                        m = LOADING.search(text)
++                        if m and int(m.group(1)) > 0:
++                            ok, line_ms = True, round((self._clock() - t0) * 1000.0, 1)
++                            break
++                        time.sleep(0.01)
++            finally:
++                try:
++                    scratch.unlink()
++                except FileNotFoundError:
++                    pass
++        finally:
++            emu.lock.release()
++        if not ok:
++            self._row({"step": "error", "game": game, "why": "the state did not load"})
++            raise live.Busy("the contest's state did not load; the game is as it was")
++        self._row({"step": "loaded", "game": game, "load_line_ms": line_ms})
++        return line_ms
++
++    # --- (3)-(5) the run -----------------------------------------------------------------------------------------
++    def _still(self, game: str) -> None:
++        try:
++            now, _system, _kind = self._reader._running()
++        except RuntimeError:
++            return                                              # busy: checked again at the next step
++        if now != game:
++            raise Ended("the game stopped")
++        try:
++            if not bool((self._stream.status() or {}).get("active")):
++                raise Ended("the stream stopped")
++        except Ended:
++            raise
++        except Exception:
++            pass
++
++    def _sample(self, game: str, rule: dict) -> dict | None:
++        try:
++            return self._reader._read(game, rule)
++        except RuntimeError:
++            return None                                         # a read not answered: no sample, not a value
++
++    def _run(self, game: str, rule: dict, seconds: int, own: dict) -> None:
++        try:
++            t_load = self._clock()
++            armed = None
++            while self._clock() - t_load < ARM_WAIT:
++                self._still(game)
++                r = self._sample(game, rule)
++                if r is not None and r["values"] != own:
++                    armed = r
++                    break
++                time.sleep(ARM_POLL)
++            if armed is None:
++                why = f"the fight did not start within {ARM_WAIT:g} s; the game left running"
++                self._row({"step": "not_armed", "game": game, "why": why})
++                self._finish({"state": "error", "seconds": seconds, "game": game, "error": why})
++                return
++            t_arm = self._clock()
++            armed_after = round(t_arm - t_load, 2)
++            names = list(armed["values"])
++            base = [armed["values"][n] for n in names]
++            self._row({"step": "armed", "game": game, "armed_after_s": armed_after, "values": armed["values"]})
++            samples = [[0.0, *base]]
++            resets, lowered = 0, False
++            with self._lock:
++                self._current.update(state="running", t0=t_arm, armed_after_s=armed_after, samples=samples)
++            k = 1
++            while True:
++                next_at = t_arm + k * SAMPLE_EVERY
++                if next_at >= t_arm + seconds:
++                    break
++                time.sleep(max(0.0, next_at - self._clock()))
++                self._still(game)
++                r = self._sample(game, rule)
++                if r is not None:
++                    vals = [r["values"][n] for n in names]
++                    samples.append([round(self._clock() - t_arm, 1), *vals])
++                    if any(v < b for v, b in zip(vals, base)):
++                        lowered = True
++                    elif lowered and vals == base:
++                        resets += 1
++                        lowered = False
++                k += 1
++            time.sleep(max(0.0, t_arm + seconds - self._clock()))
++            self._still(game)
++            final = self._reader._read(game, rule)
++            vals = [final["values"][n] for n in names]
++            if lowered and vals == base:
++                resets += 1
++            samples.append([round(self._clock() - t_arm, 1), *vals])
++            answer = {"ok": True, "game": game, "winner": final["winner"], "reason": final["reason"],
++                      "values": final["values"], "seconds": seconds, "armed_after_s": armed_after, "samples": samples,
++                      "resets_seen": resets, "ended": "running"}
++            self._row({"step": "done", **{k2: v for k2, v in answer.items() if k2 != "ok"}})
++            self._finish({"state": "done", **answer})
++        except Ended as exc:
++            self._row({"step": "ended", "game": game, "why": str(exc)})
++            self._finish({"state": "ended", "seconds": seconds, "game": game, "why": str(exc)})
++        except Exception as exc:                                    # a final read that failed, anything else
++            self._row({"step": "error", "game": game, "why": str(exc)})
++            self._finish({"state": "error", "seconds": seconds, "game": game, "error": str(exc)})
++
++    def _finish(self, outcome: dict) -> None:
++        with self._lock:
++            self._current = outcome
++
++    def _row(self, fields: dict) -> None:
++        try:
++            path = Path(self._project_path(LOG_RELATIVE))
++            path.parent.mkdir(parents=True, exist_ok=True)
++            with path.open("a", encoding="utf-8") as fh:
++                fh.write(json.dumps({"time_unix": round(time.time(), 3), **fields}, sort_keys=True) + "\n")
++        except OSError:
++            pass
+diff --git a/tests/b101_h7_contest/test_b101.py b/tests/b101_h7_contest/test_b101.py
+new file mode 100644
+index 00000000..69a827fe
+--- /dev/null
++++ b/tests/b101_h7_contest/test_b101.py
+@@ -0,0 +1,347 @@
++#!/usr/bin/env python3
++"""B101 (host): H7's timed contest — `POST /plugins/games/h7-contest?seconds=N` and `GET /plugins/games/h7-contest`
++behind PRIVYHUB_H7=1, through the companion's real HTTP server on loopback.
++
++B99's harness (a child `python3 -I` on B82 / B83's fixture tree with its own companion/; `privyhub_service`'s handler
++on a ThreadingHTTPServer at 127.0.0.1:0; network beyond loopback blocked; a made-up PS1 title launched through
++`POST /plugins/games/launch`). The fake RetroArch is B99's, extended: `LOAD_STATE_SLOT n` reads
++`<core folder>/<stem>.state<n>` (a made-up file holding the values to set), writes RetroArch's own load line into the
++game log and answers; on demand it refuses (RetroArch's failure line, memory untouched); after a load its memory
++follows a script in time; every command is logged. The stream is a stub whose `active` each case sets. Made-up slot
++files 1-3 and the slot-0 copy are hashed before and after. Flag absent / 0: both routes on the baseline's companion
++(`git archive 33d8d2cf`) and on this one, byte for byte. No emulator; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/b101_h7_contest -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import subprocess
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "art_systems"))
++sys.path.insert(0, str(ROOT / "tests" / "b99_h7_live_read"))
++import _tmp_cleanup  # noqa: E402,F401
++import test_b85 as b85  # noqa: E402
++import test_b99 as b99  # noqa: E402  (a module: its tests are not collected twice)
++
++ON = {**b85.FLAGS, "PRIVYHUB_H7": "1"}
++BASELINE = "33d8d2cf"                   # queue AL's baseline (H7-L1 committed): the companion before B101
++
++CHILD = r'''
++import hashlib, json, os, re, socket, subprocess, sys, threading, time, types, urllib.request, urllib.error
++from pathlib import Path
++root = Path(sys.argv[1]).resolve()
++args = json.loads(sys.argv[2])
++rules = os.environ.get("PRIVYHUB_H7_RULES", "")
++_connect = socket.socket.connect
++def _guard(self, addr, *a, **k):
++    if isinstance(addr, tuple) and addr[0] not in ("127.0.0.1", "localhost", "::1"):
++        raise OSError("network beyond loopback blocked by the test")
++    return _connect(self, addr, *a, **k)
++socket.socket.connect = _guard
++def _run(cmd, *a, **k):
++    return types.SimpleNamespace(returncode=1, stdout=b"" if not k.get("text") else "", stderr="")
++subprocess.run = _run
++sys.path.insert(0, str(root / "companion"))
++import privyhub_service as svc
++from plugins import PLUGINS
++from games import emulator_manager as em
++g = PLUGINS["games"]
++g._metadata_reconcile_thread.join(120)
++m = g._emulator
++class Inert:
++    def __getattr__(self, name): return Inert()
++    def __call__(self, *a, **k): return {}
++    def __bool__(self): return False
++class Stream(Inert):
++    active = True
++    def status(self): return {"active": self.active}
++stream = Stream()
++g._native_stream = stream
++P1, P2 = args["p1"], args["p2"]
++fake = {}
++def folder():
++    return m._state_root() / "Beetle PSX HW"
++class FakeRetroArch:
++    def __init__(self, cmd, **kw):
++        self.pid = 999999999; self.returncode = None; self.stdin = None; self.stop = False
++        self.out = kw.get("stdout"); self.paused = False
++        self.mem = bytearray(0x200000); self.log = []; self.refuse = False; self.silent = False
++        self.script = []; self.t_load = None
++        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++        self.sock.bind(("127.0.0.1", int(m._network_cmd_port)))
++        self.sock.settimeout(0.02)
++        fake["ra"] = self
++        threading.Thread(target=self.serve, daemon=True).start()
++    def put(self, a, b):
++        self.mem[P1:P1 + 2] = int(a).to_bytes(2, "little"); self.mem[P2:P2 + 2] = int(b).to_bytes(2, "little")
++    def logline(self, line):
++        self.out.write(line + "\n"); self.out.flush()
++    def serve(self):
++        while not self.stop:
++            if self.t_load is not None:
++                now = time.monotonic() - self.t_load
++                while self.script and self.script[0][0] <= now:
++                    _, a, b = self.script.pop(0); self.put(a, b)
++            try:
++                data, addr = self.sock.recvfrom(4096)
++            except OSError:
++                continue
++            c = data.decode().strip(); w = c.split()
++            self.log.append(w[0] if w else "")
++            if c == "GET_STATUS":
++                self.sock.sendto(f"GET_STATUS {'PAUSED' if self.paused else 'PLAYING'} psx,fixture,crc32=0".encode(), addr)
++            elif c == "PAUSE_TOGGLE":
++                self.paused = not self.paused
++            elif c == "SAVE_FILES":
++                self.sock.sendto(b"SAVE_FILES OK", addr)
++            elif w and w[0] == "LOAD_STATE_SLOT" and len(w) == 2:
++                p = folder() / (m._active_state_stem() + f".state{w[1]}")
++                if self.silent:
++                    pass                                             # answers, but no load line at all
++                elif self.refuse or not p.is_file():
++                    self.logline(f'[ERROR] [State] Failed to load state from "{p}".')
++                else:
++                    vals = json.loads(p.read_text())
++                    self.put(vals["P1"], vals["P2"])
++                    self.logline(f'[INFO] [State] Loading state "{p}", {p.stat().st_size} bytes.')
++                    self.t_load = time.monotonic(); self.script = list(fake.get("script", []))
++                self.sock.sendto(c.encode(), addr)
++            elif w and w[0] in ("READ_CORE_RAM", "READ_CORE_MEMORY") and len(w) == 3:
++                a, n = int(w[1], 16), int(w[2])
++                body = "-1" if a + n > len(self.mem) else " ".join(f"{b:02x}" for b in self.mem[a:a + n])
++                self.sock.sendto(f"{w[0]} {w[1]} {body}".encode(), addr)
++    def poll(self): return self.returncode
++    def wait(self, timeout=None):
++        self.returncode = 0; self.stop = True; return 0
++    def terminate(self): self.returncode = -15; self.stop = True
++    def kill(self): self.returncode = -9; self.stop = True
++em.subprocess.Popen = FakeRetroArch
++from http.server import ThreadingHTTPServer
++httpd = ThreadingHTTPServer(("127.0.0.1", 0), svc.PrivyHubRequestHandler)
++threading.Thread(target=httpd.serve_forever, daemon=True).start()
++port = httpd.server_address[1]
++def call(method, path, timeout=60):
++    req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", method=method, data=b"" if method == "POST" else None)
++    try:
++        with urllib.request.urlopen(req, timeout=timeout) as r:
++            code, raw = r.status, r.read().decode()
++    except urllib.error.HTTPError as e:
++        code, raw = e.code, e.read().decode()
++    return {"code": code, "raw": raw, "body": json.loads(raw or "{}")}
++def start(n=5):
++    return call("POST", f"/plugins/games/h7-contest?seconds={n}")
++def wait_done(bound=60):
++    end = time.monotonic() + bound
++    while time.monotonic() < end:
++        st = call("GET", "/plugins/games/h7-contest")["body"].get("contest") or {}
++        if st.get("state") in ("done", "error", "ended"):
++            return st
++        time.sleep(0.2)
++    return {"timeout": True}
++out = {"steps": {}}
++S = out["steps"]
++S["get_before"] = call("GET", "/plugins/games/h7-contest")
++S["post_before_launch"] = start(10)
++S["launch"] = call("POST", f"/plugins/games/launch?id={args['id']}")["code"]
++time.sleep(0.3)
++if args["mode"] == "today":
++    S["get_after"] = call("GET", "/plugins/games/h7-contest")
++    S["post_after"] = start(10)
++    S["post_bad"] = call("POST", "/plugins/games/h7-contest?seconds=999")
++else:
++    ra = fake["ra"]; ra.paused = False
++    stem = m._active_state_stem(); f = folder(); f.mkdir(parents=True, exist_ok=True)
++    slots = [f / (stem + x) for x in (".state", ".state1", ".state2", ".state3")]
++    for i, p in enumerate(slots):
++        p.write_bytes(os.urandom(64) + bytes([i]))
++    digest = lambda: [hashlib.sha256(p.read_bytes()).hexdigest() for p in slots]
++    before = digest()
++    Path(rules).mkdir(parents=True, exist_ok=True)
++    S["no_rule"] = start()
++    Path(rules, args["id"] + ".json").write_text(json.dumps({"players": [
++        {"name": "P1", "address": hex(P1), "bytes": 2}, {"name": "P2", "address": hex(P2), "bytes": 2}],
++        "winner": "max", "memory": "ram", "none_when": "equal"}))
++    S["no_state"] = start()
++    Path(rules, args["id"] + ".state").write_text(json.dumps({"P1": 0, "P2": 0}))
++    stream.active = False; S["no_stream"] = start(); stream.active = True
++    S["bad_seconds"] = start(3)
++    ra.put(50, 60)
++    # 1: end to end — 0 / 0 for 1 s, the bars fill, P1 ahead at the clock
++    fake["script"] = [(1.0, 140, 140), (3.0, 140, 100), (5.0, 120, 100)]
++    n0 = len(ra.log)
++    S["c1_start"] = start(5); time.sleep(0.2); S["c1_second"] = start(5)
++    S["c1_running"] = call("GET", "/plugins/games/h7-contest")["body"]
++    S["c1"] = wait_done(); S["c1_commands"] = ra.log[n0:]
++    # 2: a new round inside the time — every value back to full — then P2 ahead
++    fake["script"] = [(0.5, 140, 140), (2.0, 140, 90), (3.0, 140, 140), (4.5, 100, 140)]
++    S["c2_start"] = start(5); S["c2"] = wait_done()
++    # 3: equal at the clock
++    fake["script"] = [(0.5, 140, 140), (2.0, 120, 130), (3.5, 110, 110)]
++    S["c3_start"] = start(5); S["c3"] = wait_done()
++    # 4: a load the fake refuses
++    ra.put(77, 33); ra.refuse = True
++    S["c4"] = start(5); S["c4_mem"] = [int.from_bytes(ra.mem[P1:P1 + 2], "little"), int.from_bytes(ra.mem[P2:P2 + 2], "little")]
++    S["c4_get"] = call("GET", "/plugins/games/h7-contest")["body"]
++    ra.refuse = False
++    ra.silent = True; t = time.monotonic(); S["c4b"] = start(5); S["c4b_elapsed"] = round(time.monotonic() - t, 2)
++    S["c4b_mem"] = [int.from_bytes(ra.mem[P1:P1 + 2], "little"), int.from_bytes(ra.mem[P2:P2 + 2], "little")]
++    ra.silent = False
++    S["c4_scratch_left"] = sorted(p.name for p in f.iterdir() if p.name.endswith(".state8"))
++    # 5: never armed (the values never leave the state's)
++    fake["script"] = []
++    t = time.monotonic(); S["c5_start"] = start(5); S["c5"] = wait_done(); S["c5_elapsed"] = round(time.monotonic() - t, 1)
++    # 6: N64 and PS2 sessions
++    old_sys = m.active_game.get("system"); m.active_game["system"] = "n64"; S["n64"] = start(); m.active_game["system"] = old_sys
++    m._launch_kind = "pcsx2"; S["ps2"] = start(); m._launch_kind = None
++    # 7: the user's END during a contest
++    fake["script"] = [(0.5, 140, 140), (2.0, 120, 140)]
++    S["c7_start"] = start(30); time.sleep(2.0)
++    S["c7_stop"] = call("POST", "/plugins/games/stop")["code"]
++    S["c7"] = wait_done(); S["c7_lock_free"] = m.lock.acquire(timeout=1.0)
++    if S["c7_lock_free"]: m.lock.release()
++    S["scratch_left"] = sorted(p.name for p in f.iterdir() if p.name.endswith(".state8"))
++    S["slots_equal"] = digest() == before
++    log = root / "logs/games/h7_contests.jsonl"
++    out["rows"] = [json.loads(l) for l in log.read_text().splitlines()] if log.is_file() else None
++httpd.shutdown()
++print(json.dumps(out))
++'''
++
++
++def run(root: Path, env: dict, gid: str, mode: str) -> dict:
++    child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    child_env.update(env)
++    xdg = root / "xdg"
++    xdg.mkdir(exist_ok=True)
++    child_env.update({"XDG_CONFIG_HOME": str(xdg), "HOME": str(xdg), "PRIVYHUB_H7_RULES": str(root / "h7rules")})
++    r = subprocess.run([sys.executable, "-I", "-B", "-c", CHILD, str(root),
++                        json.dumps({"id": gid, "mode": mode, "p1": b99.P1, "p2": b99.P2})],
++                       cwd=root, env=child_env, capture_output=True, text=True, timeout=900)
++    assert r.returncode == 0, r.stderr[-3000:]
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++class TimedContest(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b99.tree()
++        cls.gid = ids[b85.PS1_TITLE]
++        cls.out = run(root, ON, cls.gid, "on")
++        cls.s = cls.out["steps"]
++
++    def err(self, r):
++        return r["code"], r["body"].get("error")
++
++    def test_before_any_contest_and_no_game(self):
++        self.assertEqual(self.s["get_before"]["body"], {"ok": True, "contest": None})
++        self.assertEqual(self.err(self.s["post_before_launch"]), (400, "no game is running"))
++
++    def test_the_plain_refusals(self):
++        self.assertEqual(self.err(self.s["no_rule"]), (400, "no rule for this game"))
++        self.assertEqual(self.err(self.s["no_state"]), (400, "no state for this game's contest"))
++        self.assertEqual(self.err(self.s["no_stream"]), (400, "the stream is not up"))
++        self.assertEqual(self.err(self.s["bad_seconds"]), (400, "seconds must be a whole number from 5 to 300"))
++        self.assertEqual(self.err(self.s["c1_second"]), (400, "a contest is already running"))
++
++    def test_a_contest_end_to_end(self):
++        st = self.s["c1_start"]["body"]
++        self.assertEqual((st["contest"], st["seconds"], st["state_values"]), ("started", 5, {"P1": 0, "P2": 0}))
++        self.assertIn(self.s["c1_running"]["contest"]["state"], ("arming", "running"))
++        c = self.s["c1"]
++        self.assertEqual(c["state"], "done", c)
++        self.assertEqual((c["winner"], c["reason"], c["values"]), ("P1", None, {"P1": 120, "P2": 100}))
++        self.assertEqual((c["seconds"], c["ended"], c["resets_seen"]), (5, "running", 0))
++        self.assertTrue(0.75 <= c["armed_after_s"] <= 1.75, c["armed_after_s"])     # the bars filled at 1.0 s
++        self.assertEqual(c["samples"][0][1:], [140, 140])                         # armed at the filled values
++        self.assertGreaterEqual(len(c["samples"]), 5)
++        self.assertTrue(all(c["samples"][i][0] < c["samples"][i + 1][0] for i in range(len(c["samples"]) - 1)))
++        self.assertTrue(4.8 <= c["samples"][-1][0] <= 5.6, c["samples"][-1])
++
++    def test_only_status_reads_and_one_load(self):
++        cmds = self.s["c1_commands"]
++        self.assertEqual(set(cmds), {"GET_STATUS", "READ_CORE_RAM", "LOAD_STATE_SLOT"})
++        self.assertEqual(cmds.count("LOAD_STATE_SLOT"), 1)
++
++    def test_a_new_round_is_seen_not_used(self):
++        c = self.s["c2"]
++        self.assertEqual((c["state"], c["resets_seen"], c["winner"]), ("done", 1, "P2"))
++
++    def test_equal_at_the_clock(self):
++        c = self.s["c3"]
++        self.assertEqual((c["winner"], c["reason"], c["values"]), (None, "no winner yet", {"P1": 110, "P2": 110}))
++
++    def test_a_refused_load_leaves_the_game_as_it_was(self):
++        self.assertEqual(self.err(self.s["c4"]), (503, "the contest's state did not load; the game is as it was"))
++        self.assertEqual(self.s["c4_mem"], [77, 33])
++        self.assertEqual(self.s["c4_scratch_left"], [])
++        self.assertEqual(self.s["c4_get"]["contest"]["state"], "done")                # the last outcome kept
++
++    def test_a_load_without_retroarchs_line_is_not_a_load(self):
++        self.assertEqual(self.err(self.s["c4b"]), (503, "the contest's state did not load; the game is as it was"))
++        self.assertEqual(self.s["c4b_mem"], [77, 33])
++        self.assertLess(self.s["c4b_elapsed"], 1.5 + 1.0)                            # the line's bound, not longer
++
++    def test_never_armed(self):
++        c = self.s["c5"]
++        self.assertEqual(c["state"], "error")
++        self.assertEqual(c["error"], "the fight did not start within 20 s; the game left running")
++        self.assertLess(self.s["c5_elapsed"], 20 + 3)
++
++    def test_n64_and_ps2(self):
++        self.assertEqual(self.err(self.s["n64"]),
++                         (400, "not supported yet — a state cannot be loaded into a running N64 game"))
++        self.assertEqual(self.err(self.s["ps2"]), (400, "not supported yet"))
++
++    def test_end_during_a_contest(self):
++        c = self.s["c7"]
++        self.assertEqual(self.s["c7_stop"], 200)
++        self.assertEqual((c["state"], c["why"]), ("ended", "the game stopped"))
++        self.assertNotIn("winner", c)
++        self.assertTrue(self.s["c7_lock_free"])
++        self.assertEqual(self.s["scratch_left"], [])
++
++    def test_the_users_slots_untouched(self):
++        self.assertTrue(self.s["slots_equal"])
++
++    def test_one_row_per_step(self):
++        steps = [r["step"] for r in self.out["rows"]]
++        for want in ("refused", "loaded", "armed", "done", "error", "not_armed", "ended"):
++            self.assertIn(want, steps)
++        loaded = next(r for r in self.out["rows"] if r["step"] == "loaded")
++        self.assertEqual(loaded["game"], self.gid)
++        self.assertIsNotNone(loaded["load_line_ms"])
++
++
++class FlagAbsentIsToday(unittest.TestCase):
++    def test_absent_and_zero_answer_as_the_baselines_code(self):
++        old = b99.BASELINE
++        b99.BASELINE = BASELINE
++        try:
++            code = b99.head_code()
++        finally:
++            b99.BASELINE = old
++        if code is None:
++            self.skipTest("git is absent")
++        root, ids = b99.tree(code)
++        gid = ids[b85.PS1_TITLE]
++        base = run(root, b85.FLAGS, gid, "today")
++        for env in (b85.FLAGS, {**b85.FLAGS, "PRIVYHUB_H7": "0"}):
++            root2, _ = b99.tree()
++            mine = run(root2, env, gid, "today")
++            for k in ("get_before", "post_before_launch", "get_after", "post_after", "post_bad"):
++                self.assertEqual((mine["steps"][k]["code"], mine["steps"][k]["raw"]),
++                                 (base["steps"][k]["code"], base["steps"][k]["raw"]), k)
++            self.assertEqual(mine["steps"]["launch"], base["steps"]["launch"])
++        self.assertEqual(base["steps"]["get_after"]["body"]["error"], "Unknown Games plugin action: h7-contest")
++        self.assertEqual(base["steps"]["post_after"]["body"]["error"], "Unknown Games plugin POST action: h7-contest")
++
++
++if __name__ == "__main__":
++    unittest.main()

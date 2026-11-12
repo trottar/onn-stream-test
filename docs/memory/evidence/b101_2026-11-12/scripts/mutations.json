@@ -1,0 +1,72 @@
+[
+ {
+  "id": "V1",
+  "file": "companion/plugins/games.py",
+  "old": "        if action == \"h7-contest\" and _h7_contest is not None:\n            return self._h7_contest_runner().start(",
+  "new": "        if action == \"h7-contest\":\n            return self._h7_contest_runner().start(",
+  "why": "the POST route present without the flag"
+ },
+ {
+  "id": "V2",
+  "file": "companion/h7_contest.py",
+  "old": "                    scratch.unlink()",
+  "new": "                    pass",
+  "why": "the scratch state left behind"
+ },
+ {
+  "id": "V3",
+  "file": "companion/h7_contest.py",
+  "old": "                        if m and int(m.group(1)) > 0:",
+  "new": "                        if True:",
+  "why": "RetroArch's load line not required"
+ },
+ {
+  "id": "V4",
+  "file": "companion/h7_contest.py",
+  "old": "                if r is not None and r[\"values\"] != own:",
+  "new": "                if r is not None:",
+  "why": "armed before the values leave the state's"
+ },
+ {
+  "id": "V5",
+  "file": "companion/h7_contest.py",
+  "old": "                        resets += 1\n                        lowered = False",
+  "new": "                        lowered = False",
+  "why": "a new round not counted"
+ },
+ {
+  "id": "V6",
+  "file": "companion/h7_contest.py",
+  "old": "            final = self._reader._read(game, rule)",
+  "new": "            self._emu._retroarch_network_request(\"PAUSE_TOGGLE\", expect_response=False)\n            final = self._reader._read(game, rule)",
+  "why": "the contest pauses the game at its end"
+ },
+ {
+  "id": "V7",
+  "file": "companion/h7_contest.py",
+  "old": "        if not active:\n            self._refused(\"the stream is not up\")",
+  "new": "        if False:\n            self._refused(\"the stream is not up\")",
+  "why": "the stream not checked"
+ },
+ {
+  "id": "V8",
+  "file": "companion/h7_contest.py",
+  "old": "            raise Ended(\"the game stopped\")",
+  "new": "            pass",
+  "why": "END not noticed"
+ },
+ {
+  "id": "V9",
+  "file": "companion/h7_contest.py",
+  "old": "            if self._current is not None and self._current.get(\"state\") in (\"loading\", \"arming\", \"running\"):",
+  "new": "            if False:",
+  "why": "a second contest allowed"
+ },
+ {
+  "id": "V10",
+  "file": "companion/h7_contest.py",
+  "old": "SCRATCH_SLOT = 8 ",
+  "new": "SCRATCH_SLOT = 1 ",
+  "why": "the scratch in a user's slot"
+ }
+]

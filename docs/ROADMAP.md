@@ -3129,6 +3129,17 @@ reaches 0 at a knockout — right for "who is ahead", not for "knocked out". **W
 leader when a clock ends; the 4-player title; B's three notes — a fold skipped as "not testable" should not pass, an N64
 fixture whose code lands in memory, a lighter read path for faster reads (`docs/memory/evidence/H7_L1_2026-11-12.md`).
 
+**H7-L1 met, and the first mini-game round (queue AL, 2026-11-12):** the live read named the leader in a fight the
+user was playing (three pauses and the match's end; 442 reads, 0 errors; the stream as a normal session's). **Two
+things a mini game must live with:** the number never reaches 0 at a knockout (the last blow is not taken off it), and a
+new round resets both to full ("no winner yet" just after a knockout). **B100:** a fold the search could not test no
+longer counts as passed. **B101, behind `PRIVYHUB_H7=1`:** the timed contest — `POST /plugins/games/h7-contest?seconds=N`
+loads the mini game's kept state into the running PS1 / SNES game (scratch slot 8), arms when the bars fill, samples
+once a second, and names the leader when the clock ends; it **ends running** (the onn cannot resume a pause it did not
+ask for). **Waits:** A's H7-L2 at the TV (two 30-second contests); a knockout / round signal; the 4-player title; PS2
+through PINE; N64's fixture and launch-with-state; a lighter read path (`evidence/B100_H7_UNTESTED_FOLD_2026-11-12.md`,
+`evidence/B101_H7_TIMED_CONTEST_2026-11-12.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

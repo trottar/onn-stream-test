@@ -145,8 +145,10 @@ import cheat_clean as _cheat_clean  # noqa: E402
 # B99: H7's live read (GET h7-read: who is ahead in the running game, by a kept rule), only with PRIVYHUB_H7=1.
 # Absent / 0 = today: nothing imported, the action unknown, no rules folder looked at.
 _h7_live = None
+_h7_contest = None
 if (os.environ.get("PRIVYHUB_H7") or "").strip() == "1":
     import h7_live_read as _h7_live
+    import h7_contest as _h7_contest          # B101: the timed contest (the same flag)
 
 # B56: an import's marks on the list (NEW for 7 days, a hidden .iso, "(OpenBIOS)"), only with PRIVYHUB_IMPORT=1.
 # Absent = today: nothing imported.
@@ -3466,14 +3468,30 @@ class GamesPlugin:
 
         # B99: H7's live read (PRIVYHUB_H7=1 only; the hub's own route for A's watcher, not a client call)
         if action == "h7-read" and _h7_live is not None:
-            reader = getattr(self, "_h7_live_reader", None)
-            if reader is None:
-                reader = self._h7_live_reader = _h7_live.LiveRead(self._emulator, self._emulator._project_path)
-            return reader.read()
+            return self._h7_reader().read()
+
+        # B101: the timed contest's state or last outcome (PRIVYHUB_H7=1 only)
+        if action == "h7-contest" and _h7_contest is not None:
+            return self._h7_contest_runner().status()
 
         raise ValueError(
             f"Unknown Games plugin action: {action}"
         )
+
+    def _h7_reader(self):
+        """B99 / B101: one live reader per plugin (PRIVYHUB_H7=1 only)."""
+        reader = getattr(self, "_h7_live_reader", None)
+        if reader is None:
+            reader = self._h7_live_reader = _h7_live.LiveRead(self._emulator, self._emulator._project_path)
+        return reader
+
+    def _h7_contest_runner(self):
+        """B101: one contest runner per plugin (PRIVYHUB_H7=1 only)."""
+        runner = getattr(self, "_h7_contest_obj", None)
+        if runner is None:
+            runner = self._h7_contest_obj = _h7_contest.Contest(self._emulator, self._h7_reader(), self._native_stream,
+                                                                self._emulator._project_path)
+        return runner
 
     def _find_game_by_id(
         self,
@@ -4309,6 +4327,10 @@ class GamesPlugin:
                 return payload
             except NativeStreamError as exc:
                 raise RuntimeError(str(exc)) from exc
+
+        # B101: start a timed contest (PRIVYHUB_H7=1 only)
+        if action == "h7-contest" and _h7_contest is not None:
+            return self._h7_contest_runner().start(self._first(parse_qs(raw_query), "seconds"))
 
         return self.handle_post(action, raw_query)
 

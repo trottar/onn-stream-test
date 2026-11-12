@@ -507,10 +507,13 @@ def _names(ctx: _Ctx, i: int, c: dict) -> int | None:
     return vals.index(top) if vals.count(top) == 1 else None
 
 
+UNTESTABLE_FOLD = "the template is not testable on the other states"
+
+
 def _fold(ctx: _Ctx, kind: str, e: int, w: int, train: list[int], res, fams: list[dict]) -> dict:
     row = {"held_out": e, "winner": f"P{w + 1}", "skipped": False}
     if isinstance(res, dict) and "not_testable" in res:
-        row.update(skipped=True, why="the template is not testable on the other states")
+        row.update(skipped=True, why=UNTESTABLE_FOLD)
         return row
     tf = _families(res, kind)
     owner = {}
@@ -563,11 +566,14 @@ def _report(ctx: _Ctx, kind: str, res, fams: list[dict], folds: list[dict], epw:
                 "evidence": {"level": "none", "words": "none: " + res["not_testable"], "ends_per_winner": epw,
                              "folds_run": 0, "folds_skipped": len(folds),
                              "would_make_strong": _more(epw, ctx.players)}}
+    untested = [r for r in folds if r.get("why") == UNTESTABLE_FOLD]       # B100: a template testable on all
+    for r in untested:                                                      # the states, but not on the others:
+        r["not_tested"] = True                                              # not tested is not passed
     for f in fams:
         f["passes"] = all(f.get("fold_results", []))
     passing = [f for f in fams if f["passes"]]
     once = [p for p, n in epw.items() if n < 2]
-    if passing and not once and ran and len(epw) >= 2:          # addendum 1: two different winners seen
+    if passing and not once and ran and len(epw) >= 2 and not untested:   # addendum 1; B100: every fold tested
         level = "strong"
         words = (f"strong: every winner seen has at least two 'end' states; {len(passing)} famil"
                  f"{'y passes' if len(passing) == 1 else 'ies pass'} all {len(ran)} folds; the answer is the top one")
@@ -581,6 +587,11 @@ def _report(ctx: _Ctx, kind: str, res, fams: list[dict], folds: list[dict], epw:
     else:
         level = "none"
         words = "none: no family holds in every state and every fold"
+    if level == "weak" and untested:
+        words = (f"weak: {len(passing)} famil{'y passes' if len(passing) == 1 else 'ies pass'} the {len(ran)} "
+                 f"fold{'' if len(ran) == 1 else 's'} that ran, but {len(untested)} fold"
+                 f"{' ' if len(untested) == 1 else 's '}could not be tested (the search on the other states was over its "
+                 f"cap) — a fold not tested is not a fold passed" + ("; " + words[len("weak: "):] if once else ""))
     rules = [_rule_of(f, ctx.players, kind) for f in fams[:SHOWN]]
     for r, f in zip(rules, fams):
         r["passes_every_fold"] = f["passes"]
@@ -590,7 +601,18 @@ def _report(ctx: _Ctx, kind: str, res, fams: list[dict], folds: list[dict], epw:
             "candidates": rules, "folds": folds,
             "evidence": {"level": level, "words": words, "ends_per_winner": epw, "folds_run": len(ran),
                          "folds_skipped": len(skipped),
-                         "would_make_strong": None if level == "strong" else _more(epw, ctx.players)}}
+                         **({"folds_not_tested": len(untested)} if untested else {}),
+                         "would_make_strong": None if level == "strong" else _untested_more(epw, ctx.players, untested)}}
+
+
+def _untested_more(epw: dict, players: int, untested: list) -> str:
+    """B100: with a fold not tested, what would make it strong says so (a winner seen once first)."""
+    if not untested:
+        return _more(epw, players)
+    tail = ("every fold tested — the search on the other states stayed over its cap; more states of the same kind do "
+            "not lift it")
+    once = [p for p, n in epw.items() if n < 2]
+    return (_more(epw, players) + "; and " + tail) if (once or len(epw) < 2) else tail
 
 
 def _more(epw: dict, players: int) -> str:

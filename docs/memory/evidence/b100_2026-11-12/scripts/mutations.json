@@ -1,0 +1,30 @@
+[
+ {
+  "id": "U1",
+  "file": "tools/h7_rule_search.py",
+  "old": "    if passing and not once and ran and len(epw) >= 2 and not untested:",
+  "new": "    if passing and not once and ran and len(epw) >= 2:",
+  "why": "a not-tested fold counted as passed (strong)"
+ },
+ {
+  "id": "U2",
+  "file": "tools/h7_rule_search.py",
+  "old": "        r[\"not_tested\"] = True                                              # not tested is not passed",
+  "new": "        pass",
+  "why": "a not-tested fold not marked"
+ },
+ {
+  "id": "U3",
+  "file": "tools/h7_rule_search.py",
+  "old": "                         **({\"folds_not_tested\": len(untested)} if untested else {}),\n",
+  "new": "",
+  "why": "the count of folds not tested not reported"
+ },
+ {
+  "id": "U4",
+  "file": "tools/h7_rule_search.py",
+  "old": "    if level == \"weak\" and untested:",
+  "new": "    if False:",
+  "why": "the words do not say why"
+ }
+]

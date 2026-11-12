@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-12 — Queue AL (H7: B100 a fold not tested is not passed, B101 the timed contest behind PRIVYHUB_H7=1): a template with a fold over its cap reads at most "weak"; `POST /plugins/games/h7-contest?seconds=N` loads the mini game's kept state into the running PS1 / SNES game, arms when the bars fill, and names the leader when the clock ends — it ends running (the onn cannot resume a pause it did not ask for) — OPEN (A's H7-L2 at the TV, ~10 min) — `docs/memory/evidence/B100_H7_UNTESTED_FOLD_2026-11-12.md`, `B101_H7_TIMED_CONTEST_2026-11-12.md`
 - 2026-11-12 — H7-L1 (the live read beside the user's eyes, T88's 2-player fight on the stream, PRIVYHUB_H7=1 for the sitting only): **MET** — at every pause the read's leader was the user's (140 / 110 P1, 110 / 110 even, 110 / 80 P1) and at the knockout 140 / 102 → P1; the stream not disturbed (442 reads, 0 errors, median 38 ms); L0 not run (no Continue: A's stage-1 error) and L5 not run (a menu); OPEN: a timed stop reading the leader when a clock ends; the number never reaches 0 at a knockout — `## 2026-11-12 H7-L1` below
 - 2026-11-11 — Queue AK (H7: B98 the acceptance rule in the search, B99 the live read behind PRIVYHUB_H7=1): a (b2) or (c) answer no longer decides; `GET /plugins/games/h7-read` reads the kept rule from the running game (values, leader, "no winner yet"), changing nothing; on fixtures a read once a second leaves the frames unchanged (SNES 3,603 / 3,600, PS1 3,603 / 3,601 per 60 s) — OPEN (A's H7-L1 at the TV, ~10 min) — `docs/memory/evidence/B98_H7_ACCEPTANCE_IN_SEARCH_2026-11-11.md`, `B99_H7_LIVE_READ_2026-11-11.md`
 - 2026-11-11 — H7-P3 (five states on T88: the user's two mid-fight saves added, unattended): evidence **"strong"**, decided, template h — **the game's cheat list's per-player pair reads who is ahead** in all five saves, mid-fight included; accepted; the proof met (5 × 3 of 3) → **T88's slots 1-3 erased** (the user's request; checked copies of all five kept); OPEN: the same read on a fight played on the stream (the independent check) — `## 2026-11-11 H7-P3` below
@@ -84,6 +85,24 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-12 Queue AL (B100, B101): a fold not tested is not passed; the timed contest behind its flag
+
+(`docs/memory/evidence/B100_H7_UNTESTED_FOLD_2026-11-12.md`, `B101_H7_TIMED_CONTEST_2026-11-12.md`)
+
+- **B100:** a template with a fold whose training search was over its cap reads at most "weak" (`folds_not_tested`);
+  H7-P3's (b2) case (1 of 4 folds run) now reads "weak"; the hinted pair's answer unchanged.
+- **B101 (built, not adopted):** `PRIVYHUB_H7=1` → `POST /plugins/games/h7-contest?seconds=N` (PS1, SNES): the kept
+  `<game id>.state` loaded into the running game through scratch slot 8 (never the user's 1-3, the hub's slot 0, the
+  rewind's 9 or the recovery's file), armed when the values leave the state's, N seconds with a read a second, the
+  leader at the clock; `GET` the state or the last answer. Absent / 0 = today (byte for byte).
+- **Noted:** the contest **ends running** — during a stream the onn never reads `paused`, and the hold's pause is ended
+  by the hub itself; a pause the hub kept would leave a frozen picture until the user left the stream. A mini game's
+  end is therefore not visible on the TV by itself (the H7-L2 sketch handles it with the user's own pause).
+- **OPEN (A, attended, ~10 min at the TV): H7-L2** — two 30-second contests on T88's kept "begin" state, the hub's winner
+  beside the user's leader (`docs/memory/handoffs/SESSION_B_DONE_2026-11-12AL.md`).
+- **OPEN (B, later):** a knockout / round signal (the number does not show a knockout; a new round resets it); N64
+  needs a fixture whose code lands in memory and a launch-with-state; PS2 through PINE; a lighter read path.
 
 ## 2026-11-12 H7-L1: the live read names the leader in a fight being played — MET; the flag off
 

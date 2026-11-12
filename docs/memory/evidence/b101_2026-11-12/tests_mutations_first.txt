@@ -1,0 +1,13 @@
+V1 CAUGHT (Ran 13 tests in 47.241s FAILED (failures=1)) -- the POST route present without the flag
+V2 CAUGHT (Ran 13 tests in 17.158s FAILED (failures=5, errors=1)) -- the scratch state left behind
+V3 MISSED (Ran 13 tests in 49.397s OK) -- RetroArch's load line not required
+V4 CAUGHT (Ran 13 tests in 31.245s FAILED (failures=4)) -- armed before the values leave the state's
+V5 CAUGHT (Ran 13 tests in 49.354s FAILED (failures=1)) -- a new round not counted
+V6 CAUGHT (Ran 13 tests in 49.313s FAILED (failures=1)) -- the contest pauses the game at its end
+V7 CAUGHT (Ran 13 tests in 49.418s FAILED (failures=1)) -- the stream not checked
+V8 CAUGHT (Ran 13 tests in 77.444s FAILED (failures=1, errors=1)) -- END not noticed
+V9 CAUGHT (Ran 13 tests in 44.177s FAILED (failures=3)) -- a second contest allowed
+V10 CAUGHT (Ran 13 tests in 312.087s FAILED (failures=4, errors=5)) -- the scratch in a user's slot
+caught 9 / 10
+RetroArch left after the mutations: 2 (B100's batch may run beside this one)
+note (B): V3 MISSED here — no case had a RetroArch that answers the load but writes no line at all; that case was added (test_a_load_without_retroarchs_line_is_not_a_load) and the whole batch run again: tests_x3.txt / tests_mutations.txt. The 2 RetroArch processes counted above are B100's batch's session (its own work copy).
