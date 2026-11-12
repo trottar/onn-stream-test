@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **H7-L1 DONE, MET** (`evidence/H7_L1_2026-11-12.md`): the live read on a T88 fight played on the stream named the
-  user's leader at 3 pauses and the winner at the knockout; the stream undisturbed. Bench flag off — **eighteen lines**.
+- **H7-L2 DONE, MET** (`evidence/H7_L2_2026-11-12.md`): two 30-s contests on T88's saved fight named P1 (140 / 72),
+  then P2 (128 / 140), as the user saw; nothing of the user's touched; stream undisturbed. Flag off — **eighteen lines**.
 
 ## Verified State
 
@@ -87,8 +87,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7, the user's pick:** a timed stop that reads the leader when a clock ends (the first PrivyParty mini game); or
-   the 4-player title (candidates: `runtime/h7_minigame_candidates.md`, git-ignored); or B's three notes.
+1. **H7, the user's pick:** the onn showing "time's up" at a contest's end (the end is invisible today); or the
+   4-player title (candidates: `runtime/h7_minigame_candidates.md`, git-ignored); or arming / round signals, PS2, N64.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 

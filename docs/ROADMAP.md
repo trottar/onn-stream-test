@@ -3140,6 +3140,14 @@ ask for). **Waits:** A's H7-L2 at the TV (two 30-second contests); a knockout / 
 through PINE; N64's fixture and launch-with-state; a lighter read path (`evidence/B100_H7_UNTESTED_FOLD_2026-11-12.md`,
 `evidence/B101_H7_TIMED_CONTEST_2026-11-12.md`).
 
+**H7-L2 (2026-11-12, attended) — the first timed contests, MET:** B101's contest behind `PRIVYHUB_H7=1` for one
+sitting; twice on "ready" the hub dropped T88's saved fight into the running game, timed 30 seconds and named who was
+ahead — P1 (140 / 72), then P2 (128 / 140) — each the player the user said won; nothing of the user's touched; the stream
+undisturbed. **Seen:** the end is invisible on the TV — both times the game's own round ended and reset the bars before
+the user read them. **What waits:** the onn showing "time's up" (B's first note); arming by a rule-file setting; a
+knockout / round signal; the 4-player title; PS2 through PINE; N64's fixture and launch-with-state; a lighter read path
+(`docs/memory/evidence/H7_L2_2026-11-12.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

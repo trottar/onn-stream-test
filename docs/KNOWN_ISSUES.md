@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-12 — H7-L2 (two timed contests on T88, the saved fight dropped in, 30 s, PRIVYHUB_H7=1 for the sitting only): **MET** — the hub named P1 at 140 / 72 (the user: "Player 1 won") and P2 at 128 / 140 ("player 2 won round 90%"); nothing of the user's touched; the stream undisturbed; OPEN: the end is invisible on the TV — in both contests the game's own round ended and reset the bars before the user read them — `## 2026-11-12 H7-L2` below
 - 2026-11-12 — Queue AL (H7: B100 a fold not tested is not passed, B101 the timed contest behind PRIVYHUB_H7=1): a template with a fold over its cap reads at most "weak"; `POST /plugins/games/h7-contest?seconds=N` loads the mini game's kept state into the running PS1 / SNES game, arms when the bars fill, and names the leader when the clock ends — it ends running (the onn cannot resume a pause it did not ask for) — OPEN (A's H7-L2 at the TV, ~10 min) — `docs/memory/evidence/B100_H7_UNTESTED_FOLD_2026-11-12.md`, `B101_H7_TIMED_CONTEST_2026-11-12.md`
 - 2026-11-12 — H7-L1 (the live read beside the user's eyes, T88's 2-player fight on the stream, PRIVYHUB_H7=1 for the sitting only): **MET** — at every pause the read's leader was the user's (140 / 110 P1, 110 / 110 even, 110 / 80 P1) and at the knockout 140 / 102 → P1; the stream not disturbed (442 reads, 0 errors, median 38 ms); L0 not run (no Continue: A's stage-1 error) and L5 not run (a menu); OPEN: a timed stop reading the leader when a clock ends; the number never reaches 0 at a knockout — `## 2026-11-12 H7-L1` below
 - 2026-11-11 — Queue AK (H7: B98 the acceptance rule in the search, B99 the live read behind PRIVYHUB_H7=1): a (b2) or (c) answer no longer decides; `GET /plugins/games/h7-read` reads the kept rule from the running game (values, leader, "no winner yet"), changing nothing; on fixtures a read once a second leaves the frames unchanged (SNES 3,603 / 3,600, PS1 3,603 / 3,601 per 60 s) — OPEN (A's H7-L1 at the TV, ~10 min) — `docs/memory/evidence/B98_H7_ACCEPTANCE_IN_SEARCH_2026-11-11.md`, `B99_H7_LIVE_READ_2026-11-11.md`
@@ -85,6 +86,22 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-12 H7-L2: two timed contests on the real title — MET; the flag off
+
+(`docs/memory/evidence/H7_L2_2026-11-12.md`, `docs/memory/evidence/h7l2_2026-11-12/`)
+
+- **MET:** on "ready" the hub loaded T88's kept "begin" fight into the running game (RetroArch's own load line, 33 / 52
+  ms; the first reads 0 / 0), armed when the bars filled (15.7 s, 11.8 s), ran 30 s and named the leader: **P1 140 / 72**
+  (the user: "Player 1 won"), **P2 128 / 140** (the user: "player 2 won round 90%"). The hub's 151 save files before =
+  after; no scratch file left; the stream's rows as a normal session's (490 reads, 0 errors). Eighteen lines at the close.
+- **OPEN (seen, stated beside the verdict):** the end is invisible on the TV and A's "time" reaches the user seconds
+  late; in both contests the game's own round ended ~18 s after the hub's clock (pads down, the same leader) and reset
+  both bars before the user read them. The user's lines name the round's winner (= the hub's winner); the
+  pre-registered fallback (the values at the user's Home) would read 140 / 140. → the onn showing "time's up", or a
+  pause at the clock.
+- **OPEN (what waits):** arming by a rule-file setting; a knockout / round signal; the 4-player title; PS2 through PINE;
+  N64's fixture and launch-with-state; a lighter read path.
 
 ## 2026-11-12 Queue AL (B100, B101): a fold not tested is not passed; the timed contest behind its flag
 
