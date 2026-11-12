@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-12 — H7-V1 (the first frames for an end-screen detector, T88's five kept states run headless, unattended): 1,186 pictures under runtime/h7_frames/ (git-ignored); the end is announced by a large line of text over the fight, the winner's side by a round light and a post-match tally; OPEN: the "begin" save never reaches a fight (no timer on the select screen); the win line names only the character — `## 2026-11-12 H7-V1` below
 - 2026-11-12 — H7-L2 (two timed contests on T88, the saved fight dropped in, 30 s, PRIVYHUB_H7=1 for the sitting only): **MET** — the hub named P1 at 140 / 72 (the user: "Player 1 won") and P2 at 128 / 140 ("player 2 won round 90%"); nothing of the user's touched; the stream undisturbed; OPEN: the end is invisible on the TV — in both contests the game's own round ended and reset the bars before the user read them — `## 2026-11-12 H7-L2` below
 - 2026-11-12 — Queue AL (H7: B100 a fold not tested is not passed, B101 the timed contest behind PRIVYHUB_H7=1): a template with a fold over its cap reads at most "weak"; `POST /plugins/games/h7-contest?seconds=N` loads the mini game's kept state into the running PS1 / SNES game, arms when the bars fill, and names the leader when the clock ends — it ends running (the onn cannot resume a pause it did not ask for) — OPEN (A's H7-L2 at the TV, ~10 min) — `docs/memory/evidence/B100_H7_UNTESTED_FOLD_2026-11-12.md`, `B101_H7_TIMED_CONTEST_2026-11-12.md`
 - 2026-11-12 — H7-L1 (the live read beside the user's eyes, T88's 2-player fight on the stream, PRIVYHUB_H7=1 for the sitting only): **MET** — at every pause the read's leader was the user's (140 / 110 P1, 110 / 110 even, 110 / 80 P1) and at the knockout 140 / 102 → P1; the stream not disturbed (442 reads, 0 errors, median 38 ms); L0 not run (no Continue: A's stage-1 error) and L5 not run (a menu); OPEN: a timed stop reading the leader when a clock ends; the number never reaches 0 at a knockout — `## 2026-11-12 H7-L1` below
@@ -86,6 +87,21 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-12 H7-V1: the first end-screen frames — the end is on screen; the side shows apart from the names
+
+(`docs/memory/evidence/H7_V1_2026-11-12.md`, `docs/memory/evidence/h7v1_2026-11-12/`)
+
+- **Collected:** the five kept copies run forward headless with no pads (the hub's render scale given), a picture every
+  0.5 s — 1,186 pictures in six runs, 113 MB, under `runtime/h7_frames/t88/` (git-ignored; no picture in git).
+- **Seen:** a round's end is a large line of text over the fight (a time-out line; then the winning character's name
+  with a "wins" word over a winner's pose); a round-win light beside the clock on the winner's side; after a match the
+  select screen's per-side win tally. The mid-fight saves run out by time (27.0 s, 35.0 s); no knockout seen.
+- **OPEN:** the "begin" save stops on the select screen (no timer, no pads) — no fight, no end, the same both runs; the
+  win line names only the character (the same character on both sides would not tell the sides apart) — the side
+  light and the tally do not depend on the characters.
+- **OPEN (what waits):** Cowork's look at the frames; real fights with other characters (and mirror matches, knockouts,
+  a full match) captured from the stream; the labelling; the model.
 
 ## 2026-11-12 H7-L2: two timed contests on the real title — MET; the flag off
 

@@ -3148,6 +3148,16 @@ the user read them. **What waits:** the onn showing "time's up" (B's first note)
 knockout / round signal; the 4-player title; PS2 through PINE; N64's fixture and launch-with-state; a lighter read path
 (`docs/memory/evidence/H7_L2_2026-11-12.md`).
 
+**The direction changed on the user's word (2026-11-12):** the result of a mini game comes from **the game's own end
+screen, read by a small model trained on labelled frames** — not by a clock, not by memory work per game, not by a
+player's claim ("we need to check per game start and end of each mini game so the end we take that screenshot. Then we
+give that to the model to train."). **The clock (B101) and the memory read (B99) are shelved** behind their flag, off;
+loading a kept state stays useful. **H7-V1 (2026-11-12, unattended):** T88's five kept states run headless with no pads
+— 1,186 frames under `runtime/h7_frames/` (git-ignored): the end is a large line of text over the fight, the winner's
+side shows in a round light and the post-match tally (independent of the characters), the win line names only the
+character; the "begin" save never reaches a fight. **What waits:** Cowork's look at the frames; real fights with other
+characters captured from the stream; the labelling; the model (`docs/memory/evidence/H7_V1_2026-11-12.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 
