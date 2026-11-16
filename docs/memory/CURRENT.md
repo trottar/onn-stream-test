@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **H7-V3 part 1 NOT MET** (`evidence/H7_V3_2026-11-16.md`): the spec = B104's; the stream to nobody refused by
-  line 8 (opus needs a signed setup), so no watch ran. Flag off; eighteen lines.
+- **H7-V4 MET** (`evidence/H7_V4_2026-11-16.md`): the self-proof on the user's stream, then three matches (two
+  new pairs, a mirror) each `ended` on the user's side ~2 s after the select screen. Flag off; eighteen lines.
 
 ## Verified State
 
@@ -87,9 +87,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — B:** a no-client path for H7-V3 part 1 that leaves the adopted lines and the pairing alone (a
-   watcher-only mode without the stream, or a bench-only loopback stream start); then part 1 again, the sitting after.
-   Beside it: the PrivyParty probe's first step (`handoffs/PRIVYPARTY_PC_HANDBACK_2026-11-12.md`; go given).
+1. **H7 — the PrivyParty probe's first step** (`handoffs/PRIVYPARTY_PC_HANDBACK_2026-11-12.md`; the user's go given
+   for its two downloads). Beside it (B): a watcher with no client (H7-V3's gap), leaving the adopted lines alone.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
