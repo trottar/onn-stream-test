@@ -1,0 +1,17 @@
+21:54:38.838Z start_1_2 -> { "ok": true, "state": "starting", "seats": [ 1, 2 ]}[200] 0.029916s
+21:54:48.017Z polled a: { "ok": true, "state": "playing", "seats": [ 1, 2 ], "recognised": true, "class": null, "scores": null, "why": null, "closed": false, "since_s": 9.1}
+21:54:48.020Z load_p1 {"log": "20261116-165438", "slot": 8, "sent_utc": "2026-11-16T21:54:48.047Z", "answer": "LOAD_STATE_SLOT 8", "answer_ms": 10.7, "line_ms": 51.5, "line_seen_utc": "2026-11-16T21:54:48.099Z", "bytes": 16777240, "line_is_scratch": true, "scratch_removed": true}
+21:54:54.202Z polled a: { "ok": true, "state": "ended", "seats": [ 1, 2 ], "recognised": true, "class": "end_P1", "scores": [ 1, 0 ], "why": null, "closed": false, "since_s": 15.3}
+21:54:54.205Z end_a -> { "ok": true, "state": "ended", "scores": [ 1, 0 ], "ended": true}[200] 0.231113s
+21:54:54.447Z start_2_1 -> { "ok": true, "state": "starting", "seats": [ 2, 1 ]}[200] 0.029157s
+21:54:56.531Z polled b: { "ok": true, "state": "playing", "seats": [ 2, 1 ], "recognised": null, "class": null, "scores": null, "why": null, "closed": false, "since_s": 2.0}
+21:54:58.535Z home -> { "ok": true, "kind": "native_stream_host", … "game_session": { "active": true, "paused": true, … "action": "pause", "retroarch_state": "PAUSED" }, "paused": true, "taken": "home"}[200] 0.107239s  (the answer trimmed to its keys)
+21:54:59.655Z status: {'active': True, 'paused': True, 'launch_kind': None}
+21:55:01.682Z status: {'active': True, 'paused': True, 'launch_kind': None}
+21:55:01.707Z release -> { "ok": true, "released": true, "game": "game_ps1_<hex>"}[200] 0.083824s
+21:55:02.801Z status: {'active': True, 'paused': False, 'launch_kind': None}
+21:55:03.859Z polled b: { "ok": true, "state": "playing", "seats": [ 2, 1 ], "recognised": true, "class": null, "scores": null, "why": null, "closed": false, "since_s": 9.4}
+21:55:03.862Z load_p2 {"log": "20261116-165454", "slot": 8, "sent_utc": "2026-11-16T21:55:03.887Z", "answer": "LOAD_STATE_SLOT 8", "answer_ms": 4.3, "line_ms": 45.0, "line_seen_utc": "2026-11-16T21:55:03.932Z", "bytes": 16777240, "line_is_scratch": true, "scratch_removed": true}
+21:55:11.052Z polled b: { "ok": true, "state": "ended", "seats": [ 2, 1 ], "recognised": true, "class": "end_P2", "scores": [ 0, 1 ], "why": null, "closed": false, "since_s": 16.6}
+21:55:11.056Z end_b -> { "ok": true, "state": "ended", "scores": [ 0, 1 ], "ended": true}[200] 0.231993s
+21:55:11.323Z Godot 1; RetroArch 0; ffmpeg 0; active window comm Godot_v4.7.2-st

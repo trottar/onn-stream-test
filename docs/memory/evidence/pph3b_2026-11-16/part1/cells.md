@@ -1,0 +1,22 @@
+# PP-H3b part 1 — the cells (`preregistration_part1.md`, sha256 `a61cba57…`, hashed 21:52:56Z; run 21:53:03-21:55:45Z, unattended)
+
+| cell | what was read | when (UTC) | met |
+| --- | --- | --- | --- |
+| **P6** — the board by itself, released | `launch` 200 in 1.6 s: active, paused, `launch_kind` godot (window by class 0.8 s, sound, pads P1-P4); `bench-release` → `"released": true`; the status unpaused | 21:53:13-21:53:16 | **met** |
+| **P7** — the list | `party-minigames` → one entry `mg_…`, **`"players": 2`** | 21:53:16 | **met** |
+| **P8** — seats 1,2 | `starting` → **`playing`, `recognised` true at 9.1 s**; the active window the title's (its AppImage process), 1920 × 1080 at 0, 0; rows `minigame_route` {"1": 1, "2": 2}, `minigame_stream` switched false ("the stream is not up"), `minigame_watch` loaded, `minigame_playing` | 21:53:28-21:53:37 | **met** |
+| **P9** — the end P1 state by hand | `LOAD_STATE_SLOT 8` answered; the load line (16,777,240 bytes, the scratch) 53 ms after the send; the copy removed → **`ended`, `end_P1`, `scores` [1, 0]** (`minigame_ended` 21:53:47.639Z, 5.8 s after the load line) | 21:53:41-21:53:47 | **met** |
+| **P10** — the end | `party-minigame-end` → `"ended": true` (0.24 s); **RetroArch gone** within 0.5 s; the active window the board's (Godot); the status `launch_kind` godot; a second end → **`"again": true`**; rows `minigame_taken` end_board, `minigame_stream` window board (not up), `minigame_title_stopped`, `minigame_restore` (board alive), `minigame_end` by board | 21:53:56-21:53:57 | **met** |
+| **P11** — seats 2,1, the end P2 state | `playing`, `recognised` true at 9.1 s; route {"1": 2, "2": 1}; the load 21:54:06.747Z → **`ended`, `end_P2`, `scores` [0, 1]** (21:54:13.040Z); the end → `"ended": true` (0.23 s), RetroArch gone, the board in front | 21:53:57-21:54:14 | **met** |
+| **P12** — the 15-minute give-up | **not run** (PP-H3's change 1, kept) | — | not run |
+| **P13** — the board's own script, headless | A's copy of B's driver, off both repos, Godot's folders redirected: `PrivyParty: hub mini game: a draw: the hub gave it up (the mini game did not start: the stream is not up)` and **`DRIVER [0, 0]`**, exit 0; rows start → launch → route → stream (not up) → `minigame_given_up` → `minigame_taken` end_hub → restore → end; RetroArch gone; the board repo still clean | 21:54:20-21:54:23 | **met** |
+| **P11b** — two back to back, the concurrent calls | seats 1,2 → `playing` (recognised 9.1 s); end P1 → **`ended` `end_P1` [1, 0]**; **at once** the end → **`"ended": true` in 0.23 s**; **at once** seats 2,1 → `playing` (2.0 s); **Home** (`native-stream-stop`) → **200 `"taken": "home"` in 0.11 s**, the status **`paused` true** (the title's `retroarch_state` PAUSED; no board key); `bench-release` → released 0.08 s, `paused` false; end P2 → **`ended` `end_P2` [0, 1]**; the end → `"ended": true` (0.23 s); rows `minigame_taken` end_board / home / end_board, every `minigame_stream` "the stream is not up" | 21:54:38-21:55:11 | **met** |
+| **P14b** — END during a mini game | seats 1,2 → `playing` (recognised 9.1 s) → `stop` → **200 `"taken": "end"` in 1.09 s**, `party_exit` "quit 0" → **RetroArch gone 1.15 s** after the send; rows `minigame_given_up` "ended from the onn", `minigame_taken` end, `minigame_title_stopped`, `minigame_restore`, **`minigame_end` by "onn"**, `quit` F10, **`exited` code 0** in 0.32 s; `status` → **`active` false**; no Godot, RetroArch or encoder process | 21:55:24-21:55:35 | **met** |
+| **K1** — no key to the board | 0 board `pause` / `resume` / `quit` rows between any `minigame_playing` and `minigame_end` (six mini games; P14b's `quit` after its `minigame_end`) | — | **met** |
+| **P15 / U1** — nothing of the user's | saves 161 before = after, every name and hash; no `.state8`; the pictures 116 files / 15,039,288 bytes, the same | 21:55:45 | **met** |
+| **R** — every route within 2 s | `route_watch.tsv` 21:53:03-21:55:45: 879 lines, **every one `ok` 1, none ≥ 2.0 s**; the maximum per route: `status` **1.502 s**, `party-minigame-result` 0.002 s, `native-stream-status` 0.014 s (`status`'s peaks 1.1-1.5 s at each mini game's launch, 21:53:30 / 21:54:22 / 21:54:40 / 21:54:56 / 21:55:26) | 21:53:03-21:55:45 | **met** |
+
+**Part 1 MET** → part 2's pre-registration hashed, the sitting's first line (both flags left on).
+
+**Noted, no bar:** `status` waits up to 1.5 s while a mini game's title launches, 0.5 s inside the bar; with the real
+switch in the sitting (~3.6 s on the host, B) the margin is the sitting's to show.
