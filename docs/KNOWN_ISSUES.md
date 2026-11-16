@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-16 — PP-H1 (PrivyParty on the hub, step 1: Godot 4.7.2 fetched and checked, the board game's 25 checks, the game on the hub's display under three renderers; no stream, no flag): **NOT MET by one check** — the fetch's SHA-512 equal to the published line; **24 of 25 checks pass; step 19 fails one of 125 assertions (the body's Hips piece "has a front, sides and a back") deterministically on the hub** though all pass on the PC; Forward+, Mobile and Compatibility each hold 60.0 fps every second in the heaviest scene with vsync on (all fit; headroom 146 / 334 / 370), Compatibility to carry forward; closed by the quit action (F10), exit 0, nine of nine; nothing else touched — OPEN (the PC side: step 19 on the hub; the window is 1920 × 1029 under the desktop panel; step 2 the streamed probe) — `## 2026-11-16 PP-H1` below
 - 2026-11-16 — H7-V4 (the hub proves itself on the user's own stream, then three matches judged by T88's own end screen, PRIVYHUB_H7=1 for the sitting only): **MET** — on "ready", with nobody touching the pads, `recognised` true at three starts (4.0 s each) and both kept end states called on the right side 5.9 s after each load line; then three matches with characters the spec never saw as pairs (two other pairs and a mirror): `recognised` true before each, `ended` on the side the user named 2.0 s after the select screen returned and before "back", never during a fight; nothing of the user's touched; the stream undisturbed — OPEN (a watcher with no client for unattended proofs of new games; RetroArch's notice keeps a read `unknown` ~3 s after a load; a draw, a second game, four-player placements not seen) — `## 2026-11-16 H7-V4` below
 - 2026-11-16 — H7-V3 part 1 (the whole live path with nobody at the TV, unattended, PRIVYHUB_H7=1 for the task only): **NOT MET — stopped at the stream**: the spec learnt B104's way equals B104's arrangement 3 in every number (score and replay included), and the game launches paused on loopback with no client, but **the stream to nobody is refused by adopted line 8** ("audio codec opus is required by this host … the client did not declare it in session/setup" — only a signed setup from a paired device can declare it, never a loopback one), so the pause cannot be released and `h7-start` refuses "the stream is not up"; no watch, no load; nothing of the user's touched; the flag off, eighteen lines — OPEN (B: a no-client path that leaves the adopted lines and the pairing alone — a watcher-only mode without the stream, or a bench-only loopback stream start; then part 1 again; the sitting waits) — `## 2026-11-16 H7-V3` below
 - 2026-11-16 — Queue AN (H7, after H7-V2: B104 the reader made independent of tone, B105 the watcher's gaps behind PRIVYHUB_H7=1, B106 A's next task sketched): `tools/h7_endscreen.py` spec version 2 ranks each picture against its own tone and finds the game's picture inside the window itself — learnt from H7-V1's screenshots alone it reads 495 / 508 of H7-V2's live pictures right (the rest range-edge pictures read `other`), **0 fights read as the screen in every arrangement**, no reading changed under offsets ±30, gains 0.8-1.2, gammas 0.8-1.25 or their pairs, replay says `ended` 2 s after each select screen returns on the user's sides; a version-1 spec is refused ("learn it again"); the watcher: a start over a running watch replaces it, `recognised` true / false / null within 8 s of a start with the load (false = nobody plays), `POST /plugins/games/h7-stop`, `h7-start?keep=1` keeps the pictures it reads under runtime/h7_frames/ (~5 ms a picture), `last` with thresholds and version — OPEN (A's H7-V3 part 1 unattended, then part 2 at the TV only if part 1 is fully met; the mirror match and a draw not seen; at a 1.08 rescale the start reads `unknown`) — `docs/memory/evidence/B104_H7_TONE_INDEPENDENT_READ_2026-11-16.md`, `B105_H7_WATCHER_GAPS_2026-11-16.md`, `docs/memory/handoffs/SESSION_B_DONE_2026-11-16AN.md`
@@ -92,6 +93,24 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-16 PP-H1: PrivyParty on the hub, step 1 — NOT MET by one check; all three renderers fit
+
+(`docs/memory/evidence/PP_H1_2026-11-16.md`, `docs/memory/evidence/pph1_2026-11-16/`)
+
+- **Seen:** Godot 4.7.2-stable (standard build) fetched, SHA-512 equal; the board game's checks headless on the hub:
+  24 of 25 pass; **step 19 fails `the picture wraps round a part's front; its back carries the edges on: Hips has a
+  front, sides and a back`** (1 of 125), the same on two re-runs. The game's main scene on `:0` with the owner's
+  pictures: Forward+ / Mobile / Compatibility start with no error line, hold 60.0 fps every second with vsync on in
+  Witch Hill's darkest space with fog, mist and lamps (vsync off: 146 / 334 / 370); F10 closes each with exit 0.
+- **Also:** the window comes up 1920 × 1029 at (0, 51) — the desktop panel keeps its strip and the game's fixed
+  1920 × 1080 picture is scaled into it (narrow side bars), which the stream's capture will see; the hub's xdotool
+  (3.20160805) has no window close-request command, so the clean close from outside is F10 (the `quit` action).
+  Godot made its own user-data, settings and cache folders under home (left in place).
+- **Held:** eighteen lines; no stream, companion or keeper restart; the board game's repo clean before and after (only
+  its git-ignored cache); the pictures folder unchanged; the hub's saves unchanged; nothing left running.
+- **OPEN:** the PC side's look at step 19 on the hub (a count at its limit, or a real difference in the body imported
+  here), then the 25 again; step 2, the streamed probe (Compatibility and Mobile under the encoder).
 
 ## 2026-11-16 H7-V4: the self-proof, then three matches — MET; the flag off
 
