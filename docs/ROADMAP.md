@@ -3178,6 +3178,17 @@ other characters and one with the same character on both sides (`docs/memory/han
 place read on its own (one class per winning side is not 1-4); **a draw** (never shown — it reads `unknown`); **the onn's
 "mini game over" picture** (the onn showing the result).
 
+**The first results read from the screen — H7-V2 (2026-11-16): NOT MET**, stopped by the user after two matches ("it's
+clearly broken. You need to diagnose this first"). The start loaded both times; the hub never said `ended` — it read every
+live picture as `other`. **Cause:** the live window is ~13 grey levels darker than the headless frames the spec was learnt
+from, and the reader compares absolute grey levels; with the offset taken out the same spec reads all 508 kept pictures
+right (both ends on the user's sides, ~2-3 s after the select screen, no fight as the screen) — the other characters were
+not the problem (`docs/memory/evidence/H7_V2_2026-11-16.md`). **What waits:** a tone-independent read and **re-learning
+from this sitting's pictures** (the watcher's own way of seeing; other characters); `h7-start` after a missed end; then
+H7-V2 again with the mirror match; B's notes — a finer search step, a patch per place for four players, K = 2; **a draw**;
+**a second game** to show the labels-only recipe carries over; **the board's seam `play(players) -> scores`** calling
+start and result; **the PrivyParty probe on the hub**.
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-16 — H7-V2 (three matches judged by T88's own end screen, PRIVYHUB_H7=1 for the sitting only): **NOT MET — stopped by the user after two matches** ("it's clearly broken. You need to diagnose this first") — the start loaded both times, but the hub never said `ended`: it read every live picture, the select screen included, as `other`; **found after: the live window is ~13 grey levels darker than the headless frames the spec was learnt from** (absolute distances, threshold 14.66, the live select screen 19-20); with the offset taken out the same spec reads all 508 kept pictures right (both ends on the user's sides, no fight as the screen); also `h7-start` refuses after a missed end until the game stops; nothing of the user's touched; the stream undisturbed — OPEN (B: a tone-independent read and/or the spec learnt from this sitting's pictures; then H7-V2 again) — `## 2026-11-16 H7-V2` below
 - 2026-11-12 — Queue AM (H7, the result from the game's own end screen: B102 the end-screen learner, B103 the mini game's start and result behind PRIVYHUB_H7=1): `tools/h7_endscreen.py` learns from labelled pictures alone where a mini game starts / ends and which side won — on the user's game's held-out frames the start, the P1 end and the P2 end told apart (576 / 576), 0 fight frames read as the screen; `POST /plugins/games/h7-start` loads the kept start and watches the game's window once a second (~12 ms, no frame lost, nothing written), `GET /plugins/games/h7-result` says `ended` and the side after 3 agreeing reads, sending nothing to the game — OPEN (A's H7-V2 at the TV, ~10 min: three matches, other characters, one mirror match); not seen yet: other characters on the select screen, the stream's own window, a draw, four-player placements — `docs/memory/evidence/B102_H7_END_SCREEN_LEARNER_2026-11-12.md`, `B103_H7_START_AND_RESULT_2026-11-12.md`
 - 2026-11-12 — H7-V1 (the first frames for an end-screen detector, T88's five kept states run headless, unattended): 1,186 pictures under runtime/h7_frames/ (git-ignored); the end is announced by a large line of text over the fight, the winner's side by a round light and a post-match tally; OPEN: the "begin" save never reaches a fight (no timer on the select screen); the win line names only the character — `## 2026-11-12 H7-V1` below
 - 2026-11-12 — H7-L2 (two timed contests on T88, the saved fight dropped in, 30 s, PRIVYHUB_H7=1 for the sitting only): **MET** — the hub named P1 at 140 / 72 (the user: "Player 1 won") and P2 at 128 / 140 ("player 2 won round 90%"); nothing of the user's touched; the stream undisturbed; OPEN: the end is invisible on the TV — in both contests the game's own round ended and reset the bars before the user read them — `## 2026-11-12 H7-L2` below
@@ -88,6 +89,29 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-16 H7-V2: the end screen read live — NOT MET; the live picture is darker than the learnt one; the flag off
+
+(`docs/memory/evidence/H7_V2_2026-11-16.md`, `docs/memory/evidence/h7v2_2026-11-16/`)
+
+- **Seen:** two matches played (other characters; P1 then P2 won, on the user's words); `h7-start` loaded the kept start
+  both times (`seen_start` true), and the hub **never said `ended`** — every read `other`, the select screen at
+  01 – 00 / 00 – 01 included (screen distance 19.2-20.2 against the threshold 14.66); no `unknown`. The user stopped
+  the sitting before the mirror match: "I mean it's clearly broken. You need to diagnose this first, I'm not playing
+  when it doesn't work".
+- **Cause (diagnosed after, read only):** the live window's picture is **uniformly ~13 grey levels darker** than H7-V1's
+  headless RetroArch screenshots (live ≈ 0.99 × the reference − 12.7); the framing lines up. B102 compares absolute grey
+  levels. **With the offset added back (+8 to +20 alike) B102's own reader reads all 508 kept pictures right** — the
+  start, `end_P1` / `end_P2` on the sides the user named ~2-3 s after the select screen returned, no fight, "wins" line
+  or round intro as the screen. Where the darkening comes from (the screenshot path vs the drawn window) is not settled.
+- **Also:** after a match the hub missed, `h7-start` refuses ("a mini game is already being watched") until the game
+  stops — the user had to END and relaunch for match 2. The picture keeper found no window for its first 34 s (the
+  window belongs to the AppImage's launcher process, not RetroArch's) — fixed in the sitting.
+- **Held:** nothing of the user's touched (161 save files identical); the stream undisturbed by the watcher and the
+  keeper (one loss burst in the first session, before either ran). The flag off at the close; eighteen lines.
+- **OPEN (B):** a tone-independent read (each picture's own offset out before the distances) and/or the spec learnt
+  from this sitting's 508 pictures (`runtime/h7_frames/h7v2_20261116_run/`, git-ignored), checked on them; a start after
+  a missed end; then H7-V2 again with the mirror match.
 
 ## 2026-11-12 H7-V1: the first end-screen frames — the end is on screen; the side shows apart from the names
 
