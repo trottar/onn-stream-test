@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-16 — PP-H2 (PrivyParty on the hub, step 2: the board game streamed to the onn with the user's pads, B108's launch behind PRIVYHUB_PARTY=1 for the sitting only): **MET** — the board's checks 25 of 25 on the hub (step 19 fixed on the PC side); the hub's own launch: fullscreen 1920 × 1080 window, one sound stream by pid, pads P1-P4, F10 → exit 0; the user started it from the onn, each pad drove its own figure, Home / RESUME paused and resumed (Esc), END quit (F10, exit 0), under Compatibility and Mobile; the stream 59.6-59.8 fps, bitrate never acted, no stall; sound flowing; nothing of the user's touched — OPEN (step 3 the adapter mini game; step 4 the stream switched between the board and the emulator; four pads for the board; SAVE / LOAD / Cheats / Mods shown but refused for the board; the onn's join asked again after every RESUME) — `## 2026-11-16 PP-H2` below
 - 2026-11-16 — Queue AO (PrivyParty on the hub: B107 step 19's numbers, B108 the board as a launch behind PRIVYHUB_PARTY=1, B109 A's PP-H2 sketched): step 19 on the hub — the committed body model's Hips piece counts front 9, sides 4, back 18 (the bar: more than four) in every import and read raw with no import, the fifth side corner 0.089 short — the file, not the hub; the board as a game entry the onn starts as it is (no APK change), fullscreen by Godot's own switch, its window / sound by pid, the pads made first, Home / RESUME by its own pause key, SAVE / LOAD refused plainly, END by its quit key (F10) with SIGTERM only after 8 s with no exit — OPEN (the PC side: compare its body model's sha256; A's PP-H2 at the TV; not seen yet: fullscreen over the panel, its sound stream, SDL's pad order, the keys reaching the fullscreen window; the onn's join closes at two pads for the board) — `docs/memory/evidence/B107_PP_STEP19_NUMBERS_2026-11-16.md`, `B108_PARTY_LAUNCH_2026-11-16.md`, `docs/memory/handoffs/SESSION_B_DONE_2026-11-16AO.md`
 - 2026-11-16 — PP-H1 (PrivyParty on the hub, step 1: Godot 4.7.2 fetched and checked, the board game's 25 checks, the game on the hub's display under three renderers; no stream, no flag): **NOT MET by one check** — the fetch's SHA-512 equal to the published line; **24 of 25 checks pass; step 19 fails one of 125 assertions (the body's Hips piece "has a front, sides and a back") deterministically on the hub** though all pass on the PC; Forward+, Mobile and Compatibility each hold 60.0 fps every second in the heaviest scene with vsync on (all fit; headroom 146 / 334 / 370), Compatibility to carry forward; closed by the quit action (F10), exit 0, nine of nine; nothing else touched — OPEN (the PC side: step 19 on the hub; the window is 1920 × 1029 under the desktop panel; step 2 the streamed probe) — `## 2026-11-16 PP-H1` below
 - 2026-11-16 — H7-V4 (the hub proves itself on the user's own stream, then three matches judged by T88's own end screen, PRIVYHUB_H7=1 for the sitting only): **MET** — on "ready", with nobody touching the pads, `recognised` true at three starts (4.0 s each) and both kept end states called on the right side 5.9 s after each load line; then three matches with characters the spec never saw as pairs (two other pairs and a mirror): `recognised` true before each, `ended` on the side the user named 2.0 s after the select screen returned and before "back", never during a fight; nothing of the user's touched; the stream undisturbed — OPEN (a watcher with no client for unattended proofs of new games; RetroArch's notice keeps a read `unknown` ~3 s after a load; a draw, a second game, four-player placements not seen) — `## 2026-11-16 H7-V4` below
@@ -94,6 +95,27 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-16 PP-H2: PrivyParty on the hub, step 2 — MET; the board streamed to the onn with the user's pads; the flag off
+
+(`docs/memory/evidence/PP_H2_2026-11-16.md`, `docs/memory/evidence/pph2_2026-11-16/`)
+
+- **Seen:** the board's checks 25 of 25 on the hub at its new HEAD (PP-H1's step 19 closed by the PC side's change to
+  the check). The hub's own launch: the window found by class, fullscreen 1920 × 1080 at 0, 0; one sound stream by the
+  board's pid; pads P1-P4 in order (a headless Godot line: devices 0-3 = P1-P4); F10 → exit 0. The sitting: Games →
+  PrivyParty → Launch on Companion → Start Fresh; two pads joined; a game into the first mini game; Home → Esc, RESUME
+  → Esc; END → F10 → exit 0 in 0.41 s; once more under Mobile. The user: "Each pad works as expected". The stream
+  59.6-59.8 fps, 7,000 kbit/s never acted, 5 packets lost, no stall or recovery row; audio packets growing; the encoder
+  38 % of a core, Godot 19-22 %, the graphics device 21-27 % busy.
+- **Also:** after every RESUME the onn shows its own "Hold any button to join" again and both pads must hold to
+  rejoin (the onn clears its slot map at every unpause, as for any game) — on top of the board's own join at launch;
+  the onn's join closes at two pads for the board (no player metadata); SAVE / LOAD / Cheats / Mods are still offered
+  for the board and answered with a plain refusal (not pressed in the sitting).
+- **Held:** eighteen lines at the close; the saves 161 = 161; the pictures folder unchanged; the board's repo clean;
+  `launch_orphaned` unchanged; the config file off the repo.
+- **OPEN:** step 3 (the adapter mini game behind `play(players) -> scores` calling `h7-start` / `h7-result`); step 4
+  (the stream switched between the board's window and the emulator's); four pads; the board's entry's SAVE / LOAD /
+  Cheats / Mods (a client change); one join instead of two.
 
 ## 2026-11-16 PP-H1: PrivyParty on the hub, step 1 — NOT MET by one check; all three renderers fit
 

@@ -1,0 +1,9 @@
+JOYPADS 4
+JOYPAD device 0: PrivyHub Virtual Gamepad P1 (guid 030044e5091200004850000001000000)
+JOYPAD device 1: PrivyHub Virtual Gamepad P1 (guid 030004e4091200004850000001000000)
+JOYPAD device 2: PrivyHub Virtual Gamepad P1 (guid 0300c524091200004850000001000000)
+JOYPAD device 3: PrivyHub Virtual Gamepad P1 (guid 030084e6091200004850000001000000)
+(A's own headless Godot line, off both repos, while the hub's own launch was up. Godot shows one mapping name for all
+four — they share the virtual pads' vendor / product — but each GUID's bytes 3-4 are SDL's CRC-16 of the device's own
+name: device 0 = 44e5 = "…P1", device 1 = 04e4 = "…P2", device 2 = c524 = "…P3", device 3 = 84e6 = "…P4" (computed
+here). So devices 0-3 = P1-P4. Recorded, not a cell.)
