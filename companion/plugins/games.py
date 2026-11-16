@@ -143,6 +143,12 @@ _party_session = None
 if (os.environ.get("PRIVYHUB_PARTY") or "").strip() == "1":
     import party_session as _party_session
 
+# B110: the party mini game (an emulator title played from inside the board), only with PRIVYHUB_PARTY=1 and
+# PRIVYHUB_H7=1 (the board as the session and the end-screen watcher); either absent = today: no route.
+_party_minigame = None
+if _party_session is not None and (os.environ.get("PRIVYHUB_H7") or "").strip() == "1":
+    import party_minigame as _party_minigame
+
 # B71: "Change disc" (a multi-disc PS1 session's action; PRIVYHUB_DISC_SWAP=0 = today's unknown action)
 import disc_swap as _disc_swap  # noqa: E402
 # B85: the cheat list cleaned for the TV (PRIVYHUB_CHEAT_CLEAN=0 = today's raw list; read per request)
@@ -3498,6 +3504,12 @@ class GamesPlugin:
         if action == "h7-result" and _h7_minigame is not None:
             return self._h7_minigame_runner().result()
 
+        # B110: the party mini games and the current one's result (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 only)
+        if action == "party-minigames" and _party_minigame is not None:
+            return self._party_minigame_runner().listing()
+        if action == "party-minigame-result" and _party_minigame is not None:
+            return self._party_minigame_runner().result()
+
         raise ValueError(
             f"Unknown Games plugin action: {action}"
         )
@@ -3515,6 +3527,13 @@ class GamesPlugin:
         if runner is None:
             runner = self._h7_contest_obj = _h7_contest.Contest(self._emulator, self._h7_reader(), self._native_stream,
                                                                 self._emulator._project_path)
+        return runner
+
+    def _party_minigame_runner(self):
+        """B110: one party mini-game layer per plugin (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 only)."""
+        runner = getattr(self, "_party_minigame_obj", None)
+        if runner is None:
+            runner = self._party_minigame_obj = _party_minigame.PartyMinigames(self)
         return runner
 
     def _h7_minigame_runner(self):
@@ -4372,7 +4391,34 @@ class GamesPlugin:
         # B103: the mini game's start — B101's load step alone, then the watcher (PRIVYHUB_H7=1 only)
         if action == "h7-start" and _h7_minigame is not None:
             q = parse_qs(raw_query)
+            # B112: ?bench=1 — no stream check, for a loopback caller while no client's stream is up (absent: today)
+            if "bench" in q:
+                if self._first(q, "bench") != "1":
+                    raise ValueError("bench is 1")
+                if str(client_ip or "") not in _h7_minigame.LOOPBACK:
+                    raise ValueError(_h7_minigame.BENCH_LOOPBACK)
+                return self._h7_minigame_runner().start(self._first(q, "load"), self._first(q, "keep"), bench=True)
             return self._h7_minigame_runner().start(self._first(q, "load"), self._first(q, "keep"))
+
+        # B112: the running game's pause released with no stream (PRIVYHUB_H7=1, loopback, no client's stream up)
+        if action == "bench-release" and _h7_minigame is not None:
+            return self._h7_minigame_runner().bench_release(client_ip)
+
+        # B110: a party mini game started / ended by the board (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 only)
+        if action == "party-minigame-start" and _party_minigame is not None:
+            q = parse_qs(raw_query)
+            bench = False
+            if "bench" in q:                             # B112: the mini game with no stream (loopback, none up)
+                if self._first(q, "bench") != "1":
+                    raise ValueError("bench is 1")
+                if str(client_ip or "") not in _h7_minigame.LOOPBACK:
+                    raise ValueError(_h7_minigame.BENCH_LOOPBACK)
+                if self._native_stream.status().get("active"):
+                    raise ValueError(_h7_minigame.BENCH_STREAM_UP)
+                bench = True
+            return self._party_minigame_runner().start(self._first(q, "id"), self._first(q, "seats"), bench=bench)
+        if action == "party-minigame-end" and _party_minigame is not None:
+            return self._party_minigame_runner().end(by="board")
 
         # B105: the mini game's watch ended by a call, the game untouched (PRIVYHUB_H7=1 only)
         if action == "h7-stop" and _h7_minigame is not None:

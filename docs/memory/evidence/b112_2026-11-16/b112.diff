@@ -1,0 +1,342 @@
+diff --git a/companion/h7_minigame.py b/companion/h7_minigame.py
+index 74f8869..f1999a2 100644
+--- a/companion/h7_minigame.py
++++ b/companion/h7_minigame.py
+@@ -46,6 +46,9 @@ READ_EVERY = 1.0            # s: one picture a second
+ LOG_RELATIVE = "logs/games/h7_results.jsonl"
+ SYSTEMS = ("ps1", "snes")   # the load; the watcher alone (load=0) on any system
+ XDOTOOL_WAIT = 1.0
++BENCH_STREAM_UP = "a client's stream is up: not on the bench"   # B112
++BENCH_LOOPBACK = "the bench is for loopback callers only"          # B112
++LOOPBACK = ("127.0.0.1", "::1", "localhost")
+ RECOGNISE_S = 8.0           # B105: s after a start with the load within which a read must name the start class
+ KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
+ JPEG_QUALITY = 90
+@@ -181,7 +184,7 @@ class MiniGame:
+         self._row({"step": "refused", "why": why})
+         raise ValueError(why)
+ 
+-    def start(self, load_text: str = "", keep_text: str = "") -> dict:
++    def start(self, load_text: str = "", keep_text: str = "", bench: bool = False) -> dict:
+         text = str(load_text or "").strip()
+         if text not in ("", "0", "1"):
+             raise ValueError("load is 0 or 1")
+@@ -191,9 +194,9 @@ class MiniGame:
+             raise ValueError("keep is 0 or 1")
+         keep = keep_word == "1"
+         with self._start_lock:
+-            return self._start(load, keep)
++            return self._start(load, keep, bench)
+ 
+-    def _start(self, load: bool, keep: bool) -> dict:
++    def _start(self, load: bool, keep: bool, bench: bool = False) -> dict:
+         # B105: a watch already on is replaced after the checks and the load (never refused for being on)
+         try:
+             game, system, kind = self._live._running()
+@@ -216,7 +219,9 @@ class MiniGame:
+             state = live.rules_folder(self._environ) / f"{game}.state"
+             if not state.is_file() or state.stat().st_size <= 0:
+                 self._refused("no state for this game's mini game")
+-        if not self._stream_up():
++        if bench and self._stream_up():                     # B112: the bench only while no client's stream is up
++            self._refused(BENCH_STREAM_UP)
++        if not bench and not self._stream_up():
+             self._refused("the stream is not up")
+         line_ms = None
+         if load:
+@@ -249,13 +254,26 @@ class MiniGame:
+                            "t0": self._clock(), "token": token, "_keep_dir": keep_dir}
+             self._row({"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
+                        "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
+-                       "spec_version": spec.get("version"), "recognise_s": self.recognise_s,
++                       "spec_version": spec.get("version"), "recognise_s": self.recognise_s, "bench": bench,
+                        "keep": keep_dir.name if keep_dir is not None else None})
+         threading.Thread(target=self._run, args=(token, game, reader, ended, spec), daemon=True,
+                          name="h7-minigame").start()
+         return {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms,
+                 "replaced": replaced, "keep": keep_dir.name if keep_dir is not None else None}
+ 
++    def bench_release(self, client_ip: str) -> dict:
++        """B112: the running game's pause released with no stream (loopback, no client's stream up)."""
++        if str(client_ip or "") not in LOOPBACK:
++            self._refused(BENCH_LOOPBACK)
++        if self._stream_up():
++            self._refused(BENCH_STREAM_UP)
++        game, _system, _kind = self._live._running()
++        if game is None:
++            self._refused("no game is running")
++        status = self._emu.resume()
++        self._row({"step": "bench_release", "game": game, "paused": bool(status.get("paused"))})
++        return {"ok": True, "released": not bool(status.get("paused")), "game": game}
++
+     def stop(self) -> dict:
+         """B105: `POST h7-stop` — the watch ends; nothing is sent to the game."""
+         with self._lock:
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 1b3a02a..22fdd7a 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -99,7 +99,8 @@ class PartyMinigames:
+         return {"ok": True, "minigames": [{"id": t, "players": e["players"]} for t, e in sorted(self._entries().items())]}
+ 
+     # --- start --------------------------------------------------------------------------------------------------------
+-    def start(self, token: str, seats_text: str) -> dict:
++    def start(self, token: str, seats_text: str, bench: bool = False) -> dict:
++        self.stream_needed = not bench           # B112: with the bench word, the watcher runs with no stream
+         if not party.active(self.emu):
+             self.row({"step": "minigame_refused", "why": "the board game is not the running session"})
+             raise ValueError("the board game is not the running session")
+@@ -170,7 +171,7 @@ class PartyMinigames:
+                           "routed": mg["routed"]})
+                 self._switch_stream("minigame")
+                 runner = self.p._h7_minigame_runner()
+-                runner.start("1")
++                runner.start("1", "", bench=not self.stream_needed)
+                 self.row({"step": "minigame_watch", "loaded": True})
+                 emu.resume()
+                 with self._lock:
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 5bb4a85..91b2e95 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4391,13 +4391,32 @@ class GamesPlugin:
+         # B103: the mini game's start — B101's load step alone, then the watcher (PRIVYHUB_H7=1 only)
+         if action == "h7-start" and _h7_minigame is not None:
+             q = parse_qs(raw_query)
++            # B112: ?bench=1 — no stream check, for a loopback caller while no client's stream is up (absent: today)
++            if "bench" in q:
++                if self._first(q, "bench") != "1":
++                    raise ValueError("bench is 1")
++                if str(client_ip or "") not in _h7_minigame.LOOPBACK:
++                    raise ValueError(_h7_minigame.BENCH_LOOPBACK)
++                return self._h7_minigame_runner().start(self._first(q, "load"), self._first(q, "keep"), bench=True)
+             return self._h7_minigame_runner().start(self._first(q, "load"), self._first(q, "keep"))
+ 
++        # B112: the running game's pause released with no stream (PRIVYHUB_H7=1, loopback, no client's stream up)
++        if action == "bench-release" and _h7_minigame is not None:
++            return self._h7_minigame_runner().bench_release(client_ip)
+ 
+         # B110: a party mini game started / ended by the board (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 only)
+         if action == "party-minigame-start" and _party_minigame is not None:
+             q = parse_qs(raw_query)
+-            return self._party_minigame_runner().start(self._first(q, "id"), self._first(q, "seats"))
++            bench = False
++            if "bench" in q:                             # B112: the mini game with no stream (loopback, none up)
++                if self._first(q, "bench") != "1":
++                    raise ValueError("bench is 1")
++                if str(client_ip or "") not in _h7_minigame.LOOPBACK:
++                    raise ValueError(_h7_minigame.BENCH_LOOPBACK)
++                if self._native_stream.status().get("active"):
++                    raise ValueError(_h7_minigame.BENCH_STREAM_UP)
++                bench = True
++            return self._party_minigame_runner().start(self._first(q, "id"), self._first(q, "seats"), bench=bench)
+         if action == "party-minigame-end" and _party_minigame is not None:
+             return self._party_minigame_runner().end(by="board")
+ 
+diff --git a/tests/b112_no_client_bench/test_b112.py b/tests/b112_no_client_bench/test_b112.py
+new file mode 100644
+index 0000000..40b5a78
+--- /dev/null
++++ b/tests/b112_no_client_bench/test_b112.py
+@@ -0,0 +1,201 @@
++#!/usr/bin/env python3
++"""B112 (host): the bench way to run a game with no client, behind PRIVYHUB_H7=1, through the real HTTP server on
++loopback (B103 / B110's harness: the fake RetroArch, the fake picture source, the stub stream — down unless a case
++puts it up; B108's stand-in board for the party case). A caller that is not loopback is made by giving the plugin
++another address for that one call (the handler's address as a session would give it). Flag absent → HEAD's answers
++byte for byte. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b112_no_client_bench -v
++"""
++from __future__ import annotations
++
++import os
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("art_systems", "b99_h7_live_read", "b102_h7_endscreen", "b103_h7_minigame", "b108_party_launch",
++            "b110_party_minigame"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import _tmp_cleanup  # noqa: E402,F401
++import test_b85 as b85  # noqa: E402
++import test_b99 as b99  # noqa: E402
++import test_b110 as b110  # noqa: E402  (a module: its tests are not collected twice)
++
++BASELINE = "0a3d78e2"
++H7 = {**b85.FLAGS, "PRIVYHUB_H7": "1"}
++BOTH = {**H7, "PRIVYHUB_PARTY": "1"}
++
++SCENARIO = r'''
++import types
++try:
++    import party_session as party
++    party.QUIT_WAIT_S = 1.0
++except ImportError:
++    party = None
++board_dir = Path(args["board_dir"])
++def fake_run(cmd, timeout=3.0):
++    pid = (board_dir / "pid").read_text() if (board_dir / "pid").exists() else ""
++    out = ""
++    if cmd[:4] == ["xdotool", "search", "--onlyvisible", "--class"]:
++        out = "4242\n" if pid else ""
++    elif cmd[:2] == ["xdotool", "getwindowpid"]:
++        out = pid + "\n"
++    elif cmd[:2] == ["pactl", "list"]:
++        out = f'application.process.id = "{pid}"\n' if pid else ""
++    return types.SimpleNamespace(returncode=0, stdout=out, stderr="")
++m._party_session_kwargs = {"run": fake_run, "devices": Path(args["devices"])}
++starts = []
++stream.active = False
++def stream_start(**kw):
++    starts.append(kw.get("managed_process_id")); stream.active = True; return {"active": True}
++stream.start = stream_start
++def as_other(path):
++    """One call through the real server with the plugin given a non-loopback address (as a session's would be)."""
++    real = g.handle_post_request
++    g.handle_post_request = lambda action, raw_query, client_ip: real(action, raw_query, "a-client")
++    try:
++        return call("POST", path)
++    finally:
++        g.handle_post_request = real
++def wait(path, pred, bound=20):
++    end = time.monotonic() + bound; b = {}
++    while time.monotonic() < end:
++        b = call("GET", path)["body"]
++        if pred(b):
++            return b
++        time.sleep(0.05)
++    return dict(b, timeout=True)
++out = {"steps": {}}
++S = out["steps"]
++title = args["id"]
++S["release_no_game"] = call("POST", "/plugins/games/bench-release")
++S["launch"] = call("POST", f"/plugins/games/launch?id={title}")["code"]
++if args["mode"] == "today":
++    S["release"] = call("POST", "/plugins/games/bench-release")
++    S["h7_bench"] = call("POST", "/plugins/games/h7-start?bench=1")
++    S["party_bench"] = call("POST", "/plugins/games/party-minigame-start?id=x&seats=1,2&bench=1")
++else:
++    rules_ = Path(rules); rules_.mkdir(parents=True, exist_ok=True)
++    for name in os.listdir(args["spec_dir"]):
++        shutil.copyfile(Path(args["spec_dir"], name), rules_ / name.replace("GAME", title))
++    js_ = json.loads((rules_ / f"{title}.endscreen.json").read_text()); js_["arrays"] = f"{title}.endscreen.npz"
++    (rules_ / f"{title}.endscreen.json").write_text(json.dumps(js_))
++    (rules_ / f"{title}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
++    (rules_ / f"{title}.party.json").write_text(json.dumps({"players": 2, "scores": {"end_P1": [1, 0], "end_P2": [0, 1]}}))
++    mini = g._h7_minigame_runner(); mini.picture = pic; mini.read_every = 0.2; mini.recognise_s = 1.6
++    S["paused_after_launch"] = call("GET", "/plugins/games/status")["body"].get("paused")
++    S["ready_without_stream"] = call("POST", "/plugins/games/native-stream-ready")
++    S["release_other"] = as_other("/plugins/games/bench-release")
++    S["release"] = call("POST", "/plugins/games/bench-release")
++    S["ra_paused_after"] = fake["ra"].paused
++    S["h7_no_bench"] = call("POST", "/plugins/games/h7-start")
++    S["h7_bench_other"] = as_other("/plugins/games/h7-start?bench=1")
++    pic.set(["start"] * 3 + ["other"] * 4 + ["end_P1"] * 30)
++    S["h7_bench"] = call("POST", "/plugins/games/h7-start?bench=1")
++    S["h7_result"] = wait("/plugins/games/h7-result", lambda b: b.get("state") == "ended")
++    call("POST", "/plugins/games/h7-stop")
++    stream.active = True
++    S["release_stream_up"] = call("POST", "/plugins/games/bench-release")
++    S["h7_bench_stream_up"] = call("POST", "/plugins/games/h7-start?bench=1")
++    stream.active = False
++    S["starts_so_far"] = list(starts)
++    if True:                                       # the party case (both flags in "on")
++        cfg = Path(os.environ["PRIVYHUB_PARTY_CONFIG"])
++        cfg.write_text(json.dumps({"godot": args["board"], "project": args["project"], "pictures": args["pictures"]}))
++        nodes = call("GET", "/plugins/games/games?system=party")["body"].get("nodes", [])
++        board_id = next(n["id"] for n in nodes if n.get("node_type") == "game")
++        S["board_launch"] = call("POST", f"/plugins/games/launch?id={board_id}")["code"]
++        S["board_release"] = call("POST", "/plugins/games/bench-release")
++        token = call("GET", "/plugins/games/party-minigames")["body"]["minigames"][0]["id"]
++        layer = g._party_minigame_runner(); layer.tick = 0.05
++        S["party_bench_other"] = as_other(f"/plugins/games/party-minigame-start?id={token}&seats=1,2&bench=1")
++        pic.set(["start"] * 3 + ["other"] * 4 + ["end_P2"] * 30)
++        S["party_bench"] = call("POST", f"/plugins/games/party-minigame-start?id={token}&seats=1,2&bench=1")
++        S["party_result"] = wait("/plugins/games/party-minigame-result", lambda b: b.get("state") in ("ended", "given_up"))
++        S["party_end"] = call("POST", "/plugins/games/party-minigame-end")
++        S["party_starts"] = list(starts)
++        S["status_after"] = call("GET", "/plugins/games/status")["body"].get("launch_kind")
++        call("POST", "/plugins/games/stop")
++httpd.shutdown()
++print(json.dumps(out))
++'''
++
++
++def run(env: dict, mode: str, code=None) -> dict:
++    root, ids = b99.tree(code) if code is not None else b99.tree()
++    old = b110.SCENARIO
++    b110.SCENARIO = SCENARIO
++    try:
++        return b110.run(root, env, ids, mode)
++    finally:
++        b110.SCENARIO = old
++
++
++class Bench(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.s = run(BOTH, "on")["steps"]
++
++    def err(self, r):
++        return r["code"], r["body"].get("error")
++
++    def test_a_launch_with_no_client_released(self):
++        self.assertTrue(self.s["paused_after_launch"])
++        self.assertGreaterEqual(self.s["ready_without_stream"]["code"], 400)          # today's: needs the stream
++        self.assertEqual(self.s["release"]["code"], 200, self.s["release"]["body"])
++        self.assertTrue(self.s["release"]["body"]["released"])
++        self.assertFalse(self.s["ra_paused_after"])
++
++    def test_the_watcher_with_no_stream(self):
++        self.assertEqual(self.err(self.s["h7_no_bench"]), (400, "the stream is not up"))
++        self.assertEqual(self.s["h7_bench"]["code"], 200, self.s["h7_bench"]["body"])
++        r = self.s["h7_result"]
++        self.assertEqual((r["state"], r["class"], r["recognised"]), ("ended", "end_P1", True), r)
++        self.assertEqual(self.s["starts_so_far"], [])                                   # no stream started
++
++    def test_refused_for_a_caller_that_is_not_loopback(self):
++        for k in ("release_other", "h7_bench_other", "party_bench_other"):
++            self.assertEqual(self.err(self.s[k]), (400, "the bench is for loopback callers only"), k)
++
++    def test_refused_while_a_clients_stream_is_up(self):
++        for k in ("release_stream_up", "h7_bench_stream_up"):
++            self.assertEqual(self.err(self.s[k]), (400, "a client's stream is up: not on the bench"), k)
++
++    def test_the_party_mini_game_with_no_stream(self):
++        self.assertEqual(self.s["board_launch"], 200)
++        self.assertEqual(self.s["board_release"]["code"], 200, self.s["board_release"]["body"])
++        self.assertEqual(self.s["party_bench"]["code"], 200, self.s["party_bench"]["body"])
++        r = self.s["party_result"]
++        self.assertEqual((r["state"], r["scores"]), ("ended", [0, 1]), r)
++        self.assertTrue(self.s["party_end"]["body"]["ended"])
++        self.assertEqual(self.s["party_starts"], [])                                    # no stream, no switch
++        self.assertEqual(self.s["status_after"], "godot")
++
++    def test_no_game_refused(self):
++        self.assertEqual(self.err(self.s["release_no_game"]), (400, "no game is running"))
++
++
++class FlagAbsentIsToday(unittest.TestCase):
++    def test_absent(self):
++        old = b99.BASELINE
++        b99.BASELINE = BASELINE
++        try:
++            code = b99.head_code()
++        finally:
++            b99.BASELINE = old
++        if code is None:
++            self.skipTest("git is absent")
++        for env in (b85.FLAGS, {**b85.FLAGS, "PRIVYHUB_PARTY": "1"}, {**b85.FLAGS, "PRIVYHUB_H7": "0"}):
++            base = run(env, "today", code=code)
++            mine = run(env, "today")
++            for k in ("release_no_game", "release", "h7_bench", "party_bench"):
++                self.assertEqual((mine["steps"][k]["code"], mine["steps"][k]["raw"]),
++                                 (base["steps"][k]["code"], base["steps"][k]["raw"]), (env, k))
++            self.assertIn("Unknown Games plugin POST action: bench-release", base["steps"]["release"]["raw"])
++
++
++if __name__ == "__main__":
++    unittest.main()

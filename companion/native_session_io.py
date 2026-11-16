@@ -1640,6 +1640,9 @@ class NativeControllerBridge:
     _uplink_silences: Any = None
     # B10: the client's keyframe request (set_keyframe_request; only PRIVYHUB_LOSS_GUARD=1 wires it). None = today.
     _keyframe_request: Any = None
+    # B110: a party mini game's seats → ports ({the onn's player byte: the pad it drives}); others dropped. Set only by
+    # the mini-game layer (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1) for a mini game's length. None = today.
+    _party_route: dict[int, int] | None = None
 
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
@@ -2316,6 +2319,17 @@ class NativeControllerBridge:
             except Exception:
                 pass
 
+    def set_party_route(self, route: dict[int, int] | None) -> None:
+        """B110: set (or clear, None) a party mini game's route; every pad written neutral first, so none is left
+        holding a button across the change."""
+        self._party_route = None
+        for index in range(len(self._gamepads)):
+            try:
+                self._apply_report(index, 0, 0, 0, 0, 0, 0, 0)
+            except Exception:
+                pass
+        self._party_route = dict(route) if route is not None else None
+
     def _apply_report(
         self,
         player: int,
@@ -2327,6 +2341,12 @@ class NativeControllerBridge:
         lt: int,
         rt: int,
     ) -> None:
+        # B110: a party mini game's route (None = today)
+        route = self._party_route
+        if route is not None:
+            if player not in route:
+                return
+            player = route[player]
         if not (
             0 <= player < len(
                 self._gamepads

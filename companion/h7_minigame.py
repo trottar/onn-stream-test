@@ -46,6 +46,9 @@ READ_EVERY = 1.0            # s: one picture a second
 LOG_RELATIVE = "logs/games/h7_results.jsonl"
 SYSTEMS = ("ps1", "snes")   # the load; the watcher alone (load=0) on any system
 XDOTOOL_WAIT = 1.0
+BENCH_STREAM_UP = "a client's stream is up: not on the bench"   # B112
+BENCH_LOOPBACK = "the bench is for loopback callers only"          # B112
+LOOPBACK = ("127.0.0.1", "::1", "localhost")
 RECOGNISE_S = 8.0           # B105: s after a start with the load within which a read must name the start class
 KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
 JPEG_QUALITY = 90
@@ -181,7 +184,7 @@ class MiniGame:
         self._row({"step": "refused", "why": why})
         raise ValueError(why)
 
-    def start(self, load_text: str = "", keep_text: str = "") -> dict:
+    def start(self, load_text: str = "", keep_text: str = "", bench: bool = False) -> dict:
         text = str(load_text or "").strip()
         if text not in ("", "0", "1"):
             raise ValueError("load is 0 or 1")
@@ -191,9 +194,9 @@ class MiniGame:
             raise ValueError("keep is 0 or 1")
         keep = keep_word == "1"
         with self._start_lock:
-            return self._start(load, keep)
+            return self._start(load, keep, bench)
 
-    def _start(self, load: bool, keep: bool) -> dict:
+    def _start(self, load: bool, keep: bool, bench: bool = False) -> dict:
         # B105: a watch already on is replaced after the checks and the load (never refused for being on)
         try:
             game, system, kind = self._live._running()
@@ -216,7 +219,9 @@ class MiniGame:
             state = live.rules_folder(self._environ) / f"{game}.state"
             if not state.is_file() or state.stat().st_size <= 0:
                 self._refused("no state for this game's mini game")
-        if not self._stream_up():
+        if bench and self._stream_up():                     # B112: the bench only while no client's stream is up
+            self._refused(BENCH_STREAM_UP)
+        if not bench and not self._stream_up():
             self._refused("the stream is not up")
         line_ms = None
         if load:
@@ -249,12 +254,25 @@ class MiniGame:
                            "t0": self._clock(), "token": token, "_keep_dir": keep_dir}
             self._row({"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
                        "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
-                       "spec_version": spec.get("version"), "recognise_s": self.recognise_s,
+                       "spec_version": spec.get("version"), "recognise_s": self.recognise_s, "bench": bench,
                        "keep": keep_dir.name if keep_dir is not None else None})
         threading.Thread(target=self._run, args=(token, game, reader, ended, spec), daemon=True,
                          name="h7-minigame").start()
         return {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms,
                 "replaced": replaced, "keep": keep_dir.name if keep_dir is not None else None}
+
+    def bench_release(self, client_ip: str) -> dict:
+        """B112: the running game's pause released with no stream (loopback, no client's stream up)."""
+        if str(client_ip or "") not in LOOPBACK:
+            self._refused(BENCH_LOOPBACK)
+        if self._stream_up():
+            self._refused(BENCH_STREAM_UP)
+        game, _system, _kind = self._live._running()
+        if game is None:
+            self._refused("no game is running")
+        status = self._emu.resume()
+        self._row({"step": "bench_release", "game": game, "paused": bool(status.get("paused"))})
+        return {"ok": True, "released": not bool(status.get("paused")), "game": game}
 
     def stop(self) -> dict:
         """B105: `POST h7-stop` — the watch ends; nothing is sent to the game."""

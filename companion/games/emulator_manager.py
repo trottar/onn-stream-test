@@ -2225,6 +2225,10 @@ class EmulatorManager:
     _gc_helper_sid: int | None = None
     # B108: the board game's session (party_session.Session) while it runs, else None
     _party: Any = None
+    # B110: the board's session fields while a party mini game holds the manager (else None); the mini-game layer's
+    # stop hook (else None)
+    _party_stash: Any = None
+    _party_mg_stop_hook: Any = None
     # B71: {"discs": n, "disc": i | None} on a multi-disc PS1 session, else None (= today)
     _disc_session: dict[str, Any] | None = None
     _disc_tail: Any = None
@@ -8009,6 +8013,33 @@ class EmulatorManager:
         payload["party_mode"] = True
         return payload
 
+    _PARTY_FIELDS = ("process", "log_handle", "active_game", "started_at", "_paused", "_host_window_policy",
+                     "_network_cmd_port", "_disc_session", "_disc_tail", "_active_cheat_session", "_players_session",
+                     "_hold_rewind_core", "_launch_kind", "_last_device_args", "_party")
+
+    def _party_stash_begin(self) -> dict[str, Any]:
+        """B110: the board's session set aside (its process keeps running) so the manager can run a mini game's title."""
+        with self.lock:
+            if self._party_stash is not None or self._launch_kind != _party.LAUNCH_KIND or self._party is None:
+                raise EmulatorError("the board game is not the running session")
+            stash = {name: getattr(self, name, None) for name in self._PARTY_FIELDS}
+            for name in self._PARTY_FIELDS:
+                setattr(self, name, None)
+            self._paused = False
+            self._last_device_args = []
+            self._party_stash = stash
+            return stash
+
+    def _party_stash_end(self) -> None:
+        """B110: the board's session back (the mini game's title already stopped)."""
+        with self.lock:
+            stash = self._party_stash
+            if stash is None:
+                return
+            for name in self._PARTY_FIELDS:
+                setattr(self, name, stash[name])
+            self._party_stash = None
+
     def _party_pause_resume(self, action: str) -> dict[str, Any]:
         try:
             how = self._party.pause() if action == "pause" else self._party.resume()
@@ -8697,7 +8728,7 @@ class EmulatorManager:
         if self._launch_kind == "dolphin":
             return self._dolphin_save_recovery_state()
         # B108: no save state of any kind for the board game (refused plainly, nothing sent)
-        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+        if _party is not None and (self._launch_kind == _party.LAUNCH_KIND or self._party_stash is not None):
             raise EmulatorError(_party.NO_STATES)
         with self.lock:
             self._refresh_process()
@@ -8814,7 +8845,7 @@ class EmulatorManager:
         if self._launch_kind == "dolphin":
             raise EmulatorError("The paused recovery load is not used in a GameCube session")
         # B108: no save state of any kind for the board game (refused plainly, nothing sent)
-        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+        if _party is not None and (self._launch_kind == _party.LAUNCH_KIND or self._party_stash is not None):
             raise EmulatorError(_party.NO_STATES)
         with self.lock:
             self._refresh_process()
@@ -8940,7 +8971,7 @@ class EmulatorManager:
         if self._launch_kind == "dolphin":
             raise EmulatorError(_gc.NO_RELAUNCH)
         # B108: no save state of any kind for the board game (refused plainly, nothing sent)
-        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+        if _party is not None and (self._launch_kind == _party.LAUNCH_KIND or self._party_stash is not None):
             raise EmulatorError(_party.NO_STATES)
         with self.lock:
             self._refresh_process()
@@ -8996,7 +9027,7 @@ class EmulatorManager:
                 raise EmulatorError(_gc.NO_RELAUNCH)
             return self._dolphin_load_recovery_state_running()
         # B108: no save state of any kind for the board game (refused plainly, nothing sent)
-        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+        if _party is not None and (self._launch_kind == _party.LAUNCH_KIND or self._party_stash is not None):
             raise EmulatorError(_party.NO_STATES)
         with self.lock:
             self._refresh_process()
@@ -9157,7 +9188,7 @@ class EmulatorManager:
         if self._launch_kind == "dolphin":
             return self._dolphin_copy_recovery_state_to_slot(slot, replace=replace)
         # B108: no save state of any kind for the board game (refused plainly, nothing sent)
-        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+        if _party is not None and (self._launch_kind == _party.LAUNCH_KIND or self._party_stash is not None):
             raise EmulatorError(_party.NO_STATES)
         with self.lock:
             normalized = self._normalize_save_state_slot(slot)
@@ -9513,7 +9544,7 @@ class EmulatorManager:
         if self._launch_kind == "dolphin":
             return self._dolphin_save_state(slot, replace)
         # B108: no save state of any kind for the board game (refused plainly, nothing sent)
-        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+        if _party is not None and (self._launch_kind == _party.LAUNCH_KIND or self._party_stash is not None):
             raise EmulatorError(_party.NO_STATES)
         with self.lock:
             normalized = self._normalize_save_state_slot(
@@ -9779,7 +9810,7 @@ class EmulatorManager:
         if self._launch_kind == "dolphin":
             return self._dolphin_load_state(slot)
         # B108: no save state of any kind for the board game (refused plainly, nothing sent)
-        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+        if _party is not None and (self._launch_kind == _party.LAUNCH_KIND or self._party_stash is not None):
             raise EmulatorError(_party.NO_STATES)
         with self.lock:
             normalized = (
@@ -10620,6 +10651,10 @@ class EmulatorManager:
                 payload["save_flush_confirmed"] = True
                 return payload
 
+            # B110: a party mini game on: it ends first (the emulator stopped, the board restored), then the board's stop
+            if _party is not None and self._party_mg_stop_hook is not None:
+                hook, self._party_mg_stop_hook = self._party_mg_stop_hook, None
+                return hook()
             # B49: a PCSX2 session ends by SIGTERM (SIGKILL after 5 s)
             if self._launch_kind == "pcsx2":
                 return self._pcsx2_stop()

@@ -1,0 +1,37 @@
+[
+ {
+  "id": "R1",
+  "file": "companion/h7_minigame.py",
+  "old": "        if str(client_ip or \"\") not in LOOPBACK:\n            self._refused(BENCH_LOOPBACK)",
+  "new": "        if False:\n            self._refused(BENCH_LOOPBACK)",
+  "why": "bench-release for a caller that is not loopback"
+ },
+ {
+  "id": "R2",
+  "file": "companion/h7_minigame.py",
+  "old": "        if bench and self._stream_up():",
+  "new": "        if False:",
+  "why": "the bench while a client's stream is up"
+ },
+ {
+  "id": "R3",
+  "file": "companion/h7_minigame.py",
+  "old": "        if not bench and not self._stream_up():",
+  "new": "        if not self._stream_up():",
+  "why": "the bench word ignored by the watcher"
+ },
+ {
+  "id": "R4",
+  "file": "companion/plugins/games.py",
+  "old": "                    raise ValueError(_h7_minigame.BENCH_LOOPBACK)\n                if self._native_stream.status().get(\"active\"):",
+  "new": "                    pass\n                if self._native_stream.status().get(\"active\"):",
+  "why": "the party bench for a caller that is not loopback"
+ },
+ {
+  "id": "R5",
+  "file": "companion/h7_minigame.py",
+  "old": "        status = self._emu.resume()",
+  "new": "        status = self._emu.status()",
+  "why": "bench-release that releases nothing"
+ }
+]

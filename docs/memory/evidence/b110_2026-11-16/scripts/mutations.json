@@ -1,0 +1,86 @@
+[
+ {
+  "id": "Q1",
+  "file": "companion/party_minigame.py",
+  "old": "bridge.set_party_route({s - 1: k for k, s in enumerate(mg[\"seats\"])})",
+  "new": "bridge.set_party_route(None)",
+  "why": "the seats not routed"
+ },
+ {
+  "id": "Q2",
+  "file": "companion/party_minigame.py",
+  "old": "                if bridge is not None:\n                    bridge.set_party_route(None)",
+  "new": "                if bridge is not None:\n                    pass",
+  "why": "the route left on after the mini game"
+ },
+ {
+  "id": "Q3",
+  "file": "companion/party_minigame.py",
+  "old": "self._final(mg, \"ended\", **{\"class\": cls, \"scores\": list(scores)})",
+  "new": "self._final(mg, \"ended\", **{\"class\": cls, \"scores\": list(reversed(scores))})",
+  "why": "the scores not in the order of the seats"
+ },
+ {
+  "id": "Q4",
+  "file": "companion/party_minigame.py",
+  "old": "            if r.get(\"recognised\") is False:",
+  "new": "            if False:",
+  "why": "not recognised not given up"
+ },
+ {
+  "id": "Q5",
+  "file": "companion/party_minigame.py",
+  "old": "            if now - mg[\"t0\"] >= self.play_limit_s:",
+  "new": "            if False:",
+  "why": "no time limit"
+ },
+ {
+  "id": "Q6",
+  "file": "companion/party_minigame.py",
+  "old": "                if by != \"stop\":                     # END / another launch: the stream ends with the session anyway\n                    self._switch_stream(\"board\")",
+  "new": "                if by != \"stop\":\n                    pass",
+  "why": "the stream not switched back to the board"
+ },
+ {
+  "id": "Q7",
+  "file": "companion/party_minigame.py",
+  "old": "                emu._party_stash_end()",
+  "new": "                pass",
+  "why": "the board's session not restored"
+ },
+ {
+  "id": "Q8",
+  "file": "companion/party_minigame.py",
+  "old": "                emu._party_mg_stop_hook = lambda: self._end_by_stop(mg)",
+  "new": "                pass",
+  "why": "END during a mini game not routed through the mini game"
+ },
+ {
+  "id": "Q9",
+  "file": "companion/party_minigame.py",
+  "old": "            if board is not None and board.poll() is not None:",
+  "new": "            if False:",
+  "why": "the board's death not seen"
+ },
+ {
+  "id": "Q10",
+  "file": "companion/native_session_io.py",
+  "old": "            player = route[player]",
+  "new": "            player = player",
+  "why": "the bridge's route not applied"
+ },
+ {
+  "id": "Q11",
+  "file": "companion/party_minigame.py",
+  "old": "                if not state.is_file() or state.stat().st_size <= 0:\n                    continue",
+  "new": "                if False:\n                    continue",
+  "why": "a title with no kept state listed"
+ },
+ {
+  "id": "Q12",
+  "file": "companion/party_minigame.py",
+  "old": "                emu.resume()\n                with self._lock:",
+  "new": "                with self._lock:",
+  "why": "the pause not released for the players"
+ }
+]
