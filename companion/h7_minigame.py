@@ -15,9 +15,21 @@ reading. It sends nothing to the game. The game stopping (the user's END) stops 
 
 `GET /plugins/games/h7-result` → `{"state": "no_game" | "no_spec" | "idle" | "watching" | "ended", "class",
 "seen_start", "since_s", "reads", "last": {"distances", "margin"}}`. One row per change in logs/games/h7_results.jsonl.
+
+B105 (the same flag): a start while a watch is on **replaces** it (the load again, a new watch, one row `replaced`;
+the other refusals stay, and a refused or failed start leaves the running watch as it was); **`recognised`** in the
+result — after a start with the load, `true` once a read names the start class, `false` when RECOGNISE_S pass without
+one (the picture in front of the hub is not this game's start: nobody may be sent into a match), `null` until then
+(with load=0: `true` once seen, else `null`); settled once, one row; **`POST /plugins/games/h7-stop`** ends the watch,
+the game untouched, one row; **`h7-start?keep=1`** saves every picture the watcher reads (JPEG) with an `index.csv`
+(seconds, utc, file, class, screen, margin, distances, keep_ms) under `runtime/h7_frames/<game id>_<UTC stamp>/`
+(git-ignored); **`last`** carries the read's class and distances, the thresholds they are held against and the spec's
+version; an old-measure spec is `no_spec` with B104's plain line.
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
 import os
 import subprocess
@@ -34,6 +46,9 @@ READ_EVERY = 1.0            # s: one picture a second
 LOG_RELATIVE = "logs/games/h7_results.jsonl"
 SYSTEMS = ("ps1", "snes")   # the load; the watcher alone (load=0) on any system
 XDOTOOL_WAIT = 1.0
+RECOGNISE_S = 8.0           # B105: s after a start with the load within which a read must name the start class
+KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
+JPEG_QUALITY = 90
 _endscreen = None
 
 
@@ -120,8 +135,10 @@ class MiniGame:
         self._live = live.LiveRead(emulator, project_path, environ, clock)    # its `_running` only (no read)
         self.picture = WindowPicture(emulator, environ)
         self.read_every = READ_EVERY
+        self.recognise_s = RECOGNISE_S
         self._watch: dict | None = None
         self._stopped: str | None = None
+        self._start_lock = threading.Lock()          # B105: starts one at a time (a replace cannot race a replace)
 
     # --- the spec ------------------------------------------------------------------------------------------------
     def _spec(self, game: str):
@@ -134,6 +151,9 @@ class MiniGame:
         try:
             return endscreen().load_spec(path)
         except (OSError, ValueError, KeyError, TypeError, ImportError) as exc:
+            old = getattr(endscreen(), "OLD_MEASURE", None)
+            if old and str(exc) == old:
+                raise ValueError(old) from exc                  # B105: B104's plain line ("learn it again")
             raise ValueError(f"the end-screen spec for this game cannot be read: {exc}") from exc
 
     # --- GET -----------------------------------------------------------------------------------------------------
@@ -147,7 +167,7 @@ class MiniGame:
         with self._lock:
             w = self._watch
             if w is not None and w["game"] == game and w["state"] in ("watching", "ended"):
-                out = {k: v for k, v in w.items() if k not in ("t0", "token")}
+                out = {k: v for k, v in w.items() if k not in ("t0", "token") and not k.startswith("_")}
                 out["since_s"] = round(self._clock() - w["t0"], 1)
                 return {"ok": True, **json.loads(json.dumps(out))}
         try:
@@ -161,14 +181,20 @@ class MiniGame:
         self._row({"step": "refused", "why": why})
         raise ValueError(why)
 
-    def start(self, load_text: str = "") -> dict:
+    def start(self, load_text: str = "", keep_text: str = "") -> dict:
         text = str(load_text or "").strip()
         if text not in ("", "0", "1"):
             raise ValueError("load is 0 or 1")
         load = text != "0"
-        with self._lock:
-            if self._watch is not None and self._watch["state"] == "watching":
-                self._refused("a mini game is already being watched")
+        keep_word = str(keep_text or "").strip()
+        if keep_word not in ("", "0", "1"):
+            raise ValueError("keep is 0 or 1")
+        keep = keep_word == "1"
+        with self._start_lock:
+            return self._start(load, keep)
+
+    def _start(self, load: bool, keep: bool) -> dict:
+        # B105: a watch already on is replaced after the checks and the load (never refused for being on)
         try:
             game, system, kind = self._live._running()
         except RuntimeError as exc:
@@ -208,19 +234,56 @@ class MiniGame:
         ended = endscreen().Ended(spec)
         if load:
             ended.start_loaded()
+        keep_dir = self._keep_folder(game) if keep else None
         token = object()
         with self._lock:
-            if self._watch is not None and self._watch["state"] == "watching":
-                self._refused("a mini game is already being watched")
+            old = self._watch
+            replaced = old is not None and old["state"] == "watching"
+            if replaced:
+                self._row({"step": "replaced", "game": old["game"], "reads": old["reads"], "class": old["class"],
+                           "since_s": round(self._clock() - old["t0"], 1)})
             self._stopped = None
             self._watch = {"state": "watching", "game": game, "class": None, "seen_start": ended.seen_start,
-                           "reads": 0, "last": None, "loaded": load, "picture_failures": 0, "t0": self._clock(),
-                           "token": token}
-        self._row({"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
-                   "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"]})
-        threading.Thread(target=self._run, args=(token, game, reader, ended), daemon=True,
+                           "recognised": None, "reads": 0, "last": None, "loaded": load, "picture_failures": 0,
+                           "keep": ({"folder": keep_dir.name, "pictures": 0} if keep_dir is not None else None),
+                           "t0": self._clock(), "token": token, "_keep_dir": keep_dir}
+            self._row({"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
+                       "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
+                       "spec_version": spec.get("version"), "recognise_s": self.recognise_s,
+                       "keep": keep_dir.name if keep_dir is not None else None})
+        threading.Thread(target=self._run, args=(token, game, reader, ended, spec), daemon=True,
                          name="h7-minigame").start()
-        return {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms}
+        return {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms,
+                "replaced": replaced, "keep": keep_dir.name if keep_dir is not None else None}
+
+    def stop(self) -> dict:
+        """B105: `POST h7-stop` — the watch ends; nothing is sent to the game."""
+        with self._lock:
+            w = self._watch
+            if w is None:
+                return {"ok": True, "watch": "none"}
+            self._watch = None
+            self._stopped = None
+            self._row({"step": "stopped_by_call", "game": w["game"], "reads": w["reads"], "state": w["state"]})
+            return {"ok": True, "watch": "stopped", "game": w["game"], "reads": w["reads"]}
+
+    def _keep_folder(self, game: str) -> Path | None:
+        """runtime/h7_frames/<game id>_<UTC stamp>/ with its index.csv header (None + one row when it cannot be made)."""
+        try:
+            base = Path(self._project_path(KEEP_RELATIVE))
+            stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+            d = base / f"{game}_{stamp}"
+            n = 1
+            while d.exists():
+                n += 1
+                d = base / f"{game}_{stamp}_{n}"
+            d.mkdir(parents=True)
+            with (d / "index.csv").open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerow(["seconds", "utc", "file", "class", "screen", "margin", "distances", "keep_ms"])
+            return d
+        except OSError as exc:
+            self._row({"step": "keep_failed", "game": game, "why": str(exc)[:200]})
+            return None
 
     def _stream_up(self) -> bool:
         try:
@@ -229,14 +292,59 @@ class MiniGame:
             return False
 
     # --- the watcher ---------------------------------------------------------------------------------------------
+    def _mine(self, token) -> dict | None:
+        """B105: the watch this token started, watching or just ended (its last picture is still kept)."""
+        w = self._watch
+        return w if (w is not None and w.get("token") is token) else None
+
     def _current(self, token) -> dict | None:
         w = self._watch
         return w if (w is not None and w.get("token") is token and w["state"] == "watching") else None
 
-    def _run(self, token, game: str, reader, ended) -> None:
+    def _settle(self, w: dict, value: bool, since: float, r: dict | None) -> None:
+        """B105: `recognised` settles once (under the lock), one row."""
+        w["recognised"] = value
+        self._row({"step": "recognised", "game": w["game"], "value": value, "after_s": since, "reads": w["reads"],
+                   "class": (r or {}).get("class"), "distances": (r or {}).get("distances")})
+
+    def _keep(self, token, keep_dir: Path, img, since: float, r: dict) -> None:
+        """B105: the picture as it was read, and its index row (keeping stops at the first failure, one row)."""
+        t0 = time.perf_counter()
+        try:
+            with self._lock:
+                w = self._mine(token)
+                if w is None or w.get("_keep_dir") is None:
+                    return
+                n = w["keep"]["pictures"] + 1
+            name = f"f{n:06d}.jpg"
+            pic = img if getattr(img, "mode", "RGB") in ("L", "RGB") else img.convert("RGB")
+            buf = io.BytesIO()
+            pic.save(buf, "JPEG", quality=JPEG_QUALITY)
+            (keep_dir / name).write_bytes(buf.getvalue())
+            ms = round((time.perf_counter() - t0) * 1000.0, 2)
+            now = time.time()
+            utc = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(now)) + f".{int(now * 1000) % 1000:03d}Z"
+            with (keep_dir / "index.csv").open("a", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerow([f"{since:.2f}", utc, name, r["class"], r["distances"].get("screen"),
+                                         r.get("margin"), json.dumps(r["distances"], sort_keys=True), ms])
+            with self._lock:
+                w = self._mine(token)
+                if w is not None and w.get("keep"):
+                    w["keep"]["pictures"] = n
+        except OSError as exc:
+            with self._lock:
+                w = self._mine(token)
+                if w is None:
+                    return
+                w["_keep_dir"] = None
+                self._row({"step": "keep_failed", "game": w["game"], "why": str(exc)[:200]})
+
+    def _run(self, token, game: str, reader, ended, spec: dict) -> None:
         t0 = self._clock()
         k = 1
         last_class = None
+        start_class = spec["start_class"]
+        thresholds = endscreen().thresholds(spec) if hasattr(endscreen(), "thresholds") else None
         try:
             while True:
                 time.sleep(max(0.0, t0 + k * self.read_every - self._clock()))
@@ -255,16 +363,20 @@ class MiniGame:
                         reads = self._watch["reads"]
                         self._watch = None
                         self._stopped = "the game stopped"
-                    self._row({"step": "stopped", "game": game, "why": "the game stopped", "reads": reads})
+                        self._row({"step": "stopped", "game": game, "why": "the game stopped", "reads": reads})
                     return
                 try:
                     img = self.picture.grab()
                 except Exception as exc:
                     with self._lock:
-                        if self._current(token) is None:
+                        w = self._current(token)
+                        if w is None:
                             return
-                        self._watch["picture_failures"] += 1
-                    self._row({"step": "picture_failed", "game": game, "why": str(exc)[:200]})
+                        w["picture_failures"] += 1
+                        self._row({"step": "picture_failed", "game": game, "why": str(exc)[:200]})
+                        since = round(self._clock() - w["t0"], 1)
+                        if w["recognised"] is None and w["loaded"] and since >= self.recognise_s:
+                            self._settle(w, False, since, None)
                     continue
                 r = reader.read(img)
                 seen_before = ended.seen_start
@@ -276,25 +388,35 @@ class MiniGame:
                     w["reads"] += 1
                     w["class"] = r["class"]
                     w["seen_start"] = ended.seen_start
-                    w["last"] = {"distances": r["distances"], "margin": r["margin"]}
+                    w["last"] = {"class": r["class"], "distances": r["distances"], "margin": r["margin"],
+                                 "thresholds": thresholds, "spec_version": spec.get("version")}
                     reads = w["reads"]
                     since = round(self._clock() - w["t0"], 1)
+                    keep_dir = w.get("_keep_dir")
+                    if w["recognised"] is None:
+                        if r["class"] == start_class:
+                            self._settle(w, True, since, r)
+                        elif w["loaded"] and since >= self.recognise_s:
+                            self._settle(w, False, since, r)
                     if done:
                         w.update(state="ended", **{"class": done}, ended_after_s=since)
-                if ended.seen_start and not seen_before:
-                    self._row({"step": "start_seen", "game": game, "after_s": since, "reads": reads})
-                if r["class"] == endscreen().UNKNOWN and last_class != endscreen().UNKNOWN:
-                    self._row({"step": "unknown_screen", "game": game, "after_s": since,
-                               "distances": r["distances"], "margin": r["margin"]})
+                    if ended.seen_start and not seen_before:
+                        self._row({"step": "start_seen", "game": game, "after_s": since, "reads": reads})
+                    if r["class"] == endscreen().UNKNOWN and last_class != endscreen().UNKNOWN:
+                        self._row({"step": "unknown_screen", "game": game, "after_s": since,
+                                   "distances": r["distances"], "margin": r["margin"]})
+                    if done:
+                        self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads})
                 last_class = r["class"]
+                if keep_dir is not None:
+                    self._keep(token, keep_dir, img, since, r)
                 if done:
-                    self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads})
                     return
         except Exception as exc:                                        # anything unexpected: one row, the watch off
             with self._lock:
                 if self._current(token) is not None:
                     self._watch = None
-            self._row({"step": "error", "game": game, "why": str(exc)[:200]})
+                    self._row({"step": "error", "game": game, "why": str(exc)[:200]})
 
     def _row(self, fields: dict) -> None:
         try:

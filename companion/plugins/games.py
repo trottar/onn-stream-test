@@ -4348,7 +4348,12 @@ class GamesPlugin:
 
         # B103: the mini game's start — B101's load step alone, then the watcher (PRIVYHUB_H7=1 only)
         if action == "h7-start" and _h7_minigame is not None:
-            return self._h7_minigame_runner().start(self._first(parse_qs(raw_query), "load"))
+            q = parse_qs(raw_query)
+            return self._h7_minigame_runner().start(self._first(q, "load"), self._first(q, "keep"))
+
+        # B105: the mini game's watch ended by a call, the game untouched (PRIVYHUB_H7=1 only)
+        if action == "h7-stop" and _h7_minigame is not None:
+            return self._h7_minigame_runner().stop()
 
         return self.handle_post(action, raw_query)
 

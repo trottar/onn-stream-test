@@ -1,0 +1,93 @@
+[
+ {
+  "id": "N1",
+  "file": "companion/h7_minigame.py",
+  "old": "            replaced = old is not None and old[\"state\"] == \"watching\"",
+  "new": "            replaced = False",
+  "why": "no replaced row / flag"
+ },
+ {
+  "id": "N2",
+  "file": "companion/h7_minigame.py",
+  "old": "                        elif w[\"loaded\"] and since >= self.recognise_s:",
+  "new": "                        elif False:",
+  "why": "recognised never false"
+ },
+ {
+  "id": "N3",
+  "file": "companion/h7_minigame.py",
+  "old": "                        elif w[\"loaded\"] and since >= self.recognise_s:",
+  "new": "                        elif since >= self.recognise_s:",
+  "why": "recognised false with load=0"
+ },
+ {
+  "id": "N4",
+  "file": "companion/h7_minigame.py",
+  "old": "                        if r[\"class\"] == start_class:",
+  "new": "                        if r[\"screen\"]:",
+  "why": "any screen taken as recognised"
+ },
+ {
+  "id": "N5",
+  "file": "companion/h7_minigame.py",
+  "old": "            self._watch = None\n            self._stopped = None\n            self._row({\"step\": \"stopped_by_call\"",
+  "new": "            self._stopped = None\n            self._row({\"step\": \"stopped_by_call\"",
+  "why": "h7-stop leaves the watch on"
+ },
+ {
+  "id": "N6",
+  "file": "companion/h7_minigame.py",
+  "old": "        keep = keep_word == \"1\"",
+  "new": "        keep = False",
+  "why": "keep=1 ignored"
+ },
+ {
+  "id": "N7",
+  "file": "companion/h7_minigame.py",
+  "old": "        keep = keep_word == \"1\"",
+  "new": "        keep = keep_word != \"0\"",
+  "why": "pictures kept when not asked"
+ },
+ {
+  "id": "N8",
+  "file": "companion/h7_minigame.py",
+  "old": "                                 \"thresholds\": thresholds, \"spec_version\": spec.get(\"version\")}",
+  "new": "                                 \"thresholds\": None, \"spec_version\": spec.get(\"version\")}",
+  "why": "last without the thresholds"
+ },
+ {
+  "id": "N9",
+  "file": "companion/h7_minigame.py",
+  "old": "                raise ValueError(old) from exc                  # B105: B104's plain line (\"learn it again\")",
+  "new": "                pass",
+  "why": "the old measure's line wrapped"
+ },
+ {
+  "id": "N10",
+  "file": "companion/h7_minigame.py",
+  "old": "                w = self._mine(token)\n                if w is None or w.get(\"_keep_dir\") is None:",
+  "new": "                w = self._current(token)\n                if w is None or w.get(\"_keep_dir\") is None:",
+  "why": "the ending read's picture not kept"
+ },
+ {
+  "id": "N11",
+  "file": "companion/plugins/games.py",
+  "old": "        if action == \"h7-stop\" and _h7_minigame is not None:",
+  "new": "        if action == \"h7-stopped\" and _h7_minigame is not None:",
+  "why": "the stop route gone"
+ },
+ {
+  "id": "N12",
+  "file": "companion/plugins/games.py",
+  "old": "self._first(q, \"load\"), self._first(q, \"keep\"))",
+  "new": "self._first(q, \"load\"), \"\")",
+  "why": "keep not passed through the route"
+ },
+ {
+  "id": "N13",
+  "file": "companion/h7_minigame.py",
+  "old": "        if w[\"recognised\"] is None and w[\"loaded\"] and since >= self.recognise_s:\n                            self._settle(w, False, since, None)",
+  "new": "        if False:\n                            self._settle(w, False, since, None)",
+  "why": "failed pictures not counted as time passing (recognised never false when nothing can be read)"
+ }
+]

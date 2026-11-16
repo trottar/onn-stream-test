@@ -1,0 +1,688 @@
+diff --git a/companion/h7_minigame.py b/companion/h7_minigame.py
+index 44af3d52..74f88699 100644
+--- a/companion/h7_minigame.py
++++ b/companion/h7_minigame.py
+@@ -15,9 +15,21 @@ reading. It sends nothing to the game. The game stopping (the user's END) stops
+ 
+ `GET /plugins/games/h7-result` → `{"state": "no_game" | "no_spec" | "idle" | "watching" | "ended", "class",
+ "seen_start", "since_s", "reads", "last": {"distances", "margin"}}`. One row per change in logs/games/h7_results.jsonl.
++
++B105 (the same flag): a start while a watch is on **replaces** it (the load again, a new watch, one row `replaced`;
++the other refusals stay, and a refused or failed start leaves the running watch as it was); **`recognised`** in the
++result — after a start with the load, `true` once a read names the start class, `false` when RECOGNISE_S pass without
++one (the picture in front of the hub is not this game's start: nobody may be sent into a match), `null` until then
++(with load=0: `true` once seen, else `null`); settled once, one row; **`POST /plugins/games/h7-stop`** ends the watch,
++the game untouched, one row; **`h7-start?keep=1`** saves every picture the watcher reads (JPEG) with an `index.csv`
++(seconds, utc, file, class, screen, margin, distances, keep_ms) under `runtime/h7_frames/<game id>_<UTC stamp>/`
++(git-ignored); **`last`** carries the read's class and distances, the thresholds they are held against and the spec's
++version; an old-measure spec is `no_spec` with B104's plain line.
+ """
+ from __future__ import annotations
+ 
++import csv
++import io
+ import json
+ import os
+ import subprocess
+@@ -34,6 +46,9 @@ READ_EVERY = 1.0            # s: one picture a second
+ LOG_RELATIVE = "logs/games/h7_results.jsonl"
+ SYSTEMS = ("ps1", "snes")   # the load; the watcher alone (load=0) on any system
+ XDOTOOL_WAIT = 1.0
++RECOGNISE_S = 8.0           # B105: s after a start with the load within which a read must name the start class
++KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
++JPEG_QUALITY = 90
+ _endscreen = None
+ 
+ 
+@@ -120,8 +135,10 @@ class MiniGame:
+         self._live = live.LiveRead(emulator, project_path, environ, clock)    # its `_running` only (no read)
+         self.picture = WindowPicture(emulator, environ)
+         self.read_every = READ_EVERY
++        self.recognise_s = RECOGNISE_S
+         self._watch: dict | None = None
+         self._stopped: str | None = None
++        self._start_lock = threading.Lock()          # B105: starts one at a time (a replace cannot race a replace)
+ 
+     # --- the spec ------------------------------------------------------------------------------------------------
+     def _spec(self, game: str):
+@@ -134,6 +151,9 @@ class MiniGame:
+         try:
+             return endscreen().load_spec(path)
+         except (OSError, ValueError, KeyError, TypeError, ImportError) as exc:
++            old = getattr(endscreen(), "OLD_MEASURE", None)
++            if old and str(exc) == old:
++                raise ValueError(old) from exc                  # B105: B104's plain line ("learn it again")
+             raise ValueError(f"the end-screen spec for this game cannot be read: {exc}") from exc
+ 
+     # --- GET -----------------------------------------------------------------------------------------------------
+@@ -147,7 +167,7 @@ class MiniGame:
+         with self._lock:
+             w = self._watch
+             if w is not None and w["game"] == game and w["state"] in ("watching", "ended"):
+-                out = {k: v for k, v in w.items() if k not in ("t0", "token")}
++                out = {k: v for k, v in w.items() if k not in ("t0", "token") and not k.startswith("_")}
+                 out["since_s"] = round(self._clock() - w["t0"], 1)
+                 return {"ok": True, **json.loads(json.dumps(out))}
+         try:
+@@ -161,14 +181,20 @@ class MiniGame:
+         self._row({"step": "refused", "why": why})
+         raise ValueError(why)
+ 
+-    def start(self, load_text: str = "") -> dict:
++    def start(self, load_text: str = "", keep_text: str = "") -> dict:
+         text = str(load_text or "").strip()
+         if text not in ("", "0", "1"):
+             raise ValueError("load is 0 or 1")
+         load = text != "0"
+-        with self._lock:
+-            if self._watch is not None and self._watch["state"] == "watching":
+-                self._refused("a mini game is already being watched")
++        keep_word = str(keep_text or "").strip()
++        if keep_word not in ("", "0", "1"):
++            raise ValueError("keep is 0 or 1")
++        keep = keep_word == "1"
++        with self._start_lock:
++            return self._start(load, keep)
++
++    def _start(self, load: bool, keep: bool) -> dict:
++        # B105: a watch already on is replaced after the checks and the load (never refused for being on)
+         try:
+             game, system, kind = self._live._running()
+         except RuntimeError as exc:
+@@ -208,19 +234,56 @@ class MiniGame:
+         ended = endscreen().Ended(spec)
+         if load:
+             ended.start_loaded()
++        keep_dir = self._keep_folder(game) if keep else None
+         token = object()
+         with self._lock:
+-            if self._watch is not None and self._watch["state"] == "watching":
+-                self._refused("a mini game is already being watched")
++            old = self._watch
++            replaced = old is not None and old["state"] == "watching"
++            if replaced:
++                self._row({"step": "replaced", "game": old["game"], "reads": old["reads"], "class": old["class"],
++                           "since_s": round(self._clock() - old["t0"], 1)})
+             self._stopped = None
+             self._watch = {"state": "watching", "game": game, "class": None, "seen_start": ended.seen_start,
+-                           "reads": 0, "last": None, "loaded": load, "picture_failures": 0, "t0": self._clock(),
+-                           "token": token}
+-        self._row({"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
+-                   "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"]})
+-        threading.Thread(target=self._run, args=(token, game, reader, ended), daemon=True,
++                           "recognised": None, "reads": 0, "last": None, "loaded": load, "picture_failures": 0,
++                           "keep": ({"folder": keep_dir.name, "pictures": 0} if keep_dir is not None else None),
++                           "t0": self._clock(), "token": token, "_keep_dir": keep_dir}
++            self._row({"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
++                       "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
++                       "spec_version": spec.get("version"), "recognise_s": self.recognise_s,
++                       "keep": keep_dir.name if keep_dir is not None else None})
++        threading.Thread(target=self._run, args=(token, game, reader, ended, spec), daemon=True,
+                          name="h7-minigame").start()
+-        return {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms}
++        return {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms,
++                "replaced": replaced, "keep": keep_dir.name if keep_dir is not None else None}
++
++    def stop(self) -> dict:
++        """B105: `POST h7-stop` — the watch ends; nothing is sent to the game."""
++        with self._lock:
++            w = self._watch
++            if w is None:
++                return {"ok": True, "watch": "none"}
++            self._watch = None
++            self._stopped = None
++            self._row({"step": "stopped_by_call", "game": w["game"], "reads": w["reads"], "state": w["state"]})
++            return {"ok": True, "watch": "stopped", "game": w["game"], "reads": w["reads"]}
++
++    def _keep_folder(self, game: str) -> Path | None:
++        """runtime/h7_frames/<game id>_<UTC stamp>/ with its index.csv header (None + one row when it cannot be made)."""
++        try:
++            base = Path(self._project_path(KEEP_RELATIVE))
++            stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
++            d = base / f"{game}_{stamp}"
++            n = 1
++            while d.exists():
++                n += 1
++                d = base / f"{game}_{stamp}_{n}"
++            d.mkdir(parents=True)
++            with (d / "index.csv").open("w", newline="", encoding="utf-8") as fh:
++                csv.writer(fh).writerow(["seconds", "utc", "file", "class", "screen", "margin", "distances", "keep_ms"])
++            return d
++        except OSError as exc:
++            self._row({"step": "keep_failed", "game": game, "why": str(exc)[:200]})
++            return None
+ 
+     def _stream_up(self) -> bool:
+         try:
+@@ -229,14 +292,59 @@ class MiniGame:
+             return False
+ 
+     # --- the watcher ---------------------------------------------------------------------------------------------
++    def _mine(self, token) -> dict | None:
++        """B105: the watch this token started, watching or just ended (its last picture is still kept)."""
++        w = self._watch
++        return w if (w is not None and w.get("token") is token) else None
++
+     def _current(self, token) -> dict | None:
+         w = self._watch
+         return w if (w is not None and w.get("token") is token and w["state"] == "watching") else None
+ 
+-    def _run(self, token, game: str, reader, ended) -> None:
++    def _settle(self, w: dict, value: bool, since: float, r: dict | None) -> None:
++        """B105: `recognised` settles once (under the lock), one row."""
++        w["recognised"] = value
++        self._row({"step": "recognised", "game": w["game"], "value": value, "after_s": since, "reads": w["reads"],
++                   "class": (r or {}).get("class"), "distances": (r or {}).get("distances")})
++
++    def _keep(self, token, keep_dir: Path, img, since: float, r: dict) -> None:
++        """B105: the picture as it was read, and its index row (keeping stops at the first failure, one row)."""
++        t0 = time.perf_counter()
++        try:
++            with self._lock:
++                w = self._mine(token)
++                if w is None or w.get("_keep_dir") is None:
++                    return
++                n = w["keep"]["pictures"] + 1
++            name = f"f{n:06d}.jpg"
++            pic = img if getattr(img, "mode", "RGB") in ("L", "RGB") else img.convert("RGB")
++            buf = io.BytesIO()
++            pic.save(buf, "JPEG", quality=JPEG_QUALITY)
++            (keep_dir / name).write_bytes(buf.getvalue())
++            ms = round((time.perf_counter() - t0) * 1000.0, 2)
++            now = time.time()
++            utc = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(now)) + f".{int(now * 1000) % 1000:03d}Z"
++            with (keep_dir / "index.csv").open("a", newline="", encoding="utf-8") as fh:
++                csv.writer(fh).writerow([f"{since:.2f}", utc, name, r["class"], r["distances"].get("screen"),
++                                         r.get("margin"), json.dumps(r["distances"], sort_keys=True), ms])
++            with self._lock:
++                w = self._mine(token)
++                if w is not None and w.get("keep"):
++                    w["keep"]["pictures"] = n
++        except OSError as exc:
++            with self._lock:
++                w = self._mine(token)
++                if w is None:
++                    return
++                w["_keep_dir"] = None
++                self._row({"step": "keep_failed", "game": w["game"], "why": str(exc)[:200]})
++
++    def _run(self, token, game: str, reader, ended, spec: dict) -> None:
+         t0 = self._clock()
+         k = 1
+         last_class = None
++        start_class = spec["start_class"]
++        thresholds = endscreen().thresholds(spec) if hasattr(endscreen(), "thresholds") else None
+         try:
+             while True:
+                 time.sleep(max(0.0, t0 + k * self.read_every - self._clock()))
+@@ -255,16 +363,20 @@ class MiniGame:
+                         reads = self._watch["reads"]
+                         self._watch = None
+                         self._stopped = "the game stopped"
+-                    self._row({"step": "stopped", "game": game, "why": "the game stopped", "reads": reads})
++                        self._row({"step": "stopped", "game": game, "why": "the game stopped", "reads": reads})
+                     return
+                 try:
+                     img = self.picture.grab()
+                 except Exception as exc:
+                     with self._lock:
+-                        if self._current(token) is None:
++                        w = self._current(token)
++                        if w is None:
+                             return
+-                        self._watch["picture_failures"] += 1
+-                    self._row({"step": "picture_failed", "game": game, "why": str(exc)[:200]})
++                        w["picture_failures"] += 1
++                        self._row({"step": "picture_failed", "game": game, "why": str(exc)[:200]})
++                        since = round(self._clock() - w["t0"], 1)
++                        if w["recognised"] is None and w["loaded"] and since >= self.recognise_s:
++                            self._settle(w, False, since, None)
+                     continue
+                 r = reader.read(img)
+                 seen_before = ended.seen_start
+@@ -276,25 +388,35 @@ class MiniGame:
+                     w["reads"] += 1
+                     w["class"] = r["class"]
+                     w["seen_start"] = ended.seen_start
+-                    w["last"] = {"distances": r["distances"], "margin": r["margin"]}
++                    w["last"] = {"class": r["class"], "distances": r["distances"], "margin": r["margin"],
++                                 "thresholds": thresholds, "spec_version": spec.get("version")}
+                     reads = w["reads"]
+                     since = round(self._clock() - w["t0"], 1)
++                    keep_dir = w.get("_keep_dir")
++                    if w["recognised"] is None:
++                        if r["class"] == start_class:
++                            self._settle(w, True, since, r)
++                        elif w["loaded"] and since >= self.recognise_s:
++                            self._settle(w, False, since, r)
+                     if done:
+                         w.update(state="ended", **{"class": done}, ended_after_s=since)
+-                if ended.seen_start and not seen_before:
+-                    self._row({"step": "start_seen", "game": game, "after_s": since, "reads": reads})
+-                if r["class"] == endscreen().UNKNOWN and last_class != endscreen().UNKNOWN:
+-                    self._row({"step": "unknown_screen", "game": game, "after_s": since,
+-                               "distances": r["distances"], "margin": r["margin"]})
++                    if ended.seen_start and not seen_before:
++                        self._row({"step": "start_seen", "game": game, "after_s": since, "reads": reads})
++                    if r["class"] == endscreen().UNKNOWN and last_class != endscreen().UNKNOWN:
++                        self._row({"step": "unknown_screen", "game": game, "after_s": since,
++                                   "distances": r["distances"], "margin": r["margin"]})
++                    if done:
++                        self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads})
+                 last_class = r["class"]
++                if keep_dir is not None:
++                    self._keep(token, keep_dir, img, since, r)
+                 if done:
+-                    self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads})
+                     return
+         except Exception as exc:                                        # anything unexpected: one row, the watch off
+             with self._lock:
+                 if self._current(token) is not None:
+                     self._watch = None
+-            self._row({"step": "error", "game": game, "why": str(exc)[:200]})
++                    self._row({"step": "error", "game": game, "why": str(exc)[:200]})
+ 
+     def _row(self, fields: dict) -> None:
+         try:
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index a7179ce9..dce9f138 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4348,7 +4348,12 @@ class GamesPlugin:
+ 
+         # B103: the mini game's start — B101's load step alone, then the watcher (PRIVYHUB_H7=1 only)
+         if action == "h7-start" and _h7_minigame is not None:
+-            return self._h7_minigame_runner().start(self._first(parse_qs(raw_query), "load"))
++            q = parse_qs(raw_query)
++            return self._h7_minigame_runner().start(self._first(q, "load"), self._first(q, "keep"))
++
++        # B105: the mini game's watch ended by a call, the game untouched (PRIVYHUB_H7=1 only)
++        if action == "h7-stop" and _h7_minigame is not None:
++            return self._h7_minigame_runner().stop()
+ 
+         return self.handle_post(action, raw_query)
+ 
+diff --git a/tests/b103_h7_minigame/test_b103.py b/tests/b103_h7_minigame/test_b103.py
+index e2319ddd..89f9b60e 100644
+--- a/tests/b103_h7_minigame/test_b103.py
++++ b/tests/b103_h7_minigame/test_b103.py
+@@ -237,6 +237,7 @@ else:
+     pic.set(["start"] * 3 + ["unknown"] * 8 + ["end_P1"] * 3 + ["end_P2"] * 20)
+     S["w3_start"] = start("?load=0")
+     S["w3_mid_timeline"], S["w3_mid"] = timeline(until=(), stop_at_reads=9)
++    pic.set(["start"] * 3 + ["end_P1"] * 3 + ["end_P2"] * 20)          # B105: the replacing watch's pictures
+     S["w3_second"] = start("?load=0")
+     S["w3_timeline"], S["w3"] = timeline()
+     # W4: a failed picture is a row and the watch goes on
+@@ -360,13 +361,14 @@ class MiniGame(unittest.TestCase):
+         st = self.s["w1_start"]["body"]
+         self.assertEqual((st["watch"], st["loaded"], st["game"]), ("started", True, self.gid))
+         self.assertIsNotNone(st["load_line_ms"])
+-        self.assertEqual(self.err(self.s["w1_second"]), (400, "a mini game is already being watched"))
++        # B105 (queue AN): a start while a watch is on replaces it (was B103's refusal)
++        self.assertEqual((self.s["w1_second"]["code"], self.s["w1_second"]["body"].get("replaced")), (200, True))
+         w = self.s["w1"]
+         self.assertEqual((w["state"], w["class"], w["seen_start"]), ("ended", "end_P1", True))
+         self.assertEqual(w["reads"], 13)                                   # 2 + 5 + 2 + 1 + the third end read
+         self.assertIn("ended_after_s", w)
+         self.assertIn("since_s", w)
+-        self.assertEqual(set(w["last"]), {"distances", "margin"})
++        self.assertLessEqual({"distances", "margin"}, set(w["last"]))        # B105 adds class, thresholds, version
+         ended_at = first(self.s["w1_timeline"], "ended")
+         self.assertEqual(ended_at[0], 13)
+         self.assertTrue(all(t[1] == "watching" for t in self.s["w1_timeline"] if (t[0] or 0) < 13))
+@@ -375,7 +377,7 @@ class MiniGame(unittest.TestCase):
+         self.assertEqual(self.s["w1_after"]["state"], "ended")
+ 
+     def test_no_command_to_the_game_beyond_the_load(self):
+-        self.assertEqual(self.s["w1_commands"], ["LOAD_STATE_SLOT"])
++        self.assertEqual(self.s["w1_commands"], ["LOAD_STATE_SLOT", "LOAD_STATE_SLOT"])   # B105: the replace loads again
+         self.assertEqual(self.s["w1_mem"], [0, 0])                         # the state's own values: the load took
+         self.assertEqual(self.s["w2_commands"], [])
+         self.assertEqual(self.s["w5_commands"], [])
+@@ -391,10 +393,11 @@ class MiniGame(unittest.TestCase):
+     def test_an_unknown_screen_is_said_never_ended(self):
+         mid = self.s["w3_mid"]
+         self.assertEqual((mid["state"], mid["class"]), ("watching", "unknown"))
+-        self.assertEqual(self.err(self.s["w3_second"]), (400, "a mini game is already being watched"))
+-        self.assertTrue(all(t[1] == "watching" for t in self.s["w3_timeline"] if (t[0] or 0) < 14))
++        # B105 (queue AN): the second start replaces the watch (was refused); the new watch sees the start, then 1-0
++        self.assertEqual((self.s["w3_second"]["code"], self.s["w3_second"]["body"].get("replaced")), (200, True))
++        self.assertTrue(all(t[1] == "watching" for t in self.s["w3_timeline"] if (t[0] or 0) < 6))
+         self.assertIn("unknown", [t[2] for t in self.s["w3_mid_timeline"] + self.s["w3_timeline"]])
+-        self.assertEqual((self.s["w3"]["state"], self.s["w3"]["class"], self.s["w3"]["reads"]), ("ended", "end_P1", 14))
++        self.assertEqual((self.s["w3"]["state"], self.s["w3"]["class"], self.s["w3"]["reads"]), ("ended", "end_P1", 6))
+ 
+     def test_a_failed_picture_is_a_row_and_the_watch_goes_on(self):
+         w = self.s["w4"]
+diff --git a/tests/b105_h7_watcher/test_b105.py b/tests/b105_h7_watcher/test_b105.py
+new file mode 100644
+index 00000000..bb2a468a
+--- /dev/null
++++ b/tests/b105_h7_watcher/test_b105.py
+@@ -0,0 +1,325 @@
++#!/usr/bin/env python3
++"""B105 (host): the watcher's gaps behind PRIVYHUB_H7=1, through the companion's real HTTP server on loopback.
++
++B103's harness reused (a child `python3 -I` on B82 / B83's fixture tree; `privyhub_service`'s handler on a
++ThreadingHTTPServer at 127.0.0.1:0; network beyond loopback blocked; B101's fake RetroArch with its command log; the
++fake picture source with B102's synthetic tallies — start 0-0, end_P1 1-0, end_P2 0-1, an unseen 1-1, fights; a spec
++learnt in the test with B104's tool). Cases: a start over a running watch → `replaced`, the second watch ends rightly;
++the load done but an unknown screen / a fight shown → `recognised` false within RECOGNISE_S (scaled down) and no
++`ended`; the start shown → true; load=0 → null, then true; `h7-stop` → idle, nothing sent to the game; `keep=1` writes
++the pictures and the index, absent writes none; `git check-ignore` for the keep folder's shape; an old-measure spec →
++`no_spec` with the plain line; `last` carries the thresholds and the spec's version; the flag absent / 0 → HEAD's
++answers byte for byte (h7-stop included). Temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/b105_h7_watcher -v
++"""
++from __future__ import annotations
++
++import csv
++import json
++import os
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "art_systems"))
++sys.path.insert(0, str(ROOT / "tests" / "b99_h7_live_read"))
++sys.path.insert(0, str(ROOT / "tests" / "b102_h7_endscreen"))
++sys.path.insert(0, str(ROOT / "tests" / "b103_h7_minigame"))
++sys.path.insert(0, str(ROOT / "tools"))
++import _tmp_cleanup  # noqa: E402,F401
++import test_b85 as b85  # noqa: E402
++import test_b99 as b99  # noqa: E402  (modules: their tests are not collected twice)
++import test_b103 as b103  # noqa: E402
++
++ON = {**b85.FLAGS, "PRIVYHUB_H7": "1"}
++BASELINE = "d61f9b56"                   # queue AN's baseline (H7-V2 committed): the companion before B105
++RECOGNISE_S = 1.6                       # the test's: 8 reads at 0.2 s (the hub's: 8 s at 1 s)
++
++SCENARIO = r'''
++import csv
++out = {"steps": {}}
++S = out["steps"]
++def stop():
++    return call("POST", "/plugins/games/h7-stop")
++def wait_for(pred, bound=20):
++    end = time.monotonic() + bound; b = result()
++    while time.monotonic() < end:
++        b = result()
++        if pred(b):
++            return b
++        time.sleep(0.03)
++    return dict(b, timeout=True)
++def rows():
++    log = root / "logs/games/h7_results.jsonl"
++    return [json.loads(l) for l in log.read_text().splitlines()] if log.is_file() else []
++S["launch"] = call("POST", f"/plugins/games/launch?id={args['id']}")["code"]
++time.sleep(0.3)
++if args["mode"] == "today":
++    S["get_after"] = call("GET", "/plugins/games/h7-result")
++    S["start_after"] = start()
++    S["start_keep"] = start("?keep=1")
++    S["stop_after"] = stop()
++else:
++    mini = g._h7_minigame_runner()
++    mini.picture = pic
++    mini.read_every = 0.2
++    mini.recognise_s = args["recognise_s"]
++    ra = fake["ra"]; ra.paused = False
++    stem = m._active_state_stem(); f = folder(); f.mkdir(parents=True, exist_ok=True)
++    Path(rules).mkdir(parents=True, exist_ok=True)
++    for name in os.listdir(args["spec_dir"]):
++        shutil.copyfile(Path(args["spec_dir"], name), Path(rules, name.replace("GAME", args["id"])))
++    Path(rules, args["id"] + ".state").write_text(json.dumps({"P1": 0, "P2": 0}))
++    keep_root = root / "runtime" / "h7_frames"
++    def folders():
++        return sorted(p.name for p in keep_root.iterdir()) if keep_root.is_dir() else []
++    S["stop_none"] = stop()
++    S["bad_keep_word"] = start("?keep=2")
++    # R1: a start over a running watch replaces it; the second watch ends rightly
++    pic.set(["start"] * 3 + ["other"] * 200)
++    n0 = len(ra.log); r0 = len(rows())
++    S["r1_first"] = start()
++    S["r1_mid"] = wait_for(lambda b: (b.get("reads") or 0) >= 5)
++    pic.set(["start"] * 3 + ["end_P2"] * 3 + ["other"] * 50)
++    S["r1_second"] = start()
++    S["r1"] = wait_for(lambda b: b.get("state") == "ended")
++    time.sleep(0.6)
++    S["r1_commands"] = ra.log[n0:]
++    S["r1_rows"] = rows()[r0:]
++    # R2: the load done, an unseen tally (1-1) shown: recognised false, never ended
++    for tag, tok in (("r2", "unknown"), ("r3", "other"), ("r3f", "fail")):
++        pic.set([tok] * 400)
++        r0 = len(rows())
++        S[tag + "_start"] = start()
++        S[tag + "_null"] = result()
++        S[tag] = wait_for(lambda b: b.get("recognised") is not None)
++        time.sleep(1.5)
++        S[tag + "_after"] = result()
++        S[tag + "_rows"] = rows()[r0:]
++    # R4: the start shown → true at the first read
++    pic.set(["start"] * 400)
++    S["r4_start"] = start()
++    S["r4"] = wait_for(lambda b: b.get("recognised") is not None)
++    # R5: load=0: null through a fight past RECOGNISE_S, then true once the start is read
++    pic.set(["other"] * 15 + ["start"] * 400)
++    S["r5_start"] = start("?load=0")
++    S["r5_past"] = wait_for(lambda b: (b.get("reads") or 0) >= 12)
++    S["r5"] = wait_for(lambda b: b.get("recognised") is not None)
++    # R6: stop → idle, nothing sent to the game after the call
++    n0 = len(ra.log); r0 = len(rows())
++    S["r6_stop"] = stop()
++    S["r6_idle"] = result()
++    time.sleep(1.0)
++    S["r6_later"] = result()
++    S["r6_commands"] = ra.log[n0:]
++    S["r6_stop_again"] = stop()
++    S["r6_rows"] = rows()[r0:]
++    # R7: keep=1 writes the pictures and the index; absent writes none
++    before = folders()
++    pic.set(["start"] * 3 + ["end_P1"] * 3 + ["other"] * 50)
++    S["r7_start"] = start("?keep=1")
++    S["r7"] = wait_for(lambda b: b.get("state") == "ended")
++    time.sleep(0.5)
++    made = [x for x in folders() if x not in before]
++    S["r7_folders"] = made
++    if made:
++        d = keep_root / made[0]
++        S["r7_files"] = sorted(p.name for p in d.iterdir())
++        with (d / "index.csv").open(newline="") as fh:
++            S["r7_index"] = list(csv.DictReader(fh))
++        S["r7_header"] = (d / "index.csv").read_text().splitlines()[0]
++    before = folders()
++    pic.set(["start"] * 3 + ["end_P2"] * 3 + ["other"] * 50)
++    S["r7b_start"] = start()
++    S["r7b"] = wait_for(lambda b: b.get("state") == "ended")
++    S["r7b_new_folders"] = [x for x in folders() if x not in before]
++    # R8: an old-measure spec (the ended watch stopped first: an ended watch is shown until the next start or stop)
++    S["r8_stop"] = stop()
++    js = Path(rules, args["id"] + ".endscreen.json")
++    old = json.loads(js.read_text()); old["version"] = 1; old.pop("measure", None)
++    js.write_text(json.dumps(old))
++    S["r8_get"] = result()
++    S["r8_start"] = start()
++    S["scratch_left"] = sorted(p.name for p in f.iterdir() if p.name.endswith(".state8"))
++    out["rows"] = rows()
++httpd.shutdown()
++print(json.dumps(out))
++'''
++
++
++def child() -> str:
++    """B103's harness (everything before its own steps) + B105's steps."""
++    head = b103.CHILD.split('out = {"steps": {}}')[0]
++    return head + SCENARIO
++
++
++def run(root: Path, env: dict, gid: str, mode: str) -> dict:
++    child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    child_env.update(env)
++    xdg = root / "xdg"
++    xdg.mkdir(exist_ok=True)
++    child_env.update({"XDG_CONFIG_HOME": str(xdg), "HOME": str(xdg), "PRIVYHUB_H7_RULES": str(root / "h7rules")})
++    (root / "tools").mkdir(exist_ok=True)
++    shutil.copyfile(ROOT / "tools" / "h7_endscreen.py", root / "tools" / "h7_endscreen.py")
++    work = Path(tempfile.mkdtemp(prefix="b105_fx_"))
++    frames, spec_dir, js = b103.fixtures(work)
++    js["arrays"] = f"{gid}.endscreen.npz"
++    (spec_dir / "GAME.endscreen.json").write_text(json.dumps(js))
++    r = subprocess.run([sys.executable, "-I", "-B", "-c", child(), str(root),
++                        json.dumps({"id": gid, "mode": mode, "p1": b99.P1, "p2": b99.P2, "frames": str(frames),
++                                    "spec_dir": str(spec_dir), "recognise_s": RECOGNISE_S})],
++                       cwd=root, env=child_env, capture_output=True, text=True, timeout=900)
++    shutil.rmtree(work, ignore_errors=True)
++    assert r.returncode == 0, r.stderr[-3000:]
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++def steps(rows, name):
++    return [r for r in rows if r["step"] == name]
++
++
++class Watcher(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b99.tree()
++        cls.gid = ids[b85.PS1_TITLE]
++        cls.out = run(root, ON, cls.gid, "on")
++        cls.s = cls.out["steps"]
++
++    def test_words(self):
++        self.assertEqual(self.s["stop_none"]["body"], {"ok": True, "watch": "none"})
++        self.assertEqual((self.s["bad_keep_word"]["code"], self.s["bad_keep_word"]["body"]["error"]),
++                         (400, "keep is 0 or 1"))
++
++    def test_a_start_over_a_running_watch_replaces_it(self):
++        s = self.s
++        self.assertEqual((s["r1_first"]["code"], s["r1_first"]["body"]["replaced"]), (200, False))
++        self.assertEqual((s["r1_mid"]["state"], s["r1_mid"]["class"]), ("watching", "other"))
++        self.assertEqual((s["r1_second"]["code"], s["r1_second"]["body"]["replaced"]), (200, True))
++        w = s["r1"]
++        self.assertEqual((w["state"], w["class"], w["reads"], w["recognised"]), ("ended", "end_P2", 6, True))
++        self.assertEqual(s["r1_commands"], ["LOAD_STATE_SLOT", "LOAD_STATE_SLOT"])          # the load again
++        rows = s["r1_rows"]
++        self.assertEqual(len(steps(rows, "replaced")), 1)
++        rep = steps(rows, "replaced")[0]
++        self.assertGreaterEqual(rep["reads"], 5)
++        after = rows[rows.index(rep) + 1:]
++        self.assertEqual([r["step"] for r in after if r["step"] in ("watching", "ended")], ["watching", "ended"])
++        self.assertEqual(steps(after, "ended")[0]["reads"], 6)                    # only the new watch's rows after
++        self.assertEqual(len(steps(rows, "watching")), 2)
++
++    def test_last_carries_the_thresholds_and_the_version(self):
++        last = self.s["r1"]["last"]
++        self.assertEqual(set(last), {"class", "distances", "margin", "thresholds", "spec_version"})
++        self.assertEqual(last["spec_version"], 2)
++        self.assertEqual(set(last["thresholds"]), {"screen", "classes", "margin_needed"})
++        self.assertIsNotNone(last["thresholds"]["screen"])
++
++    def test_an_unknown_screen_or_a_fight_after_the_load_is_not_recognised(self):
++        for tag, cls in (("r2", "unknown"), ("r3", "other")):
++            s = self.s
++            self.assertEqual(s[tag + "_start"]["code"], 200)
++            self.assertIsNone(s[tag + "_null"].get("recognised"))
++            w = s[tag]
++            self.assertIs(w["recognised"], False, w)
++            self.assertNotIn("timeout", w)
++            self.assertEqual(w["state"], "watching")
++            self.assertEqual(s[tag + "_after"]["state"], "watching")                # no ended, still not recognised
++            self.assertIs(s[tag + "_after"]["recognised"], False)
++            rec = steps(s[tag + "_rows"], "recognised")
++            self.assertEqual(len(rec), 1)
++            self.assertEqual((rec[0]["value"], rec[0]["class"]), (False, cls))
++            self.assertGreaterEqual(rec[0]["after_s"], RECOGNISE_S)
++            self.assertLess(rec[0]["after_s"], RECOGNISE_S + 0.6)                     # within the stated seconds
++            self.assertEqual(steps(s[tag + "_rows"], "ended"), [])
++
++    def test_pictures_that_cannot_be_read_after_the_load_are_not_recognised(self):
++        w = self.s["r3f"]
++        self.assertIs(w["recognised"], False, w)
++        self.assertEqual((w["state"], w["reads"]), ("watching", 0))
++        self.assertGreaterEqual(w["picture_failures"], 7)
++        rec = steps(self.s["r3f_rows"], "recognised")
++        self.assertEqual((len(rec), rec[0]["value"], rec[0]["class"]), (1, False, None))
++
++    def test_the_start_shown_is_recognised(self):
++        w = self.s["r4"]
++        self.assertIs(w["recognised"], True)
++        self.assertLessEqual(w["reads"], 2)
++
++    def test_load_0_stays_null_then_true(self):
++        self.assertIsNone(self.s["r5_past"]["recognised"])                          # past RECOGNISE_S: still null
++        self.assertGreaterEqual(self.s["r5_past"]["reads"], 12)
++        self.assertIs(self.s["r5"]["recognised"], True)
++
++    def test_stop_ends_the_watch_and_sends_nothing(self):
++        s = self.s
++        self.assertEqual((s["r6_stop"]["code"], s["r6_stop"]["body"]["watch"]), (200, "stopped"))
++        self.assertEqual(s["r6_idle"]["state"], "idle")
++        self.assertEqual(s["r6_later"]["state"], "idle")
++        self.assertEqual(s["r6_commands"], [])
++        self.assertEqual(s["r6_stop_again"]["body"], {"ok": True, "watch": "none"})
++        self.assertEqual([r["step"] for r in s["r6_rows"]], ["stopped_by_call"])
++
++    def test_keep_writes_the_pictures_and_the_index(self):
++        s = self.s
++        self.assertEqual(len(s["r7_folders"]), 1)
++        name = s["r7_folders"][0]
++        self.assertTrue(name.startswith(self.gid + "_"))
++        self.assertEqual(s["r7_start"]["body"]["keep"], name)
++        self.assertEqual((s["r7"]["state"], s["r7"]["class"]), ("ended", "end_P1"))
++        n = s["r7"]["reads"]
++        self.assertEqual(s["r7_header"], "seconds,utc,file,class,screen,margin,distances,keep_ms")
++        self.assertEqual(len(s["r7_index"]), n)
++        self.assertEqual(sorted(s["r7_files"]), sorted(["index.csv"] + [f"f{i:06d}.jpg" for i in range(1, n + 1)]))
++        self.assertEqual([r["class"] for r in s["r7_index"]][-3:], ["end_P1"] * 3)
++        self.assertEqual(json.loads(s["r7_index"][0]["distances"])["screen"], float(s["r7_index"][0]["screen"]))
++        self.assertEqual(s["r7"]["keep"], {"folder": name, "pictures": n})
++        self.assertEqual(s["r7b_new_folders"], [])                                  # absent: none
++        r = subprocess.run(["git", "-C", os.environ.get("H7_GIT_REPO") or str(ROOT), "check-ignore", "-q",
++                            f"runtime/h7_frames/{name}/f000001.jpg"], capture_output=True, timeout=60)
++        if r.returncode == 128:
++            self.skipTest("git is absent")
++        self.assertEqual(r.returncode, 0)                                           # git-ignored on the repo
++
++    def test_an_old_measure_spec(self):
++        line = "this end-screen spec was learnt with the old measure (absolute grey levels): learn it again"
++        self.assertEqual((self.s["r8_get"]["state"], self.s["r8_get"]["why"]), ("no_spec", line))
++        self.assertEqual((self.s["r8_start"]["code"], self.s["r8_start"]["body"]["error"]), (400, line))
++
++    def test_no_scratch_left(self):
++        self.assertEqual(self.s["scratch_left"], [])
++
++
++class FlagAbsentIsToday(unittest.TestCase):
++    def test_absent_and_zero_answer_as_heads_code(self):
++        old = b99.BASELINE
++        b99.BASELINE = BASELINE
++        try:
++            code = b99.head_code()
++        finally:
++            b99.BASELINE = old
++        if code is None:
++            self.skipTest("git is absent")
++        root, ids = b99.tree(code)
++        gid = ids[b85.PS1_TITLE]
++        base = run(root, b85.FLAGS, gid, "today")
++        keys = ("get_after", "start_after", "start_keep", "stop_after")
++        for env in (b85.FLAGS, {**b85.FLAGS, "PRIVYHUB_H7": "0"}):
++            root2, _ = b99.tree()
++            mine = run(root2, env, gid, "today")
++            for k in keys:
++                self.assertEqual((mine["steps"][k]["code"], mine["steps"][k]["raw"]),
++                                 (base["steps"][k]["code"], base["steps"][k]["raw"]), k)
++            self.assertEqual(mine["steps"]["launch"], base["steps"]["launch"])
++        self.assertEqual(base["steps"]["stop_after"]["body"]["error"], "Unknown Games plugin POST action: h7-stop")
++        self.assertEqual(base["steps"]["get_after"]["body"]["error"], "Unknown Games plugin action: h7-result")
++
++
++if __name__ == "__main__":
++    unittest.main()

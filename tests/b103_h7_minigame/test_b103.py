@@ -237,6 +237,7 @@ else:
     pic.set(["start"] * 3 + ["unknown"] * 8 + ["end_P1"] * 3 + ["end_P2"] * 20)
     S["w3_start"] = start("?load=0")
     S["w3_mid_timeline"], S["w3_mid"] = timeline(until=(), stop_at_reads=9)
+    pic.set(["start"] * 3 + ["end_P1"] * 3 + ["end_P2"] * 20)          # B105: the replacing watch's pictures
     S["w3_second"] = start("?load=0")
     S["w3_timeline"], S["w3"] = timeline()
     # W4: a failed picture is a row and the watch goes on
@@ -360,13 +361,14 @@ class MiniGame(unittest.TestCase):
         st = self.s["w1_start"]["body"]
         self.assertEqual((st["watch"], st["loaded"], st["game"]), ("started", True, self.gid))
         self.assertIsNotNone(st["load_line_ms"])
-        self.assertEqual(self.err(self.s["w1_second"]), (400, "a mini game is already being watched"))
+        # B105 (queue AN): a start while a watch is on replaces it (was B103's refusal)
+        self.assertEqual((self.s["w1_second"]["code"], self.s["w1_second"]["body"].get("replaced")), (200, True))
         w = self.s["w1"]
         self.assertEqual((w["state"], w["class"], w["seen_start"]), ("ended", "end_P1", True))
         self.assertEqual(w["reads"], 13)                                   # 2 + 5 + 2 + 1 + the third end read
         self.assertIn("ended_after_s", w)
         self.assertIn("since_s", w)
-        self.assertEqual(set(w["last"]), {"distances", "margin"})
+        self.assertLessEqual({"distances", "margin"}, set(w["last"]))        # B105 adds class, thresholds, version
         ended_at = first(self.s["w1_timeline"], "ended")
         self.assertEqual(ended_at[0], 13)
         self.assertTrue(all(t[1] == "watching" for t in self.s["w1_timeline"] if (t[0] or 0) < 13))
@@ -375,7 +377,7 @@ class MiniGame(unittest.TestCase):
         self.assertEqual(self.s["w1_after"]["state"], "ended")
 
     def test_no_command_to_the_game_beyond_the_load(self):
-        self.assertEqual(self.s["w1_commands"], ["LOAD_STATE_SLOT"])
+        self.assertEqual(self.s["w1_commands"], ["LOAD_STATE_SLOT", "LOAD_STATE_SLOT"])   # B105: the replace loads again
         self.assertEqual(self.s["w1_mem"], [0, 0])                         # the state's own values: the load took
         self.assertEqual(self.s["w2_commands"], [])
         self.assertEqual(self.s["w5_commands"], [])
@@ -391,10 +393,11 @@ class MiniGame(unittest.TestCase):
     def test_an_unknown_screen_is_said_never_ended(self):
         mid = self.s["w3_mid"]
         self.assertEqual((mid["state"], mid["class"]), ("watching", "unknown"))
-        self.assertEqual(self.err(self.s["w3_second"]), (400, "a mini game is already being watched"))
-        self.assertTrue(all(t[1] == "watching" for t in self.s["w3_timeline"] if (t[0] or 0) < 14))
+        # B105 (queue AN): the second start replaces the watch (was refused); the new watch sees the start, then 1-0
+        self.assertEqual((self.s["w3_second"]["code"], self.s["w3_second"]["body"].get("replaced")), (200, True))
+        self.assertTrue(all(t[1] == "watching" for t in self.s["w3_timeline"] if (t[0] or 0) < 6))
         self.assertIn("unknown", [t[2] for t in self.s["w3_mid_timeline"] + self.s["w3_timeline"]])
-        self.assertEqual((self.s["w3"]["state"], self.s["w3"]["class"], self.s["w3"]["reads"]), ("ended", "end_P1", 14))
+        self.assertEqual((self.s["w3"]["state"], self.s["w3"]["class"], self.s["w3"]["reads"]), ("ended", "end_P1", 6))
 
     def test_a_failed_picture_is_a_row_and_the_watch_goes_on(self):
         w = self.s["w4"]

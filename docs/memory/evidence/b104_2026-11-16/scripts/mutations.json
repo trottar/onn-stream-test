@@ -1,0 +1,107 @@
+[
+ {
+  "id": "M1",
+  "file": "tools/h7_endscreen.py",
+  "old": "    t = max(1, int(round(TOL * spread * QUANT)))",
+  "new": "    t = 0",
+  "why": "ranks without the contrast tolerance (amendment 1)"
+ },
+ {
+  "id": "M2",
+  "file": "tools/h7_endscreen.py",
+  "old": "    if spread < FLAT:\n        return np.zeros(a.shape, dtype=np.float32), True",
+  "new": "    if spread < -1:\n        return np.zeros(a.shape, dtype=np.float32), True",
+  "why": "a flat picture ranked as if it had a tone"
+ },
+ {
+  "id": "M3",
+  "file": "tools/h7_endscreen.py",
+  "old": "    floor = int(a.min()) + BAR_MAX",
+  "new": "    floor = BAR_MAX",
+  "why": "bars at a fixed black again (amendment 4)"
+ },
+ {
+  "id": "M4",
+  "file": "tools/h7_endscreen.py",
+  "old": "    bx = min(_lead(cols), _lead(cols[::-1]))",
+  "new": "    bx = max(_lead(cols), _lead(cols[::-1]))",
+  "why": "a one-sided dark edge taken for a bar"
+ },
+ {
+  "id": "M5",
+  "file": "tools/h7_endscreen.py",
+  "old": "    if sy > sx and sy >= BAR_SHARE and h - 2 * by >= h / 2:",
+  "new": "    if sy > sx and sy >= 0 and h - 2 * by >= h / 2:",
+  "why": "a game's own thin border cut"
+ },
+ {
+  "id": "M6",
+  "file": "tools/h7_endscreen.py",
+  "old": "    if spec.get(\"version\") == 1:\n        raise ValueError(OLD_MEASURE)",
+  "new": "    if spec.get(\"version\") == 1:\n        spec[\"version\"], spec[\"measure\"] = VERSION, MEASURE",
+  "why": "an old-measure spec read as a new one"
+ },
+ {
+  "id": "M7",
+  "file": "tools/h7_endscreen.py",
+  "old": "    ids = {c: np.asarray(frame_sources[c] if frame_sources else",
+  "new": "    ids = {c: np.asarray(frame_sources[c] if False else",
+  "why": "pairs never seen in one source make the outcome mask (amendment 3)"
+ },
+ {
+  "id": "M8",
+  "file": "tools/h7_endscreen.py",
+  "old": "    outcome_mask = (apart > DIFFER_R) & (apart > SEP * spread)",
+  "new": "    outcome_mask = (apart > DIFFER_R) & (apart > 0 * spread)",
+  "why": "no steadiness against the separation"
+ },
+ {
+  "id": "M9",
+  "file": "tools/h7_endscreen.py",
+  "old": "        own = [float(dd[i]) for dd in dists[c] if int(np.argmin(dd)) == i]     # amendment 3: like their label",
+  "new": "        own = [float(dd[i]) for dd in dists[c]]",
+  "why": "a frame unlike its label sets its class's threshold"
+ },
+ {
+  "id": "M10",
+  "file": "tools/h7_endscreen.py",
+  "old": "    ok = gap > 0 and gap >= min_gap",
+  "new": "    ok = gap > 0",
+  "why": "no minimum gap"
+ },
+ {
+  "id": "M11",
+  "file": "tools/h7_endscreen.py",
+  "old": "                if d <= thr and mean < self._fit(a)[1]:                       # amendment 2: the mean decides",
+  "new": "                if d <= thr and d < sd:",
+  "why": "the search decided by the median (amendment 2)"
+ },
+ {
+  "id": "M12",
+  "file": "tools/h7_endscreen.py",
+  "old": "    own_screen = max(d for c in screens for d, ok in zip(sd(c), like[c]) if ok) \\",
+  "new": "    own_screen = max(d for c in screens for d, ok in zip(sd(c), like[c]) if True) \\",
+  "why": "a frame unlike its label sets the screen's threshold (amendment 4)"
+ },
+ {
+  "id": "M13",
+  "file": "tools/h7_endscreen.py",
+  "old": "    return float(np.median(np.abs(r[mask] - sref)))",
+  "new": "    return float(np.mean(np.abs(r[mask] - sref)))",
+  "why": "the screen distance a mean, not B102's median"
+ },
+ {
+  "id": "M14",
+  "file": "tools/h7_endscreen.py",
+  "old": "            e[\"after_end_screen_s\"] = round(e[\"seconds\"] - before[-1], 2) if before else None",
+  "new": "            e[\"after_end_screen_s\"] = round(e[\"seconds\"] - before[0], 2) if before else None",
+  "why": "replay set against the wrong end-screen arrival"
+ },
+ {
+  "id": "M15",
+  "file": "tools/h7_endscreen.py",
+  "old": "            ended = Ended(spec, k)\n    arrivals",
+  "new": "            pass\n    arrivals",
+  "why": "replay not re-armed after an end"
+ }
+]
