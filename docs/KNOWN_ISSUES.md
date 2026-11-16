@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-16 — PP-H3 (PrivyParty steps 3-4: a mini game on the emulator from inside the board, B110 / B111 / B112 behind PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 for the task only): **NOT MET** — part 1 on the bench fully met (both kept end states → [1, 0] / [0, 1], the board back each time, its script's draw, F10 quit); in the sitting match 1 was right end to end (the hub end_P1 [1, 0], the board credited player 1, the user agreed) but **the hand-back found the stream down** (the title's stop took it; the recovery brought the board back after ~7 s with an Escape pause / resume to the board and a step to 5,000 kbit/s), and **match 2's start deadlocked the companion** (a lock held between the pads' route and the stream switch; every route timed out; the title stood paused; the onn showed no END) — closed by F10 to the board and the companion's restart (RetroArch SIGKILLed); nothing of the user's touched — OPEN (B: the deadlock, the hand-back's order, a back-to-back test through a live stream; the onn's END while a mini game is stuck; the board at a full core behind the title) — `## 2026-11-16 PP-H3` below
 - 2026-11-16 — Queue AP (PrivyParty steps 3 and 4 behind the bench flags: B110 the hub's mini-game session, B111 the board's hub mini game, B112 a bench way with no client, B113 A's PP-H3 sketched): the board reaches a mini game → the hub runs the emulator title beside it, the seats' pads on ports 1-2, the onn's stream switched to it by a capture restart (session kept; the last frame held ~1-2 s, not yet seen on the onn) → the end screen read → the scores in the seats' order back to the board → everything handed back; the board's script swallows the pads while it waits; a bench release / watch with no stream for loopback only — OPEN (A's PP-H3: part 1 on the bench, then the sitting; the picture's hand-over time on the onn; three joins for the user — the onn's, the board's, the title's select; the PC side to commit the board's two new files) — `docs/memory/evidence/B110_PARTY_MINIGAME_SESSION_2026-11-16.md`, `B111_PARTY_BOARD_ADAPTER_2026-11-16.md`, `B112_NO_CLIENT_BENCH_2026-11-16.md`, `docs/memory/handoffs/SESSION_B_DONE_2026-11-16AP.md`
 - 2026-11-16 — PP-H2 (PrivyParty on the hub, step 2: the board game streamed to the onn with the user's pads, B108's launch behind PRIVYHUB_PARTY=1 for the sitting only): **MET** — the board's checks 25 of 25 on the hub (step 19 fixed on the PC side); the hub's own launch: fullscreen 1920 × 1080 window, one sound stream by pid, pads P1-P4, F10 → exit 0; the user started it from the onn, each pad drove its own figure, Home / RESUME paused and resumed (Esc), END quit (F10, exit 0), under Compatibility and Mobile; the stream 59.6-59.8 fps, bitrate never acted, no stall; sound flowing; nothing of the user's touched — OPEN (step 3 the adapter mini game; step 4 the stream switched between the board and the emulator; four pads for the board; SAVE / LOAD / Cheats / Mods shown but refused for the board; the onn's join asked again after every RESUME) — `## 2026-11-16 PP-H2` below
 - 2026-11-16 — Queue AO (PrivyParty on the hub: B107 step 19's numbers, B108 the board as a launch behind PRIVYHUB_PARTY=1, B109 A's PP-H2 sketched): step 19 on the hub — the committed body model's Hips piece counts front 9, sides 4, back 18 (the bar: more than four) in every import and read raw with no import, the fifth side corner 0.089 short — the file, not the hub; the board as a game entry the onn starts as it is (no APK change), fullscreen by Godot's own switch, its window / sound by pid, the pads made first, Home / RESUME by its own pause key, SAVE / LOAD refused plainly, END by its quit key (F10) with SIGTERM only after 8 s with no exit — OPEN (the PC side: compare its body model's sha256; A's PP-H2 at the TV; not seen yet: fullscreen over the panel, its sound stream, SDL's pad order, the keys reaching the fullscreen window; the onn's join closes at two pads for the board) — `docs/memory/evidence/B107_PP_STEP19_NUMBERS_2026-11-16.md`, `B108_PARTY_LAUNCH_2026-11-16.md`, `docs/memory/handoffs/SESSION_B_DONE_2026-11-16AO.md`
@@ -96,6 +97,27 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-16 PP-H3: a mini game from inside the board — NOT MET; match 1 right, its hand-back by the recovery, match 2 hung the companion
+
+(`docs/memory/evidence/PP_H3_2026-11-16.md`, `docs/memory/evidence/pph3_2026-11-16/`)
+
+- **Seen:** part 1 on the bench fully met. In the sitting the board drew its hub mini game; the TV changed to T88 in
+  3.6 s on the host (three short client stalls the recovery caught); the hub said `end_P1` [1, 0]; the board's log
+  credited seats 1,2; the user agreed. **The hand-back:** `minigame_stream` "switched": false, "the stream is not up" —
+  the title's stop had taken the stream down; the onn's open session stalled; the recovery paused the board (Escape),
+  held 5 s, restarted the encoder on it and resumed it (Escape) — the board back ~7.2 s after `ended`; the bitrate's
+  recovery escalation stepped to 5,000. **Match 2:** `minigame_start` → launch → route (20:29:19Z) → nothing; every route
+  timed out (208 of 214 threads waiting on a lock); the title stood at its launch's pause; the onn's Home bar offered no
+  END; the user left from the onn's top bar; the recovery gave up at 20:31:20Z (its save refused for the board).
+- **The close:** F10 to the board → exit 0 (a zombie of the stuck companion); RetroArch ignored two `QUIT`s; the
+  companion's restart ended it and the encoders with SIGKILL at the 20-s stop timeout. Eighteen lines; the saves,
+  pictures and the board's repo unchanged; `launch_orphaned` unchanged.
+- **Also:** while the title plays the board keeps drawing at ~98 % of a core; the board's two new files were committed
+  without their `.gd.uid` files (none appeared).
+- **OPEN (B):** the start's lock (deadlock on a second mini game — the first hand-back had gone through the recovery);
+  the hand-back's order (switch the stream to the board before stopping the title); a test of two mini games back to
+  back through a live stream; the onn's END while a mini game is stuck; then PP-H3's sitting again.
 
 ## 2026-11-16 PP-H2: PrivyParty on the hub, step 2 — MET; the board streamed to the onn with the user's pads; the flag off
 

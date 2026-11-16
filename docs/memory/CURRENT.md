@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **PP-H2 MET** (`evidence/PP_H2_2026-11-16.md`): the board streamed to the onn, each pad its own figure, Home /
-  RESUME / END clean, 60 fps, checks 25 / 25. Flag off; eighteen lines.
+- **PP-H3 NOT MET** (`evidence/PP_H3_2026-11-16.md`): part 1 met; match 1 right, its hand-back by the recovery;
+  match 2's start deadlocked the companion. Flags off; eighteen lines. PP-H2 MET.
 
 ## Verified State
 
@@ -87,8 +87,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — PrivyParty step 3's design (Cowork's):** the adapter mini game behind `play(players) -> scores`
-   calling `h7-start` / `h7-result`. Beside it: B's no-client watcher; four pads for the board.
+1. **H7 — Cowork's next step for PrivyParty** after PP-H3: B's fixes (the mini game start's deadlock, the hand-back
+   order, a back-to-back test through a live stream), then PP-H3's sitting again. Beside it: B's no-client watcher.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
