@@ -1,0 +1,5 @@
+B116 mutations of minigames/hub_minigame.gd (scratch copy), Godot headless, 2026-11-16T21:19:43Z
+nocap:   FAIL: while it waits the board draws at most 10 frames a second   FAIL: a capped board waits at 10 too   FAIL: the gate torn down mid-wait puts the board's own frame rate back at once HUB MINIGAME CHECK: FAIL (3 of 34 assertions) 
+norestore:   FAIL: its own frame rate is back before the hub is told the end   FAIL: after a result the board's own frame rate (no cap) is back (got 10, wanted 0)   FAIL: after a give-up the board's own cap (144) is back (got 10, wanted 144)   FAIL: after the hub stopped answering the board's own frame rate is back (got 10, wanted 0)   FAIL: the gate torn down mid-wait puts the board's own frame rate back at once   FAIL: and it stays back after the wait (got 10, wanted 0) HUB MINIGAME CHECK: FAIL (6 of 34 assertions) 
+noearly:   FAIL: its own frame rate is back before the hub is told the end HUB MINIGAME CHECK: FAIL (1 of 34 assertions) 
+restored: same

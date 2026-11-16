@@ -1,0 +1,178 @@
+diff --git a/checks/hub_minigame_check.gd b/checks/hub_minigame_check.gd
+index 966ec0e..e921945 100644
+--- a/checks/hub_minigame_check.gd
++++ b/checks/hub_minigame_check.gd
+@@ -15,6 +15,10 @@ extends SceneTree
+ ##     many players, or not being there at all is a draw (everyone the same)
+ ##   - the mini game is ended on the hub whenever it was started
+ ##   - while it waits the board's controls see no pad; afterwards they do
++##   - while it waits the board draws at most IDLE_FPS frames a second, and its
++##     own frame rate is back before the hub is told the end and after every
++##     way the wait ends (a result, a give-up, the hub silent, the gate torn
++##     down); with no wait (a refusal, no hub) it is never changed
+ ##   - it fits the registry's contract and the picker can offer it for two
+ ## Exit code 0 = PASS, 1 = FAIL.
+ 
+@@ -27,6 +31,8 @@ var _server := TCPServer.new()
+ var _port := 0
+ var _calls: Array[String] = []    # every path the stand-in hub was asked, in order
+ var _polls := {}                  # scenario -> result calls so far
++var _fps_polls := {}              # scenario -> Engine.max_fps at each result call (the board waiting)
++var _fps_at_end := {}             # scenario -> Engine.max_fps when the end was asked
+ 
+ 
+ class Witness extends Node:  # stands where the board's controls stand: sees what reaches them
+@@ -72,7 +78,12 @@ func _run() -> void:
+ 
+ 	var two := [{"index": 0, "name": "A", "coins": 0}, {"index": 1, "name": "B", "coins": 0}]
+ 	controls.players = ["pad0", "pad1"]
++	var idle: int = HubMinigame.IDLE_FPS
++	Engine.max_fps = 0  # the board's own: no cap
+ 	_same(await _play(stage, base, "win1", two), [1, 0], "player 1's win comes back as the hub's scores")
++	_expect_fps(_all_are(_fps_polls.get("win1", []), idle), "while it waits the board draws at most %d frames a second" % idle)
++	_expect_fps(_fps_at_end.get("win1", -1) == 0, "its own frame rate is back before the hub is told the end")
++	_same(Engine.max_fps, 0, "after a result the board's own frame rate (no cap) is back")
+ 	_expect_asked(_asked("win1", "party-minigame-start?id=mg_one&seats=1,2"), "the seats in the order of the players given")
+ 	_expect_asked(_asked("win1", "party-minigame-end"), "the mini game ended on the hub")
+ 	_same(await _play(stage, base, "win2", two), [0, 1], "player 2's win comes back as the hub's scores")
+@@ -98,12 +109,36 @@ func _run() -> void:
+ 	_same(witness.pads, 1, "afterwards they do")
+ 	_expect(not root.get_children().any(func(n): return n is HubMinigame.PadGate), "the gate is gone")
+ 
++	Engine.max_fps = 144  # a board with a cap of its own
+ 	_same(await _play(stage, base, "giveup", two), [0, 0], "a give-up is a draw")
+ 	_expect_asked(_asked("giveup", "party-minigame-end"), "a given-up mini game is ended on the hub too")
++	_expect_fps(_all_are(_fps_polls.get("giveup", []), idle), "a capped board waits at %d too" % idle)
++	_same(Engine.max_fps, 144, "after a give-up the board's own cap (144) is back")
++	Engine.max_fps = 0
++	_same(await _play(stage, base, "silent", two), [0, 0], "the hub not answering is a draw")
++	_same(Engine.max_fps, 0, "after the hub stopped answering the board's own frame rate is back")
++	var torn := [-1, -1]
++	var tear := func():
++		await create_timer(1.5).timeout
++		torn[0] = Engine.max_fps
++		for n in root.get_children():
++			if n is HubMinigame.PadGate:
++				root.remove_child(n)  # the scene going while it waits
++		torn[1] = Engine.max_fps
++	tear.call()
++	_same(await _play(stage, base, "teardown", two), [1, 0], "a wait whose gate was torn down still comes back")
++	_expect_fps(torn[0] == idle and torn[1] == 0, "the gate torn down mid-wait puts the board's own frame rate back at once")
++	_same(Engine.max_fps, 0, "and it stays back after the wait")
++	Engine.max_fps = 5  # a board capped lower than the wait's cap keeps its own
++	_same(await _play(stage, base, "win2", two), [0, 1], "a board capped at 5 still plays")
++	_expect_fps(_all_are(_fps_polls.get("win2", []).slice(-1), 5), "a lower cap of the board's own is kept while it waits")
++	_same(Engine.max_fps, 5, "and is its own after")
++	Engine.max_fps = 0
+ 	_same(await _play(stage, base, "refused", two), [0, 0], "a refusal is a draw")
+ 	_expect_asked(not _asked("refused", "party-minigame-end"), "a refused mini game is not ended (it never started)")
+ 	_same(await _play(stage, base, "four", two), [0, 0], "no mini game for this many players is a draw")
+ 	_same(await _play(stage, "http://127.0.0.1:9", "nohub", two), [0, 0], "no hub is a draw")
++	_same(Engine.max_fps, 0, "with no wait (a refusal, none for the players, no hub) the frame rate is never changed")
+ 
+ 	var script: Script = load("res://minigames/hub_minigame.gd")
+ 	var constants: Dictionary = script.get_script_constant_map()
+@@ -154,6 +189,16 @@ func _expect_asked(condition: bool, what: String) -> void:
+ 		_expect(condition, what)
+ 
+ 
++## The frame rate seen by the stand-in hub (its own records): with an outside hub, left to that hub.
++func _expect_fps(condition: bool, what: String) -> void:
++	if _port != 0:
++		_expect(condition, what)
++
++
++func _all_are(values: Array, value: int) -> bool:
++	return not values.is_empty() and values.all(func(v): return int(v) == value)
++
++
+ # --- the stand-in hub -----------------------------------------------------------
+ 
+ func _serve() -> void:
+@@ -192,15 +237,22 @@ func _answer(peer: StreamPeerTCP) -> void:
+ 				body["state"] = "starting"
+ 		"party-minigame-result":
+ 			_polls[scenario] = int(_polls.get(scenario, 0)) + 1
++			if not _fps_polls.has(scenario):
++				_fps_polls[scenario] = []
++			_fps_polls[scenario].append(Engine.max_fps)
+ 			var n: int = _polls[scenario]
+-			var needed := 3 if scenario == "slow" else 1
+-			if n <= needed:
++			var needed := 3 if scenario in ["slow", "teardown"] else 1
++			if scenario == "silent":
++				code = 500
++				body = {"ok": false, "error": "the hub is busy"}
++			elif n <= needed:
+ 				body.merge({"state": "playing", "recognised": true})
+ 			elif scenario == "giveup":
+ 				body.merge({"state": "given_up", "why": "no end within 900 s", "scores": null})
+ 			else:
+ 				body.merge({"state": "ended", "class": "end_P1", "scores": [0, 1] if scenario in ["win2", "slow"] else [1, 0]})
+ 		"party-minigame-end":
++			_fps_at_end[scenario] = Engine.max_fps
+ 			body["ended"] = true
+ 		_:
+ 			code = 404
+diff --git a/minigames/hub_minigame.gd b/minigames/hub_minigame.gd
+index aa82042..927cb5c 100644
+--- a/minigames/hub_minigame.gd
++++ b/minigames/hub_minigame.gd
+@@ -11,7 +11,9 @@ extends "res://rules/minigame.gd"
+ ## of its own swallows joypad input; keys still work, so the hub can still
+ ## close the board). Anything that goes wrong is a draw: no hub, no mini game
+ ## for this many players, a refusal, a give-up — one plain line in the log.
+-## It only awaits; it never holds the board's frame.
++## It only awaits; it never holds the board's frame. While it waits the board
++## draws at most IDLE_FPS frames a second (nobody sees it: the TV shows the
++## hub's game), and its own frame rate is back as soon as the wait ends.
+ 
+ const ID := "hub"
+ const TITLE := "On the hub"
+@@ -29,6 +31,8 @@ const REQUEST_SECONDS := 10.0
+ ## The hub gives a mini game up after 15 minutes; this is the board's own bound.
+ const LIMIT_SECONDS := 1200.0
+ const MISSED_POLLS := 10
++## The board's frame cap while the hub's game is on the TV (Engine.max_fps).
++const IDLE_FPS := 10
+ 
+ var stage: Node
+ 
+@@ -37,10 +41,29 @@ static var _played := 0
+ 
+ ## Swallows joypad input while a mini game plays on the hub: the last node in
+ ## the tree gets input first, so the board's controls never see the pads.
++## While it is in the tree the board draws at most IDLE_FPS frames a second;
++## the board's own cap comes back with restore(), or when the gate leaves the
++## tree however that happens (the end, the board quitting, the scene going).
+ class PadGate extends Node:
++	var _own_fps := -1
++
++	func _enter_tree() -> void:
++		if _own_fps < 0:
++			_own_fps = Engine.max_fps
++			if _own_fps == 0 or _own_fps > IDLE_FPS:  # 0 is no cap; a lower cap of the board's own stays
++				Engine.max_fps = IDLE_FPS
++
+ 	func _ready() -> void:
+ 		process_mode = Node.PROCESS_MODE_ALWAYS
+ 
++	func _exit_tree() -> void:
++		restore()
++
++	func restore() -> void:
++		if _own_fps >= 0:
++			Engine.max_fps = _own_fps
++			_own_fps = -1
++
+ 	func _input(event: InputEvent) -> void:
+ 		if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+ 			get_viewport().set_input_as_handled()
+@@ -105,6 +128,7 @@ func play(players: Array) -> Array:
+ 		if waited >= LIMIT_SECONDS:
+ 			why = "no result within %d s" % int(LIMIT_SECONDS)
+ 			break
++	gate.restore()  # the board's own frame rate before the hub hands the TV back
+ 	await _call(tree, "POST", hub + END)
+ 	if gate.get_parent() != null:
+ 		gate.get_parent().remove_child(gate)

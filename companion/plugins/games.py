@@ -3372,6 +3372,13 @@ class GamesPlugin:
             keep_blank_values=False,
         )
 
+        # B114: with a party mini game on, status answers within 2 s (the last good answer if it cannot be read now)
+        if (_party_minigame is not None and action in ("status", "native-stream-status")
+                and getattr(self, "_party_minigame_obj", None) is not None and not _party_minigame.inside()):
+            read = self._party_minigame_obj.bounded_read(action, lambda: self.handle(action, raw_query))
+            if read is not None:
+                return read
+
         if action == "systems":
             return self.systems()
 
@@ -3664,6 +3671,13 @@ class GamesPlugin:
             raw_query,
             keep_blank_values=False,
         )
+
+        # B114: with a party mini game on, Home / RESUME / END are taken at once onto its queue, acted on in order
+        if (_party_minigame is not None and action in _party_minigame.TAKEN
+                and getattr(self, "_party_minigame_obj", None) is not None and not _party_minigame.inside()):
+            taken = self._party_minigame_obj.take(action, lambda: self.handle_post_request(action, raw_query, client_ip))
+            if taken is not None:
+                return taken
 
         # PRIVYHUB_A7_PATCH_11_A7_4_SOFTPATCH_MODS_ADB_FIX API
         if action == "mod-catalog":
@@ -4115,10 +4129,13 @@ class GamesPlugin:
                 -1,
             )
 
-            self._recovery.note_client_desync(
-                reason,
-                float(age_ms),
-            )
+            # B115: a party mini game's planned switch: the client's desync accepted, not acted on
+            planned = getattr(self._recovery, "_planned_switch", None) if _party_minigame is not None else None
+            if planned is None or not planned.swallow("desync"):
+                self._recovery.note_client_desync(
+                    reason,
+                    float(age_ms),
+                )
 
             return {
                 "ok": True,

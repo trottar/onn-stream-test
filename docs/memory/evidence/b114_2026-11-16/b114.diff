@@ -1,0 +1,1375 @@
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 22fdd7a..c26d96c 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -7,27 +7,40 @@ the rules folder, B103 / B105): `plugins/games.py` imports this module then; eit
+   GET  party-minigames            the titles whose rules folder holds a version-2 spec, a kept begin state and a
+                                   sidecar <game id>.party.json ({"players": n, "scores": {end class: [n numbers]}});
+                                   ids opaque to the board
+-  POST party-minigame-start       ?id=<token>&seats=a,b — answers at once ("starting"); a worker: the board's session
+-                                  set aside (it keeps running), the title launched by the manager, paused, the pads
+-                                  routed (seat a's pad → port 1 …), the stream switched to the title (if up), B103's
+-                                  start (the begin state, the watch), the pause released → "playing"
++  POST party-minigame-start       ?id=<token>&seats=a,b — answers at once ("starting"); the mini game's own actor: the
++                                  board's session set aside (it keeps running), the title launched by the manager,
++                                  paused, the pads routed (seat a's pad → port 1 …), the stream switched to the title
++                                  (if up), B103's start (the begin state, the watch), the pause released → "playing"
+   GET  party-minigame-result      starting / playing (recognised) / ended (class, scores in the order of the seats
+                                   given) / given_up (why) — never a guess
+-  POST party-minigame-end         the watch stopped, the title stopped, the route cleared, the board's session back,
+-                                  the stream switched back (if up); safe to call twice; also done by the hub itself
+-                                  when the board dies, END / another launch reach stop, or the caller does not come back
++  POST party-minigame-end         taken at once; the actor: the watch stopped, the title stopped, the route cleared,
++                                  the board's session back, the stream switched back (if up); safe to call twice;
++                                  also done by the hub itself when the board dies, END / another launch reach stop,
++                                  the caller does not come back, or the start is stuck
++
++B114 (the hang PP-H3's second mini game hit): **no lock is held across a launch, a stream start or stop, or a wait on
++another thread.** The start held the manager's lock across the stream switch, whose end waited on the live bitrate
++controller's lock, held by a client-health report waiting on the manager's lock. Now each manager call takes the
++manager's lock for that call only; the stream switch runs on a helper thread with nothing held and is waited for at
++most SWITCH_LIMIT_S; the layer's own lock guards its fields only. While a mini game is on, **every route answers
++within 2 s**: `status` / `native-stream-status` from a snapshot when a part cannot be read at once, the result from
++the mini game's own state, Home / RESUME / END and the board's end **taken at once** onto the mini game's own queue
++and **acted on in order** by its actor (RESUME answers with its own start's answer, which the onn needs). A start
++still `starting` after START_LIMIT_S is given up by the hub; END always works — if the actor is stuck in a step past
++STEP_GRACE_S the end runs without it.
+ 
+ One row per step in the party log (logs/games/party.jsonl), field names and numbers only.
+ """
+ from __future__ import annotations
+ 
++import collections
+ import hashlib
+ import json
+ import os
+ import threading
+ import time
+ from pathlib import Path
+-from typing import Any
++from typing import Any, Callable
+ 
+ import h7_live_read as live
+ import party_session as party
+@@ -38,6 +51,29 @@ POLL_GONE_S = 120.0         # no result call this long while playing: the caller
+ END_WAIT_S = 60.0           # no end call this long after a final state: the hub ends it
+ TICK = 0.5
+ FINAL = ("ended", "given_up")
++# B114
++START_LIMIT_S = 30.0        # a mini game still starting after this is given up by the hub (a normal start ~5 s)
++SWITCH_LIMIT_S = 15.0       # one stream switch's bound (the real one ~1-4 s)
++STEP_GRACE_S = 3.0          # END waits this long for the actor to take it before the end runs without the actor
++TAKE_WAIT_S = 1.5           # a taken Home / END / board end answers with its own answer if done within this
++RESUME_WAIT_S = 25.0        # a taken RESUME waits its turn this long (the onn's read timeout is 30 s)
++READ_WAIT_S = 1.5           # a status read waits this long before the last snapshot answers
++EMU_TRY_S = 0.2             # the manager's lock is tried in steps of this, an END checked between
++MANAGER_BOUND_S = 10.0      # the end's manager calls: give up the wait after this (the title then ended directly)
++# the onn's calls taken while a mini game is on (route → kind)
++TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
++         "stop": "end"}
++
++_local = threading.local()
++
++
++def inside() -> bool:
++    """True on the mini game's own threads running a taken call or a bounded read (they take today's path)."""
++    return bool(getattr(_local, "inside", False))
++
++
++class _Abort(Exception):
++    """The start's steps stop: an end was asked for (or done) while starting."""
+ 
+ 
+ class PartyMinigames:
+@@ -47,11 +83,14 @@ class PartyMinigames:
+         self.environ = environ
+         self.clock = clock
+         self._salt = os.urandom(8)
+-        self._lock = threading.Lock()
++        self._lock = threading.Lock()           # the fields below and each mini game's; never held across a call
++        self._cond = threading.Condition(self._lock)
+         self.mg: dict | None = None            # the current (or last) mini game
+         self.play_limit_s, self.unknown_limit_s = PLAY_LIMIT_S, UNKNOWN_LIMIT_S
+         self.poll_gone_s, self.end_wait_s, self.tick = POLL_GONE_S, END_WAIT_S, TICK
++        self.start_limit_s, self.switch_limit_s, self.step_grace_s = START_LIMIT_S, SWITCH_LIMIT_S, STEP_GRACE_S
+         self.stream_needed = True               # B112's bench sets False (no stream, no switch)
++        self._reads: dict[str, dict] = {}       # B114: the last good answer of each bounded read, its helper
+ 
+     # --- rows ---------------------------------------------------------------------------------------------------------
+     def row(self, fields: dict) -> None:
+@@ -105,7 +144,7 @@ class PartyMinigames:
+             self.row({"step": "minigame_refused", "why": "the board game is not the running session"})
+             raise ValueError("the board game is not the running session")
+         with self._lock:
+-            if self.mg is not None and not self.mg["closed"]:
++            if self.mg is not None and not self._finished(self.mg):
+                 raise ValueError("a mini game is already on")
+         entry = self._entries().get(str(token or "").strip())
+         if entry is None:
+@@ -116,33 +155,30 @@ class PartyMinigames:
+             raise ValueError("seats are numbers 1-4, comma-separated") from None
+         if len(seats) != entry["players"] or len(set(seats)) != len(seats) or not all(1 <= s <= 4 for s in seats):
+             raise ValueError(f"this mini game takes {entry['players']} different seats, 1-4")
++        now = self.clock()
+         mg = {"state": "starting", "seats": seats, "entry": entry, "recognised": None, "class": None,
+-              "scores": None, "why": None, "t0": self.clock(), "last_poll": self.clock(), "final_at": None,
+-              "stash": None, "launched": False, "routed": False, "ended_by": None, "closed": False}
++              "scores": None, "why": None, "t0": now, "last_poll": now, "final_at": None,
++              "stash": None, "launched": False, "routed": False, "ended_by": None, "closed": False,
++              # B114: the actor's step, the taken calls, the end's owner
++              "step": None, "step_since": None, "queue": collections.deque(), "end_req": None, "ending": False,
++              "title_proc": None, "actor_done": False, "switched_to": None}
+         with self._lock:
+             self.mg = mg
+         self.row({"step": "minigame_start", "seats": seats, "players": entry["players"]})
+-        threading.Thread(target=self._run, args=(mg,), daemon=True, name="party-minigame").start()
++        threading.Thread(target=self._actor, args=(mg,), daemon=True, name="party-minigame").start()
++        threading.Thread(target=self._watch, args=(mg,), daemon=True, name="party-minigame-watch").start()
+         return {"ok": True, "state": "starting", "seats": seats}
+ 
++    @staticmethod
++    def _finished(mg: dict) -> bool:
++        return bool(mg["closed"] and mg["actor_done"])
++
+     def _bridge(self):
+         try:
+             return self.p._native_stream._session_io.controller
+         except Exception:
+             return None
+ 
+-    def _switch_stream(self, which: str) -> None:
+-        if not self.stream_needed or not self.p._recovery_stream_active():
+-            self.row({"step": "minigame_stream", "window": which, "switched": False, "why": "the stream is not up"})
+-            return
+-        t0 = self.clock()
+-        try:
+-            self.p._recovery_full_start_encoder()
+-            self.row({"step": "minigame_stream", "window": which, "switched": True,
+-                      "seconds": round(self.clock() - t0, 3)})
+-        except Exception as exc:
+-            self.row({"step": "minigame_stream", "window": which, "switched": False, "why": str(exc)[:160]})
+-
+     def _final(self, mg: dict, state: str, **fields) -> None:
+         with self._lock:
+             if mg["state"] in FINAL or mg["closed"]:
+@@ -150,39 +186,243 @@ class PartyMinigames:
+             mg.update(state=state, final_at=self.clock(), **fields)
+         self.row({"step": "minigame_" + state, **{k: v for k, v in fields.items() if k in ("class", "scores", "why")}})
+ 
+-    def _run(self, mg: dict) -> None:
++    # --- B114: bounded calls ------------------------------------------------------------------------------------------
++    def _emu_call(self, mg: dict | None, fn: Callable[[], Any], bound: float | None = None, abort: bool = True):
++        """One manager call under the manager's own lock, for that call only. The lock is tried in EMU_TRY_S steps;
++        between them an END stops the start (abort); `bound` gives the wait up (TimeoutError)."""
++        lock = self.emu.lock
++        deadline = None if bound is None else self.clock() + bound
++        while not lock.acquire(timeout=EMU_TRY_S):
++            if abort and mg is not None and (mg["end_req"] is not None or mg["closed"]):
++                raise _Abort()
++            if deadline is not None and self.clock() >= deadline:
++                raise TimeoutError("the manager's lock was not free within %.0f s" % bound)
++        try:
++            if abort and mg is not None and (mg["end_req"] is not None or mg["closed"]):
++                raise _Abort()
++            return fn()
++        finally:
++            lock.release()
++
++    def _bounded(self, fn: Callable[[], Any], limit: float) -> tuple[bool, Any]:
++        """fn on a helper thread with nothing held; (done, result or exception) after at most `limit` seconds."""
++        box: dict = {}
++        done = threading.Event()
++
++        def run():
++            _local.inside = True
++            try:
++                box["r"] = fn()
++            except BaseException as exc:          # noqa: BLE001 - handed back to the caller
++                box["e"] = exc
++            finally:
++                done.set()
++        threading.Thread(target=run, daemon=True, name="party-minigame-call").start()
++        if not done.wait(limit):
++            return False, None
++        return True, box.get("e", box.get("r"))
++
++    def _switch_stream(self, which: str) -> bool:
++        """The onn's stream to the other window: the recovery's own full start, on a helper thread with no lock held,
++        waited for at most switch_limit_s. True when switched."""
++        if not self.stream_needed or not self.p._recovery_stream_active():
++            self.row({"step": "minigame_stream", "window": which, "switched": False, "why": "the stream is not up"})
++            return False
++        t0 = self.clock()
++        done, res = self._bounded(self.p._recovery_full_start_encoder, self.switch_limit_s)
++        if not done:
++            self.row({"step": "minigame_stream", "window": which, "switched": False,
++                      "why": f"the switch did not finish within {self.switch_limit_s:.0f} s"})
++            raise TimeoutError(f"the stream switch did not finish within {self.switch_limit_s:.0f} s")
++        if isinstance(res, BaseException):
++            self.row({"step": "minigame_stream", "window": which, "switched": False, "why": str(res)[:160]})
++            return False
++        self.row({"step": "minigame_stream", "window": which, "switched": True,
++                  "seconds": round(self.clock() - t0, 3)})
++        return True
++
++    # --- the actor: the start's steps, then every taken call in order -------------------------------------------------
++    def _step(self, mg: dict, name: str, fn: Callable[[], Any]):
++        with self._cond:
++            if mg["end_req"] is not None or mg["closed"] or mg["state"] != "starting":
++                raise _Abort()
++            mg["step"], mg["step_since"] = name, self.clock()
++        try:
++            return fn()
++        finally:
++            with self._cond:
++                mg["step"] = None
++                self._cond.notify_all()
++
++    def _start_steps(self, mg: dict) -> None:
+         emu = self.emu
++        mg["stash"] = self._step(mg, "stash", lambda: self._emu_call(mg, emu._party_stash_begin))
++        emu._party_mg_stop_hook = lambda: self._end_by_stop(mg)
++        game = self.p._find_game_by_id(mg["entry"]["game"])
++
++        def launch():
++            emu.launch(game)
++            return emu.process
++        proc = self._step(mg, "launch", lambda: self._emu_call(mg, launch))
++        with self._lock:
++            mg["launched"], mg["title_proc"] = True, proc
++            late = mg["ending"] or mg["closed"]
++        if late:                                     # the end ran while the title launched: it is not left running
++            self._kill(proc)
++            raise _Abort()
++        self.row({"step": "minigame_launch", "pid_owned": True})
++        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
++        bridge = self._bridge()
++        if bridge is not None:
++            self._step(mg, "route", lambda: bridge.set_party_route({s - 1: k for k, s in enumerate(mg["seats"])}))
++            mg["routed"] = True
++        self.row({"step": "minigame_route", "ports": {str(k + 1): s for k, s in enumerate(mg["seats"])},
++                  "routed": mg["routed"]})
++        if self._step(mg, "switch", lambda: self._switch_stream("minigame")):
++            mg["switched_to"] = "minigame"
++        runner = self.p._h7_minigame_runner()
++        self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed))
++        self.row({"step": "minigame_watch", "loaded": True})
++        self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))
++        with self._lock:
++            if mg["state"] == "starting":
++                mg["state"] = "playing"
++        self.row({"step": "minigame_playing"})
++
++    def _actor(self, mg: dict) -> None:
+         try:
+-            with emu.lock:                       # the start, serialised with stop / Home / the onn's reads
+-                if mg["state"] != "starting":
+-                    return
+-                mg["stash"] = emu._party_stash_begin()
+-                emu._party_mg_stop_hook = lambda: self._end_by_stop(mg)
+-                game = self.p._find_game_by_id(mg["entry"]["game"])
+-                emu.launch(game)
+-                mg["launched"] = True
+-                self.row({"step": "minigame_launch", "pid_owned": True})
+-                emu.pause()
+-                bridge = self._bridge()
+-                if bridge is not None:
+-                    bridge.set_party_route({s - 1: k for k, s in enumerate(mg["seats"])})
+-                    mg["routed"] = True
+-                self.row({"step": "minigame_route", "ports": {str(k + 1): s for k, s in enumerate(mg["seats"])},
+-                          "routed": mg["routed"]})
+-                self._switch_stream("minigame")
+-                runner = self.p._h7_minigame_runner()
+-                runner.start("1", "", bench=not self.stream_needed)
+-                self.row({"step": "minigame_watch", "loaded": True})
+-                emu.resume()
+-                with self._lock:
+-                    if mg["state"] == "starting":
+-                        mg["state"] = "playing"
+-                self.row({"step": "minigame_playing"})
++            self._start_steps(mg)
++        except _Abort:
++            pass
+         except Exception as exc:
+             self._final(mg, "given_up", why=f"the mini game did not start: {str(exc)[:160]}")
+-        self._watch(mg)
++            self._enqueue(mg, "end_hub", None, by="hub: the start failed")   # B114: the title not left up
++        self._serve(mg)
+ 
+-    # --- the watch ----------------------------------------------------------------------------------------------------
++    def _serve(self, mg: dict) -> None:
++        """Every taken call in the order taken; ends when the mini game is closed and nothing is left."""
++        while True:
++            with self._cond:
++                while not mg["queue"] and not mg["closed"]:
++                    self._cond.wait(0.2)
++                if not mg["queue"]:
++                    mg["actor_done"] = True
++                    self._cond.notify_all()
++                    return
++                item = mg["queue"].popleft()
++            self._do(mg, item)
++
++    def _do(self, mg: dict, item: dict) -> None:
++        with self._lock:                              # one runner per item: the actor or the END's guard
++            if item.get("claimed"):
++                return
++            item["claimed"] = True
++        kind = item["kind"]
++        if kind in ("end", "end_board", "end_hub"):
++            self._end_once(mg, item["by"])
++        _local.inside = True
++        try:
++            if item["fn"] is not None:
++                item["result"] = item["fn"]()
++        except BaseException as exc:                  # noqa: BLE001 - the route raises it in its own thread
++            item["error"] = exc
++        finally:
++            _local.inside = False
++            item["done"].set()
++
++    # --- taking the onn's calls and the ends --------------------------------------------------------------------------
++    def _enqueue(self, mg: dict, kind: str, fn: Callable[[], Any] | None, by: str | None = None) -> dict | None:
++        item = {"kind": kind, "fn": fn, "by": by, "done": threading.Event(), "result": None, "error": None}
++        with self._cond:
++            if mg["actor_done"]:
++                return None
++            if kind in ("end", "end_board", "end_hub") and mg["end_req"] is None:
++                mg["end_req"] = by
++            mg["queue"].append(item)
++            state = mg["state"]
++            self._cond.notify_all()
++        self.row({"step": "minigame_taken", "what": kind, "state": state})
++        if kind in ("end", "end_board", "end_hub"):
++            threading.Thread(target=self._guard_end, args=(mg, item), daemon=True, name="party-minigame-end").start()
++        return item
++
++    def _guard_end(self, mg: dict, item: dict) -> None:
++        """END always works: if the actor has not taken the end within step_grace_s (stuck in a step), it runs here."""
++        end = self.clock() + self.step_grace_s
++        with self._cond:
++            while not (mg["ending"] or mg["closed"] or item["done"].is_set()) and self.clock() < end:
++                self._cond.wait(0.1)
++            if mg["ending"] or mg["closed"] or item["done"].is_set():
++                return
++            stuck = mg["step"]
++            since = mg["step_since"]
++        self.row({"step": "minigame_stuck", "what": stuck,
++                  "seconds": round(self.clock() - since, 1) if since is not None else None})
++        self._do(mg, item)
++
++    def take(self, action: str, fn: Callable[[], Any]) -> dict | None:
++        """A route the onn sends while a mini game is on (Home / RESUME / END): taken at once onto the mini game's
++        queue and acted on in order. None when no mini game is on (the route runs today's path)."""
++        kind = TAKEN.get(action)
++        with self._lock:
++            mg = self.mg
++        if kind is None or mg is None or mg["actor_done"]:
++            return None
++        if kind == "end":
++            self._final(mg, "given_up", why="ended from the onn")
++        item = self._enqueue(mg, kind, fn, by="onn" if kind == "end" else None)
++        if item is None:
++            return None
++        wait = RESUME_WAIT_S if kind.startswith("resume") else TAKE_WAIT_S
++        if not item["done"].wait(wait):
++            if kind.startswith("resume"):
++                raise RuntimeError(f"the mini game's calls did not reach this one within {wait:.0f} s")
++            with self._lock:
++                state = mg["state"]
++            return {"ok": True, "plugin": "games", "taken": kind, "minigame": state, "pending": True}
++        if item["error"] is not None:
++            raise item["error"]
++        res = item["result"]
++        if isinstance(res, dict) and kind in ("home", "end"):
++            res = {**res, "taken": kind}
++        return res
++
++    def bounded_read(self, action: str, fn: Callable[[], Any]) -> dict | None:
++        """`status` / `native-stream-status` while a mini game is on: today's answer if it comes within READ_WAIT_S,
++        else the last good one with "snapshot": true (one helper per route at a time). None when no mini game is on."""
++        with self._lock:
++            mg = self.mg
++            if mg is None or self._finished(mg):
++                return None
++            slot = self._reads.setdefault(action, {"last": None, "busy": None})
++            helper = slot["busy"]
++            if helper is None:
++                helper = slot["busy"] = {"done": threading.Event(), "r": None, "e": None}
++
++                def run(h=helper, s=slot):
++                    _local.inside = True
++                    try:
++                        h["r"] = fn()
++                    except BaseException as exc:      # noqa: BLE001
++                        h["e"] = exc
++                    finally:
++                        with self._lock:
++                            if h["e"] is None and isinstance(h["r"], dict):
++                                s["last"] = h["r"]
++                            s["busy"] = None
++                        h["done"].set()
++                threading.Thread(target=run, daemon=True, name="party-minigame-read").start()
++        if helper["done"].wait(READ_WAIT_S):
++            if helper["e"] is not None:
++                raise helper["e"]
++            return helper["r"]
++        with self._lock:
++            last = slot["last"]
++        if last is None:
++            return {"ok": True, "plugin": "games", "snapshot": True, "minigame": mg["state"]}
++        return {**last, "snapshot": True}
++
++    # --- the watch (from the start) -----------------------------------------------------------------------------------
+     def _watch(self, mg: dict) -> None:
+         runner = self.p._h7_minigame_runner()
+         unknown_since = None
+@@ -192,17 +432,24 @@ class PartyMinigames:
+                 if self.mg is not mg or mg["closed"]:
+                     return
+                 state = mg["state"]
++                asked = mg["end_req"] is not None
+             now = self.clock()
+             stash = mg.get("stash") or {}
+             board = stash.get("process")
+-            if board is not None and board.poll() is not None:
++            if board is not None and board.poll() is not None and not asked:
+                 self._final(mg, "given_up", why="the board stopped")
+-                self.end(by="hub: the board stopped")
+-                return
++                self._enqueue(mg, "end_hub", None, by="hub: the board stopped")
++                continue
++            if asked:
++                continue
+             if state in FINAL:
+                 if now - (mg["final_at"] or now) >= self.end_wait_s:
+-                    self.end(by="hub: no end call")
+-                    return
++                    self._enqueue(mg, "end_hub", None, by="hub: no end call")
++                continue
++            if state == "starting":
++                if now - mg["t0"] >= self.start_limit_s:
++                    self._final(mg, "given_up", why=f"the mini game did not start within {self.start_limit_s:.0f} s")
++                    self._enqueue(mg, "end_hub", None, by="hub: the start was stuck")
+                 continue
+             if state != "playing":
+                 continue
+@@ -251,46 +498,90 @@ class PartyMinigames:
+                     "since_s": round(self.clock() - mg["t0"], 1)}
+ 
+     def end(self, by: str = "board") -> dict:
++        """The board's end: taken at once, acted on in order; answered with the end done if it is within TAKE_WAIT_S."""
++        with self._lock:
++            mg = self.mg
++            if mg is None:
++                return {"ok": True, "state": "none", "ended": False}
++            if mg["closed"] or mg["end_req"] is not None:
++                again = mg["closed"]
++                ans = {"ok": True, "state": mg["state"], "scores": mg["scores"], "ended": True}
++                return {**ans, "again": True} if again else {**ans, "pending": True}
++        if mg["state"] not in FINAL:
++            self._final(mg, "given_up", why=f"ended before a result ({by})")
++        item = self._enqueue(mg, "end_board", None, by=by)
++        done = item["done"].wait(TAKE_WAIT_S) if item is not None else True
++        with self._lock:
++            ans = {"ok": True, "state": mg["state"], "scores": mg["scores"], "ended": True}
++        return ans if done else {**ans, "pending": True}
++
++    def _end_once(self, mg: dict, by: str, inline: bool = False) -> bool:
++        """The end's steps, once per mini game (whoever comes first: the actor, the guard, the manager's stop)."""
++        with self._cond:
++            if mg["ending"] or mg["closed"]:
++                return False
++            mg["ending"] = True
++            if mg["end_req"] is None:
++                mg["end_req"] = by
++        try:
++            self._end_steps(mg, by, inline)
++        finally:
++            with self._cond:
++                mg["ended_by"] = by
++                mg["closed"] = True
++                self._cond.notify_all()
++            self.row({"step": "minigame_end", "by": by})
++        return True
++
++    def _kill(self, proc: Any) -> None:
++        try:
++            if proc is not None and proc.poll() is None:
++                proc.kill()
++        except Exception:
++            pass
++
++    def _end_steps(self, mg: dict, by: str, inline: bool) -> None:
+         emu = self.emu
+-        with emu.lock:
+-            with self._lock:
+-                mg = self.mg
+-                if mg is None:
+-                    return {"ok": True, "state": "none", "ended": False}
+-                if mg["closed"]:
+-                    return {"ok": True, "state": mg["state"], "scores": mg["scores"], "ended": True, "again": True}
+-            if mg["state"] not in FINAL:
+-                self._final(mg, "given_up", why=f"ended before a result ({by})")
++        if mg["state"] not in FINAL:
++            self._final(mg, "given_up", why=f"ended before a result ({by})")
++        self._bounded(lambda: self.p._h7_minigame_runner().stop(), 2.0)
++        if emu._party_mg_stop_hook is not None:
++            emu._party_mg_stop_hook = None
++        title = mg.get("title_proc")
++
++        def stop_title():
++            if emu._party_stash is not None and emu.process is not None and emu.process is title:
++                emu.stop()                       # the title, RetroArch's own stop (the hook already cleared)
++        if mg.get("launched"):
++            try:
++                if inline:
++                    stop_title()
++                else:
++                    self._emu_call(None, stop_title, bound=MANAGER_BOUND_S, abort=False)
++            except Exception as exc:
++                self.row({"step": "minigame_end", "title_stop_failed": str(exc)[:160]})
++            self._kill(title)                    # whatever the manager's stop did, the title is not left running
++        if mg.get("routed"):
++            bridge = self._bridge()
++            if bridge is not None:
++                bridge.set_party_route(None)
++        try:
++            restored = (emu._party_stash_end() if inline else
++                        self._emu_call(None, emu._party_stash_end, bound=MANAGER_BOUND_S, abort=False))
++            del restored
++            self.row({"step": "minigame_restore", "board_alive": emu.process is not None
++                      and emu.process.poll() is None})
++        except Exception as exc:
++            self.row({"step": "minigame_restore", "failed": str(exc)[:160]})
++        if by not in ("stop", "onn") and not inline:     # END / another launch: the stream ends with the session
+             try:
+-                self.p._h7_minigame_runner().stop()
++                self._switch_stream("board")
+             except Exception:
+                 pass
+-            if emu._party_mg_stop_hook is not None:
+-                emu._party_mg_stop_hook = None
+-            if mg.get("launched") and emu._party_stash is not None and emu.process is not None:
+-                try:
+-                    emu.stop()                   # the title, RetroArch's own stop (the hook already cleared)
+-                except Exception as exc:
+-                    self.row({"step": "minigame_end", "title_stop_failed": str(exc)[:160]})
+-            if mg.get("routed"):
+-                bridge = self._bridge()
+-                if bridge is not None:
+-                    bridge.set_party_route(None)
+-            if emu._party_stash is not None:
+-                emu._party_stash_end()
+-                self.row({"step": "minigame_restore", "board_alive": emu.process is not None
+-                          and emu.process.poll() is None})
+-                if by != "stop":                     # END / another launch: the stream ends with the session anyway
+-                    self._switch_stream("board")
+-            with self._lock:
+-                mg["ended_by"] = by
+-                mg["closed"] = True
+-            self.row({"step": "minigame_end", "by": by})
+-            return {"ok": True, "state": mg["state"], "scores": mg["scores"], "ended": True}
+ 
+     def _end_by_stop(self, mg: dict) -> dict:
+-        """The manager's stop with a mini game on (END, another launch, launch_orphaned): the mini game first, then
+-        the board's own stop (F10)."""
++        """The manager's stop with a mini game on (another launch, launch_orphaned — its caller holds the manager's
++        lock): the mini game ended inline, waiting on nothing (no actor, no stream), then the board's own stop (F10)."""
+         self._final(mg, "given_up", why="ended from the onn")
+-        self.end(by="stop")
++        self._end_once(mg, "stop", inline=True)
+         return self.emu.stop()
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 91b2e95..4ad941c 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -3372,6 +3372,13 @@ class GamesPlugin:
+             keep_blank_values=False,
+         )
+ 
++        # B114: with a party mini game on, status answers within 2 s (the last good answer if it cannot be read now)
++        if (_party_minigame is not None and action in ("status", "native-stream-status")
++                and getattr(self, "_party_minigame_obj", None) is not None and not _party_minigame.inside()):
++            read = self._party_minigame_obj.bounded_read(action, lambda: self.handle(action, raw_query))
++            if read is not None:
++                return read
++
+         if action == "systems":
+             return self.systems()
+ 
+@@ -3665,6 +3672,13 @@ class GamesPlugin:
+             keep_blank_values=False,
+         )
+ 
++        # B114: with a party mini game on, Home / RESUME / END are taken at once onto its queue, acted on in order
++        if (_party_minigame is not None and action in _party_minigame.TAKEN
++                and getattr(self, "_party_minigame_obj", None) is not None and not _party_minigame.inside()):
++            taken = self._party_minigame_obj.take(action, lambda: self.handle_post_request(action, raw_query, client_ip))
++            if taken is not None:
++                return taken
++
+         # PRIVYHUB_A7_PATCH_11_A7_4_SOFTPATCH_MODS_ADB_FIX API
+         if action == "mod-catalog":
+             game_id = self._first(query, "id").strip()
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+new file mode 100644
+index 0000000..e0729b4
+--- /dev/null
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -0,0 +1,550 @@
++# B114's child scenario (appended to B103's harness head; run by test_b114.py). Not a test module by itself.
++# The stream stub models what the real stream does that B110's stub did not: its own RLock held across start / stop /
++# status / the recovery's restart / the bitrate's step; the capture bound to the process it was started for (that
++# process gone -> the stream down until the next start). A client thread plays the onn: client-health every 0.1 s
++# (the real observe() path), heartbeats with the real output age, the stall datagrams (PHS1) through the real stall
++# worker. Other threads call status / party-minigame-result throughout; Home / RESUME / END are sent during matches.
++import struct, traceback, collections
++try:
++    import party_session as party
++    party.QUIT_WAIT_S = 1.0
++except ImportError:
++    party = None
++import stall_owner
++stall_owner.V2_MS = 1000
++import stall_signal as ss
++board_dir = Path(args["board_dir"])
++cmds = []
++def fake_run(cmd, timeout=3.0):
++    cmds.append(list(cmd))
++    pid = (board_dir / "pid").read_text() if (board_dir / "pid").exists() else ""
++    out, rc = "", 0
++    if cmd[:4] == ["xdotool", "search", "--onlyvisible", "--class"]:
++        out = "4242\n" if pid else ""
++    elif cmd[:2] == ["xdotool", "getwindowpid"]:
++        out = pid + "\n"
++    elif cmd[:2] == ["xdotool", "windowactivate"]:
++        with (board_dir / "keys").open("a") as fh:
++            fh.write(cmd[-1] + "\n")
++    elif cmd[:2] == ["pactl", "list"]:
++        out = f'application.process.id = "{pid}"\n' if pid else ""
++    else:
++        rc = 1
++    return types.SimpleNamespace(returncode=rc, stdout=out, stderr="")
++m._party_session_kwargs = {"run": fake_run, "devices": Path(args["devices"])}
++import native_session_io as nsio
++bridge = nsio.NativeControllerBridge(Path(args["board_dir"]) / "bridge")
++bridge._gamepads = ["P1", "P2", "P3", "P4"]
++bridge._controller_backend = "linux_uinput"
++bridge._write_linux_report_locked = lambda index, report, *a, **k: None
++T0 = time.monotonic()
++def now_s():
++    return round(time.monotonic() - T0, 3)
++
++
++class StubStream:
++    """The real stream's shape: one RLock over start / stop / status / restarts; the capture follows one process."""
++    def __init__(self):
++        self._lock = threading.RLock()
++        self.active = False
++        self.captured = None
++        self.captured_pid = None
++        self.restarting = False
++        self.frames_at = time.monotonic()
++        self.events = []
++        self.start_s = float(args.get("start_s", 0.6))
++        self.gate = threading.Event(); self.gate.set()          # cleared: a start blocks inside the lock (stuck)
++        self.emu_lock_in_start = []
++        self._session_io = types.SimpleNamespace(controller=bridge)
++    def _proc_for(self, pid):
++        cands = [m.process]
++        st = getattr(m, "_party_stash", None)
++        if isinstance(st, dict):
++            cands.append(st.get("process"))
++        for p in cands:
++            if p is not None and getattr(p, "pid", None) == pid:
++                return p
++        return None
++    def _reap(self):
++        if self.active and (self.captured is None or self.captured.poll() is not None):
++            self.active = False
++            self.events.append(["down", self.captured_pid, now_s()])
++    def flowing(self):
++        return self.active and not self.restarting and self.captured is not None and self.captured.poll() is None
++    def status(self):
++        with self._lock:
++            self._reap()
++            return {"active": self.active, "bitrate_kbps": 7000}
++    def start(self, client_ip=None, port=None, managed_process_id=None):
++        self.emu_lock_in_start.append(bool(m.lock._is_owned()))
++        with self._lock:
++            self.restarting = True
++            self.events.append(["start_begin", managed_process_id, now_s()])
++            time.sleep(self.start_s / 2)                         # the old capture, encoder and sound stopped
++            self.gate.wait()
++            proc = self._proc_for(managed_process_id)
++            time.sleep(self.start_s / 2)                         # the new encoder, its check, the new sound
++            self.captured, self.captured_pid = proc, managed_process_id
++            self.active = proc is not None and proc.poll() is None
++            self.restarting = False
++            self.frames_at = time.monotonic()
++            self.events.append(["start", managed_process_id, now_s()])
++            return {"active": self.active, "bitrate_kbps": 7000}
++    def stop(self):
++        with self._lock:
++            self.active = False
++            self.events.append(["stop", None, now_s()])
++            return {"active": False}
++    def end_game_session(self):
++        with self._lock:
++            self.active = False
++            self.events.append(["end_session", None, now_s()])
++            return {"active": False}
++    def recovery_restart_encoder(self):
++        with self._lock:
++            self.restarting = True
++            time.sleep(self.start_s / 2)
++            self.restarting = False
++            self.frames_at = time.monotonic()
++            self.events.append(["restart", self.captured_pid, now_s()])
++            return {"video": {}}
++    def adaptive_level_transition(self, kbps):
++        with self._lock:
++            time.sleep(0.2)
++            self.events.append(["level", kbps, now_s()])
++            return {"ok": True, "target_bitrate_kbps": kbps}
++    def __getattr__(self, name):
++        return Inert()
++
++
++stream = StubStream()
++g._native_stream = stream
++g._adaptive_bitrate.bind(actuator=stream.adaptive_level_transition, context=g._adaptive_bitrate_context,
++                         serial_lock=stream._lock, recovery_state=g._recovery.current_state)
++out = {"steps": {}, "lat": collections.defaultdict(list), "slow": []}
++S = out["steps"]
++S["abr_live_same"] = bool(svc.adaptive_bitrate_controller(svc.PROJECT_ROOT) is g._adaptive_bitrate)
++S["stall_worker"] = g._recovery._client_stall is not None
++
++
++def mg_on():
++    """A mini game on (not yet finished) — the calls the 2-s bound is about."""
++    lay = getattr(g, "_party_minigame_obj", None)
++    mg_ = getattr(lay, "mg", None) if lay is not None else None
++    return mg_ is not None and not (mg_.get("closed") and mg_.get("actor_done", True))
++
++
++def timed(kind, method, path, timeout=12):
++    on = mg_on()
++    t = time.monotonic()
++    try:
++        r = call(method, path, timeout=timeout)
++    except Exception as exc:
++        r = {"code": 0, "raw": "", "body": {"error": f"{type(exc).__name__}"}}
++    dt = round(time.monotonic() - t, 3)
++    on = on or mg_on()
++    out["lat"][kind + ("" if on else "_no_minigame")].append(dt)
++    if dt >= 2.0:
++        out["slow"].append([kind, dt, now_s(), r["code"], on])
++    return r
++
++
++class Client:
++    """The onn: in the stream or not (Home leaves it, RESUME returns)."""
++    def __init__(self):
++        self.in_stream = False; self.seq = 0; self.hb = 0; self.stalling = False; self.stop = False
++        self.stalls_sent = 0; self.ends_sent = 0; self.silent = False
++        g._recovery._client_packet_age_ms = lambda: 20.0 if self.in_stream else None
++        for target, every in ((self.health, 0.1), (self.heartbeat, 0.25), (self.stall_watch, 0.05)):
++            threading.Thread(target=self.loop, args=(target, every), daemon=True).start()
++    def loop(self, fn, every):
++        while not self.stop:
++            if self.in_stream:
++                try:
++                    fn()
++                except Exception:
++                    pass
++            time.sleep(every)
++    def age_ms(self):
++        if stream.flowing() and not self.silent:
++            stream.frames_at = time.monotonic()
++        return int((time.monotonic() - stream.frames_at) * 1000)
++    def report(self):
++        """The onn's client-health report (privyhub_client_health_v1), its counters rising."""
++        self.hseq = getattr(self, "hseq", 0) + 1
++        n = self.hseq
++        v = {k: 0 for k in ("lost_packets", "dropped_frames", "fec_recovered_packets", "fec_unrecoverable_groups",
++                            "late_or_reordered_packets", "forward_gap_events")}
++        v.update(packets=600 * n, recent_fps=59.8, recent_mbps=7.0, waiting_for_idr=False)
++        d = {k: 0 for k in ("queued_frames", "dropped_frames", "queue_overflow_drops", "stale_output_drops")}
++        d.update(rendered_frames=60 * n, queue_depth=0, latest_rx_to_decode_ms=8,
++                 latest_output_gap_ms=min(self.age_ms(), 60000), hardware_accelerated=True, vendor_codec=True,
++                 low_latency_enabled=True)
++        return {"schema": "privyhub_client_health_v1", "sequence": n, "interval_ms": 2000,
++                "session_elapsed_ms": 100 * n, "video": v, "decoder": d}
++    def health(self):
++        req = urllib.request.Request(f"http://127.0.0.1:{port}/diagnostics/client-health", method="POST",
++                                     data=json.dumps(self.report()).encode(),
++                                     headers={"Content-Type": "application/json"})
++        t = time.monotonic()
++        try:
++            urllib.request.urlopen(req, timeout=12).read()
++        except Exception:
++            pass
++        out["lat"]["client_health"].append(round(time.monotonic() - t, 3))
++    def heartbeat(self):
++        self.hb += 1
++        timed("heartbeat", "POST", f"/plugins/games/native-stream-heartbeat?sequence={self.hb}&interval_ms=2000"
++              f"&last_output_age_ms={self.age_ms()}&rendered_frames={600 + self.hb}&queued_frames=0&rx_packets=900"
++              f"&elapsed_ms={self.hb * 250}")
++    def stall_watch(self):
++        age = self.age_ms()
++        sig = g._recovery._client_stall
++        if age >= 400:
++            self.seq += 1; self.stalls_sent += 1; self.stalling = True
++            sig.on_datagram(ss.PACKET.pack(ss.MAGIC, ss.KIND_STALL, 0, 0, self.seq, 1000 + self.seq, age), time.monotonic())
++        elif self.stalling and age < 100:
++            self.seq += 1; self.ends_sent += 1; self.stalling = False
++            sig.on_datagram(ss.PACKET.pack(ss.MAGIC, ss.KIND_END, 0, 0, self.seq, 1000 + self.seq, age), time.monotonic())
++
++
++client = Client()
++watching = {"on": True}
++def watcher(kind, path):
++    while watching["on"]:
++        timed(kind, "GET", path)
++        time.sleep(0.1)
++for kind, path in (("status", "/plugins/games/status"), ("result", "/plugins/games/party-minigame-result"),
++                   ("ns_status", "/plugins/games/native-stream-status")):
++    threading.Thread(target=watcher, args=(kind, path), daemon=True).start()
++
++
++def stacks():
++    names = {t.ident: t.name for t in threading.enumerate()}
++    res = []
++    for ident, frame in sys._current_frames().items():
++        if ident == threading.get_ident():
++            continue
++        fr = [f"{Path(f.filename).name}:{f.name}:{f.lineno}" for f in traceback.extract_stack(frame)][-6:]
++        res.append({"thread": re.sub(r"\d+", "#", names.get(ident, "?")), "top": fr})
++    return res
++
++
++def finish(hung_at=None):
++    watching["on"] = False; client.stop = True
++    out["hung"] = hung_at
++    if hung_at is not None:
++        st = stacks()
++        out["stacks"] = st
++        out["waiting_on_emu_lock"] = sum(1 for s in st if any(":status:" in x or ":pause:" in x or ":stop:" in x or ":end:" in x for x in s["top"][-2:]) and any("emulator_manager.py" in x for x in s["top"][-2:]))
++        out["mg_thread"] = [s for s in st if s["thread"].startswith("party-minigame")]
++    out["stream_events"] = stream.events
++    out["abr_samples"] = sum(1 for r in abr_rows() if r.get("event") == "sample")
++    out["emu_lock_in_start"] = stream.emu_lock_in_start
++    out["lat"] = {k: {"n": len(v), "max": max(v) if v else None} for k, v in out["lat"].items()}
++    text = json.dumps(out)
++    for form in {str(root), str(root.resolve())}:
++        text = text.replace(form, "<root>")
++    sys.stdout.write(text + "\n"); sys.stdout.flush()
++    os._exit(0)
++
++
++def keys():
++    p = board_dir / "keys"
++    return p.read_text().split() if p.exists() else []
++def rows():
++    p = root / "logs/games/party.jsonl"
++    return [json.loads(l) for l in p.read_text().splitlines()] if p.is_file() else []
++def rec_rows():
++    p = g._recovery.log_path()
++    out_ = []
++    if p.is_file():
++        for l in p.read_text().splitlines():
++            try:
++                out_.append(json.loads(l))
++            except ValueError:
++                pass
++    return out_
++def abr_rows():
++    p = root / "logs/games/adaptive_bitrate_shadow.jsonl"
++    return [json.loads(l) for l in p.read_text().splitlines()] if p.is_file() else []
++def result_now():
++    return call("GET", "/plugins/games/party-minigame-result", timeout=12)["body"]
++def wait_for(pred, bound):
++    end = time.monotonic() + bound; b = {}
++    while time.monotonic() < end:
++        try:
++            b = result_now()
++        except Exception:
++            b = {}
++        if pred(b):
++            return b
++        time.sleep(0.05)
++    return dict(b, timeout=True)
++def wait_until(pred, bound):
++    end = time.monotonic() + bound
++    while time.monotonic() < end:
++        if pred():
++            return True
++        time.sleep(0.05)
++    return False
++
++
++cfg = Path(os.environ["PRIVYHUB_PARTY_CONFIG"])
++cfg.write_text(json.dumps({"godot": args["board"], "project": args["project"], "pictures": args["pictures"]}))
++board_nodes = call("GET", "/plugins/games/games?system=party")["body"].get("nodes", [])
++board_id = next((n["id"] for n in board_nodes if n.get("node_type") == "game"), None)
++title = args["id"]
++
++
++def board_pid_now():
++    try:
++        return int((board_dir / "pid").read_text())
++    except (OSError, ValueError):
++        return None
++
++
++def board_up(tag):
++    """The board as the session, the onn's stream up (as the onn has it)."""
++    if board_pid_now() is not None and call("GET", "/plugins/games/status")["body"].get("launch_kind") == "godot":
++        call("POST", "/plugins/games/stop")                  # the board left by the last case: a fresh one
++        wait_until(lambda: board_pid_now() is None, 10)
++    (board_dir / "keys").unlink(missing_ok=True)
++    S[tag + "_board_launch"] = call("POST", f"/plugins/games/launch?id={board_id}")["code"]
++    call("POST", "/plugins/games/native-stream-start?port=48100")
++    call("POST", "/plugins/games/native-stream-ready")
++    client.in_stream = True
++    return int((board_dir / "pid").read_text())
++
++
++if args["mode"] == "probe":
++    pr = S["probe"] = {}
++    try:
++        acc = svc.CLIENT_HEALTH_STORE.accept(client.report(), payload_bytes=400)
++        pr["accept"] = str(type(acc))
++        ns_ = g.handle("native-stream-status", "")
++        pr["ns_keys"] = sorted(ns_)[:40]
++        tel = svc.STREAM_TELEMETRY_STORE.accept(client_health_feedback=svc.CLIENT_HEALTH_STORE.snapshot(),
++                                                native_stream_status=ns_)
++        pr["tel"] = str(type(tel))
++        abr = svc.adaptive_bitrate_controller(svc.PROJECT_ROOT)
++        pr["live"] = bool(svc.adaptive_bitrate_is_live(abr)); pr["log"] = str(abr.log_path)
++        import adaptive_bitrate as ab_
++        pr["sample"] = str(ab_._sample(tel))[:300]
++        abr.observe(tel, stream_bitrate_kbps=7000, native_status=ns_)
++        pr["rows"] = len(abr_rows())
++    except Exception as exc:
++        pr["error"] = f"{type(exc).__name__}: {exc}"[:400]
++    finish()
++
++if args["mode"] == "today":
++    for k, (meth, path) in {"list": ("GET", "/plugins/games/party-minigames"),
++                            "start": ("POST", "/plugins/games/party-minigame-start?id=x&seats=1,2"),
++                            "result": ("GET", "/plugins/games/party-minigame-result"),
++                            "end": ("POST", "/plugins/games/party-minigame-end"),
++                            "status_idle": ("GET", "/plugins/games/status"),
++                            "home_idle": ("POST", "/plugins/games/native-stream-stop"),
++                            "stop_idle": ("POST", "/plugins/games/stop")}.items():
++        S[k] = call(meth, path)
++    finish()
++
++rules_ = Path(rules); rules_.mkdir(parents=True, exist_ok=True)
++for name in os.listdir(args["spec_dir"]):
++    shutil.copyfile(Path(args["spec_dir"], name), rules_ / name.replace("GAME", title))
++js_ = json.loads((rules_ / f"{title}.endscreen.json").read_text())
++js_["arrays"] = f"{title}.endscreen.npz"
++(rules_ / f"{title}.endscreen.json").write_text(json.dumps(js_))
++(rules_ / f"{title}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
++(rules_ / f"{title}.party.json").write_text(json.dumps({"players": 2, "scores": {"end_P1": [1, 0], "end_P2": [0, 1]}}))
++token = call("GET", "/plugins/games/party-minigames")["body"]["minigames"][0]["id"]
++mini = g._h7_minigame_runner(); mini.picture = pic; mini.read_every = 0.2; mini.recognise_s = 1.6
++layer = g._party_minigame_runner(); layer.tick = 0.05
++LIMITS = ("start_limit_s", "switch_limit_s", "step_grace_s")
++S["limits_present"] = [k for k in LIMITS if hasattr(layer, k)]
++
++
++def one(tag, seats, script, during=None, home_resume=False):
++    pic.set(script)
++    r0, q0, k0 = len(rows()), len(rec_rows()), len(keys())
++    a0, e0 = len(abr_rows()), len(stream.events)
++    S[tag + "_start"] = timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats={seats}")
++    p = wait_for(lambda b: b.get("state") in ("playing", "ended", "given_up"), 25)
++    S[tag + "_playing"] = p
++    if p.get("timeout"):
++        S[tag + "_rows"] = [r["step"] for r in rows()[r0:]]
++        finish(hung_at=tag + ": never playing (" + str(p.get("state")) + ")")
++    k_play = len(keys())
++    if home_resume:
++        time.sleep(0.4)
++        h = timed("home", "POST", "/plugins/games/native-stream-stop")
++        client.in_stream = False
++        time.sleep(0.3)
++        S[tag + "_title_paused_after_home"] = fake["ra"].paused if "ra" in fake else None
++        rs = timed("resume_start", "POST", "/plugins/games/native-stream-start?port=48100", timeout=30)
++        client.in_stream = True
++        rr = timed("resume_ready", "POST", "/plugins/games/native-stream-ready", timeout=30)
++        S[tag + "_home"] = {"code": h["code"], "taken": h["body"].get("taken")}
++        S[tag + "_resume"] = {"start": rs["code"], "start_active": rs["body"].get("active"), "ready": rr["code"],
++                              "released": rr["body"].get("released")}
++        S[tag + "_title_running_after_resume"] = (not fake["ra"].paused) if "ra" in fake else None
++    if during is not None:
++        during(tag)
++    e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 40)
++    S[tag] = e
++    if e.get("timeout"):
++        finish(hung_at=tag + ": never ended")
++    k_end = len(keys())
++    S[tag + "_end"] = timed("board_end", "POST", "/plugins/games/party-minigame-end")
++    S[tag + "_closed"] = wait_for(lambda b: b.get("closed"), 20).get("closed")
++    S[tag + "_end_again"] = call("POST", "/plugins/games/party-minigame-end")["body"].get("again")
++    S[tag + "_title_gone"] = fake["ra"].poll() is not None if "ra" in fake else None
++    S[tag + "_route_after"] = bridge._party_route
++    S[tag + "_keys_in_match"] = keys()[k_play:k_end]
++    S[tag + "_rows"] = [r["step"] for r in rows()[r0:]]
++    S[tag + "_stream_rows"] = [{k: v for k, v in r.items() if k in ("window", "switched", "why")}
++                               for r in rows()[r0:] if r["step"] == "minigame_stream"]
++    S[tag + "_rec"] = [r.get("event") for r in rec_rows()[q0:]]
++    S[tag + "_status_kind"] = call("GET", "/plugins/games/status")["body"].get("launch_kind")
++    S[tag + "_keys_all"] = keys()[k0:]
++    S[tag + "_abr"] = [[r.get("event"), r.get("source")] for r in abr_rows()[a0:]
++                       if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
++    S[tag + "_stream_events"] = [e[:2] for e in stream.events[e0:]]
++    S[tag + "_switches"] = [{k: v for k, v in r.items() if k in ("window", "switched", "planned", "seconds", "why")}
++                            for r in rows()[r0:] if r["step"] == "minigame_stream"]
++    n_sw = sum(1 for r in rows()[r0:] if r["step"] == "minigame_stream" and r.get("switched"))
++    wait_until(lambda: sum(1 for r in rows()[r0:] if r["step"] == "minigame_switch_window") >= n_sw, 6)
++    S[tag + "_windows"] = [{k: v for k, v in r.items() if k != "at_utc" and k != "schema"}
++                           for r in rows()[r0:] if r["step"] == "minigame_switch_window"]
++    S[tag + "_stalls_sent"] = client.stalls_sent
++    t_ = time.monotonic()
++    S[tag + "_board_picture_back"] = wait_until(lambda: stream.flowing() and stream.captured_pid == board_pid_now(), 20)
++    S[tag + "_board_picture_s"] = round(time.monotonic() - t_, 2)
++
++
++END1 = ["start"] * 3 + ["other"] * 6 + ["end_P1"] * 40
++END2 = ["start"] * 3 + ["other"] * 30 + ["end_P2"] * 40
++END3 = ["start"] * 3 + ["other"] * 60 + ["end_P1"] * 40
++board_pid = board_up("b1")
++out["board_pid"] = board_pid
++if args["mode"] == "three":
++    def real_stall(tag):
++        """The client's video stops while the title plays, outside the switch windows: handled as today."""
++        time.sleep(4.0)                                    # past the way in's window (3 s after its switch)
++        q0, k0 = len(rec_rows()), len(keys())
++        client.silent = True
++        S[tag + "_paused_by_stall"] = wait_until(lambda: fake["ra"].paused, 3)
++        time.sleep(0.2)
++        client.silent = False
++        S[tag + "_resumed_after_stall"] = wait_until(lambda: not fake["ra"].paused, 5)
++        time.sleep(0.5)
++        S[tag + "_stall_rec"] = [[r.get("event"), r.get("trigger") or r.get("via")] for r in rec_rows()[q0:]]
++        S[tag + "_stall_keys"] = keys()[k0:]
++    s0 = len(client.__dict__)
++    one("m1", "1,2", END2, home_resume=True)
++    one("m2", "2,1", END1)
++    one("m3", "1,2", END3, during=real_stall)
++    S["abr_all"] = [[r.get("event"), r.get("source")] for r in abr_rows()
++                    if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
++    S["stream_all"] = [e[:2] for e in stream.events]
++    timed("end_onn", "POST", "/plugins/games/stop")
++    finish()
++one("m1", "1,2", END2, home_resume=True)
++one("m2", "1,2", END1)
++S["b2b_events"] = [e[:2] for e in stream.events]
++out["board_pid"] = board_pid
++
++if args["mode"] == "b2b":
++    call("POST", "/plugins/games/stop")
++    finish()
++
++# --- after the fix: END in every phase, and the stuck starts ------------------------------------------------------
++LONG = ["start"] * 3 + ["other"] * 2000
++
++
++def end_case(tag, when):
++    """END (`stop`) from the onn at a phase; then the title, the board and the stream must be gone."""
++    bp = board_up(tag)
++    pic.set(LONG)
++    k0, r0 = len(keys()), len(rows())
++    if when == "starting":
++        stream.start_s = 2.0
++        timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats=1,2")
++        time.sleep(0.05)
++    elif when == "playing":
++        timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats=1,2")
++        wait_for(lambda b: b.get("state") == "playing", 25)
++    elif when == "handover_in":
++        stream.start_s = 3.0
++        timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats=1,2")
++        wait_until(lambda: stream.restarting, 15)
++    elif when == "handover_back":
++        stream.start_s = 3.0
++        pic.set(END1)
++        timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats=1,2")
++        wait_for(lambda b: b.get("state") == "ended", 30)
++        timed("board_end", "POST", "/plugins/games/party-minigame-end")
++        wait_until(lambda: stream.restarting, 15)
++    elif when == "stuck":
++        stream.gate.clear()
++        timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats=1,2")
++        wait_until(lambda: stream.restarting, 15)
++        time.sleep(0.5)
++    S[tag + "_state_at_end"] = result_now().get("state")
++    st = timed("end_onn", "POST", "/plugins/games/stop")
++    S[tag + "_stop"] = {"code": st["code"], "taken": st["body"].get("taken")}
++    gone = wait_until(lambda: not (board_dir / "pid").exists() and ("ra" not in fake or fake["ra"].poll() is not None), 20)
++    if when == "stuck":
++        stream.gate.set()
++    S[tag + "_gone"] = gone
++    S[tag + "_closed"] = wait_for(lambda b: b.get("closed"), 20).get("closed")
++    S[tag + "_why"] = result_now().get("why")
++    S[tag + "_keys"] = keys()[k0:]
++    S[tag + "_active_after"] = wait_until(lambda: call("GET", "/plugins/games/status")["body"].get("active") is False, 10)
++    S[tag + "_route_after"] = bridge._party_route
++    S[tag + "_rows"] = [r["step"] for r in rows()[r0:]]
++    stream.start_s = float(args.get("start_s", 0.6))
++    client.in_stream = False
++
++
++for tag in ("starting", "playing", "handover_in", "handover_back", "stuck"):
++    end_case("end_" + tag, tag)
++
++
++def give_up_case(tag, how):
++    bp = board_up(tag)
++    pic.set(LONG)
++    r0 = len(rows())
++    layer.start_limit_s, layer.switch_limit_s = 3.0, 2.0
++    if how == "switch":
++        stream.gate.clear()
++    else:
++        real = mini.start
++        hold = threading.Event()
++        def stuck_start(*a, **k):
++            hold.wait(30)
++            return real(*a, **k)
++        mini.start = stuck_start
++    timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats=1,2")
++    g_ = wait_for(lambda b: b.get("state") == "given_up", 15)
++    S[tag] = {"state": g_.get("state"), "why": g_.get("why")}
++    if how == "switch":
++        stream.gate.set()
++    S[tag + "_board_end"] = timed("board_end", "POST", "/plugins/games/party-minigame-end")["code"]   # as the board does
++    S[tag + "_closed"] = wait_for(lambda b: b.get("closed"), 20).get("closed")
++    S[tag + "_title_gone"] = wait_until(lambda: fake["ra"].poll() is not None, 10)
++    S[tag + "_board_kind"] = wait_until(lambda: call("GET", "/plugins/games/status")["body"].get("launch_kind") == "godot", 10)
++    S[tag + "_board_alive"] = (board_dir / "pid").exists()
++    S[tag + "_route_after"] = bridge._party_route
++    S[tag + "_picture_back"] = wait_until(lambda: stream.captured_pid == bp and stream.active, 15)
++    S[tag + "_rows"] = [r["step"] for r in rows()[r0:]]
++    if how != "switch":
++        hold.set(); mini.start = real
++    layer.start_limit_s, layer.switch_limit_s = 30.0, 15.0
++    timed("end_onn", "POST", "/plugins/games/stop")
++    wait_until(lambda: not (board_dir / "pid").exists(), 10)
++    client.in_stream = False
++
++
++give_up_case("stuck_watch", "watch")
++give_up_case("stuck_switch", "switch")
++finish()
+diff --git a/tests/b114_party_minigame_hang/test_b114.py b/tests/b114_party_minigame_hang/test_b114.py
+new file mode 100644
+index 0000000..54b90f6
+--- /dev/null
++++ b/tests/b114_party_minigame_hang/test_b114.py
+@@ -0,0 +1,199 @@
++#!/usr/bin/env python3
++"""B114 (host): the party mini game's start can no longer hang the companion — through the real HTTP server on loopback.
++
++PP-H3's second mini game hung the companion: the start held the manager's lock across the stream switch, whose end
++(the live bitrate controller's note) waited on the bitrate lock, held by a client-health report waiting on the
++manager's lock. This test runs **two mini games back to back through a live (stubbed) stream** with the hub's adopted
++lines that matter on (the live bitrate controller, the link recovery's stall worker and stall owner, the fast restart)
++and the onn's traffic from other threads (client-health every 0.1 s, heartbeats, stall datagrams; `status`,
++`native-stream-status` and `party-minigame-result` every 0.1 s; Home and RESUME during the first match). The stream
++stub has its own lock and its capture follows one process (that process gone → the stream down), as the real one.
++Then, after the fix: END from the onn during starting / playing / a hand-over each way / a stuck start, and a start
++stuck in the watch's start and in the stream switch given up by the hub. A start that never reaches `playing` within
++25 s (or a match that never ends within 40 s) makes the child write every thread's stack and leave: **the suite fails,
++it does not hang.** `B114_AGAINST=<rev>` runs the same scenario on that revision's companion (the record's HEAD run).
++Each flag absent → HEAD's answers byte for byte. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b114_party_minigame_hang -v
++"""
++from __future__ import annotations
++
++import io
++import json
++import os
++import re
++import shutil
++import subprocess
++import sys
++import tarfile
++import tempfile
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("art_systems", "b99_h7_live_read", "b102_h7_endscreen", "b103_h7_minigame", "b108_party_launch"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import _tmp_cleanup  # noqa: E402,F401
++import test_b85 as b85  # noqa: E402
++import test_b99 as b99  # noqa: E402
++import test_b103 as b103  # noqa: E402
++import test_b108 as b108  # noqa: E402
++
++BASELINE = "8fa398c8"                    # queue AQ's baseline (PP-H3 committed): the companion before B114
++ADOPTED = {"PRIVYHUB_ADAPTIVE_BITRATE_MODE": "live", "PRIVYHUB_LINK_RECOVERY": "1", "PRIVYHUB_RESTART_FAST": "1",
++           "PRIVYHUB_RESTART_FAST_UNLOCK": "1"}
++BOTH = {**b85.FLAGS, **ADOPTED, "PRIVYHUB_PARTY": "1", "PRIVYHUB_H7": "1"}
++SCENARIO = (HERE / "b114_scenario.py").read_text()
++WITHIN_S = 2.0
++CLOCK = re.compile(r'"(since_ms|elapsed_seconds)": [0-9.]+')   # the recovery's clock reading: not the code's answer
++
++
++def code_of(rev: str) -> Path | None:
++    try:
++        repo = os.environ.get("H7_GIT_REPO") or str(ROOT)
++        data = subprocess.run(["git", "-C", repo, "archive", rev, "companion"], capture_output=True, timeout=120,
++                              check=True).stdout
++    except (OSError, subprocess.SubprocessError):
++        return None
++    d = Path(tempfile.mkdtemp(prefix="b114_head_"))
++    with tarfile.open(fileobj=io.BytesIO(data)) as tf:
++        tf.extractall(d, filter="data")
++    return d
++
++
++def child() -> str:
++    return b103.CHILD.split('out = {"steps": {}}')[0] + SCENARIO
++
++
++def run(root: Path, env: dict, ids: dict, mode: str, timeout: int = 600) -> dict:
++    child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    child_env.update(env)
++    xdg = root / "xdg"
++    xdg.mkdir(exist_ok=True)
++    work = Path(tempfile.mkdtemp(prefix="b114_fx_"))
++    fx = b108.fixtures(work)
++    child_env.update({"XDG_CONFIG_HOME": str(xdg), "HOME": str(xdg), "PRIVYHUB_H7_RULES": str(root / "h7rules"),
++                      "PRIVYHUB_PARTY_CONFIG": str(work / "party.json"), "B108_BOARD_DIR": fx["board_dir"]})
++    (root / "tools").mkdir(exist_ok=True)
++    shutil.copyfile(ROOT / "tools" / "h7_endscreen.py", root / "tools" / "h7_endscreen.py")
++    frames, spec_dir, js = b103.fixtures(work)
++    try:
++        r = subprocess.run([sys.executable, "-I", "-B", "-c", child(), str(root),
++                            json.dumps({"id": ids[b85.PS1_TITLE], "mode": mode, "p1": b99.P1, "p2": b99.P2,
++                                        "frames": str(frames), "spec_dir": str(spec_dir), "start_s": 0.6, **fx})],
++                           cwd=root, env=child_env, capture_output=True, text=True, timeout=timeout)
++    finally:
++        # the stand-in board, if a hung run left it, is ended with the child (it exits by itself after 120 s)
++        try:
++            pid = int((Path(fx["board_dir"]) / "pid").read_text())
++            os.kill(pid, 15)
++        except (OSError, ValueError):
++            pass
++        shutil.rmtree(work, ignore_errors=True)
++    assert r.returncode == 0, r.stderr[-4000:]
++    if os.environ.get("B114_OUT"):                       # the record keeps the child's own answer
++        with open(os.environ["B114_OUT"], "a", encoding="utf-8") as fh:
++            fh.write(r.stdout.strip().splitlines()[-1] + "\n")
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++class NoHang(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        against = os.environ.get("B114_AGAINST")
++        code = code_of(against) if against else None
++        if against and code is None:
++            raise unittest.SkipTest("git is absent")
++        root, cls.ids = b99.tree(code)
++        cls.out = run(root, BOTH, cls.ids, "all")
++        cls.s = cls.out["steps"]
++
++    def test_0_two_mini_games_back_to_back_not_hung(self):
++        self.assertTrue(self.s["abr_live_same"] and self.s["stall_worker"])   # the adopted lines are live in the test
++        self.assertIsNone(self.out["hung"], json.dumps({k: self.out.get(k) for k in
++                                                        ("hung", "mg_thread", "waiting_on_emu_lock")}))
++        for tag, cls_, scores in (("m1", "end_P2", [0, 1]), ("m2", "end_P1", [1, 0])):
++            r = self.s[tag]
++            self.assertEqual((r["state"], r["class"], r["scores"]), ("ended", cls_, scores), (tag, r))
++            self.assertTrue(self.s[tag + "_closed"], tag)
++            self.assertTrue(self.s[tag + "_end_again"], tag)
++            self.assertTrue(self.s[tag + "_title_gone"], tag)
++            self.assertIsNone(self.s[tag + "_route_after"], tag)
++            self.assertEqual(self.s[tag + "_status_kind"], "godot", tag)
++            self.assertTrue(self.s[tag + "_board_picture_back"], tag)
++
++    def test_1_every_route_within_2_s(self):
++        """While a mini game is on (started and not yet finished); the calls with none on are today's code."""
++        lat = self.out["lat"]
++        for kind in ("status", "result", "ns_status", "home", "board_end", "end_onn", "start"):
++            self.assertIn(kind, lat)
++            self.assertLess(lat[kind]["max"], WITHIN_S, (kind, lat[kind], [x for x in self.out["slow"] if x[4]][:8]))
++        self.assertGreater(lat["status"]["n"], 100)
++        self.assertGreater(lat["result"]["n"], 100)
++
++    def test_2_no_lock_of_the_manager_inside_a_stream_start(self):
++        self.assertTrue(self.out["emu_lock_in_start"])
++        self.assertEqual(set(self.out["emu_lock_in_start"]), {False}, self.out["emu_lock_in_start"])
++
++    def test_3_home_and_resume_taken_at_once_and_acted_on_in_order(self):
++        self.assertEqual(self.s["m1_home"], {"code": 200, "taken": "home"})
++        self.assertIs(self.s["m1_title_paused_after_home"], True)             # Home paused the title
++        self.assertEqual(self.s["m1_resume"], {"start": 200, "start_active": True, "ready": 200, "released": True})
++        self.assertIs(self.s["m1_title_running_after_resume"], True)
++        steps = self.s["m1_rows"]
++        taken = [i for i, x in enumerate(steps) if x == "minigame_taken"]
++        self.assertGreaterEqual(len(taken), 3)                                 # home, resume start, resume ready
++
++    def test_4_end_from_the_onn_in_every_phase(self):
++        self._end_cases(("starting", "playing", "handover_in", "stuck"))
++
++    def test_4b_end_from_the_onn_during_the_hand_over_back(self):
++        """B115's way back (the switch before the title's stop) makes the hand-over back a step of the mini game."""
++        self._end_cases(("handover_back",))
++
++    def _end_cases(self, phases):
++        for when in phases:
++            tag = "end_" + when
++            self.assertEqual(self.s[tag + "_stop"], {"code": 200, "taken": "end"}, tag)
++            self.assertTrue(self.s[tag + "_gone"], (tag, self.s[tag + "_rows"]))   # the title and the board gone
++            self.assertTrue(self.s[tag + "_closed"], tag)
++            self.assertIn("F10", self.s[tag + "_keys"], tag)                     # the board quit by its own key
++            self.assertTrue(self.s[tag + "_active_after"], tag)
++            self.assertIsNone(self.s[tag + "_route_after"], tag)
++            if when != "handover_back":
++                self.assertIn("ended from the onn", self.s[tag + "_why"] or "", tag)
++
++    def test_5_a_stuck_start_given_up_by_the_hub(self):
++        self.assertEqual(self.s["stuck_watch"]["state"], "given_up")
++        self.assertIn("did not start within 3 s", self.s["stuck_watch"]["why"])
++        self.assertEqual(self.s["stuck_switch"]["state"], "given_up")
++        self.assertIn("switch did not finish within 2 s", self.s["stuck_switch"]["why"])
++        for tag in ("stuck_watch", "stuck_switch"):
++            self.assertTrue(self.s[tag + "_closed"], tag)
++            self.assertTrue(self.s[tag + "_title_gone"], tag)
++            self.assertTrue(self.s[tag + "_board_kind"], tag)                   # the board's session back
++            self.assertTrue(self.s[tag + "_board_alive"], tag)
++            self.assertIsNone(self.s[tag + "_route_after"], tag)
++            self.assertTrue(self.s[tag + "_picture_back"], tag)                 # the stream on the board again
++
++
++class FlagsAbsentAreToday(unittest.TestCase):
++    def test_each_flag_absent(self):
++        code = code_of(BASELINE)
++        if code is None:
++            self.skipTest("git is absent")
++        for env in ({**b85.FLAGS, **ADOPTED, "PRIVYHUB_PARTY": "1"}, {**b85.FLAGS, **ADOPTED, "PRIVYHUB_H7": "1"},
++                    {**b85.FLAGS, **ADOPTED}, {**b85.FLAGS, **ADOPTED, "PRIVYHUB_PARTY": "1", "PRIVYHUB_H7": "0"}):
++            root, ids = b99.tree(code)
++            base = run(root, env, ids, "today")
++            root2, ids2 = b99.tree()
++            mine = run(root2, env, ids2, "today")
++            for k in ("list", "start", "result", "end", "status_idle", "home_idle", "stop_idle"):
++                self.assertEqual((mine["steps"][k]["code"], CLOCK.sub("<ms>", mine["steps"][k]["raw"])),
++                                 (base["steps"][k]["code"], CLOCK.sub("<ms>", base["steps"][k]["raw"])), (env, k))
++            self.assertIn("Unknown Games plugin", base["steps"]["start"]["body"]["error"])
++
++
++if __name__ == "__main__":
++    unittest.main()

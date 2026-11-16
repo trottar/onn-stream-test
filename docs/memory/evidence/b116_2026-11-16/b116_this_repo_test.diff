@@ -1,0 +1,39 @@
+diff --git a/tests/b111_party_board/test_b111.py b/tests/b111_party_board/test_b111.py
+index 5a483f0..b1b107c 100644
+--- a/tests/b111_party_board/test_b111.py
++++ b/tests/b111_party_board/test_b111.py
+@@ -60,7 +60,9 @@ class FakeHub:
+                         body["state"] = "starting"
+                 elif action == "party-minigame-result":
+                     n = hub.polls[scenario] = hub.polls.get(scenario, 0) + 1
+-                    if n <= (3 if scenario == "slow" else 1):
++                    if scenario == "silent":                          # B116: the hub not answering
++                        code, body = 500, {"ok": False, "error": "the hub is busy"}
++                    elif n <= (3 if scenario in ("slow", "teardown") else 1):
+                         body.update(state="playing", recognised=True)
+                     elif scenario == "giveup":
+                         body.update(state="given_up", why="no end within 900 s", scores=None)
+@@ -117,7 +119,7 @@ class BoardCheck(unittest.TestCase):
+     def test_with_the_checks_own_stand_in_hub(self):
+         r = run_check({})
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+-        self.assertIn("HUB MINIGAME CHECK: PASS (20 assertions)", r.stdout)
++        self.assertIn("HUB MINIGAME CHECK: PASS (34 assertions)", r.stdout)   # B116: 20 + 14 on the frame rate
+ 
+     def test_against_this_tests_fake_hub(self):
+         hub = FakeHub()
+@@ -126,10 +128,12 @@ class BoardCheck(unittest.TestCase):
+         finally:
+             hub.close()
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+-        self.assertIn("HUB MINIGAME CHECK: PASS (14 assertions)", r.stdout)   # its five "asked" ones and "listens" are ours here
++        # its five "asked" ones, "listens" and (B116) the five frame-rate ones it reads at its own hub are ours here
++        self.assertIn("HUB MINIGAME CHECK: PASS (23 assertions)", r.stdout)
+         starts = [c for c in hub.calls if "party-minigame-start" in c]
+         self.assertIn("/s/win1/plugins/games/party-minigame-start?id=mg_one&seats=1,2", starts)
+-        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 5)   # every started one
++        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 8)   # every started one
++        self.assertIn("PrivyParty: hub mini game: a draw: the hub stopped answering", r.stdout)   # B116's silent hub
+         self.assertFalse(any(c.startswith("/s/refused/") and c.endswith("party-minigame-end") for c in hub.calls))
+         self.assertIn("PrivyParty: hub mini game: a draw: the hub gave it up (no end within 900 s)", r.stdout)
+         self.assertIn("PrivyParty: hub mini game: a draw: no hub (no hub)", r.stdout)

@@ -1,0 +1,30 @@
+B114 state (HEAD 8fa398c8 + B114), 2026-11-16T21:10:47Z, a work copy, TMPDIR on the main disk
+test_each_flag_absent (test_b114.FlagsAbsentAreToday.test_each_flag_absent) ... ok
+test_0_two_mini_games_back_to_back_not_hung (test_b114.NoHang.test_0_two_mini_games_back_to_back_not_hung) ... ok
+While a mini game is on (started and not yet finished); the calls with none on are today's code. ... ok
+test_2_no_lock_of_the_manager_inside_a_stream_start (test_b114.NoHang.test_2_no_lock_of_the_manager_inside_a_stream_start) ... ok
+test_3_home_and_resume_taken_at_once_and_acted_on_in_order (test_b114.NoHang.test_3_home_and_resume_taken_at_once_and_acted_on_in_order) ... ok
+test_4_end_from_the_onn_in_every_phase (test_b114.NoHang.test_4_end_from_the_onn_in_every_phase) ... ok
+B115's way back (the switch before the title's stop) makes the hand-over back a step of the mini game. ... FAIL
+test_5_a_stuck_start_given_up_by_the_hub (test_b114.NoHang.test_5_a_stuck_start_given_up_by_the_hub) ... ok
+AssertionError: {'code': 200, 'taken': None} != {'code': 200, 'taken': 'end'}
+Ran 8 tests in 91.323s
+FAILED (failures=1)
+the same test against HEAD 8fa398c8's companion (B114_AGAINST), 2026-11-16T21:12:19Z
+test_0_two_mini_games_back_to_back_not_hung (tests.b114_party_minigame_hang.test_b114.NoHang.test_0_two_mini_games_back_to_back_not_hung) ... FAIL
+While a mini game is on (started and not yet finished); the calls with none on are today's code. ... FAIL
+test_2_no_lock_of_the_manager_inside_a_stream_start (tests.b114_party_minigame_hang.test_b114.NoHang.test_2_no_lock_of_the_manager_inside_a_stream_start) ... FAIL
+test_3_home_and_resume_taken_at_once_and_acted_on_in_order (tests.b114_party_minigame_hang.test_b114.NoHang.test_3_home_and_resume_taken_at_once_and_acted_on_in_order) ... ERROR
+test_4_end_from_the_onn_in_every_phase (tests.b114_party_minigame_hang.test_b114.NoHang.test_4_end_from_the_onn_in_every_phase) ... ERROR
+B115's way back (the switch before the title's stop) makes the hand-over back a step of the mini game. ... ERROR
+test_5_a_stuck_start_given_up_by_the_hub (tests.b114_party_minigame_hang.test_b114.NoHang.test_5_a_stuck_start_given_up_by_the_hub) ... ERROR
+KeyError: 'm1_home'
+KeyError: 'end_starting_stop'
+KeyError: 'end_handover_back_stop'
+KeyError: 'stuck_watch'
+AssertionError: 'm1: never playing (starting)' is not None : {"hung": "m1: never playing (starting)", "mg_thread": [{"thread": "party-minigame", "top": ["threading.py:_bootstrap_inner:1043", "threading.py:run:994", "party_minigame.py:_run:172", "party_minigame.py:_switch_stream:140", "games.py:_recovery_full_start_encoder:488", "adaptive_bitrate_live.py:note_recovery_restart:1064"]}], "waiting_on_emu_lock": 5}
+AssertionError: 12.012 not less than 2.0 : ('status', {'n': 2, 'max': 12.012}, [['ns_status', 12.01, 13.04, 0, True], ['status', 12.012, 13.044, 0, True], ['ns_status', 12.012, 25.153, 0, True], ['status', 12.012, 25.156, 0, True]])
+AssertionError: Items in the first set but not the second:
+Ran 7 tests in 29.162s
+FAILED (failures=3, errors=4)
+temp dirs left: 2

@@ -1,0 +1,353 @@
+{
+ "run": "B114's test on HEAD + B114 (the work copy of B114's state)",
+ "hung": null,
+ "answers": {
+  "result_no_minigame": {
+   "n": 224,
+   "max": 0.011
+  },
+  "ns_status_no_minigame": {
+   "n": 137,
+   "max": 2.993
+  },
+  "status_no_minigame": {
+   "n": 126,
+   "max": 2.954
+  },
+  "start": {
+   "n": 9,
+   "max": 0.004
+  },
+  "heartbeat": {
+   "n": 156,
+   "max": 0.003
+  },
+  "result": {
+   "n": 398,
+   "max": 0.003
+  },
+  "client_health": {
+   "n": 319,
+   "max": 2.914
+  },
+  "ns_status": {
+   "n": 215,
+   "max": 1.502
+  },
+  "status": {
+   "n": 213,
+   "max": 1.502
+  },
+  "home": {
+   "n": 1,
+   "max": 0.006
+  },
+  "resume_start": {
+   "n": 1,
+   "max": 0.605
+  },
+  "resume_ready": {
+   "n": 1,
+   "max": 0.007
+  },
+  "board_end": {
+   "n": 5,
+   "max": 0.006
+  },
+  "heartbeat_no_minigame": {
+   "n": 66,
+   "max": 0.002
+  },
+  "end_onn": {
+   "n": 5,
+   "max": 1.502
+  },
+  "end_onn_no_minigame": {
+   "n": 2,
+   "max": 2.994
+  }
+ },
+ "slow_answers_all": [
+  [
+   "end_onn",
+   2.994,
+   40.877,
+   200,
+   false
+  ],
+  [
+   "status",
+   2.954,
+   40.877,
+   200,
+   false
+  ],
+  [
+   "ns_status",
+   2.993,
+   40.879,
+   200,
+   false
+  ]
+ ],
+ "manager_lock_held_inside_a_stream_start": [
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  false
+ ],
+ "m1": {
+  "m1": {
+   "ok": true,
+   "state": "ended",
+   "seats": [
+    1,
+    2
+   ],
+   "recognised": true,
+   "class": "end_P2",
+   "scores": [
+    0,
+    1
+   ],
+   "why": null,
+   "closed": false,
+   "since_s": 8.0
+  },
+  "m1_home": {
+   "code": 200,
+   "taken": "home"
+  },
+  "m1_resume": {
+   "start": 200,
+   "start_active": true,
+   "ready": 200,
+   "released": true
+  },
+  "m1_title_paused_after_home": true,
+  "m1_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_watch",
+   "minigame_playing",
+   "minigame_taken",
+   "minigame_taken",
+   "minigame_taken",
+   "minigame_ended",
+   "minigame_taken",
+   "minigame_restore",
+   "minigame_stream",
+   "minigame_end"
+  ],
+  "m1_board_picture_s": 3.26
+ },
+ "m2": {
+  "m2": {
+   "ok": true,
+   "state": "ended",
+   "seats": [
+    1,
+    2
+   ],
+   "recognised": true,
+   "class": "end_P1",
+   "scores": [
+    1,
+    0
+   ],
+   "why": null,
+   "closed": false,
+   "since_s": 3.2
+  },
+  "m2_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_watch",
+   "minigame_playing",
+   "minigame_ended",
+   "minigame_taken",
+   "minigame_restore",
+   "minigame_stream",
+   "minigame_end"
+  ],
+  "m2_board_picture_s": 3.37
+ },
+ "end_cases": {
+  "end_starting_state_at_end": "starting",
+  "end_starting_stop": {
+   "code": 200,
+   "taken": "end"
+  },
+  "end_starting_gone": true,
+  "end_starting_why": "ended from the onn",
+  "end_starting_rows": [
+   "minigame_start",
+   "minigame_given_up",
+   "minigame_taken",
+   "minigame_launch",
+   "minigame_restore",
+   "minigame_end",
+   "quit",
+   "exited"
+  ],
+  "end_playing_state_at_end": "playing",
+  "end_playing_stop": {
+   "code": 200,
+   "taken": "end"
+  },
+  "end_playing_gone": true,
+  "end_playing_why": "ended from the onn",
+  "end_playing_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_watch",
+   "minigame_playing",
+   "minigame_given_up",
+   "minigame_taken",
+   "minigame_restore",
+   "minigame_end",
+   "quit",
+   "exited"
+  ],
+  "end_handover_in_state_at_end": "starting",
+  "end_handover_in_stop": {
+   "code": 200,
+   "taken": "end"
+  },
+  "end_handover_in_gone": true,
+  "end_handover_in_why": "ended from the onn",
+  "end_handover_in_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_given_up",
+   "minigame_taken",
+   "minigame_stream",
+   "minigame_restore",
+   "minigame_end",
+   "quit",
+   "exited"
+  ],
+  "end_handover_back_state_at_end": "ended",
+  "end_handover_back_stop": {
+   "code": 200,
+   "taken": null
+  },
+  "end_handover_back_gone": true,
+  "end_handover_back_why": null,
+  "end_handover_back_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_watch",
+   "minigame_playing",
+   "minigame_ended",
+   "minigame_taken",
+   "minigame_restore",
+   "minigame_stream",
+   "minigame_end",
+   "pause",
+   "quit",
+   "exited"
+  ],
+  "end_stuck_state_at_end": "starting",
+  "end_stuck_stop": {
+   "code": 200,
+   "taken": "end"
+  },
+  "end_stuck_gone": true,
+  "end_stuck_why": "ended from the onn",
+  "end_stuck_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_given_up",
+   "minigame_taken",
+   "minigame_stuck",
+   "minigame_restore",
+   "minigame_end",
+   "quit",
+   "exited",
+   "minigame_stream"
+  ]
+ },
+ "stuck": {
+  "stuck_watch_board_launch": 200,
+  "stuck_watch": {
+   "state": "given_up",
+   "why": "the mini game did not start within 3 s"
+  },
+  "stuck_watch_board_end": 200,
+  "stuck_watch_closed": true,
+  "stuck_watch_title_gone": true,
+  "stuck_watch_board_kind": true,
+  "stuck_watch_board_alive": true,
+  "stuck_watch_route_after": null,
+  "stuck_watch_picture_back": true,
+  "stuck_watch_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_given_up",
+   "minigame_taken",
+   "minigame_stuck",
+   "minigame_restore",
+   "minigame_stream",
+   "minigame_end",
+   "pause",
+   "resume"
+  ],
+  "stuck_switch_board_launch": 200,
+  "stuck_switch": {
+   "state": "given_up",
+   "why": "the mini game did not start: the stream switch did not finish within 2 s"
+  },
+  "stuck_switch_board_end": 200,
+  "stuck_switch_closed": true,
+  "stuck_switch_title_gone": true,
+  "stuck_switch_board_kind": true,
+  "stuck_switch_board_alive": true,
+  "stuck_switch_route_after": null,
+  "stuck_switch_picture_back": true,
+  "stuck_switch_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_given_up",
+   "minigame_taken",
+   "minigame_restore",
+   "minigame_stream",
+   "minigame_end",
+   "resume",
+   "pause",
+   "resume"
+  ]
+ }
+}

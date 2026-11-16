@@ -1,0 +1,372 @@
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index c26d96c..f96e8fa 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -60,6 +60,8 @@ RESUME_WAIT_S = 25.0        # a taken RESUME waits its turn this long (the onn's
+ READ_WAIT_S = 1.5           # a status read waits this long before the last snapshot answers
+ EMU_TRY_S = 0.2             # the manager's lock is tried in steps of this, an END checked between
+ MANAGER_BOUND_S = 10.0      # the end's manager calls: give up the wait after this (the title then ended directly)
++# B115
++PLANNED_GRACE_S = 3.0       # the planned-switch window stays open this long after the switch's start returns
+ # the onn's calls taken while a mini game is on (route → kind)
+ TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
+          "stop": "end"}
+@@ -76,6 +78,67 @@ class _Abort(Exception):
+     """The start's steps stop: an end was asked for (or done) while starting."""
+ 
+ 
++class PlannedSwitch:
++    """B115: the recovery told that a capture restart is planned (`recovery._planned_switch`, set only here): while
++    the window is open the client's video-stall datagrams (stall / stall end) and its desync are not taken — no
++    client_stall, no desync_pause, no stall save, no stall_handover_v2, no key to the board. The window opens just
++    before a mini game's switch and closes PLANNED_GRACE_S after the switch's start returns. What still counts: the
++    controller's silence (the pads' packets stopping), a stall that outlasts the window, the recovery's own monitor."""
++
++    def __init__(self, clock=time.monotonic):
++        self.clock = clock
++        self._lock = threading.Lock()
++        self.seq = 0
++        self.windows: dict[int, dict] = {}        # each switch's own window (two may overlap by their grace)
++
++    def open(self, which: str, bound_s: float) -> int:
++        with self._lock:
++            self.seq += 1
++            now = self.clock()
++            self.windows[self.seq] = {"which": which, "opened_at": now, "until": now + bound_s,
++                                      "counts": {"stall": 0, "end": 0, "desync": 0}}
++            for old in [k for k in self.windows if k <= self.seq - 8]:
++                del self.windows[old]
++            return self.seq
++
++    def close_after(self, seq: int, grace_s: float) -> float | None:
++        with self._lock:
++            w = self.windows.get(seq)
++            if w is None:
++                return None
++            w["until"] = min(w["until"], self.clock() + grace_s)
++            return w["until"]
++
++    def _covering(self, at: float) -> dict | None:
++        for k in sorted(self.windows, reverse=True):
++            w = self.windows[k]
++            if w["opened_at"] <= at <= w["until"]:
++                return w
++        return None
++
++    def covers(self, at: float | None = None) -> bool:
++        with self._lock:
++            return self._covering(self.clock() if at is None else at) is not None
++
++    def swallow(self, what: str, at: float | None = None) -> bool:
++        """True (and counted) when `what` ("stall" / "end" / "desync") falls in an open window: not taken."""
++        with self._lock:
++            w = self._covering(self.clock() if at is None else at)
++            if w is None:
++                return False
++            w["counts"][what] = w["counts"].get(what, 0) + 1
++            return True
++
++    def report(self, seq: int) -> dict | None:
++        with self._lock:
++            w = self.windows.get(seq)
++            if w is None:
++                return None
++            return {"window": w["which"], "open_s": round(w["until"] - w["opened_at"], 2),
++                    "stalls_not_taken": w["counts"]["stall"], "stall_ends_not_taken": w["counts"]["end"],
++                    "desyncs_not_taken": w["counts"]["desync"]}
++
++
+ class PartyMinigames:
+     def __init__(self, plugin: Any, environ=os.environ, clock=time.monotonic):
+         self.p = plugin
+@@ -222,25 +285,70 @@ class PartyMinigames:
+             return False, None
+         return True, box.get("e", box.get("r"))
+ 
+-    def _switch_stream(self, which: str) -> bool:
+-        """The onn's stream to the other window: the recovery's own full start, on a helper thread with no lock held,
+-        waited for at most switch_limit_s. True when switched."""
++    def _planned(self) -> PlannedSwitch:
++        rec = self.p._recovery
++        ps = getattr(rec, "_planned_switch", None)
++        if ps is None:
++            ps = rec._planned_switch = PlannedSwitch()
++        return ps
++
++    def _note_bitrate_planned(self) -> None:
++        """B115: the bitrate controller told of the new SSRC (its blackout, as for any restart) but not as a recovery
++        restart: no escalation count, so no escalation step for a planned switch."""
++        try:
++            import adaptive_bitrate_live as abl
++            abr = getattr(self.p, "_adaptive_bitrate", None)
++            if abl.is_live(abr):
++                with abr._lock:
++                    abr._emit(abr._policy.note_ssrc_change("minigame_switch"), None)
++        except Exception:
++            pass
++
++    def _switch_stream(self, which: str, pid: int | None = None) -> bool:
++        """The onn's stream to the other window (B115: a planned switch for `pid`, the recovery told): the stream's own
++        start for that process, with the remembered client, on a helper thread with no lock held (B114), waited for at
++        most switch_limit_s. True when switched."""
+         if not self.stream_needed or not self.p._recovery_stream_active():
+             self.row({"step": "minigame_stream", "window": which, "switched": False, "why": "the stream is not up"})
+             return False
++        args = getattr(self.p, "_recovery_start_args", None)
++        if not isinstance(args, dict) or not args.get("client_ip") or pid is None:
++            self.row({"step": "minigame_stream", "window": which, "switched": False,
++                      "why": "no remembered client or no process"})
++            return False
++        ps = self._planned()
++        seq = ps.open(which, self.switch_limit_s + PLANNED_GRACE_S)
+         t0 = self.clock()
+-        done, res = self._bounded(self.p._recovery_full_start_encoder, self.switch_limit_s)
++        ns = self.p._native_stream
++
++        def go():
++            return ns.start(client_ip=str(args["client_ip"]), port=int(args["port"]), managed_process_id=int(pid))
++        try:
++            done, res = self._bounded(go, self.switch_limit_s)
++        finally:
++            until = ps.close_after(seq, PLANNED_GRACE_S)
++            threading.Thread(target=self._window_row, args=(ps, seq, until), daemon=True,
++                             name="party-minigame-window").start()
+         if not done:
+-            self.row({"step": "minigame_stream", "window": which, "switched": False,
++            self.row({"step": "minigame_stream", "window": which, "switched": False, "planned": True,
+                       "why": f"the switch did not finish within {self.switch_limit_s:.0f} s"})
+             raise TimeoutError(f"the stream switch did not finish within {self.switch_limit_s:.0f} s")
+         if isinstance(res, BaseException):
+-            self.row({"step": "minigame_stream", "window": which, "switched": False, "why": str(res)[:160]})
++            self.row({"step": "minigame_stream", "window": which, "switched": False, "planned": True,
++                      "why": str(res)[:160]})
+             return False
+-        self.row({"step": "minigame_stream", "window": which, "switched": True,
++        self._note_bitrate_planned()
++        self.row({"step": "minigame_stream", "window": which, "switched": True, "planned": True,
+                   "seconds": round(self.clock() - t0, 3)})
+         return True
+ 
++    def _window_row(self, ps: PlannedSwitch, seq: int, until: float | None) -> None:
++        if until is not None:
++            time.sleep(max(0.0, until - self.clock()) + 0.05)
++        rep = ps.report(seq)
++        if rep is not None:
++            self.row({"step": "minigame_switch_window", **rep})
++
+     # --- the actor: the start's steps, then every taken call in order -------------------------------------------------
+     def _step(self, mg: dict, name: str, fn: Callable[[], Any]):
+         with self._cond:
+@@ -278,7 +386,7 @@ class PartyMinigames:
+             mg["routed"] = True
+         self.row({"step": "minigame_route", "ports": {str(k + 1): s for k, s in enumerate(mg["seats"])},
+                   "routed": mg["routed"]})
+-        if self._step(mg, "switch", lambda: self._switch_stream("minigame")):
++        if self._step(mg, "switch", lambda: self._switch_stream("minigame", getattr(proc, "pid", None))):
+             mg["switched_to"] = "minigame"
+         runner = self.p._h7_minigame_runner()
+         self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed))
+@@ -541,12 +649,25 @@ class PartyMinigames:
+             pass
+ 
+     def _end_steps(self, mg: dict, by: str, inline: bool) -> None:
++        """B115's way back: the route cleared, **the stream switched to the board while the title still runs** (the
++        board's own pid: the title's stop cannot take the stream), **then** the title stopped, then the board's
++        session back. END from the onn and the manager's stop (the session ends): no switch."""
+         emu = self.emu
+         if mg["state"] not in FINAL:
+             self._final(mg, "given_up", why=f"ended before a result ({by})")
+         self._bounded(lambda: self.p._h7_minigame_runner().stop(), 2.0)
+         if emu._party_mg_stop_hook is not None:
+             emu._party_mg_stop_hook = None
++        if mg.get("routed"):
++            bridge = self._bridge()
++            if bridge is not None:
++                bridge.set_party_route(None)
++        board = (mg.get("stash") or {}).get("process")
++        if by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:
++            try:
++                self._switch_stream("board", getattr(board, "pid", None))
++            except Exception:
++                pass
+         title = mg.get("title_proc")
+ 
+         def stop_title():
+@@ -561,23 +682,16 @@ class PartyMinigames:
+             except Exception as exc:
+                 self.row({"step": "minigame_end", "title_stop_failed": str(exc)[:160]})
+             self._kill(title)                    # whatever the manager's stop did, the title is not left running
+-        if mg.get("routed"):
+-            bridge = self._bridge()
+-            if bridge is not None:
+-                bridge.set_party_route(None)
++            self.row({"step": "minigame_title_stopped"})
+         try:
+-            restored = (emu._party_stash_end() if inline else
+-                        self._emu_call(None, emu._party_stash_end, bound=MANAGER_BOUND_S, abort=False))
+-            del restored
++            if inline:
++                emu._party_stash_end()
++            else:
++                self._emu_call(None, emu._party_stash_end, bound=MANAGER_BOUND_S, abort=False)
+             self.row({"step": "minigame_restore", "board_alive": emu.process is not None
+                       and emu.process.poll() is None})
+         except Exception as exc:
+             self.row({"step": "minigame_restore", "failed": str(exc)[:160]})
+-        if by not in ("stop", "onn") and not inline:     # END / another launch: the stream ends with the session
+-            try:
+-                self._switch_stream("board")
+-            except Exception:
+-                pass
+ 
+     def _end_by_stop(self, mg: dict) -> dict:
+         """The manager's stop with a mini game on (another launch, launch_orphaned — its caller holds the manager's
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 4ad941c..5aacc5e 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4129,10 +4129,13 @@ class GamesPlugin:
+                 -1,
+             )
+ 
+-            self._recovery.note_client_desync(
+-                reason,
+-                float(age_ms),
+-            )
++            # B115: a party mini game's planned switch: the client's desync accepted, not acted on
++            planned = getattr(self._recovery, "_planned_switch", None) if _party_minigame is not None else None
++            if planned is None or not planned.swallow("desync"):
++                self._recovery.note_client_desync(
++                    reason,
++                    float(age_ms),
++                )
+ 
+             return {
+                 "ok": True,
+diff --git a/companion/stall_signal.py b/companion/stall_signal.py
+index 6df3ee5..0f47da2 100644
+--- a/companion/stall_signal.py
++++ b/companion/stall_signal.py
+@@ -138,6 +138,10 @@ class StallSignal:
+             if se is not None:
+                 se.note_bye(rx, frame)
+             return
++        # B115: a party mini game's planned capture restart: the client's stall / stall end in its window not taken
++        ps = getattr(self.recovery, "_planned_switch", None)
++        if ps is not None and ps.swallow("stall" if kind == KIND_STALL else "end", rx):
++            return
+         state, reason, _key = self._state()
+         if kind == KIND_STALL:
+             self.stalls += 1
+diff --git a/tests/b115_party_handovers/test_b115.py b/tests/b115_party_handovers/test_b115.py
+new file mode 100644
+index 0000000..c49a4c7
+--- /dev/null
++++ b/tests/b115_party_handovers/test_b115.py
+@@ -0,0 +1,106 @@
++#!/usr/bin/env python3
++"""B115 (host): the mini game's hand-overs made planned — through the real HTTP server on loopback.
++
++B114's harness (its stream stub with its own lock and a capture that follows one process, the onn's client thread
++with client-health, heartbeats and stall datagrams through the real stall worker, status / result /
++native-stream-status every 0.1 s) with the hub's adopted lines on: **three mini games back to back** (Home / RESUME in
++the first; a real stall — the client's video stopping while the title plays, outside the switch windows — in the
++third). Checked: **the way back switches the stream to the board before the title stops** (switched true, the stream
++never down, the title's stop row after the switch's), **the way in the same**; across every hand-over **no**
++client_stall / desync_pause / stall_handover_v2 / encoder_restart / resumed row, **no** escalation or bitrate step,
++**no key to the board**, while the client did stall during each restart (the stalls sent and not taken, counted in
++the window's row); the real stall handled as today (the title paused, no key to the board, resumed); every route
++< 2 s while a mini game is on. Each flag absent → today: B114's flag test (the real routes against HEAD's code), and
++the stall worker with no window attribute is today's (its suites). Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b115_party_handovers -v
++"""
++from __future__ import annotations
++
++import os
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "b114_party_minigame_hang"))
++import test_b114 as b114  # noqa: E402  (its harness; its tests are not collected here)
++
++RECOVERY_ACTS = ("client_stall", "desync_pause", "stall_handover_v2", "encoder_restart", "resumed", "gave_up_saved",
++                 "input_hold_handover", "stall_resume_failed")
++
++
++class Handovers(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, cls.ids = b114.b99.tree()
++        cls.out = b114.run(root, b114.BOTH, cls.ids, "three")
++        cls.s = cls.out["steps"]
++
++    def test_0_three_back_to_back(self):
++        self.assertIsNone(self.out["hung"], self.out.get("mg_thread"))
++        for tag, cls_, scores in (("m1", "end_P2", [0, 1]), ("m2", "end_P1", [1, 0]), ("m3", "end_P1", [1, 0])):
++            r = self.s[tag]
++            self.assertEqual((r["state"], r["class"], r["scores"]), ("ended", cls_, scores), (tag, r))
++            self.assertTrue(self.s[tag + "_closed"] and self.s[tag + "_title_gone"], tag)
++            self.assertIsNone(self.s[tag + "_route_after"], tag)
++            self.assertEqual(self.s[tag + "_status_kind"], "godot", tag)
++
++    def test_1_the_way_back_switches_before_the_title_stops(self):
++        board = self.out["board_pid"]
++        for tag in ("m1", "m2", "m3"):
++            sw = self.s[tag + "_switches"]
++            self.assertEqual([(x["window"], x["switched"], x.get("planned")) for x in sw],
++                             [("minigame", True, True), ("board", True, True)], (tag, sw))
++            rows = self.s[tag + "_rows"]
++            back = max(i for i, x in enumerate(rows) if x == "minigame_stream")
++            self.assertLess(back, rows.index("minigame_title_stopped"), (tag, rows))   # the switch, then the title
++            ev = self.s[tag + "_stream_events"]
++            self.assertNotIn("down", [e[0] for e in ev], (tag, ev))                     # the stream never went down
++            starts = [e for e in ev if e[0] == "start"]
++            self.assertEqual(starts[-1][1], board, (tag, ev))                            # the board's own window
++            self.assertTrue(self.s[tag + "_board_picture_back"], tag)
++            self.assertLess(self.s[tag + "_board_picture_s"], 1.0, tag)                  # already back at the end
++
++    def test_2_the_recovery_stays_out_of_both_hand_overs(self):
++        for tag in ("m1", "m2"):
++            acts = [x for x in self.s[tag + "_rec"] if x in RECOVERY_ACTS]
++            # m1's Home / RESUME end and start the recovery's session (session_ended / session_started): not acts
++            self.assertEqual(acts, [], (tag, self.s[tag + "_rec"]))
++        stall_rows = [x[0] for x in self.s["m3_stall_rec"]]
++        m3_acts = [x for x in self.s["m3_rec"] if x in RECOVERY_ACTS]
++        self.assertEqual(sorted(m3_acts), sorted(x for x in stall_rows if x in RECOVERY_ACTS))   # only the real stall's
++        for tag in ("m1", "m2", "m3"):
++            self.assertEqual(self.s[tag + "_keys_all"], [], tag)                         # no key to the board at all
++            wins = self.s[tag + "_windows"]
++            self.assertEqual([w["window"] for w in wins], ["minigame", "board"], (tag, wins))
++            self.assertGreater(sum(w["stalls_not_taken"] for w in wins), 0, (tag, wins))  # the client did stall
++
++    def test_3_no_escalation_no_bitrate_step(self):
++        events = [e[0] for e in self.s["abr_all"]]
++        self.assertNotIn("escalation_armed", events, self.s["abr_all"])
++        self.assertNotIn("transition", events, self.s["abr_all"])
++        sources = [e[1] for e in self.s["abr_all"] if e[0] == "ssrc_change"]
++        self.assertEqual(sources.count("minigame_switch"), 6, self.s["abr_all"])       # two per mini game, planned
++        self.assertNotIn("recovery_full_start", sources)
++
++    def test_4_a_real_stall_during_a_mini_game_is_handled_as_today(self):
++        self.assertTrue(self.s["m3_paused_by_stall"])                                    # the title paused
++        self.assertTrue(self.s["m3_resumed_after_stall"])
++        rows = self.s["m3_stall_rec"]
++        self.assertIn(["desync_pause", "client_stall"], rows, rows)
++        self.assertIn("resumed", [x[0] for x in rows], rows)
++        self.assertEqual(self.s["m3_stall_keys"], [])                                    # the title's, not the board's
++
++    def test_5_every_route_within_2_s_and_home_resume_in_order(self):
++        lat = self.out["lat"]
++        for kind in ("status", "result", "ns_status", "home", "board_end", "start"):
++            self.assertLess(lat[kind]["max"], b114.WITHIN_S, (kind, lat[kind]))
++        self.assertEqual(self.s["m1_home"], {"code": 200, "taken": "home"})
++        self.assertIs(self.s["m1_title_paused_after_home"], True)
++        self.assertEqual(self.s["m1_resume"], {"start": 200, "start_active": True, "ready": 200, "released": True})
++
++
++if __name__ == "__main__":
++    unittest.main()

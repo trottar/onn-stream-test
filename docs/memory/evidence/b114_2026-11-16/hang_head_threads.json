@@ -1,0 +1,156 @@
+{
+ "run": "B114's test against HEAD 8fa398c8's companion (B114_AGAINST=8fa398c8), mini game 1",
+ "hung": "m1: never playing (starting)",
+ "the_start_thread": [
+  {
+   "thread": "party-minigame",
+   "top": [
+    "threading.py:_bootstrap_inner:1043",
+    "threading.py:run:994",
+    "party_minigame.py:_run:172",
+    "party_minigame.py:_switch_stream:140",
+    "games.py:_recovery_full_start_encoder:488",
+    "adaptive_bitrate_live.py:note_recovery_restart:1064"
+   ]
+  }
+ ],
+ "rows_of_mini_game_1": [
+  "minigame_start",
+  "minigame_launch",
+  "minigame_route"
+ ],
+ "answers_while_hung": {
+  "result_no_minigame": {
+   "n": 10,
+   "max": 0.013
+  },
+  "ns_status_no_minigame": {
+   "n": 5,
+   "max": 0.508
+  },
+  "status_no_minigame": {
+   "n": 3,
+   "max": 0.508
+  },
+  "start": {
+   "n": 1,
+   "max": 0.003
+  },
+  "heartbeat": {
+   "n": 100,
+   "max": 0.003
+  },
+  "result": {
+   "n": 246,
+   "max": 0.002
+  },
+  "client_health": {
+   "n": 2,
+   "max": 12.013
+  },
+  "ns_status": {
+   "n": 2,
+   "max": 12.012
+  },
+  "status": {
+   "n": 2,
+   "max": 12.012
+  }
+ },
+ "slow_answers": [
+  [
+   "ns_status",
+   12.01,
+   13.04,
+   0,
+   true
+  ],
+  [
+   "status",
+   12.012,
+   13.044,
+   0,
+   true
+  ],
+  [
+   "ns_status",
+   12.012,
+   25.153,
+   0,
+   true
+  ],
+  [
+   "status",
+   12.012,
+   25.156,
+   0,
+   true
+  ]
+ ],
+ "threads_by_where_they_wait": [
+  {
+   "threads": 3,
+   "thread_name": "Thread-# (process_request_thread)",
+   "top_frames": [
+    "privyhub_service.py:do_GET:2146",
+    "games.py:handle:3437",
+    "emulator_manager.py:status:402"
+   ]
+  },
+  {
+   "threads": 3,
+   "thread_name": "Thread-# (process_request_thread)",
+   "top_frames": [
+    "privyhub_service.py:do_GET:2146",
+    "games.py:handle:3454",
+    "adaptive_bitrate_live.py:status:1153"
+   ]
+  },
+  {
+   "threads": 2,
+   "thread_name": "Thread-# (process_request_thread)",
+   "top_frames": [
+    "privyhub_service.py:_native_stream_status:2063",
+    "games.py:handle:3454",
+    "adaptive_bitrate_live.py:status:1153"
+   ]
+  },
+  {
+   "threads": 1,
+   "thread_name": "Thread-# (process_request_thread)",
+   "top_frames": [
+    "adaptive_bitrate_live.py:_ctx:904",
+    "games.py:_adaptive_bitrate_context:417",
+    "emulator_manager.py:status:402"
+   ]
+  },
+  {
+   "threads": 1,
+   "thread_name": "party-minigame",
+   "top_frames": [
+    "party_minigame.py:_switch_stream:140",
+    "games.py:_recovery_full_start_encoder:488",
+    "adaptive_bitrate_live.py:note_recovery_restart:1064"
+   ]
+  },
+  {
+   "threads": 1,
+   "thread_name": "PrivyHub-Link-Drop-Recovery",
+   "top_frames": [
+    "threading.py:_bootstrap_inner:1043",
+    "threading.py:run:994",
+    "link_drop_recovery.py:_monitor_loop:787"
+   ]
+  },
+  {
+   "threads": 1,
+   "thread_name": "PrivyHub-Stall-Signal",
+   "top_frames": [
+    "stall_signal.py:handle:155",
+    "link_drop_recovery.py:_enter_recovery:502",
+    "emulator_manager.py:pause:8482"
+   ]
+  }
+ ],
+ "threads_total": 22
+}

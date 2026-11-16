@@ -1,0 +1,397 @@
+{
+ "run": "tests/b115_party_handovers on the tree (HEAD 8fa398c8 + B114 + B115), three mini games back to back",
+ "answers_while_a_mini_game_is_on_s": {
+  "start": {
+   "n": 3,
+   "max": 0.005
+  },
+  "heartbeat": {
+   "n": 104,
+   "max": 0.003
+  },
+  "result": {
+   "n": 267,
+   "max": 0.003
+  },
+  "client_health": {
+   "n": 304,
+   "max": 0.589
+  },
+  "ns_status": {
+   "n": 229,
+   "max": 0.528
+  },
+  "status": {
+   "n": 221,
+   "max": 0.6
+  },
+  "home": {
+   "n": 1,
+   "max": 0.007
+  },
+  "resume_start": {
+   "n": 1,
+   "max": 0.607
+  },
+  "resume_ready": {
+   "n": 1,
+   "max": 0.01
+  },
+  "board_end": {
+   "n": 3,
+   "max": 0.61
+  }
+ },
+ "answers_with_no_mini_game_on_s": {
+  "result_no_minigame": {
+   "n": 101,
+   "max": 0.011
+  },
+  "ns_status_no_minigame": {
+   "n": 93,
+   "max": 0.597
+  },
+  "status_no_minigame": {
+   "n": 90,
+   "max": 0.506
+  },
+  "heartbeat_no_minigame": {
+   "n": 37,
+   "max": 0.003
+  },
+  "end_onn_no_minigame": {
+   "n": 1,
+   "max": 0.069
+  }
+ },
+ "abr_rows_all": [
+  [
+   "ssrc_change",
+   "minigame_switch"
+  ],
+  [
+   "ssrc_change",
+   "minigame_switch"
+  ],
+  [
+   "ssrc_change",
+   "minigame_switch"
+  ],
+  [
+   "ssrc_change",
+   "minigame_switch"
+  ],
+  [
+   "ssrc_change",
+   "minigame_switch"
+  ],
+  [
+   "ssrc_change",
+   "minigame_switch"
+  ]
+ ],
+ "m1": {
+  "result": {
+   "state": "ended",
+   "class": "end_P2",
+   "scores": [
+    0,
+    1
+   ],
+   "seats": [
+    1,
+    2
+   ]
+  },
+  "switches": [
+   {
+    "planned": true,
+    "seconds": 0.602,
+    "switched": true,
+    "window": "minigame"
+   },
+   {
+    "planned": true,
+    "seconds": 0.602,
+    "switched": true,
+    "window": "board"
+   }
+  ],
+  "windows": [
+   {
+    "desyncs_not_taken": 0,
+    "open_s": 3.6,
+    "stall_ends_not_taken": 1,
+    "stalls_not_taken": 5,
+    "window": "minigame"
+   },
+   {
+    "desyncs_not_taken": 0,
+    "open_s": 3.6,
+    "stall_ends_not_taken": 1,
+    "stalls_not_taken": 5,
+    "window": "board"
+   }
+  ],
+  "party_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_watch",
+   "minigame_playing",
+   "minigame_taken",
+   "minigame_taken",
+   "minigame_taken",
+   "minigame_switch_window",
+   "minigame_ended",
+   "minigame_taken",
+   "minigame_stream",
+   "minigame_title_stopped",
+   "minigame_restore",
+   "minigame_end"
+  ],
+  "recovery_rows": [
+   "session_ended",
+   "session_started"
+  ],
+  "stream_events": [
+   [
+    "start_begin",
+    "title"
+   ],
+   [
+    "start",
+    "title"
+   ],
+   [
+    "stop",
+    null
+   ],
+   [
+    "start_begin",
+    "title"
+   ],
+   [
+    "start",
+    "title"
+   ],
+   [
+    "start_begin",
+    "board"
+   ],
+   [
+    "start",
+    "board"
+   ]
+  ],
+  "keys_to_the_board": [],
+  "board_picture_back_s_after_closed": 0.0,
+  "home_resume": {
+   "home": {
+    "code": 200,
+    "taken": "home"
+   },
+   "title_paused_after_home": true,
+   "resume": {
+    "start": 200,
+    "start_active": true,
+    "ready": 200,
+    "released": true
+   }
+  }
+ },
+ "m2": {
+  "result": {
+   "state": "ended",
+   "class": "end_P1",
+   "scores": [
+    1,
+    0
+   ],
+   "seats": [
+    2,
+    1
+   ]
+  },
+  "switches": [
+   {
+    "planned": true,
+    "seconds": 0.602,
+    "switched": true,
+    "window": "minigame"
+   },
+   {
+    "planned": true,
+    "seconds": 0.602,
+    "switched": true,
+    "window": "board"
+   }
+  ],
+  "windows": [
+   {
+    "desyncs_not_taken": 0,
+    "open_s": 3.6,
+    "stall_ends_not_taken": 1,
+    "stalls_not_taken": 4,
+    "window": "minigame"
+   },
+   {
+    "desyncs_not_taken": 0,
+    "open_s": 3.6,
+    "stall_ends_not_taken": 1,
+    "stalls_not_taken": 5,
+    "window": "board"
+   }
+  ],
+  "party_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_watch",
+   "minigame_playing",
+   "minigame_ended",
+   "minigame_taken",
+   "minigame_switch_window",
+   "minigame_stream",
+   "minigame_title_stopped",
+   "minigame_restore",
+   "minigame_end"
+  ],
+  "recovery_rows": [],
+  "stream_events": [
+   [
+    "start_begin",
+    "title"
+   ],
+   [
+    "start",
+    "title"
+   ],
+   [
+    "start_begin",
+    "board"
+   ],
+   [
+    "start",
+    "board"
+   ]
+  ],
+  "keys_to_the_board": [],
+  "board_picture_back_s_after_closed": 0.0
+ },
+ "m3": {
+  "result": {
+   "state": "ended",
+   "class": "end_P1",
+   "scores": [
+    1,
+    0
+   ],
+   "seats": [
+    1,
+    2
+   ]
+  },
+  "switches": [
+   {
+    "planned": true,
+    "seconds": 0.602,
+    "switched": true,
+    "window": "minigame"
+   },
+   {
+    "planned": true,
+    "seconds": 0.602,
+    "switched": true,
+    "window": "board"
+   }
+  ],
+  "windows": [
+   {
+    "desyncs_not_taken": 0,
+    "open_s": 3.6,
+    "stall_ends_not_taken": 1,
+    "stalls_not_taken": 5,
+    "window": "minigame"
+   },
+   {
+    "desyncs_not_taken": 0,
+    "open_s": 3.6,
+    "stall_ends_not_taken": 1,
+    "stalls_not_taken": 5,
+    "window": "board"
+   }
+  ],
+  "party_rows": [
+   "minigame_start",
+   "minigame_launch",
+   "minigame_route",
+   "minigame_stream",
+   "minigame_watch",
+   "minigame_playing",
+   "minigame_switch_window",
+   "minigame_ended",
+   "minigame_taken",
+   "minigame_stream",
+   "minigame_title_stopped",
+   "minigame_restore",
+   "minigame_end"
+  ],
+  "recovery_rows": [
+   "state_save_failed",
+   "desync_pause",
+   "client_stall",
+   "rewind_skipped",
+   "resumed"
+  ],
+  "stream_events": [
+   [
+    "start_begin",
+    "title"
+   ],
+   [
+    "start",
+    "title"
+   ],
+   [
+    "start_begin",
+    "board"
+   ],
+   [
+    "start",
+    "board"
+   ]
+  ],
+  "keys_to_the_board": [],
+  "board_picture_back_s_after_closed": 0.0,
+  "real_stall": {
+   "title_paused": true,
+   "resumed": true,
+   "recovery_rows": [
+    [
+     "state_save_failed",
+     null
+    ],
+    [
+     "desync_pause",
+     "client_stall"
+    ],
+    [
+     "client_stall",
+     null
+    ],
+    [
+     "rewind_skipped",
+     "stall_end"
+    ],
+    [
+     "resumed",
+     "stall_end"
+    ]
+   ],
+   "keys_to_the_board": []
+  }
+ }
+}

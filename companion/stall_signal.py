@@ -138,6 +138,10 @@ class StallSignal:
             if se is not None:
                 se.note_bye(rx, frame)
             return
+        # B115: a party mini game's planned capture restart: the client's stall / stall end in its window not taken
+        ps = getattr(self.recovery, "_planned_switch", None)
+        if ps is not None and ps.swallow("stall" if kind == KIND_STALL else "end", rx):
+            return
         state, reason, _key = self._state()
         if kind == KIND_STALL:
             self.stalls += 1
