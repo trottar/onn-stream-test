@@ -1,0 +1,128 @@
+[
+ {
+  "id": "P1",
+  "file": "companion/party_session.py",
+  "old": "\"--rendering-driver\", RENDERERS[cfg[\"renderer\"]], \"--fullscreen\", \"--\",",
+  "new": "\"--rendering-driver\", RENDERERS[cfg[\"renderer\"]], \"--\",",
+  "why": "no fullscreen switch"
+ },
+ {
+  "id": "P2",
+  "file": "companion/party_session.py",
+  "old": "DEFAULT_RENDERER = \"gl_compatibility\"",
+  "new": "DEFAULT_RENDERER = \"forward_plus\"",
+  "why": "the default renderer not Compatibility"
+ },
+ {
+  "id": "P3",
+  "file": "companion/party_session.py",
+  "old": "        if not self.released:\n            self.row({\"step\": \"pause\", \"key\": None, \"why\": \"not released yet (the lobby): nothing sent\"})\n            return \"held\"",
+  "new": "        if False:\n            return \"held\"",
+  "why": "a key sent at launch (before the first release)"
+ },
+ {
+  "id": "P4",
+  "file": "companion/party_session.py",
+  "old": "        if self.paused_by_key:\n            self.row({\"step\": \"pause\", \"key\": None, \"why\": \"already paused\"})\n            return \"already\"",
+  "new": "        if False:\n            return \"already\"",
+  "why": "a second Home toggles the board back"
+ },
+ {
+  "id": "P5",
+  "file": "companion/party_session.py",
+  "old": "        self.key(PAUSE_KEY)\n        self.paused_by_key = False",
+  "new": "        self.paused_by_key = False",
+  "why": "RESUME sends nothing"
+ },
+ {
+  "id": "P6",
+  "file": "companion/party_session.py",
+  "old": "        try:\n            self.key(QUIT_KEY)\n            self.row({\"step\": \"quit\", \"key\": QUIT_KEY})",
+  "new": "        try:\n            self.row({\"step\": \"quit\", \"key\": QUIT_KEY})",
+  "why": "END without F10 (straight to SIGTERM)"
+ },
+ {
+  "id": "P7",
+  "file": "companion/party_session.py",
+  "old": "        try:\n            self.kill(self.pid, signal.SIGTERM)\n        except ProcessLookupError:\n            pass\n        self.row({\"step\": \"sigterm\",",
+  "new": "        try:\n            pass\n        except ProcessLookupError:\n            pass\n        self.row({\"step\": \"sigterm\",",
+  "why": "no SIGTERM after the wait"
+ },
+ {
+  "id": "P8",
+  "file": "companion/party_session.py",
+  "old": "    if renderer not in RENDERERS:",
+  "new": "    if False:",
+  "why": "a bad renderer word accepted"
+ },
+ {
+  "id": "P9",
+  "file": "companion/party_session.py",
+  "old": "        if not str(data.get(field) or \"\").strip():",
+  "new": "        if data.get(field) is None and False:",
+  "why": "a missing field accepted"
+ },
+ {
+  "id": "P10",
+  "file": "companion/party_session.py",
+  "old": "    if not Path(cfg[\"pictures\"]).is_dir():",
+  "new": "    if False:",
+  "why": "a missing pictures folder accepted"
+ },
+ {
+  "id": "P11",
+  "file": "companion/games/emulator_manager.py",
+  "old": "        if cheat_source_index is not None or mod_index is not None:\n            self._party_row({\"step\": \"refused\", \"why\": _party.NO_EXTRAS})",
+  "new": "        if False:\n            self._party_row({\"step\": \"refused\", \"why\": _party.NO_EXTRAS})",
+  "why": "a cheat / mod pick not refused"
+ },
+ {
+  "id": "P12",
+  "file": "companion/games/emulator_manager.py",
+  "old": "        # B108: nor the board game (it reads its own pads; no mapping editor)\n        if _party is not None and system_id == _party.SYSTEM_ID:\n            return system_id, \"\", {}",
+  "new": "        # B108 (mutated off)",
+  "why": "details asks the board for an emulator profile"
+ },
+ {
+  "id": "P13",
+  "file": "companion/games/emulator_manager.py",
+  "old": "            if _party is not None and self._launch_kind == _party.LAUNCH_KIND:\n                return self._party_stop()",
+  "new": "            if False:\n                return self._party_stop()",
+  "why": "END on the board by the RetroArch path"
+ },
+ {
+  "id": "P14",
+  "file": "companion/games/emulator_manager.py",
+  "old": "                payload[\"launch_kind\"] = _party.LAUNCH_KIND\n                payload[\"party\"] = {",
+  "new": "                payload[\"party\"] = {",
+  "why": "status without launch_kind"
+ },
+ {
+  "id": "P15",
+  "file": "companion/plugins/games.py",
+  "old": "        if _party_session is not None:\n            systems = {**systems, _party_session.SYSTEM_ID: {",
+  "new": "        if False:\n            systems = {**systems, _party_session.SYSTEM_ID: {",
+  "why": "the board's system not listed"
+ },
+ {
+  "id": "P16",
+  "file": "companion/plugins/games.py",
+  "old": "                if _party_session is not None and _party_session.active(self._emulator):\n                    payload[\"party_mode\"] = True",
+  "new": "                if False:\n                    payload[\"party_mode\"] = True",
+  "why": "the stream start does not say party_mode"
+ },
+ {
+  "id": "P17",
+  "file": "companion/games/emulator_manager.py",
+  "old": "            return self._dolphin_save_state(slot, replace)\n        # B108: no save state of any kind for the board game (refused plainly, nothing sent)\n        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:\n            raise EmulatorError(_party.NO_STATES)",
+  "new": "            return self._dolphin_save_state(slot, replace)",
+  "why": "SAVE on the board not refused"
+ },
+ {
+  "id": "P18",
+  "file": "companion/games/emulator_manager.py",
+  "old": "            return self._dolphin_load_recovery_state_running()\n        # B108: no save state of any kind for the board game (refused plainly, nothing sent)\n        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:\n            raise EmulatorError(_party.NO_STATES)\n",
+  "new": "        # B108: no save state of any kind for the board game (refused plainly, nothing sent)\n        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:\n            raise EmulatorError(_party.NO_STATES)\n            return self._dolphin_load_recovery_state_running()\n",
+  "why": "the first build's slip: the refusal inside the GameCube branch (its recovery load dead, flag absent too)"
+ }
+]

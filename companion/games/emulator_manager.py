@@ -48,6 +48,12 @@ _gc = None
 if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
     import gamecube_session as _gc
 
+# B108: the board game's launch kind (Godot), only with PRIVYHUB_PARTY=1. Absent = today: nothing imported, a `party`
+# title never listed or launched.
+_party = None
+if (os.environ.get("PRIVYHUB_PARTY") or "").strip() == "1":
+    import party_session as _party
+
 # B71: "Change disc" on a multi-disc PS1 (.m3u) session; PRIVYHUB_DISC_SWAP=0 (read at each launch) = today
 import disc_swap as _disc_swap  # noqa: E402
 import cheat_clean as _cheat_clean  # noqa: E402  (B85: heading rows read with the knob on)
@@ -217,6 +223,10 @@ class EmulatorManager:
         self._ps2 = None
         self._gc = None
         self._n64_core = None
+        if _party is not None and self._party is not None:   # B108: the board ended by itself
+            _party.row(self._project_path, {"step": "exited", "code": getattr(self._party, "last_code", None),
+                                            "why": "ended by itself"})
+            self._party = None
 
         if cheat_runtime_cleanup:
             self._cleanup_cheat_runtime()
@@ -529,6 +539,12 @@ class EmulatorManager:
                 self._disc_refresh()
                 payload["discs"] = int(self._disc_session["discs"])
                 payload["disc"] = self._disc_session.get("disc")
+            # B108: the board game's session (only with PRIVYHUB_PARTY=1 and the board running)
+            if _party is not None and active and self._launch_kind == _party.LAUNCH_KIND and self._party is not None:
+                payload["launch_kind"] = _party.LAUNCH_KIND
+                payload["party"] = {"renderer": getattr(self._party, "renderer", None),
+                                    "window": self._party.window_id is not None,
+                                    "paused_by_key": self._party.paused_by_key}
             return payload
 
     def _resolve_game(
@@ -1894,6 +1910,9 @@ class EmulatorManager:
         # B69: nor a GameCube title (Core default; Dolphin's four ports, GCPadNew.ini)
         if _gc is not None and system_id == _gc.SYSTEM_ID:
             return system_id, "", {}
+        # B108: nor the board game (it reads its own pads; no mapping editor)
+        if _party is not None and system_id == _party.SYSTEM_ID:
+            return system_id, "", {}
 
         config = self._load_config()
         systems = config.get(
@@ -2204,6 +2223,8 @@ class EmulatorManager:
     # B69
     _gc: Any = None
     _gc_helper_sid: int | None = None
+    # B108: the board game's session (party_session.Session) while it runs, else None
+    _party: Any = None
     # B71: {"discs": n, "disc": i | None} on a multi-disc PS1 session, else None (= today)
     _disc_session: dict[str, Any] | None = None
     _disc_tail: Any = None
@@ -5984,6 +6005,10 @@ class EmulatorManager:
                     return self._launch_dolphin(game, players_chosen, cheat_source_index, cheat_enabled_indexes)
                 return self._launch_dolphin(game, players_chosen)
 
+            # B108: the board game (only with PRIVYHUB_PARTY=1; absent: never listed, never reached)
+            if _party is not None and str(game.get("system", "")).strip().casefold() == _party.SYSTEM_ID:
+                return self._launch_party(game, cheat_source_index, mod_index)
+
             # B46: the chooser's pick for this launch (None = today: the metadata alone)
             players_plan: dict[str, Any] | None = None
             if players_chosen is not None:
@@ -7919,6 +7944,111 @@ class EmulatorManager:
         return payload
 
     # ------------------------------------------------------------------
+    # B108: the board game's launch kind (Godot), reached only with PRIVYHUB_PARTY=1
+    # ------------------------------------------------------------------
+
+    def _party_row(self, fields: dict[str, Any]) -> None:
+        _party.row(self._project_path, fields)
+
+    def _launch_party(self, game: dict[str, Any], cheat_source_index: int | None = None,
+                      mod_index: int | None = None) -> dict[str, Any]:
+        if cheat_source_index is not None or mod_index is not None:
+            self._party_row({"step": "refused", "why": _party.NO_EXTRAS})
+            raise EmulatorError(_party.NO_EXTRAS)
+        try:
+            cfg = _party.read_config(os.environ)
+        except _party.PartyError as exc:
+            self._party_row({"step": "refused", "why": str(exc)})
+            raise EmulatorError(str(exc)) from exc
+        logs_dir = self._project_path("logs/games")
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        log_handle = (logs_dir / (time.strftime("%Y%m%d-%H%M%S") + "-party.log")).open("a", encoding="utf-8",
+                                                                                         buffering=1)
+        log_handle.write(f"PrivyHub game session (the board game) renderer={cfg['renderer']}\n")
+        try:
+            process = _party.start(cfg, log_handle, os.environ)
+        except Exception as exc:
+            log_handle.close()
+            self._party_row({"step": "refused", "why": "the board did not start"})
+            raise EmulatorError(f"The board game did not start: {type(exc).__name__}") from exc
+        self._party_row({"step": "launch", "renderer": cfg["renderer"], "fullscreen": True,
+                         "fields": sorted(k for k in cfg if cfg[k])})
+        self.process = process
+        self.log_handle = log_handle
+        self.active_game = dict(game)
+        self.started_at = time.monotonic()
+        self._paused = False
+        self._host_window_policy = None
+        self._network_cmd_port = None
+        self._disc_session = None
+        self._active_cheat_session = None
+        self._players_session = None
+        self._hold_rewind_core = None
+        self._launch_kind = _party.LAUNCH_KIND
+        self._last_device_args = []
+        sess = _party.Session(process.pid, self._party_row, **getattr(self, "_party_session_kwargs", {}))
+        sess.renderer = cfg["renderer"]
+        self._party = sess
+        alive = lambda: process.poll() is None  # noqa: E731
+        waited = sess.wait_window(alive)
+        self._party_row({"step": "window", "found": waited is not None, "class": _party.WINDOW_CLASS,
+                         "seconds": round(waited, 2) if waited is not None else None})
+        if waited is None:
+            try:
+                self._party_stop()
+            except Exception:
+                pass
+            raise EmulatorError("The board game showed no window")
+        heard = sess.wait_audio(alive)
+        self._party_row({"step": "audio", "sink_input": heard is not None,
+                         "seconds": round(heard, 2) if heard is not None else None})
+        self._party_row({"step": "pads", "in_event_order": _party.pads_in_order(sess.devices)})
+        payload = self.status()
+        payload["action"] = "launch"
+        payload["launch_kind"] = _party.LAUNCH_KIND
+        payload["party_mode"] = True
+        return payload
+
+    def _party_pause_resume(self, action: str) -> dict[str, Any]:
+        try:
+            how = self._party.pause() if action == "pause" else self._party.resume()
+        except Exception as exc:
+            raise EmulatorError(f"The board game's {action} failed: {exc}") from exc
+        self._paused = action == "pause"
+        payload = self.status()
+        payload["action"] = action
+        payload["paused"] = self._paused
+        payload["party_" + action] = how
+        payload["party_mode"] = True
+        return payload
+
+    def _party_stop(self) -> dict[str, Any]:
+        process = self.process
+        how = "gone"
+        if process is not None and self._party is not None:
+            how = self._party.stop(process)
+        self._close_quietly(self.log_handle)
+        self.process = None
+        self.log_handle = None
+        self.active_game = None
+        self.started_at = None
+        self._paused = False
+        self._host_window_policy = None
+        self._network_cmd_port = None
+        self._disc_session = None
+        self._active_cheat_session = None
+        self._players_session = None
+        self._launch_kind = None
+        self._party = None
+        payload = self.status()
+        payload["action"] = "stop"
+        payload["stopped"] = True
+        payload["graceful"] = how.startswith("quit")
+        payload["save_flush_confirmed"] = how.startswith("quit")
+        payload["party_exit"] = how
+        return payload
+
+    # ------------------------------------------------------------------
     # B69: the GameCube launch kind (Dolphin), reached only with PRIVYHUB_GAMECUBE=1
     # ------------------------------------------------------------------
 
@@ -8330,6 +8460,9 @@ class EmulatorManager:
             # B69: Dolphin's pause (the F10 hotkey confirmed by the CPU thread's clock, else SIGSTOP)
             if self._launch_kind == "dolphin":
                 return self._dolphin_pause_resume("pause")
+            # B108: the board's own pause action (Esc once; none before its first release)
+            if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+                return self._party_pause_resume("pause")
 
             observed = self._retroarch_network_status()
 
@@ -8372,6 +8505,9 @@ class EmulatorManager:
             # B69: Dolphin's resume (the way it was paused)
             if self._launch_kind == "dolphin":
                 return self._dolphin_pause_resume("resume")
+            # B108: the board's resume (Esc once if it was paused by key)
+            if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+                return self._party_pause_resume("resume")
 
             observed = self._retroarch_network_status()
 
@@ -8560,6 +8696,9 @@ class EmulatorManager:
         # B69: a GameCube session's give-up save: Shift+F8, the file, the recovery index as PS1's
         if self._launch_kind == "dolphin":
             return self._dolphin_save_recovery_state()
+        # B108: no save state of any kind for the board game (refused plainly, nothing sent)
+        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+            raise EmulatorError(_party.NO_STATES)
         with self.lock:
             self._refresh_process()
             if (
@@ -8674,6 +8813,9 @@ class EmulatorManager:
         # B69: and in a GameCube session (its recovery load is the running one below)
         if self._launch_kind == "dolphin":
             raise EmulatorError("The paused recovery load is not used in a GameCube session")
+        # B108: no save state of any kind for the board game (refused plainly, nothing sent)
+        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+            raise EmulatorError(_party.NO_STATES)
         with self.lock:
             self._refresh_process()
             if (
@@ -8797,6 +8939,9 @@ class EmulatorManager:
         # B69: four native ports never relaunch
         if self._launch_kind == "dolphin":
             raise EmulatorError(_gc.NO_RELAUNCH)
+        # B108: no save state of any kind for the board game (refused plainly, nothing sent)
+        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+            raise EmulatorError(_party.NO_STATES)
         with self.lock:
             self._refresh_process()
             if self.process is None or self.process.poll() is not None:
@@ -8850,6 +8995,9 @@ class EmulatorManager:
             if source is not None:
                 raise EmulatorError(_gc.NO_RELAUNCH)
             return self._dolphin_load_recovery_state_running()
+        # B108: no save state of any kind for the board game (refused plainly, nothing sent)
+        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+            raise EmulatorError(_party.NO_STATES)
         with self.lock:
             self._refresh_process()
             if (
@@ -9008,6 +9156,9 @@ class EmulatorManager:
         # B69: the GameCube recovery file copied to the user slot's Dolphin name
         if self._launch_kind == "dolphin":
             return self._dolphin_copy_recovery_state_to_slot(slot, replace=replace)
+        # B108: no save state of any kind for the board game (refused plainly, nothing sent)
+        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+            raise EmulatorError(_party.NO_STATES)
         with self.lock:
             normalized = self._normalize_save_state_slot(slot)
 
@@ -9361,6 +9512,9 @@ class EmulatorManager:
         # B69: a GameCube session saves by Shift+F<n>, answering exactly as the PS1 path
         if self._launch_kind == "dolphin":
             return self._dolphin_save_state(slot, replace)
+        # B108: no save state of any kind for the board game (refused plainly, nothing sent)
+        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+            raise EmulatorError(_party.NO_STATES)
         with self.lock:
             normalized = self._normalize_save_state_slot(
                 slot
@@ -9624,6 +9778,9 @@ class EmulatorManager:
         # B69: a GameCube session loads by F<n> (B52's picture check), answering exactly as the PS1 path
         if self._launch_kind == "dolphin":
             return self._dolphin_load_state(slot)
+        # B108: no save state of any kind for the board game (refused plainly, nothing sent)
+        if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+            raise EmulatorError(_party.NO_STATES)
         with self.lock:
             normalized = (
                 self._normalize_save_state_slot(
@@ -10469,6 +10626,9 @@ class EmulatorManager:
             # B69: a Dolphin session ends by SIGTERM (SIGKILL after 5 s)
             if self._launch_kind == "dolphin":
                 return self._dolphin_stop()
+            # B108: the board ends by its quit action (F10), SIGTERM only after QUIT_WAIT_S with no exit
+            if _party is not None and self._launch_kind == _party.LAUNCH_KIND:
+                return self._party_stop()
 
             process = self.process
             active_cheat_session = (

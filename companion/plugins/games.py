@@ -137,6 +137,12 @@ _gc_session = None
 if (os.environ.get("PRIVYHUB_GAMECUBE") or "").strip() == "1":
     import gamecube_session as _gc_session
 
+# B108: the board game listed as one entry of its own system (Godot), only with PRIVYHUB_PARTY=1. Absent = today:
+# nothing imported, SYSTEMS unchanged.
+_party_session = None
+if (os.environ.get("PRIVYHUB_PARTY") or "").strip() == "1":
+    import party_session as _party_session
+
 # B71: "Change disc" (a multi-disc PS1 session's action; PRIVYHUB_DISC_SWAP=0 = today's unknown action)
 import disc_swap as _disc_swap  # noqa: E402
 # B85: the cheat list cleaned for the TV (PRIVYHUB_CHEAT_CLEAN=0 = today's raw list; read per request)
@@ -224,6 +230,10 @@ class GamesPlugin:
         if _gc_session is not None:
             systems = {**systems, _gc_session.SYSTEM_ID: {
                 "name": _gc_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
+        # B108: the board game's own system (one entry; its paths in a config file off the repo)
+        if _party_session is not None:
+            systems = {**systems, _party_session.SYSTEM_ID: {
+                "name": _party_session.SYSTEM_NAME, "folder": None, "extensions": set()}}
         return systems
 
     @classmethod
@@ -236,6 +246,8 @@ class GamesPlugin:
             folder = _n64_session.read_dir(root)
         elif _gc_session is not None and system_id == _gc_session.SYSTEM_ID:
             folder = _gc_session.read_dir(root)
+        elif _party_session is not None and system_id == _party_session.SYSTEM_ID:
+            return True           # B108: always listed; a launch without its config is refused plainly
         else:
             config = cls.SYSTEMS.get(system_id)
             folder = root / "games" / str(config["folder"]) if config else None
@@ -1944,6 +1956,12 @@ class GamesPlugin:
                 games.extend(_gc_session.titles_for_plugin(
                     _gc_session.read_dir(self.PROJECT_ROOT), self._stable_id, self._clean_name)
                     [:max(0, self.MAX_GAMES - len(games))])
+                if len(games) >= self.MAX_GAMES:
+                    break
+                continue
+            # B108: the board game, one entry (absent: never reached)
+            if _party_session is not None and system_id == _party_session.SYSTEM_ID:
+                games.extend(_party_session.titles_for_plugin(self._stable_id)[:max(0, self.MAX_GAMES - len(games))])
                 if len(games) >= self.MAX_GAMES:
                     break
                 continue
@@ -4230,6 +4248,11 @@ class GamesPlugin:
                     self._recovery._log("gc_session", gc_mode=True, gc_states="hotkey",
                                         live=list(_gc_session.LIVE_BEHAVIOURS), off=list(_gc_session.OFF_BEHAVIOURS),
                                         pads=pads)
+                # B108: the board game: no save states, its own pause, said in the response and a row
+                if _party_session is not None and _party_session.active(self._emulator):
+                    payload["party_mode"] = True
+                    self._recovery._log("party_session", party_mode=True, states="none", pause="board_key",
+                                        quit="board_key")
                 # B41: the title's player count for the client's prompt (only a client with player_prompt=1 asks)
                 if self._first(query, "player_prompt") == "1":
                     import player_count as _player_count
