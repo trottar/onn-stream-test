@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **H7-C2 MET** (`evidence/H7_C2_2026-11-17.md`): both mini-game titles launched with the users' cheat setups, 243
-  pictures of the unlocked screens. Flag off; eighteen lines. H7-C1 NOT MET by one clause; PP-H3b MET.
+- **H7-V5 NOT MET** (`evidence/H7_V5_2026-11-17.md`): both titles started under their cheat setups, but neither start
+  screen was recognised in the hub's 8 s; the users' files unchanged. Flags off; eighteen lines. H7-C2 MET.
 
 ## Verified State
 
@@ -87,8 +87,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — Cowork labels H7-C2's pictures** (the unlocked screens), then B: the readers taught them, the mini games
-   launched with the cheat setups (`docs/ROADMAP.md` §H7). Beside it: the faster switch; B's no-client watcher.
+1. **H7 — what failed in H7-V5 (B):** the start's 8-s window under a cheat setup (T88 just over the line, T89 far
+   from it — see what its window shows), then H7-V5 again; PP-H4 waits. Beside it: the faster switch.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
