@@ -40,6 +40,14 @@ first (`cheat_profiles`: that `profile_id` with the same source and indexes, and
 Extras query** (`id`, `cheat_source`, `cheat_indexes`), and the session's `profile_id` must then be the sidecar's (else
 given up, the title stopped). `h7-start` loads the setup's begin into the setup's own `states/<core>/` (B127 in
 `h7_minigame`). A sidecar without `cheat` → today.
+
+B137 — **nothing a player presses reaches a held title before the go.** From the launch's answer to the go the title
+is never resumed: paused → the bridge's mute on (every pad neutral, every report dropped) → the watch's load (the
+begin) → ADVANCE_FRAMES × RetroArch's `FRAMEADVANCE`, ADVANCE_GAP_S apart (the PS1 core shows a state loaded into a
+paused core only after a frame; the N64 core's load runs a frame itself, reading the pads) → the mute off (row
+`minigame_frame_advance`) → the watcher reads the redrawn, paused window (RetroArch's "Paused." corner masked) → ready.
+The go: the route, the planned switch, the resume — no second load when the title has not run since its begin was
+loaded. A practice's way back pauses first, then clears the route and switches, then prepares again the same way.
 """
 from __future__ import annotations
 
@@ -91,6 +99,9 @@ PRACTICE_S = 90.0          # a practice left after this long playing (or by the 
 XUSB_START = 0x0010        # the pad report's Start bit (native_session_io: XUSB_START)
 NO_GO = "no mini game is waiting for the go"
 NOT_RECOGNISED = "the title's start screen was not recognised"
+# B137
+ADVANCE_FRAMES = 2          # FRAMEADVANCE sent after the paused load (PS1 needs 1, N64 0: one frame of margin)
+ADVANCE_GAP_S = 0.06        # between them, and after the last (>= 50 ms: each one counts; 2 ms apart they merge)
 
 _local = threading.local()
 
@@ -179,6 +190,7 @@ class PartyMinigames:
         self.poll_gone_s, self.end_wait_s, self.tick = POLL_GONE_S, END_WAIT_S, TICK
         self.start_limit_s, self.switch_limit_s, self.step_grace_s = START_LIMIT_S, SWITCH_LIMIT_S, STEP_GRACE_S
         self.practice_s = PRACTICE_S               # B134
+        self.advance_frames, self.advance_gap_s = ADVANCE_FRAMES, ADVANCE_GAP_S     # B137
         self.stream_needed = True               # B112's bench sets False (no stream, no switch)
         self._reads: dict[str, dict] = {}       # B114: the last good answer of each bounded read, its helper
 
@@ -308,7 +320,9 @@ class PartyMinigames:
               "title_proc": None, "actor_done": False, "switched_to": None,
               # B133 / B134: a held start — prepared behind the board, handed over on the board's go
               "hold": bool(hold), "phase": None, "go": None, "prep_t0": now, "ready_at": None, "play_t0": None,
-              "practice": False, "practice_t0": None, "practices": 0, "practice_end_by": None}
+              "practice": False, "practice_t0": None, "practices": 0, "practice_end_by": None,
+              # B137: the title resumed since its begin was last loaded (then the go loads it again); the mute
+              "ran_since_begin": False, "muted": False}
         with self._lock:
             self.mg = mg
         self.row({"step": "minigame_start", "seats": seats, "players": entry["players"],
@@ -547,18 +561,47 @@ class PartyMinigames:
             with self._cond:
                 self._cond.wait(0.1)
 
+    def _mute(self, mg: dict, on: bool) -> None:
+        """B137: the bridge's mute on / off (no bridge: nothing to mute)."""
+        bridge = self._bridge()
+        if bridge is None or not hasattr(bridge, "party_mute"):
+            return
+        bridge.party_mute(on)
+        mg["muted"] = bool(on)
+
+    def _advance(self, mg: dict) -> bool:
+        """B137: ADVANCE_FRAMES × FRAMEADVANCE into the paused title, each its own manager call, ADVANCE_GAP_S apart and
+        after the last; then GET_STATUS → True when still PAUSED (else paused again: False)."""
+        emu = self.emu
+        for _ in range(int(self.advance_frames)):
+            self._emu_call(mg, lambda: emu._retroarch_network_request("FRAMEADVANCE", expect_response=False))
+            time.sleep(self.advance_gap_s)
+        paused = self._emu_call(mg, emu._retroarch_network_status) == "PAUSED"
+        if not paused:
+            self._emu_call(mg, emu.pause)
+        return paused
+
     def _prepare(self, mg: dict, after_practice: bool = False) -> None:
-        """The title made ready behind the board: paused, the begin loaded (a new watch), run until the start is read
-        (the stream untouched, no pad route), then paused again → "ready". Not recognised → RuntimeError."""
+        """The title made ready behind the board, never resumed (B137): paused, the mute on, the begin loaded (a new
+        watch, the label masked), the frames advanced, the mute off; the watcher reads the paused window → "ready".
+        Not recognised → RuntimeError."""
         emu = self.emu
         runner = self.p._h7_minigame_runner()
         t0 = self.clock()
         with self._lock:
             mg["phase"], mg["prep_t0"], mg["ready_at"] = "preparing", t0, None
         self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
-        self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed))
-        self.row({"step": "minigame_watch", "loaded": True})
-        self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))      # behind the board: nobody routed
+        m0 = self.clock()
+        self._mute(mg, True)                                                    # B137: no press reaches a frame
+        try:
+            self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed, mask_label=True))
+            self.row({"step": "minigame_watch", "loaded": True})
+            paused = self._step(mg, "advance", lambda: self._advance(mg))
+        finally:
+            self._mute(mg, False)
+        mg["ran_since_begin"] = False
+        self.row({"step": "minigame_frame_advance", "frames": int(self.advance_frames),
+                  "mute_ms": round((self.clock() - m0) * 1000.0, 1), "paused": paused})
         seen: dict = {}
 
         def recognised() -> bool:
@@ -573,7 +616,6 @@ class PartyMinigames:
         self._wait(mg, recognised)
         if seen.get("r") is not True:
             raise RuntimeError(NOT_RECOGNISED)
-        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))        # held paused: no input, notices run out
         now = self.clock()
         with self._cond:
             mg["phase"], mg["ready_at"], mg["recognised"] = "ready", now, True
@@ -592,8 +634,13 @@ class PartyMinigames:
             mg["phase"] = "handing_over"
         self.row({"step": "minigame_go", "held_s": round(t0 - (mg["ready_at"] or t0), 3),
                   "remembered": bool(go["remembered"]), **({"practice": True} if go["practice"] else {})})
-        self._step(mg, "reload", lambda: runner.reload())
-        self.row({"step": "minigame_reloaded", "loaded": True})
+        if mg.get("ran_since_begin"):                       # B137: only when the title ran since its begin was loaded
+            self._mute(mg, True)
+            try:
+                self._step(mg, "reload", lambda: runner.reload())
+            finally:
+                self._mute(mg, False)
+            self.row({"step": "minigame_reloaded", "loaded": True})
         if go["practice"]:
             self._bounded(lambda: runner.stop(), 2.0)       # B134: nothing read in a practice
         bridge = self._bridge()
@@ -606,7 +653,9 @@ class PartyMinigames:
             mg["switched_to"] = "minigame"
         if go["practice"] and bridge is not None:
             self._start_hook(mg, bridge)
+        runner.label_mask(False)                            # B137: the title runs: no "Paused." to mask
         self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))
+        mg["ran_since_begin"] = True
         now = self.clock()
         with self._cond:
             if mg["state"] == "starting":
@@ -633,8 +682,8 @@ class PartyMinigames:
         bridge._party_buttons = hook
 
     def _way_back(self, mg: dict) -> None:
-        """B134: a practice over — the route cleared, the planned switch to the board, the title paused; then made
-        ready again behind the board (`_prepare`)."""
+        """B134: a practice over — (B137) the title paused first, while its pads are still routed; the route cleared,
+        the planned switch to the board; then made ready again behind the board (`_prepare`)."""
         emu = self.emu
         bridge = self._bridge()
         if bridge is not None:
@@ -642,13 +691,13 @@ class PartyMinigames:
         now = self.clock()
         self.row({"step": "minigame_practice_end", "by": mg["practice_end_by"] or "time",
                   "practice_s": round(now - (mg["practice_t0"] or now), 3)})
+        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))        # B137: before the route is cleared
         if mg.get("routed") and bridge is not None:
             self._step(mg, "unroute", lambda: bridge.set_party_route(None))
             mg["routed"] = False
         board = (mg.get("stash") or {}).get("process")
         if self._step(mg, "switch", lambda: self._switch_stream("board", getattr(board, "pid", None))):
             mg["switched_to"] = "board"
-        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
         with self._cond:
             mg.update(state="starting", practice=False, practice_t0=None, practice_end_by=None, go=None,
                       practices=mg["practices"] + 1, phase="preparing")
@@ -1013,6 +1062,8 @@ class PartyMinigames:
         bridge = self._bridge()
         if bridge is not None and getattr(bridge, "_party_buttons", None) is not None:
             bridge._party_buttons = None                  # B134: a practice's Start hook never outlives it
+        if bridge is not None and getattr(bridge, "_party_mute", False):
+            bridge.party_mute(False)                      # B137: the mute never outlives the mini game
         if mg.get("hold") and mg.get("switched_to") != "minigame":
             pass                                          # B133: the stream never left the board: no switch back
         elif by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:

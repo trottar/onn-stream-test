@@ -48,7 +48,8 @@ class PrepareAndGo(unittest.TestCase):
         self.assertIsNone(self.out["hung"])
         self.assertEqual(s["h1_preparing"]["phase"], "preparing")
         self.assertEqual(s["h1_ready"], {"state": "starting", "phase": "ready", "recognised": True, "practices": 0})
-        self.assertEqual(s["h1_rows_at_ready"], ["minigame_start", "minigame_launch", "minigame_watch", "minigame_ready"])
+        self.assertEqual(s["h1_rows_at_ready"], ["minigame_start", "minigame_launch", "minigame_watch",
+                                                 "minigame_frame_advance", "minigame_ready"])    # B137's order
         self.assertIsNone(s["h1_route_ready"])
         self.assertTrue(s["h1_stream_on_board"])
         self.assertTrue(s["h1_title_paused_ready"])
@@ -60,9 +61,9 @@ class PrepareAndGo(unittest.TestCase):
         self.assertEqual(s["h1_route_playing"], {"0": 0, "1": 1})
         self.assertTrue(s["h1_stream_on_title"])
         self.assertEqual(s["h1"], {"state": "ended", "class": "end_P1", "scores": [1, 0], "why": None})
-        self.assertEqual(s["h1_rows"][:9], ["minigame_start", "minigame_launch", "minigame_watch", "minigame_ready",
-                                            "minigame_go", "minigame_reloaded", "minigame_route", "minigame_stream",
-                                            "minigame_playing"])
+        self.assertEqual(s["h1_rows"][:9], ["minigame_start", "minigame_launch", "minigame_watch",
+                                            "minigame_frame_advance", "minigame_ready", "minigame_go",
+                                            "minigame_route", "minigame_stream", "minigame_playing"])   # B137: no reload
         f = s["h1_row_fields"]
         self.assertEqual(f["minigame_start"], {"hold": True})
         self.assertGreater(f["minigame_ready"]["prepare_s"], 0.5)

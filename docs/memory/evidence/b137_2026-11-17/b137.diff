@@ -1,0 +1,899 @@
+diff --git a/companion/h7_minigame.py b/companion/h7_minigame.py
+index 7f5c39fd..00bfeb30 100644
+--- a/companion/h7_minigame.py
++++ b/companion/h7_minigame.py
+@@ -37,6 +37,10 @@ B129 (the same flag): the watcher's picture is the largest visible window **owne
+ 10 s) — never a rectangle kept from another process; no such window → a picture failure, no read.
+ B130 (the same flag): a watch begun with the load under a cheat setup waits RECOGNISE_SETUP_S (15 s) for the start
+ before `recognised` is false; every other watch RECOGNISE_S (8 s), as today.
++B137 (a held party mini game only — `start(mask_label=True)`, never the HTTP `h7-start`): while the watch's label mask
++is on (`label_mask`), every picture has its top-right LABEL_BOX painted black before it is read — RetroArch draws
++"Paused." there for as long as the core is paused, and on a title with black bars its text breaks the reader's bar
++cut. The `watching` row says `"label_mask": true` only then.
+ """
+ from __future__ import annotations
+ 
+@@ -69,6 +73,7 @@ REFIND_S = 10.0             # B129: the game's window found again at most this o
+ KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
+ JPEG_QUALITY = 90
+ SETUP_PREFIX = 12           # B127: a setup's begin is <game id>.<the profile_id's first 12 characters>.state
++LABEL_BOX = (200, 70)       # B137: RetroArch's "Paused." box (~170 x 55 px, the same in every window size) + a margin
+ _PROFILE_ID = re.compile(r"^[0-9A-F]{64}$")
+ _endscreen = None
+ 
+@@ -87,6 +92,16 @@ def session_profile_id(emulator: Any) -> str | None:
+     return pid if _PROFILE_ID.match(pid) else None
+ 
+ 
++def mask_label(img, box=None):
++    """B137: the picture with its top-right `box` (w, h px; LABEL_BOX) painted black — RetroArch's "Paused." label."""
++    w, h = box if box is not None else LABEL_BOX
++    out = img.copy()
++    W = out.size[0]
++    black = 0 if out.mode in ("L", "1", "I", "F") else (0,) * len(out.getbands())
++    out.paste(black, (max(0, W - int(w)), 0, W, min(out.size[1], int(h))))
++    return out
++
++
+ def endscreen():
+     """B102's learner (`tools/h7_endscreen.py`: PIL + numpy, both on the hub), imported at the first start or result —
+     not when the companion starts, so a companion whose tools/ lacks it still starts (B99 / B101 run as before)."""
+@@ -237,7 +252,7 @@ class MiniGame:
+         self._row({"step": "refused", "why": why})
+         raise ValueError(why)
+ 
+-    def start(self, load_text: str = "", keep_text: str = "", bench: bool = False) -> dict:
++    def start(self, load_text: str = "", keep_text: str = "", bench: bool = False, mask_label: bool = False) -> dict:
+         text = str(load_text or "").strip()
+         if text not in ("", "0", "1"):
+             raise ValueError("load is 0 or 1")
+@@ -247,9 +262,9 @@ class MiniGame:
+             raise ValueError("keep is 0 or 1")
+         keep = keep_word == "1"
+         with self._start_lock:
+-            return self._start(load, keep, bench)
++            return self._start(load, keep, bench, mask_label)
+ 
+-    def _start(self, load: bool, keep: bool, bench: bool = False) -> dict:
++    def _start(self, load: bool, keep: bool, bench: bool = False, mask_label: bool = False) -> dict:
+         # B105: a watch already on is replaced after the checks and the load (never refused for being on)
+         try:
+             game, system, kind = self._live._running()
+@@ -326,12 +341,16 @@ class MiniGame:
+                            "keep": ({"folder": keep_dir.name, "pictures": 0} if keep_dir is not None else None),
+                            "t0": self._clock(), "token": token, "_keep_dir": keep_dir,
+                            "_recognise_s": recognise_s}
++            if mask_label:
++                self._watch["_mask_label"] = True                    # B137: a held party mini game's paused reads
+             row = {"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
+                    "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
+                    "spec_version": spec.get("version"), "recognise_s": recognise_s, "bench": bench,
+                    "keep": keep_dir.name if keep_dir is not None else None}
+             if begin is not None:
+                 row["begin"] = begin                                 # B127: only under a cheat setup
++            if mask_label:
++                row["label_mask"] = True                             # B137
+             self._row(row)
+         threading.Thread(target=self._run, args=(token, game, reader, ended, spec), daemon=True,
+                          name="h7-minigame").start()
+@@ -382,6 +401,15 @@ class MiniGame:
+             self._row({"step": "reloaded", "game": game, "load_line_ms": line_ms})
+             return line_ms
+ 
++    def label_mask(self, on: bool) -> bool:
++        """B137: the current watch's label mask on / off (the party layer: off at the go). -> True when a watch took it."""
++        with self._lock:
++            w = self._watch
++            if w is None:
++                return False
++            w["_mask_label"] = bool(on)
++            return True
++
+     def bench_release(self, client_ip: str) -> dict:
+         """B112: the running game's pause released with no stream (loopback, no client's stream up)."""
+         if str(client_ip or "") not in LOOPBACK:
+@@ -506,6 +534,11 @@ class MiniGame:
+                     return
+                 try:
+                     img = self.picture.grab()
++                    with self._lock:
++                        w = self._current(token)
++                        masked = bool(w is not None and w.get("_mask_label"))
++                    if masked:
++                        img = mask_label(img)                         # B137: RetroArch's "Paused." corner
+                 except Exception as exc:
+                     with self._lock:
+                         w = self._current(token)
+diff --git a/companion/native_session_io.py b/companion/native_session_io.py
+index 9db59e4a..05b94275 100644
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -1644,6 +1644,9 @@ class NativeControllerBridge:
+     # the mini-game layer (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1) for a mini game's length. None = today.
+     _party_route: dict[int, int] | None = None
+     _party_buttons = None      # B134: a party practice's report hook (player, buttons); None = today
++    # B137: a party mini game's mute — while set, every report is dropped (the pads stay neutral). Set only by the
++    # mini-game layer around a held title's load and frame advance. False = today.
++    _party_mute = False
+ 
+     LINUX_VENDOR_ID = 0x1209
+     LINUX_PRODUCT_ID = 0x5048
+@@ -2331,6 +2334,15 @@ class NativeControllerBridge:
+                 pass
+         self._party_route = dict(route) if route is not None else None
+ 
++    def party_mute(self, on: bool) -> None:
++        """B137: on — every pad written neutral (a companion-injected meta button kept, as `_neutralize`), then every
++        report dropped until off. The flag is set under the meta lock and read again there by `_apply_report`, so no
++        report is written after the neutral one."""
++        with self._meta_lock:
++            self._party_mute = bool(on)
++            if on:
++                self._neutralize()
++
+     def _apply_report(
+         self,
+         player: int,
+@@ -2367,6 +2379,8 @@ class NativeControllerBridge:
+         # Serialize real reports with the forced meta-button overlay so
+         # receiver traffic cannot erase a hotkey.
+         with self._meta_lock:
++            if self._party_mute:                  # B137: a held mini game's load / frame advance: nothing reaches a pad
++                return
+             forced_buttons = self._forced_buttons[player]
+             report = {
+                 "buttons": int(buttons) & 0xFFFF,
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 8c5f8177..dd72ebf9 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -40,6 +40,14 @@ first (`cheat_profiles`: that `profile_id` with the same source and indexes, and
+ Extras query** (`id`, `cheat_source`, `cheat_indexes`), and the session's `profile_id` must then be the sidecar's (else
+ given up, the title stopped). `h7-start` loads the setup's begin into the setup's own `states/<core>/` (B127 in
+ `h7_minigame`). A sidecar without `cheat` → today.
++
++B137 — **nothing a player presses reaches a held title before the go.** From the launch's answer to the go the title
++is never resumed: paused → the bridge's mute on (every pad neutral, every report dropped) → the watch's load (the
++begin) → ADVANCE_FRAMES × RetroArch's `FRAMEADVANCE`, ADVANCE_GAP_S apart (the PS1 core shows a state loaded into a
++paused core only after a frame; the N64 core's load runs a frame itself, reading the pads) → the mute off (row
++`minigame_frame_advance`) → the watcher reads the redrawn, paused window (RetroArch's "Paused." corner masked) → ready.
++The go: the route, the planned switch, the resume — no second load when the title has not run since its begin was
++loaded. A practice's way back pauses first, then clears the route and switches, then prepares again the same way.
+ """
+ from __future__ import annotations
+ 
+@@ -91,6 +99,9 @@ PRACTICE_S = 90.0          # a practice left after this long playing (or by the
+ XUSB_START = 0x0010        # the pad report's Start bit (native_session_io: XUSB_START)
+ NO_GO = "no mini game is waiting for the go"
+ NOT_RECOGNISED = "the title's start screen was not recognised"
++# B137
++ADVANCE_FRAMES = 2          # FRAMEADVANCE sent after the paused load (PS1 needs 1, N64 0: one frame of margin)
++ADVANCE_GAP_S = 0.06        # between them, and after the last (>= 50 ms: each one counts; 2 ms apart they merge)
+ 
+ _local = threading.local()
+ 
+@@ -179,6 +190,7 @@ class PartyMinigames:
+         self.poll_gone_s, self.end_wait_s, self.tick = POLL_GONE_S, END_WAIT_S, TICK
+         self.start_limit_s, self.switch_limit_s, self.step_grace_s = START_LIMIT_S, SWITCH_LIMIT_S, STEP_GRACE_S
+         self.practice_s = PRACTICE_S               # B134
++        self.advance_frames, self.advance_gap_s = ADVANCE_FRAMES, ADVANCE_GAP_S     # B137
+         self.stream_needed = True               # B112's bench sets False (no stream, no switch)
+         self._reads: dict[str, dict] = {}       # B114: the last good answer of each bounded read, its helper
+ 
+@@ -308,7 +320,9 @@ class PartyMinigames:
+               "title_proc": None, "actor_done": False, "switched_to": None,
+               # B133 / B134: a held start — prepared behind the board, handed over on the board's go
+               "hold": bool(hold), "phase": None, "go": None, "prep_t0": now, "ready_at": None, "play_t0": None,
+-              "practice": False, "practice_t0": None, "practices": 0, "practice_end_by": None}
++              "practice": False, "practice_t0": None, "practices": 0, "practice_end_by": None,
++              # B137: the title resumed since its begin was last loaded (then the go loads it again); the mute
++              "ran_since_begin": False, "muted": False}
+         with self._lock:
+             self.mg = mg
+         self.row({"step": "minigame_start", "seats": seats, "players": entry["players"],
+@@ -547,18 +561,47 @@ class PartyMinigames:
+             with self._cond:
+                 self._cond.wait(0.1)
+ 
++    def _mute(self, mg: dict, on: bool) -> None:
++        """B137: the bridge's mute on / off (no bridge: nothing to mute)."""
++        bridge = self._bridge()
++        if bridge is None or not hasattr(bridge, "party_mute"):
++            return
++        bridge.party_mute(on)
++        mg["muted"] = bool(on)
++
++    def _advance(self, mg: dict) -> bool:
++        """B137: ADVANCE_FRAMES × FRAMEADVANCE into the paused title, each its own manager call, ADVANCE_GAP_S apart and
++        after the last; then GET_STATUS → True when still PAUSED (else paused again: False)."""
++        emu = self.emu
++        for _ in range(int(self.advance_frames)):
++            self._emu_call(mg, lambda: emu._retroarch_network_request("FRAMEADVANCE", expect_response=False))
++            time.sleep(self.advance_gap_s)
++        paused = self._emu_call(mg, emu._retroarch_network_status) == "PAUSED"
++        if not paused:
++            self._emu_call(mg, emu.pause)
++        return paused
++
+     def _prepare(self, mg: dict, after_practice: bool = False) -> None:
+-        """The title made ready behind the board: paused, the begin loaded (a new watch), run until the start is read
+-        (the stream untouched, no pad route), then paused again → "ready". Not recognised → RuntimeError."""
++        """The title made ready behind the board, never resumed (B137): paused, the mute on, the begin loaded (a new
++        watch, the label masked), the frames advanced, the mute off; the watcher reads the paused window → "ready".
++        Not recognised → RuntimeError."""
+         emu = self.emu
+         runner = self.p._h7_minigame_runner()
+         t0 = self.clock()
+         with self._lock:
+             mg["phase"], mg["prep_t0"], mg["ready_at"] = "preparing", t0, None
+         self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
+-        self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed))
+-        self.row({"step": "minigame_watch", "loaded": True})
+-        self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))      # behind the board: nobody routed
++        m0 = self.clock()
++        self._mute(mg, True)                                                    # B137: no press reaches a frame
++        try:
++            self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed, mask_label=True))
++            self.row({"step": "minigame_watch", "loaded": True})
++            paused = self._step(mg, "advance", lambda: self._advance(mg))
++        finally:
++            self._mute(mg, False)
++        mg["ran_since_begin"] = False
++        self.row({"step": "minigame_frame_advance", "frames": int(self.advance_frames),
++                  "mute_ms": round((self.clock() - m0) * 1000.0, 1), "paused": paused})
+         seen: dict = {}
+ 
+         def recognised() -> bool:
+@@ -573,7 +616,6 @@ class PartyMinigames:
+         self._wait(mg, recognised)
+         if seen.get("r") is not True:
+             raise RuntimeError(NOT_RECOGNISED)
+-        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))        # held paused: no input, notices run out
+         now = self.clock()
+         with self._cond:
+             mg["phase"], mg["ready_at"], mg["recognised"] = "ready", now, True
+@@ -592,8 +634,13 @@ class PartyMinigames:
+             mg["phase"] = "handing_over"
+         self.row({"step": "minigame_go", "held_s": round(t0 - (mg["ready_at"] or t0), 3),
+                   "remembered": bool(go["remembered"]), **({"practice": True} if go["practice"] else {})})
+-        self._step(mg, "reload", lambda: runner.reload())
+-        self.row({"step": "minigame_reloaded", "loaded": True})
++        if mg.get("ran_since_begin"):                       # B137: only when the title ran since its begin was loaded
++            self._mute(mg, True)
++            try:
++                self._step(mg, "reload", lambda: runner.reload())
++            finally:
++                self._mute(mg, False)
++            self.row({"step": "minigame_reloaded", "loaded": True})
+         if go["practice"]:
+             self._bounded(lambda: runner.stop(), 2.0)       # B134: nothing read in a practice
+         bridge = self._bridge()
+@@ -606,7 +653,9 @@ class PartyMinigames:
+             mg["switched_to"] = "minigame"
+         if go["practice"] and bridge is not None:
+             self._start_hook(mg, bridge)
++        runner.label_mask(False)                            # B137: the title runs: no "Paused." to mask
+         self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))
++        mg["ran_since_begin"] = True
+         now = self.clock()
+         with self._cond:
+             if mg["state"] == "starting":
+@@ -633,8 +682,8 @@ class PartyMinigames:
+         bridge._party_buttons = hook
+ 
+     def _way_back(self, mg: dict) -> None:
+-        """B134: a practice over — the route cleared, the planned switch to the board, the title paused; then made
+-        ready again behind the board (`_prepare`)."""
++        """B134: a practice over — (B137) the title paused first, while its pads are still routed; the route cleared,
++        the planned switch to the board; then made ready again behind the board (`_prepare`)."""
+         emu = self.emu
+         bridge = self._bridge()
+         if bridge is not None:
+@@ -642,13 +691,13 @@ class PartyMinigames:
+         now = self.clock()
+         self.row({"step": "minigame_practice_end", "by": mg["practice_end_by"] or "time",
+                   "practice_s": round(now - (mg["practice_t0"] or now), 3)})
++        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))        # B137: before the route is cleared
+         if mg.get("routed") and bridge is not None:
+             self._step(mg, "unroute", lambda: bridge.set_party_route(None))
+             mg["routed"] = False
+         board = (mg.get("stash") or {}).get("process")
+         if self._step(mg, "switch", lambda: self._switch_stream("board", getattr(board, "pid", None))):
+             mg["switched_to"] = "board"
+-        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
+         with self._cond:
+             mg.update(state="starting", practice=False, practice_t0=None, practice_end_by=None, go=None,
+                       practices=mg["practices"] + 1, phase="preparing")
+@@ -1013,6 +1062,8 @@ class PartyMinigames:
+         bridge = self._bridge()
+         if bridge is not None and getattr(bridge, "_party_buttons", None) is not None:
+             bridge._party_buttons = None                  # B134: a practice's Start hook never outlives it
++        if bridge is not None and getattr(bridge, "_party_mute", False):
++            bridge.party_mute(False)                      # B137: the mute never outlives the mini game
+         if mg.get("hold") and mg.get("switched_to") != "minigame":
+             pass                                          # B133: the stream never left the board: no switch back
+         elif by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index 2a6ed427..3935c921 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -715,7 +715,7 @@ if args["mode"] == "cheat":
+     S["c_scratch_end"] = scratch_anywhere()
+     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
+     finish()
+-if args["mode"] in ("hold", "practice"):
++if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
+     n64 = args["n64_id"]
+     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+@@ -929,6 +929,342 @@ if args["mode"] in ("hold", "practice"):
+                 call("POST", "/plugins/games/native-stream-start?port=48100")
+                 client.in_stream = True
+                 call("POST", "/plugins/games/native-stream-ready")
++    if args["mode"] in ("nopress", "nopress_head"):
++        # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
++        # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but
++        # neutral reaches it (a pick on the select screen -> a fight); a frame advance runs one frame; its load puts the
++        # begin back (PS1-shaped: shown at the next frame; N64-shaped: the load runs a frame, reading the pads); notices
++        # cover its picture for NOTICE_S after a load; its own log. The watcher's picture follows the fake (RetroArch's
++        # "Paused." drawn in its corner while paused). A confirm press from each player through the bridge every 0.2 s.
++        import h7_minigame as h7m
++        NOTICE_S, CONFIRM = 0.6, 0x1000                     # XUSB_A: the board's confirm
++        if hasattr(h7m, "LABEL_BOX"):
++            h7m.LABEL_BOX = (24, 10)                        # the label's box at the fixtures' scale (320 x 260)
++        LBL = (20, 8)
++        VP = {"cur": [0, 0, 0, 0], "log": []}
++
++        def _rec(index, report, *a_, forced_buttons=0, **k_):
++            b_ = (int(report["buttons"]) | int(forced_buttons)) & 0xFFFF
++            VP["cur"][index] = b_
++            VP["log"].append([time.monotonic(), index, b_])
++        bridge._write_linux_report_locked = _rec
++        EV = []                                             # the fake title's own log: [t, what, detail]
++        TITLE = {"begin": "start"}
++
++        class TitleRA(FakeRetroArch):
++            def __init__(self, cmd, **kw):
++                self.screen, self.shown, self.notice_until = "boot", "boot", 0.0
++                self.loads = self.advances = self.frames = 0
++                super().__init__(cmd, **kw)
++                EV.append([time.monotonic(), "launch", None])
++                threading.Thread(target=self.run_frames, daemon=True).start()
++
++            def frame(self, why):
++                pads = list(VP["cur"])
++                if self.screen == "start" and any(b_ != 0 for b_ in pads):
++                    self.screen = "fight"
++                    EV.append([time.monotonic(), "left_start", why])
++                self.shown = self.screen
++                self.frames += 1
++                EV.append([time.monotonic(), "frame", [why, pads]])
++
++            def run_frames(self):
++                while not self.stop:
++                    if not self.paused:
++                        self.frame("run")
++                    time.sleep(1 / 60)
++
++            def serve(self):
++                while not self.stop:
++                    try:
++                        data, addr = self.sock.recvfrom(4096)
++                    except OSError:
++                        continue
++                    c = data.decode().strip(); w = c.split()
++                    self.log.append(w[0] if w else "")
++                    if c == "GET_STATUS":
++                        self.sock.sendto(f"GET_STATUS {'PAUSED' if self.paused else 'PLAYING'} psx,fixture,crc32=0".encode(), addr)
++                    elif c == "PAUSE_TOGGLE":
++                        self.paused = not self.paused
++                        EV.append([time.monotonic(), "pause" if self.paused else "resume", None])
++                    elif c == "FRAMEADVANCE":
++                        if self.paused:
++                            self.advances += 1
++                            self.frame("advance")
++                            EV.append([time.monotonic(), "advance", self.advances])
++                    elif c == "SAVE_FILES":
++                        self.sock.sendto(b"SAVE_FILES OK", addr)
++                    elif w and w[0] == "LOAD_STATE_SLOT" and len(w) == 2:
++                        p_ = folder() / (m._active_state_stem() + f".state{w[1]}")
++                        if not p_.is_file():
++                            self.logline(f'[ERROR] [State] Failed to load state from "{p_}".')
++                        else:
++                            self.screen = TITLE["begin"]
++                            self.loads += 1
++                            self.notice_until = time.monotonic() + NOTICE_S
++                            EV.append([time.monotonic(), "load", self.loads])
++                            if m._n64_core:                 # the N64 core's load runs a frame (B137's settle)
++                                self.frame("load")
++                            self.logline(f'[INFO] [State] Loading state "{p_}", {p_.stat().st_size} bytes.')
++                        self.sock.sendto(c.encode(), addr)
++                    elif w and w[0] in ("READ_CORE_RAM", "READ_CORE_MEMORY") and len(w) == 3:
++                        self.sock.sendto(f"{w[0]} {w[1]} -1".encode(), addr)
++        em.subprocess.Popen = TitleRA
++        P_UNROUTE = []                                      # each route cleared while a title runs: was it paused
++        _set_route = bridge.set_party_route
++
++        def _route_spy(route):
++            ra_ = fake.get("ra")
++            if route is None and ra_ is not None and ra_.poll() is None and layer.mg is not None \
++                    and layer.mg.get("practice_end_by") is not None:                   # a practice's way back
++                P_UNROUTE.append(bool(ra_.paused))
++            return _set_route(route)
++        bridge.set_party_route = _route_spy
++        READS = []                                          # every read: [t, paused, the label's corner max]
++
++        class FollowPicture:
++            def __init__(self):
++                self.n = {}
++
++            def grab(self):
++                ra_ = fake.get("ra")
++                if ra_ is None or ra_.poll() is not None:
++                    raise RuntimeError("the picture was not read: no game window")
++                n64_ = bool(m._n64_core)
++                shown = ra_.shown
++                if time.monotonic() < ra_.notice_until or shown in ("boot", "fight"):
++                    tok = "s4other" if n64_ else "other"
++                elif shown == "start":
++                    tok = "s4start" if n64_ else "start"
++                else:
++                    tok = shown
++                i = self.n[tok] = (self.n.get(tok, -1) + 1) % 6
++                with Image.open(frames / f"{tok}_{i}.png") as im:
++                    img = im.convert("L")
++                if ra_.paused:                              # RetroArch's "Paused." in the corner
++                    img.paste(255, (img.size[0] - LBL[0], 0, img.size[0], LBL[1]))
++                return img
++        follow = FollowPicture()
++        mini.picture = follow
++        es_ = h7m.endscreen()
++        _read = es_.Reader.read
++
++        def _spy(self_, img):
++            ra_ = fake.get("ra")
++            W_ = img.size[0]
++            corner = max(img.crop((W_ - LBL[0], 0, W_, LBL[1])).getdata())
++            READS.append([time.monotonic(), bool(ra_ is not None and ra_.paused), corner])
++            return _read(self_, img)
++        es_.Reader.read = _spy
++        PRESS = {"on": False, "players": [0, 1], "sent": []}
++
++        def presser():
++            while watching["on"]:
++                if not PRESS["on"]:
++                    time.sleep(0.02); continue
++                for pl in list(PRESS["players"]):
++                    bridge._apply_report(pl, CONFIRM, 0, 0, 0, 0, 0, 0)
++                PRESS["sent"].append([time.monotonic(), "down"])
++                time.sleep(0.1)
++                for pl in list(PRESS["players"]):
++                    bridge._apply_report(pl, 0, 0, 0, 0, 0, 0, 0)
++                PRESS["sent"].append([time.monotonic(), "up"])
++                time.sleep(0.1)
++        threading.Thread(target=presser, daemon=True, name="b137-presses").start()
++
++        def ev_since(t0_):
++            return [e for e in EV if e[0] >= t0_]
++
++        def segment(t_from, t_go):
++            """From the first pause at or after t_from to the go: the resumes, the frames that saw a button, the loads."""
++            p0 = next((e[0] for e in EV if e[0] >= t_from and e[1] == "pause"), None)
++            if p0 is None:
++                return {"paused_from": None}
++            seg = [e for e in EV if p0 <= e[0] <= t_go]
++            return {"paused_from": True, "resumes": sum(1 for e in seg if e[1] == "resume"),
++                    "frames": sum(1 for e in seg if e[1] == "frame"),
++                    "frames_with_a_button": sum(1 for e in seg if e[1] == "frame" and any(e[2][1])),
++                    "left_start": sum(1 for e in seg if e[1] == "left_start"),
++                    "loads": sum(1 for e in seg if e[1] == "load"),
++                    "advances": sum(1 for e in seg if e[1] == "advance")}
++
++        def mute_windows(t_from, t_to):
++            """Each load .. the last advance after it (inside the mute): presses sent in it, buttons written in it."""
++            outw = []
++            loads = [e[0] for e in EV if t_from <= e[0] <= t_to and e[1] == "load"]
++            for tl in loads:
++                adv = [e[0] for e in EV if e[0] >= tl and e[1] == "advance"][:2]
++                if not adv:
++                    continue
++                te = adv[-1]
++                outw.append({"s": round(te - tl, 3),
++                             "presses_sent": sum(1 for x in PRESS["sent"] if tl <= x[0] <= te and x[1] == "down"),
++                             "buttons_written": sum(1 for x in VP["log"] if tl <= x[0] <= te and x[2] != 0)})
++            return outw
++
++        def screen_at_resume_after(t_):
++            """The fake's screen the moment it was first resumed after t_ (the go): the frame right after it."""
++            r_ = next((e[0] for e in EV if e[0] >= t_ and e[1] == "resume"), None)
++            if r_ is None:
++                return None
++            f_ = next((e for e in EV if e[0] >= r_ and e[1] == "frame"), None)
++            lf = [e for e in EV if r_ <= e[0] and e[1] == "left_start"]
++            return {"left_start_at_first_frame": bool(lf and f_ is not None and lf[0][0] <= f_[0]),
++                    "loads_after_go": sum(1 for e in EV if e[0] >= t_ and e[1] == "load")}
++
++        def reads_paused_unmasked(t_from, t_to):
++            return [r_ for r_ in READS if t_from <= r_[0] <= t_to and r_[1] and r_[2] != 0]
++
++        def press_case(tag, tok, seats, players, remembered=False, t_end_tok="end_P1"):
++            PRESS["players"] = players
++            PRESS["on"] = True
++            t0_ = time.monotonic()
++            r0 = held_start(tag, tok, seats, ["other"])
++            if remembered:
++                S[tag + "_go_early"] = call("POST", "/plugins/games/party-minigame-go")["body"]
++                wait_until(lambda: layer.mg.get("phase") == "handing_over" or layer.mg.get("state") != "starting", 25)
++                PRESS["on"] = False                          # the go acted on: the players' presses are theirs again
++                b = wait_phase(lambda b: b.get("state") != "starting", 25)
++                go_t = [e[0] for e in EV if e[0] >= t0_ and e[1] == "resume"]     # the go acted on at ready
++                t_go = go_t[0] - 0.001 if go_t else time.monotonic()
++                S[tag + "_ready"] = {"state": b.get("state"), "phase": b.get("phase")}
++            else:
++                b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++                S[tag + "_ready"] = {k: b.get(k) for k in ("state", "phase", "recognised", "why")}
++                if b.get("phase") != "ready":
++                    PRESS["on"] = False
++                    S[tag + "_rows"] = steps_since(r0)
++                    S[tag + "_ev"] = [[round(e[0] - t0_, 3), e[1]] for e in EV if e[0] >= t0_ and e[1] != "frame"][:40]
++                    finish_case(tag, r0)
++                    return r0, t0_, None
++                time.sleep(1.0)                              # held, the presses go on
++                t_go = time.monotonic()
++                S[tag + "_go"] = timed("go", "POST", "/plugins/games/party-minigame-go")["body"]
++            PRESS["on"] = False
++            p_ = wait_phase(lambda b: b.get("state") != "starting", 20)
++            S[tag + "_playing"] = {k: p_.get(k) for k in ("state", "recognised")}
++            time.sleep(0.4)
++            S[tag + "_segment"] = segment(t0_ + 0.05, t_go)
++            S[tag + "_mute"] = mute_windows(t0_, t_go)
++            S[tag + "_on_the_begin"] = screen_at_resume_after(t_go)
++            S[tag + "_reads_paused_unmasked"] = len(reads_paused_unmasked(t0_, t_go))
++            S[tag + "_reads_paused"] = sum(1 for r_ in READS if t0_ <= r_[0] <= t_go and r_[1])
++            S[tag + "_reads_running_masked"] = sum(1 for r_ in READS if r_[0] > t_go + 0.5 and not r_[1] and r_[2] == 0)
++            S[tag + "_route_playing"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
++            fake["ra"].screen = t_end_tok                    # the title's own end screen
++            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++            S[tag] = {k: e.get(k) for k in ("state", "class", "scores", "places", "why")}
++            finish_case(tag, r0)
++            S[tag + "_row_fields"] = [{k: v for k, v in r.items() if k in ("step", "frames", "mute_ms", "paused",
++                                                                         "remembered", "label_mask")}
++                                      for r in rows()[r0:] if r["step"] in ("minigame_frame_advance", "minigame_go",
++                                                                             "minigame_reloaded")]
++            S[tag + "_mute_after"] = bool(getattr(bridge, "_party_mute", False))
++            return r0, t0_, t_go
++
++        if args["mode"] == "nopress_head":
++            # HEAD's code (B133's order): the same presses -> the title leaves its start behind the board; and the
++            # control, no presses -> ready
++            layer.advance_gap_s = 0.06
++            press_case("x1", tok2, "1,2", [0, 1])
++            PRESS["players"] = []
++            press_case("x0", tok2, "1,2", [])
++        else:
++            layer.advance_gap_s = 0.15                       # the mute long enough to see presses dropped in it
++            # N1: T88-shaped, a confirm press from both players every 0.2 s from the start call to the go
++            press_case("n1", tok2, "1,2", [0, 1])
++            # N2: three practices, the presses throughout (the ways back too); Start twice, time once; a real go
++            PRESS["players"] = [0, 1]; PRESS["on"] = True
++            t0_ = time.monotonic()
++            r0 = held_start("n2", tok2, "1,2", ["other"])
++            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++            S["n2_ready0"] = {k: b.get(k) for k in ("state", "phase")}
++            gos, ends = [], []
++            for n in range(3):
++                gos.append(time.monotonic())
++                call("POST", "/plugins/games/party-minigame-go?practice=1")
++                wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
++                time.sleep(0.8)                              # practising: routed presses reach the title
++                ends.append(time.monotonic())
++                if n < 2:
++                    bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # Start on the second pad
++                    bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
++                else:
++                    layer.practice_s = 0.5
++                b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++                layer.practice_s = 90.0
++                S[f"n2_back{n + 1}"] = {k: b.get(k) for k in ("state", "phase", "practices")}
++            time.sleep(0.6)
++            t_go = time.monotonic()
++            S["n2_go"] = timed("go", "POST", "/plugins/games/party-minigame-go")["body"]
++            PRESS["on"] = False
++            p_ = wait_phase(lambda b: b.get("state") != "starting", 20)
++            S["n2_playing"] = {k: p_.get(k) for k in ("state", "practice")}
++            time.sleep(0.4)
++            segs = [segment(ends[k], (gos + [t_go])[k + 1]) for k in range(3)]
++            S["n2_way_back_segments"] = segs
++            S["n2_way_back_mute"] = [mute_windows(ends[k], (gos + [t_go])[k + 1]) for k in range(3)]
++            S["n2_first_segment"] = segment(t0_ + 0.05, gos[0])
++            # each way back: the pause before the route was cleared (the fake paused while still routed)
++            S["n2_pause_before_unroute"] = [P_UNROUTE[k] for k in range(len(P_UNROUTE))]
++            S["n2_on_the_begin"] = screen_at_resume_after(t_go)
++            S["n2_reads_paused_unmasked"] = len(reads_paused_unmasked(t0_, t_go))
++            fake["ra"].screen = "end_P2"
++            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++            S["n2"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
++            finish_case("n2", r0)
++            S["n2_steps"] = [r["step"] for r in rows()[r0:] if r["step"] in (
++                "minigame_practice_end", "minigame_frame_advance", "minigame_ready", "minigame_go",
++                "minigame_reloaded", "minigame_route", "minigame_playing")]
++            # N3: T89-shaped (N64, its load runs a frame), four players pressing, a remembered go
++            press_case("n3", tok4, "3,1,4,2", [0, 1, 2, 3], remembered=True, t_end_tok="s4r2143")
++            # N4: never the start (the begin shows a fight) -> given up, no route, no switch, never resumed
++            TITLE["begin"] = "fight"
++            PRESS["players"] = [0, 1]; PRESS["on"] = True
++            t0_ = time.monotonic()
++            r0 = held_start("n4", tok2, "1,2", ["other"])
++            e = wait_for(lambda b: b.get("state") in ("given_up", "ended") or b.get("phase") == "ready", 20)
++            PRESS["on"] = False
++            S["n4"] = {k: e.get(k) for k in ("state", "why", "phase")}
++            S["n4_resumes"] = sum(1 for e_ in ev_since(t0_) if e_[1] == "resume")
++            finish_case("n4", r0)
++            TITLE["begin"] = "start"
++            # N5: during the mute — the board's end, the onn's Home, a second start, the onn's END
++            layer.advance_gap_s = 0.7
++            for tag, how in (("n5b", "board"), ("n5h", "home"), ("n5s", "second"), ("n5e", "onn_end")):
++                PRESS["players"] = [0, 1]; PRESS["on"] = True
++                r0 = held_start(tag, tok2, "1,2", ["other"])
++                S[tag + "_mute_seen"] = wait_until(lambda: bool(getattr(bridge, "_party_mute", False)), 10)
++                if how == "board":
++                    S[tag + "_call"] = timed("board_end", "POST", "/plugins/games/party-minigame-end")["code"]
++                elif how == "home":
++                    S[tag + "_call"] = timed("home", "POST", "/plugins/games/native-stream-stop")["code"]
++                    client.in_stream = False
++                elif how == "second":
++                    S[tag + "_call"] = call("POST", f"/plugins/games/party-minigame-start?id={tok2}&seats=1,2&hold=1")["code"]
++                    S[tag + "_mute_still"] = bool(getattr(bridge, "_party_mute", False))
++                    timed("board_end", "POST", "/plugins/games/party-minigame-end")
++                else:
++                    S[tag + "_call"] = timed("end_onn", "POST", "/plugins/games/stop")["code"]
++                wait_until(lambda: layer.mg.get("closed"), 15)
++                PRESS["on"] = False
++                time.sleep(0.3)
++                S[tag] = {k: layer.mg.get(k) for k in ("state", "why", "closed")}
++                S[tag + "_mute_after"] = bool(getattr(bridge, "_party_mute", False))
++                S[tag + "_title_gone"] = not title_alive()
++                S[tag + "_route"] = bridge._party_route
++                S[tag + "_switches"] = [[r.get("window"), r.get("switched")] for r in rows()[r0:]
++                                        if r["step"] == "minigame_stream"]
++                if how == "home":
++                    call("POST", "/plugins/games/native-stream-start?port=48100")
++                    client.in_stream = True
++                    call("POST", "/plugins/games/native-stream-ready")
++                    S[tag + "_kind_after"] = call("GET", "/plugins/games/status")["body"].get("launch_kind")
++                if how == "onn_end":
++                    S[tag + "_board_gone"] = wait_until(lambda: board_pid_now() is None, 15)
++            layer.advance_gap_s = 0.06
++            S["n_lat"] = {k: max(v) if v else None for k, v in out["lat"].items()}
++        es_.Reader.read = _read
+     S["h_running_at_end"] = [title_alive()]
+     timed("end_onn", "POST", "/plugins/games/stop")
+     wait_until(lambda: board_pid_now() is None, 10)
+diff --git a/tests/b133_party_prepare_go/test_b133.py b/tests/b133_party_prepare_go/test_b133.py
+index f603b9e8..58db3c47 100644
+--- a/tests/b133_party_prepare_go/test_b133.py
++++ b/tests/b133_party_prepare_go/test_b133.py
+@@ -48,7 +48,8 @@ class PrepareAndGo(unittest.TestCase):
+         self.assertIsNone(self.out["hung"])
+         self.assertEqual(s["h1_preparing"]["phase"], "preparing")
+         self.assertEqual(s["h1_ready"], {"state": "starting", "phase": "ready", "recognised": True, "practices": 0})
+-        self.assertEqual(s["h1_rows_at_ready"], ["minigame_start", "minigame_launch", "minigame_watch", "minigame_ready"])
++        self.assertEqual(s["h1_rows_at_ready"], ["minigame_start", "minigame_launch", "minigame_watch",
++                                                 "minigame_frame_advance", "minigame_ready"])    # B137's order
+         self.assertIsNone(s["h1_route_ready"])
+         self.assertTrue(s["h1_stream_on_board"])
+         self.assertTrue(s["h1_title_paused_ready"])
+@@ -60,9 +61,9 @@ class PrepareAndGo(unittest.TestCase):
+         self.assertEqual(s["h1_route_playing"], {"0": 0, "1": 1})
+         self.assertTrue(s["h1_stream_on_title"])
+         self.assertEqual(s["h1"], {"state": "ended", "class": "end_P1", "scores": [1, 0], "why": None})
+-        self.assertEqual(s["h1_rows"][:9], ["minigame_start", "minigame_launch", "minigame_watch", "minigame_ready",
+-                                            "minigame_go", "minigame_reloaded", "minigame_route", "minigame_stream",
+-                                            "minigame_playing"])
++        self.assertEqual(s["h1_rows"][:9], ["minigame_start", "minigame_launch", "minigame_watch",
++                                            "minigame_frame_advance", "minigame_ready", "minigame_go",
++                                            "minigame_route", "minigame_stream", "minigame_playing"])   # B137: no reload
+         f = s["h1_row_fields"]
+         self.assertEqual(f["minigame_start"], {"hold": True})
+         self.assertGreater(f["minigame_ready"]["prepare_s"], 0.5)
+diff --git a/tests/b137_party_no_press/test_b137.py b/tests/b137_party_no_press/test_b137.py
+new file mode 100644
+index 00000000..6dcd9bef
+--- /dev/null
++++ b/tests/b137_party_no_press/test_b137.py
+@@ -0,0 +1,195 @@
++#!/usr/bin/env python3
++"""B137 (host): nothing a player presses reaches a held title before the go — through the real HTTP server on loopback,
++behind PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
++
++B114's scenario, its `nopress` mode: B108's stand-in board; B101's fake RetroArch taught `FRAMEADVANCE` and a title —
++running, it reads the virtual pads every 1/60 s and **leaves its start screen when any button but neutral reaches it**;
++a frame advance runs one frame; its load puts the begin back (PS1-shaped: shown at the next frame; N64-shaped: the load
++runs a frame and reads the pads); notices cover its picture after each load; its own log. The watcher's picture follows
++the fake (RetroArch's "Paused." drawn in its corner while paused); the virtual pads' writes recorded. **A confirm press
++from each player through the bridge every 0.2 s from the start call to the go.**
++
++Checked: T88-shaped → `ready`, the fake never resumed from the launch's answer to the go, every frame it ran then saw
++neutral pads, presses sent inside the mute and nothing but neutral written there, `minigame_frame_advance` (2 frames,
++the mute's ms), **no second load at the go** (no `minigame_reloaded`), `playing` on the begin, scored as today; every
++paused read had the label's corner masked, none after the go; three practices with presses throughout (each way back
++paused while still routed, then the same checks to the next go), then a real go scored; T89-shaped (N64, four pads, a
++remembered go); never the start → given up, no route, no switch, never resumed; the board's end, the onn's Home, a
++second start and the onn's END **during the mute** → the mute released, the title gone; every route < 2 s. **HEAD's
++code (B133's order) with the same presses → "not recognised"; with none → ready.** The flags absent → HEAD's answers
++byte for byte. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b137_party_no_press -v
++"""
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b114_party_minigame_hang", "b124_party_four_seats", "b127_party_cheat_setups", "b115_party_handovers",
++            "b123_h7_n64_start", "b133_party_prepare_go"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import test_b114 as b114  # noqa: E402  (harnesses; their tests are not collected here)
++import test_b124 as b124  # noqa: E402
++
++HEAD = "498ff031"                       # queue AV's baseline: the companion before B137 (B133's order)
++NOT_RECOGNISED = "the title's start screen was not recognised"
++
++
++def _run(code=None, mode="nopress"):
++    root, ids = b114.b99.tree(code)
++    b124.IDS.clear()
++    b124.IDS.update(ids)
++    return b114.run(root, b114.BOTH, ids, mode, extra=b124.extra)
++
++
++class NoPressBeforeTheGo(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.out = _run()
++        cls.s = cls.out["steps"]
++
++    def _no_press_reached(self, seg, tag):
++        self.assertTrue(seg.get("paused_from"), (tag, seg))
++        self.assertEqual(seg["resumes"], 0, (tag, seg))                     # never resumed before the go
++        self.assertEqual(seg["frames_with_a_button"], 0, (tag, seg))        # every frame it ran saw neutral pads
++        self.assertEqual(seg["left_start"], 0, (tag, seg))
++        self.assertEqual(seg["loads"], 1, (tag, seg))
++        self.assertEqual(seg["advances"], 2, (tag, seg))
++
++    def test_0_t88_shaped_ready_with_presses_never_resumed(self):
++        s = self.s
++        self.assertIsNone(self.out["hung"])
++        self.assertEqual(s["n1_ready"], {"state": "starting", "phase": "ready", "recognised": True, "why": None})
++        self._no_press_reached(s["n1_segment"], "n1")
++        self.assertGreaterEqual(s["n1_segment"]["frames"], 2)              # the advanced frames ran
++        for w in s["n1_mute"]:
++            self.assertGreaterEqual(w["presses_sent"], 1, w)                # presses were sent inside the mute ...
++            self.assertEqual(w["buttons_written"], 0, w)                    # ... and none reached a pad
++        self.assertFalse(s["n1_mute_after"])
++
++    def test_1_the_go_no_second_load_playing_on_the_begin(self):
++        s = self.s
++        self.assertEqual(s["n1_go"], {"ok": True, "go": "taken", "phase": "ready", "practice": False})
++        self.assertEqual(s["n1_playing"]["state"], "playing")
++        self.assertEqual(s["n1_on_the_begin"], {"left_start_at_first_frame": False, "loads_after_go": 0})
++        self.assertEqual(s["n1_rows"][:9], ["minigame_start", "minigame_launch", "minigame_watch",
++                                            "minigame_frame_advance", "minigame_ready", "minigame_go",
++                                            "minigame_route", "minigame_stream", "minigame_playing"])
++        self.assertNotIn("minigame_reloaded", s["n1_rows"])
++        fa = [r for r in s["n1_row_fields"] if r["step"] == "minigame_frame_advance"]
++        self.assertEqual(len(fa), 1)
++        self.assertEqual((fa[0]["frames"], fa[0]["paused"]), (2, True))
++        self.assertGreater(fa[0]["mute_ms"], 300.0)                         # 2 x 0.15 s (slowed in the test) + the load
++        self.assertLess(fa[0]["mute_ms"], 1500.0)
++        self.assertEqual(s["n1_route_playing"], {"0": 0, "1": 1})
++        self.assertEqual(s["n1"], {"state": "ended", "class": "end_P1", "scores": [1, 0], "places": None, "why": None})
++        self.assertTrue(s["n1_title_gone"] and s["n1_closed"] and s["n1_board_picture_back"])
++
++    def test_2_the_label_masked_on_every_paused_read_and_never_after_the_go(self):
++        s = self.s
++        self.assertGreater(s["n1_reads_paused"], 3)
++        self.assertEqual(s["n1_reads_paused_unmasked"], 0)
++        self.assertEqual(s["n1_reads_running_masked"], 0)
++        self.assertEqual(s["n2_reads_paused_unmasked"], 0)
++
++    def test_3_three_practices_presses_throughout_the_ways_back(self):
++        s = self.s
++        self.assertEqual(s["n2_ready0"], {"state": "starting", "phase": "ready"})
++        self._no_press_reached(s["n2_first_segment"], "n2 first")
++        for n in range(3):
++            self.assertEqual(s[f"n2_back{n + 1}"], {"state": "starting", "phase": "ready", "practices": n + 1})
++            self._no_press_reached(s["n2_way_back_segments"][n], f"n2 way back {n + 1}")
++            for w in s["n2_way_back_mute"][n]:
++                self.assertEqual(w["buttons_written"], 0, (n, w))
++        self.assertEqual(s["n2_pause_before_unroute"], [True, True, True])   # paused while still routed
++        self.assertEqual(s["n2_go"]["go"], "taken")
++        self.assertEqual(s["n2_playing"], {"state": "playing", "practice": None})
++        self.assertEqual(s["n2_on_the_begin"], {"left_start_at_first_frame": False, "loads_after_go": 0})
++        self.assertEqual(s["n2"], {"state": "ended", "class": "end_P2", "scores": [0, 1], "practices": 3})
++        self.assertNotIn("minigame_reloaded", s["n2_steps"])
++        self.assertEqual(s["n2_steps"].count("minigame_frame_advance"), 4)   # the first preparation + 3 ways back
++
++    def test_4_t89_shaped_four_pads_a_remembered_go(self):
++        s = self.s
++        self.assertEqual(s["n3_go_early"]["go"], "remembered")
++        self.assertEqual(s["n3_ready"]["state"], "playing")
++        self._no_press_reached(s["n3_segment"], "n3")
++        self.assertGreaterEqual(s["n3_segment"]["frames"], 3)              # the load's own frame + 2 advanced
++        for w in s["n3_mute"]:
++            self.assertEqual(w["buttons_written"], 0, w)
++        self.assertEqual(s["n3_on_the_begin"], {"left_start_at_first_frame": False, "loads_after_go": 0})
++        self.assertEqual(s["n3_route_playing"], {"2": 0, "0": 1, "3": 2, "1": 3})
++        self.assertEqual((s["n3"]["state"], s["n3"]["places"], s["n3"]["scores"]), ("ended", [2, 1, 4, 3], [3, 4, 1, 2]))
++
++    def test_5_never_the_start_given_up_never_resumed(self):
++        s = self.s
++        self.assertEqual(s["n4"]["state"], "given_up")
++        self.assertIn("start screen was not recognised", s["n4"]["why"])
++        self.assertEqual(s["n4_resumes"], 0)
++        self.assertNotIn("minigame_route", s["n4_rows"])
++        self.assertEqual(s["n4_switches"], [])
++        self.assertTrue(s["n4_title_gone"])
++
++    def test_6_ends_home_and_a_second_start_during_the_mute(self):
++        s = self.s
++        for tag in ("n5b", "n5h", "n5s", "n5e"):
++            self.assertTrue(s[tag + "_mute_seen"], tag)
++            self.assertEqual(s[tag + "_call"] if tag != "n5s" else 200, 200, tag)
++            self.assertTrue(s[tag]["closed"], (tag, s[tag]))
++            self.assertEqual(s[tag]["state"], "given_up", tag)
++            self.assertFalse(s[tag + "_mute_after"], tag)                   # the mute never outlives the mini game
++            self.assertTrue(s[tag + "_title_gone"], tag)
++            self.assertIsNone(s[tag + "_route"], tag)
++            self.assertEqual(s[tag + "_switches"], [], tag)
++        self.assertEqual(s["n5s_call"], 400)                                # a second start refused
++        self.assertEqual(s["n5h"]["why"], "the onn's Home during the preparation")
++        self.assertEqual(s["n5h_kind_after"], "godot")
++        self.assertEqual(s["n5e"]["why"], "ended from the onn")
++        self.assertTrue(s["n5e_board_gone"])
++
++    def test_7_routes_within_2_s_nothing_left(self):
++        for kind in ("status", "result", "ns_status", "start", "go", "board_end", "home", "end_onn"):
++            self.assertLess(self.out["lat"][kind]["max"], b114.WITHIN_S, kind)
++        self.assertEqual(self.s["h_running_at_end"], [False])
++        self.assertIsNone(self.s["h_board_at_end"])
++
++
++class HeadsOrder(unittest.TestCase):
++    """The mutation that shows the fault: HEAD's companion (B133: resumed behind the board until the start is read)."""
++
++    def test_the_same_presses_on_heads_code_are_not_recognised(self):
++        code = b114.code_of(HEAD)
++        if code is None:
++            self.skipTest("git is absent")
++        s = _run(code, "nopress_head")["steps"]
++        self.assertEqual(s["x1_ready"]["state"], "given_up", s.get("x1_ev"))
++        self.assertIn(NOT_RECOGNISED, s["x1_ready"]["why"])
++        self.assertNotIn("minigame_route", s["x1_rows"])
++        # the control: no presses on HEAD's code -> ready, then played as before
++        self.assertEqual(s["x0_ready"]["phase"], "ready")
++        self.assertEqual(s["x0"]["state"], "ended")
++
++
++class Today(unittest.TestCase):
++    def test_flags_absent_and_no_mini_game_are_heads(self):
++        code = b114.code_of(HEAD)
++        if code is None:
++            self.skipTest("git is absent")
++        for env in ({**b114.b85.FLAGS, **b114.ADOPTED}, {**b114.b85.FLAGS, **b114.ADOPTED, "PRIVYHUB_PARTY": "1"},
++                    {**b114.b85.FLAGS, **b114.ADOPTED, "PRIVYHUB_H7": "1"}):
++            root, ids = b114.b99.tree(code)
++            base = b114.run(root, env, ids, "today")["steps"]
++            root2, ids2 = b114.b99.tree()
++            mine = b114.run(root2, env, ids2, "today")["steps"]
++            for k in ("list", "start", "result", "end", "go", "status_idle", "home_idle", "stop_idle"):
++                self.assertEqual((mine[k]["code"], b114.CLOCK.sub("<ms>", mine[k]["raw"])),
++                                 (base[k]["code"], b114.CLOCK.sub("<ms>", base[k]["raw"])), (sorted(env), k))
++            self.assertEqual(mine["ports_today"], base["ports_today"], sorted(env))
++
++
++if __name__ == "__main__":
++    unittest.main()

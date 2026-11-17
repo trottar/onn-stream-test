@@ -37,6 +37,10 @@ B129 (the same flag): the watcher's picture is the largest visible window **owne
 10 s) — never a rectangle kept from another process; no such window → a picture failure, no read.
 B130 (the same flag): a watch begun with the load under a cheat setup waits RECOGNISE_SETUP_S (15 s) for the start
 before `recognised` is false; every other watch RECOGNISE_S (8 s), as today.
+B137 (a held party mini game only — `start(mask_label=True)`, never the HTTP `h7-start`): while the watch's label mask
+is on (`label_mask`), every picture has its top-right LABEL_BOX painted black before it is read — RetroArch draws
+"Paused." there for as long as the core is paused, and on a title with black bars its text breaks the reader's bar
+cut. The `watching` row says `"label_mask": true` only then.
 """
 from __future__ import annotations
 
@@ -69,6 +73,7 @@ REFIND_S = 10.0             # B129: the game's window found again at most this o
 KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
 JPEG_QUALITY = 90
 SETUP_PREFIX = 12           # B127: a setup's begin is <game id>.<the profile_id's first 12 characters>.state
+LABEL_BOX = (200, 70)       # B137: RetroArch's "Paused." box (~170 x 55 px, the same in every window size) + a margin
 _PROFILE_ID = re.compile(r"^[0-9A-F]{64}$")
 _endscreen = None
 
@@ -85,6 +90,16 @@ def session_profile_id(emulator: Any) -> str | None:
         return None
     pid = str(sess.get("profile_id") or "").strip().upper()
     return pid if _PROFILE_ID.match(pid) else None
+
+
+def mask_label(img, box=None):
+    """B137: the picture with its top-right `box` (w, h px; LABEL_BOX) painted black — RetroArch's "Paused." label."""
+    w, h = box if box is not None else LABEL_BOX
+    out = img.copy()
+    W = out.size[0]
+    black = 0 if out.mode in ("L", "1", "I", "F") else (0,) * len(out.getbands())
+    out.paste(black, (max(0, W - int(w)), 0, W, min(out.size[1], int(h))))
+    return out
 
 
 def endscreen():
@@ -237,7 +252,7 @@ class MiniGame:
         self._row({"step": "refused", "why": why})
         raise ValueError(why)
 
-    def start(self, load_text: str = "", keep_text: str = "", bench: bool = False) -> dict:
+    def start(self, load_text: str = "", keep_text: str = "", bench: bool = False, mask_label: bool = False) -> dict:
         text = str(load_text or "").strip()
         if text not in ("", "0", "1"):
             raise ValueError("load is 0 or 1")
@@ -247,9 +262,9 @@ class MiniGame:
             raise ValueError("keep is 0 or 1")
         keep = keep_word == "1"
         with self._start_lock:
-            return self._start(load, keep, bench)
+            return self._start(load, keep, bench, mask_label)
 
-    def _start(self, load: bool, keep: bool, bench: bool = False) -> dict:
+    def _start(self, load: bool, keep: bool, bench: bool = False, mask_label: bool = False) -> dict:
         # B105: a watch already on is replaced after the checks and the load (never refused for being on)
         try:
             game, system, kind = self._live._running()
@@ -326,12 +341,16 @@ class MiniGame:
                            "keep": ({"folder": keep_dir.name, "pictures": 0} if keep_dir is not None else None),
                            "t0": self._clock(), "token": token, "_keep_dir": keep_dir,
                            "_recognise_s": recognise_s}
+            if mask_label:
+                self._watch["_mask_label"] = True                    # B137: a held party mini game's paused reads
             row = {"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
                    "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
                    "spec_version": spec.get("version"), "recognise_s": recognise_s, "bench": bench,
                    "keep": keep_dir.name if keep_dir is not None else None}
             if begin is not None:
                 row["begin"] = begin                                 # B127: only under a cheat setup
+            if mask_label:
+                row["label_mask"] = True                             # B137
             self._row(row)
         threading.Thread(target=self._run, args=(token, game, reader, ended, spec), daemon=True,
                          name="h7-minigame").start()
@@ -381,6 +400,15 @@ class MiniGame:
                 raise live.Busy("the mini game's state did not load; the game is as it was") from None
             self._row({"step": "reloaded", "game": game, "load_line_ms": line_ms})
             return line_ms
+
+    def label_mask(self, on: bool) -> bool:
+        """B137: the current watch's label mask on / off (the party layer: off at the go). -> True when a watch took it."""
+        with self._lock:
+            w = self._watch
+            if w is None:
+                return False
+            w["_mask_label"] = bool(on)
+            return True
 
     def bench_release(self, client_ip: str) -> dict:
         """B112: the running game's pause released with no stream (loopback, no client's stream up)."""
@@ -506,6 +534,11 @@ class MiniGame:
                     return
                 try:
                     img = self.picture.grab()
+                    with self._lock:
+                        w = self._current(token)
+                        masked = bool(w is not None and w.get("_mask_label"))
+                    if masked:
+                        img = mask_label(img)                         # B137: RetroArch's "Paused." corner
                 except Exception as exc:
                     with self._lock:
                         w = self._current(token)

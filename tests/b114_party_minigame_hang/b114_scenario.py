@@ -715,7 +715,7 @@ if args["mode"] == "cheat":
     S["c_scratch_end"] = scratch_anywhere()
     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
     finish()
-if args["mode"] in ("hold", "practice"):
+if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
     n64 = args["n64_id"]
     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
@@ -929,6 +929,342 @@ if args["mode"] in ("hold", "practice"):
                 call("POST", "/plugins/games/native-stream-start?port=48100")
                 client.in_stream = True
                 call("POST", "/plugins/games/native-stream-ready")
+    if args["mode"] in ("nopress", "nopress_head"):
+        # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
+        # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but
+        # neutral reaches it (a pick on the select screen -> a fight); a frame advance runs one frame; its load puts the
+        # begin back (PS1-shaped: shown at the next frame; N64-shaped: the load runs a frame, reading the pads); notices
+        # cover its picture for NOTICE_S after a load; its own log. The watcher's picture follows the fake (RetroArch's
+        # "Paused." drawn in its corner while paused). A confirm press from each player through the bridge every 0.2 s.
+        import h7_minigame as h7m
+        NOTICE_S, CONFIRM = 0.6, 0x1000                     # XUSB_A: the board's confirm
+        if hasattr(h7m, "LABEL_BOX"):
+            h7m.LABEL_BOX = (24, 10)                        # the label's box at the fixtures' scale (320 x 260)
+        LBL = (20, 8)
+        VP = {"cur": [0, 0, 0, 0], "log": []}
+
+        def _rec(index, report, *a_, forced_buttons=0, **k_):
+            b_ = (int(report["buttons"]) | int(forced_buttons)) & 0xFFFF
+            VP["cur"][index] = b_
+            VP["log"].append([time.monotonic(), index, b_])
+        bridge._write_linux_report_locked = _rec
+        EV = []                                             # the fake title's own log: [t, what, detail]
+        TITLE = {"begin": "start"}
+
+        class TitleRA(FakeRetroArch):
+            def __init__(self, cmd, **kw):
+                self.screen, self.shown, self.notice_until = "boot", "boot", 0.0
+                self.loads = self.advances = self.frames = 0
+                super().__init__(cmd, **kw)
+                EV.append([time.monotonic(), "launch", None])
+                threading.Thread(target=self.run_frames, daemon=True).start()
+
+            def frame(self, why):
+                pads = list(VP["cur"])
+                if self.screen == "start" and any(b_ != 0 for b_ in pads):
+                    self.screen = "fight"
+                    EV.append([time.monotonic(), "left_start", why])
+                self.shown = self.screen
+                self.frames += 1
+                EV.append([time.monotonic(), "frame", [why, pads]])
+
+            def run_frames(self):
+                while not self.stop:
+                    if not self.paused:
+                        self.frame("run")
+                    time.sleep(1 / 60)
+
+            def serve(self):
+                while not self.stop:
+                    try:
+                        data, addr = self.sock.recvfrom(4096)
+                    except OSError:
+                        continue
+                    c = data.decode().strip(); w = c.split()
+                    self.log.append(w[0] if w else "")
+                    if c == "GET_STATUS":
+                        self.sock.sendto(f"GET_STATUS {'PAUSED' if self.paused else 'PLAYING'} psx,fixture,crc32=0".encode(), addr)
+                    elif c == "PAUSE_TOGGLE":
+                        self.paused = not self.paused
+                        EV.append([time.monotonic(), "pause" if self.paused else "resume", None])
+                    elif c == "FRAMEADVANCE":
+                        if self.paused:
+                            self.advances += 1
+                            self.frame("advance")
+                            EV.append([time.monotonic(), "advance", self.advances])
+                    elif c == "SAVE_FILES":
+                        self.sock.sendto(b"SAVE_FILES OK", addr)
+                    elif w and w[0] == "LOAD_STATE_SLOT" and len(w) == 2:
+                        p_ = folder() / (m._active_state_stem() + f".state{w[1]}")
+                        if not p_.is_file():
+                            self.logline(f'[ERROR] [State] Failed to load state from "{p_}".')
+                        else:
+                            self.screen = TITLE["begin"]
+                            self.loads += 1
+                            self.notice_until = time.monotonic() + NOTICE_S
+                            EV.append([time.monotonic(), "load", self.loads])
+                            if m._n64_core:                 # the N64 core's load runs a frame (B137's settle)
+                                self.frame("load")
+                            self.logline(f'[INFO] [State] Loading state "{p_}", {p_.stat().st_size} bytes.')
+                        self.sock.sendto(c.encode(), addr)
+                    elif w and w[0] in ("READ_CORE_RAM", "READ_CORE_MEMORY") and len(w) == 3:
+                        self.sock.sendto(f"{w[0]} {w[1]} -1".encode(), addr)
+        em.subprocess.Popen = TitleRA
+        P_UNROUTE = []                                      # each route cleared while a title runs: was it paused
+        _set_route = bridge.set_party_route
+
+        def _route_spy(route):
+            ra_ = fake.get("ra")
+            if route is None and ra_ is not None and ra_.poll() is None and layer.mg is not None \
+                    and layer.mg.get("practice_end_by") is not None:                   # a practice's way back
+                P_UNROUTE.append(bool(ra_.paused))
+            return _set_route(route)
+        bridge.set_party_route = _route_spy
+        READS = []                                          # every read: [t, paused, the label's corner max]
+
+        class FollowPicture:
+            def __init__(self):
+                self.n = {}
+
+            def grab(self):
+                ra_ = fake.get("ra")
+                if ra_ is None or ra_.poll() is not None:
+                    raise RuntimeError("the picture was not read: no game window")
+                n64_ = bool(m._n64_core)
+                shown = ra_.shown
+                if time.monotonic() < ra_.notice_until or shown in ("boot", "fight"):
+                    tok = "s4other" if n64_ else "other"
+                elif shown == "start":
+                    tok = "s4start" if n64_ else "start"
+                else:
+                    tok = shown
+                i = self.n[tok] = (self.n.get(tok, -1) + 1) % 6
+                with Image.open(frames / f"{tok}_{i}.png") as im:
+                    img = im.convert("L")
+                if ra_.paused:                              # RetroArch's "Paused." in the corner
+                    img.paste(255, (img.size[0] - LBL[0], 0, img.size[0], LBL[1]))
+                return img
+        follow = FollowPicture()
+        mini.picture = follow
+        es_ = h7m.endscreen()
+        _read = es_.Reader.read
+
+        def _spy(self_, img):
+            ra_ = fake.get("ra")
+            W_ = img.size[0]
+            corner = max(img.crop((W_ - LBL[0], 0, W_, LBL[1])).getdata())
+            READS.append([time.monotonic(), bool(ra_ is not None and ra_.paused), corner])
+            return _read(self_, img)
+        es_.Reader.read = _spy
+        PRESS = {"on": False, "players": [0, 1], "sent": []}
+
+        def presser():
+            while watching["on"]:
+                if not PRESS["on"]:
+                    time.sleep(0.02); continue
+                for pl in list(PRESS["players"]):
+                    bridge._apply_report(pl, CONFIRM, 0, 0, 0, 0, 0, 0)
+                PRESS["sent"].append([time.monotonic(), "down"])
+                time.sleep(0.1)
+                for pl in list(PRESS["players"]):
+                    bridge._apply_report(pl, 0, 0, 0, 0, 0, 0, 0)
+                PRESS["sent"].append([time.monotonic(), "up"])
+                time.sleep(0.1)
+        threading.Thread(target=presser, daemon=True, name="b137-presses").start()
+
+        def ev_since(t0_):
+            return [e for e in EV if e[0] >= t0_]
+
+        def segment(t_from, t_go):
+            """From the first pause at or after t_from to the go: the resumes, the frames that saw a button, the loads."""
+            p0 = next((e[0] for e in EV if e[0] >= t_from and e[1] == "pause"), None)
+            if p0 is None:
+                return {"paused_from": None}
+            seg = [e for e in EV if p0 <= e[0] <= t_go]
+            return {"paused_from": True, "resumes": sum(1 for e in seg if e[1] == "resume"),
+                    "frames": sum(1 for e in seg if e[1] == "frame"),
+                    "frames_with_a_button": sum(1 for e in seg if e[1] == "frame" and any(e[2][1])),
+                    "left_start": sum(1 for e in seg if e[1] == "left_start"),
+                    "loads": sum(1 for e in seg if e[1] == "load"),
+                    "advances": sum(1 for e in seg if e[1] == "advance")}
+
+        def mute_windows(t_from, t_to):
+            """Each load .. the last advance after it (inside the mute): presses sent in it, buttons written in it."""
+            outw = []
+            loads = [e[0] for e in EV if t_from <= e[0] <= t_to and e[1] == "load"]
+            for tl in loads:
+                adv = [e[0] for e in EV if e[0] >= tl and e[1] == "advance"][:2]
+                if not adv:
+                    continue
+                te = adv[-1]
+                outw.append({"s": round(te - tl, 3),
+                             "presses_sent": sum(1 for x in PRESS["sent"] if tl <= x[0] <= te and x[1] == "down"),
+                             "buttons_written": sum(1 for x in VP["log"] if tl <= x[0] <= te and x[2] != 0)})
+            return outw
+
+        def screen_at_resume_after(t_):
+            """The fake's screen the moment it was first resumed after t_ (the go): the frame right after it."""
+            r_ = next((e[0] for e in EV if e[0] >= t_ and e[1] == "resume"), None)
+            if r_ is None:
+                return None
+            f_ = next((e for e in EV if e[0] >= r_ and e[1] == "frame"), None)
+            lf = [e for e in EV if r_ <= e[0] and e[1] == "left_start"]
+            return {"left_start_at_first_frame": bool(lf and f_ is not None and lf[0][0] <= f_[0]),
+                    "loads_after_go": sum(1 for e in EV if e[0] >= t_ and e[1] == "load")}
+
+        def reads_paused_unmasked(t_from, t_to):
+            return [r_ for r_ in READS if t_from <= r_[0] <= t_to and r_[1] and r_[2] != 0]
+
+        def press_case(tag, tok, seats, players, remembered=False, t_end_tok="end_P1"):
+            PRESS["players"] = players
+            PRESS["on"] = True
+            t0_ = time.monotonic()
+            r0 = held_start(tag, tok, seats, ["other"])
+            if remembered:
+                S[tag + "_go_early"] = call("POST", "/plugins/games/party-minigame-go")["body"]
+                wait_until(lambda: layer.mg.get("phase") == "handing_over" or layer.mg.get("state") != "starting", 25)
+                PRESS["on"] = False                          # the go acted on: the players' presses are theirs again
+                b = wait_phase(lambda b: b.get("state") != "starting", 25)
+                go_t = [e[0] for e in EV if e[0] >= t0_ and e[1] == "resume"]     # the go acted on at ready
+                t_go = go_t[0] - 0.001 if go_t else time.monotonic()
+                S[tag + "_ready"] = {"state": b.get("state"), "phase": b.get("phase")}
+            else:
+                b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+                S[tag + "_ready"] = {k: b.get(k) for k in ("state", "phase", "recognised", "why")}
+                if b.get("phase") != "ready":
+                    PRESS["on"] = False
+                    S[tag + "_rows"] = steps_since(r0)
+                    S[tag + "_ev"] = [[round(e[0] - t0_, 3), e[1]] for e in EV if e[0] >= t0_ and e[1] != "frame"][:40]
+                    finish_case(tag, r0)
+                    return r0, t0_, None
+                time.sleep(1.0)                              # held, the presses go on
+                t_go = time.monotonic()
+                S[tag + "_go"] = timed("go", "POST", "/plugins/games/party-minigame-go")["body"]
+            PRESS["on"] = False
+            p_ = wait_phase(lambda b: b.get("state") != "starting", 20)
+            S[tag + "_playing"] = {k: p_.get(k) for k in ("state", "recognised")}
+            time.sleep(0.4)
+            S[tag + "_segment"] = segment(t0_ + 0.05, t_go)
+            S[tag + "_mute"] = mute_windows(t0_, t_go)
+            S[tag + "_on_the_begin"] = screen_at_resume_after(t_go)
+            S[tag + "_reads_paused_unmasked"] = len(reads_paused_unmasked(t0_, t_go))
+            S[tag + "_reads_paused"] = sum(1 for r_ in READS if t0_ <= r_[0] <= t_go and r_[1])
+            S[tag + "_reads_running_masked"] = sum(1 for r_ in READS if r_[0] > t_go + 0.5 and not r_[1] and r_[2] == 0)
+            S[tag + "_route_playing"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+            fake["ra"].screen = t_end_tok                    # the title's own end screen
+            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+            S[tag] = {k: e.get(k) for k in ("state", "class", "scores", "places", "why")}
+            finish_case(tag, r0)
+            S[tag + "_row_fields"] = [{k: v for k, v in r.items() if k in ("step", "frames", "mute_ms", "paused",
+                                                                         "remembered", "label_mask")}
+                                      for r in rows()[r0:] if r["step"] in ("minigame_frame_advance", "minigame_go",
+                                                                             "minigame_reloaded")]
+            S[tag + "_mute_after"] = bool(getattr(bridge, "_party_mute", False))
+            return r0, t0_, t_go
+
+        if args["mode"] == "nopress_head":
+            # HEAD's code (B133's order): the same presses -> the title leaves its start behind the board; and the
+            # control, no presses -> ready
+            layer.advance_gap_s = 0.06
+            press_case("x1", tok2, "1,2", [0, 1])
+            PRESS["players"] = []
+            press_case("x0", tok2, "1,2", [])
+        else:
+            layer.advance_gap_s = 0.15                       # the mute long enough to see presses dropped in it
+            # N1: T88-shaped, a confirm press from both players every 0.2 s from the start call to the go
+            press_case("n1", tok2, "1,2", [0, 1])
+            # N2: three practices, the presses throughout (the ways back too); Start twice, time once; a real go
+            PRESS["players"] = [0, 1]; PRESS["on"] = True
+            t0_ = time.monotonic()
+            r0 = held_start("n2", tok2, "1,2", ["other"])
+            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            S["n2_ready0"] = {k: b.get(k) for k in ("state", "phase")}
+            gos, ends = [], []
+            for n in range(3):
+                gos.append(time.monotonic())
+                call("POST", "/plugins/games/party-minigame-go?practice=1")
+                wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+                time.sleep(0.8)                              # practising: routed presses reach the title
+                ends.append(time.monotonic())
+                if n < 2:
+                    bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # Start on the second pad
+                    bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+                else:
+                    layer.practice_s = 0.5
+                b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+                layer.practice_s = 90.0
+                S[f"n2_back{n + 1}"] = {k: b.get(k) for k in ("state", "phase", "practices")}
+            time.sleep(0.6)
+            t_go = time.monotonic()
+            S["n2_go"] = timed("go", "POST", "/plugins/games/party-minigame-go")["body"]
+            PRESS["on"] = False
+            p_ = wait_phase(lambda b: b.get("state") != "starting", 20)
+            S["n2_playing"] = {k: p_.get(k) for k in ("state", "practice")}
+            time.sleep(0.4)
+            segs = [segment(ends[k], (gos + [t_go])[k + 1]) for k in range(3)]
+            S["n2_way_back_segments"] = segs
+            S["n2_way_back_mute"] = [mute_windows(ends[k], (gos + [t_go])[k + 1]) for k in range(3)]
+            S["n2_first_segment"] = segment(t0_ + 0.05, gos[0])
+            # each way back: the pause before the route was cleared (the fake paused while still routed)
+            S["n2_pause_before_unroute"] = [P_UNROUTE[k] for k in range(len(P_UNROUTE))]
+            S["n2_on_the_begin"] = screen_at_resume_after(t_go)
+            S["n2_reads_paused_unmasked"] = len(reads_paused_unmasked(t0_, t_go))
+            fake["ra"].screen = "end_P2"
+            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+            S["n2"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
+            finish_case("n2", r0)
+            S["n2_steps"] = [r["step"] for r in rows()[r0:] if r["step"] in (
+                "minigame_practice_end", "minigame_frame_advance", "minigame_ready", "minigame_go",
+                "minigame_reloaded", "minigame_route", "minigame_playing")]
+            # N3: T89-shaped (N64, its load runs a frame), four players pressing, a remembered go
+            press_case("n3", tok4, "3,1,4,2", [0, 1, 2, 3], remembered=True, t_end_tok="s4r2143")
+            # N4: never the start (the begin shows a fight) -> given up, no route, no switch, never resumed
+            TITLE["begin"] = "fight"
+            PRESS["players"] = [0, 1]; PRESS["on"] = True
+            t0_ = time.monotonic()
+            r0 = held_start("n4", tok2, "1,2", ["other"])
+            e = wait_for(lambda b: b.get("state") in ("given_up", "ended") or b.get("phase") == "ready", 20)
+            PRESS["on"] = False
+            S["n4"] = {k: e.get(k) for k in ("state", "why", "phase")}
+            S["n4_resumes"] = sum(1 for e_ in ev_since(t0_) if e_[1] == "resume")
+            finish_case("n4", r0)
+            TITLE["begin"] = "start"
+            # N5: during the mute — the board's end, the onn's Home, a second start, the onn's END
+            layer.advance_gap_s = 0.7
+            for tag, how in (("n5b", "board"), ("n5h", "home"), ("n5s", "second"), ("n5e", "onn_end")):
+                PRESS["players"] = [0, 1]; PRESS["on"] = True
+                r0 = held_start(tag, tok2, "1,2", ["other"])
+                S[tag + "_mute_seen"] = wait_until(lambda: bool(getattr(bridge, "_party_mute", False)), 10)
+                if how == "board":
+                    S[tag + "_call"] = timed("board_end", "POST", "/plugins/games/party-minigame-end")["code"]
+                elif how == "home":
+                    S[tag + "_call"] = timed("home", "POST", "/plugins/games/native-stream-stop")["code"]
+                    client.in_stream = False
+                elif how == "second":
+                    S[tag + "_call"] = call("POST", f"/plugins/games/party-minigame-start?id={tok2}&seats=1,2&hold=1")["code"]
+                    S[tag + "_mute_still"] = bool(getattr(bridge, "_party_mute", False))
+                    timed("board_end", "POST", "/plugins/games/party-minigame-end")
+                else:
+                    S[tag + "_call"] = timed("end_onn", "POST", "/plugins/games/stop")["code"]
+                wait_until(lambda: layer.mg.get("closed"), 15)
+                PRESS["on"] = False
+                time.sleep(0.3)
+                S[tag] = {k: layer.mg.get(k) for k in ("state", "why", "closed")}
+                S[tag + "_mute_after"] = bool(getattr(bridge, "_party_mute", False))
+                S[tag + "_title_gone"] = not title_alive()
+                S[tag + "_route"] = bridge._party_route
+                S[tag + "_switches"] = [[r.get("window"), r.get("switched")] for r in rows()[r0:]
+                                        if r["step"] == "minigame_stream"]
+                if how == "home":
+                    call("POST", "/plugins/games/native-stream-start?port=48100")
+                    client.in_stream = True
+                    call("POST", "/plugins/games/native-stream-ready")
+                    S[tag + "_kind_after"] = call("GET", "/plugins/games/status")["body"].get("launch_kind")
+                if how == "onn_end":
+                    S[tag + "_board_gone"] = wait_until(lambda: board_pid_now() is None, 15)
+            layer.advance_gap_s = 0.06
+            S["n_lat"] = {k: max(v) if v else None for k, v in out["lat"].items()}
+        es_.Reader.read = _read
     S["h_running_at_end"] = [title_alive()]
     timed("end_onn", "POST", "/plugins/games/stop")
     wait_until(lambda: board_pid_now() is None, 10)

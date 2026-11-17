@@ -1644,6 +1644,9 @@ class NativeControllerBridge:
     # the mini-game layer (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1) for a mini game's length. None = today.
     _party_route: dict[int, int] | None = None
     _party_buttons = None      # B134: a party practice's report hook (player, buttons); None = today
+    # B137: a party mini game's mute — while set, every report is dropped (the pads stay neutral). Set only by the
+    # mini-game layer around a held title's load and frame advance. False = today.
+    _party_mute = False
 
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
@@ -2331,6 +2334,15 @@ class NativeControllerBridge:
                 pass
         self._party_route = dict(route) if route is not None else None
 
+    def party_mute(self, on: bool) -> None:
+        """B137: on — every pad written neutral (a companion-injected meta button kept, as `_neutralize`), then every
+        report dropped until off. The flag is set under the meta lock and read again there by `_apply_report`, so no
+        report is written after the neutral one."""
+        with self._meta_lock:
+            self._party_mute = bool(on)
+            if on:
+                self._neutralize()
+
     def _apply_report(
         self,
         player: int,
@@ -2367,6 +2379,8 @@ class NativeControllerBridge:
         # Serialize real reports with the forced meta-button overlay so
         # receiver traffic cannot erase a hotkey.
         with self._meta_lock:
+            if self._party_mute:                  # B137: a held mini game's load / frame advance: nothing reaches a pad
+                return
             forced_buttons = self._forced_buttons[player]
             report = {
                 "buttons": int(buttons) & 0xFFFF,
