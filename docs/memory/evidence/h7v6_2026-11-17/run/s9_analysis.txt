@@ -1,0 +1,18 @@
+## party rows
+23:17:27.285 minigame_start {"hold": true, "players": 4, "seats": [3, 1, 4, 2]}
+23:17:28.871 minigame_launch {"cheat": true, "pid_owned": true, "profile_matches": true}
+23:17:29.046 minigame_watch {"loaded": true}
+23:17:29.169 minigame_frame_advance {"frames": 2, "mute_ms": 196.7, "paused": true}
+23:17:44.106 minigame_given_up {"why": "the mini game did not start: the title's start screen was not recognised"}
+23:17:44.106 minigame_taken {"state": "given_up", "what": "end_hub"}
+23:17:44.331 minigame_title_stopped {}
+23:17:44.331 minigame_restore {"board_alive": true}
+23:17:44.331 minigame_end {"by": "hub: the start failed"}
+## h7_results rows
+23:17:29.045 loaded {"load_line_ms": 56.0}
+23:17:29.046 watching {"begin": "setup", "bench": true, "end_classes": ["end"], "k": 3, "keep": null, "label_mask": true, "load_line_ms": 56.0, "loaded": true, "recognise_s": 15.0, "spec_version": 3, "start_class": "start"}
+23:17:44.059 recognised {"after_s": 15.0, "class": "other", "distances": {"end": 0.2921, "screen": 0.2367, "start": 0.2367}, "reads": 15, "value": false}
+23:17:44.107 stopped_by_call {"reads": 15, "state": "watching"}
+## the paused proof per preparation (watch row → its go, or the preparation's end)
+watch 1 at 23:17:29.046 → minigame_given_up at 23:17:44.106: 15 words, PAUSED 15, other []
+   the first words after it: [(1.1, 'none'), (2.1, 'none')]

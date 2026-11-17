@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **H7-V5b MET** (`evidence/H7_V5B_2026-11-17.md`): both mini games under the cheat setups from the board — T88 at
-  10 s, T89 at 2 s, results right, SAVE / LOAD refused. Flags off; eighteen lines. H7-D1 MET.
+- **H7-V6: T88 NOT MET, T89 NOT MET** (`evidence/H7_V6_2026-11-17.md`): prepared paused behind the board (B137),
+  paused throughout, but neither paused start recognised in 15 s. Flags off; eighteen lines. H7-V5b MET.
 
 ## Verified State
 
@@ -87,8 +87,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — PP-H4**, the four-person sitting with everything unlocked (B132's / B128's lines), offered now that H7-V5b
-   is MET. Beside it: the faster switch.
+1. **H7 — B: the paused read** (see the paused window; fix the start read for both titles), then H7-V6 again;
+   PP-H3c and PP-H4 wait. The onn's adb answers "unauthorized": trust it again before PP-H3c.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 

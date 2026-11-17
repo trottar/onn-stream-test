@@ -1,0 +1,25 @@
+## party rows
+23:16:42.212 launch {"fields": ["godot", "pictures", "project", "renderer"], "fullscreen": true, "renderer": "gl_compatibility"}
+23:16:43.008 window {"class": "PrivyParty", "found": true, "seconds": 0.8}
+23:16:43.012 audio {"seconds": 0.0, "sink_input": true}
+23:16:43.013 pads {"in_event_order": [{"event": 11, "player": 1}, {"event": 12, "player": 2}, {"event": 13, "player": 3}, {"event": 14, "player": 4}]}
+23:16:43.017 pause {"key": null, "why": "not released yet (the lobby): nothing sent"}
+23:16:44.064 resume {"key": null, "why": "first release"}
+23:16:50.528 minigame_start {"hold": true, "players": 2, "seats": [1, 2]}
+23:16:51.350 minigame_launch {"cheat": true, "pid_owned": true, "profile_matches": true}
+23:16:51.479 minigame_watch {"loaded": true}
+23:16:51.607 minigame_frame_advance {"frames": 2, "mute_ms": 163.9, "paused": true}
+23:17:06.539 minigame_given_up {"why": "the mini game did not start: the title's start screen was not recognised"}
+23:17:06.539 minigame_taken {"state": "given_up", "what": "end_hub"}
+23:17:06.768 minigame_title_stopped {}
+23:17:06.768 minigame_restore {"board_alive": true}
+23:17:06.768 minigame_end {"by": "hub: the start failed"}
+## h7_results rows
+23:16:44.068 bench_release {"paused": false}
+23:16:51.479 loaded {"load_line_ms": 27.4}
+23:16:51.479 watching {"begin": "setup", "bench": true, "end_classes": ["end_P1", "end_P2"], "k": 3, "keep": null, "label_mask": true, "load_line_ms": 27.4, "loaded": true, "recognise_s": 15.0, "spec_version": 2, "start_class": "start"}
+23:17:06.494 recognised {"after_s": 15.0, "class": "other", "distances": {"screen": 0.1641}, "reads": 15, "value": false}
+23:17:06.540 stopped_by_call {"reads": 15, "state": "watching"}
+## the paused proof per preparation (watch row → its go, or the preparation's end)
+watch 1 at 23:16:51.479 → minigame_given_up at 23:17:06.539: 15 words, PAUSED 15, other []
+   the first words after it: [(0.6, 'none'), (1.6, 'none')]
