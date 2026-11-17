@@ -25,6 +25,12 @@ the game untouched, one row; **`h7-start?keep=1`** saves every picture the watch
 (seconds, utc, file, class, screen, margin, distances, keep_ms) under `runtime/h7_frames/<game id>_<UTC stamp>/`
 (git-ignored); **`last`** carries the read's class and distances, the thresholds they are held against and the spec's
 version; an old-measure spec is `no_spec` with B104's plain line.
+
+B127 (the same flag): **under a cheat setup** (the session's `cheat_session.profile_id` set — the onn's Extras launch,
+or a party mini game launched with its setup) the begin is the setup's own **`<game id>.<the profile_id's first 12
+characters>.state`** when the rules folder holds it, else `<game id>.state` as today; it is loaded through scratch slot
+8 of **the setup's own `states/<core>/`** (`_state_root()` is the setup's while its session runs — where RetroArch
+reads). The answer and the `watching` row carry `"begin": "setup" | "normal"` only under a setup; without one, today.
 """
 from __future__ import annotations
 
@@ -32,6 +38,7 @@ import csv
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -53,7 +60,23 @@ LOOPBACK = ("127.0.0.1", "::1", "localhost")
 RECOGNISE_S = 8.0           # B105: s after a start with the load within which a read must name the start class
 KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
 JPEG_QUALITY = 90
+SETUP_PREFIX = 12           # B127: a setup's begin is <game id>.<the profile_id's first 12 characters>.state
+_PROFILE_ID = re.compile(r"^[0-9A-F]{64}$")
 _endscreen = None
+
+
+def setup_begin_name(game: str, profile_id: str) -> str:
+    """B127: the rules folder's name for a cheat setup's begin, beside the normal `<game id>.state`."""
+    return f"{game}.{str(profile_id).strip().upper()[:SETUP_PREFIX]}.state"
+
+
+def session_profile_id(emulator: Any) -> str | None:
+    """B127: the running session's cheat setup (`profile_id`, upper case), or None (no setup, or a mod session)."""
+    sess = getattr(emulator, "_active_cheat_session", None)
+    if not isinstance(sess, dict) or sess.get("session_kind", "cheat") != "cheat":
+        return None
+    pid = str(sess.get("profile_id") or "").strip().upper()
+    return pid if _PROFILE_ID.match(pid) else None
 
 
 def endscreen():
@@ -210,12 +233,20 @@ class MiniGame:
         except ValueError as exc:
             self._refused(str(exc))
         loader = _Loader(self)
+        begin = None                                        # B127: "setup" / "normal" only under a cheat setup
         if load:
             if kind in ("pcsx2", "dolphin"):
                 self._refused("not supported yet")
             if system not in SYSTEMS:
                 self._refused("not supported yet")
             state = live.rules_folder(self._environ) / f"{game}.state"
+            setup = session_profile_id(self._emu)
+            if setup is not None:
+                own = live.rules_folder(self._environ) / setup_begin_name(game, setup)
+                if own.is_file() and own.stat().st_size > 0:
+                    state, begin = own, "setup"
+                else:
+                    begin = "normal"
             if not state.is_file() or state.stat().st_size <= 0:
                 self._refused("no state for this game's mini game")
         if bench and self._stream_up():                     # B112: the bench only while no client's stream is up
@@ -261,14 +292,20 @@ class MiniGame:
                            "recognised": None, "reads": 0, "last": None, "loaded": load, "picture_failures": 0,
                            "keep": ({"folder": keep_dir.name, "pictures": 0} if keep_dir is not None else None),
                            "t0": self._clock(), "token": token, "_keep_dir": keep_dir}
-            self._row({"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
-                       "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
-                       "spec_version": spec.get("version"), "recognise_s": self.recognise_s, "bench": bench,
-                       "keep": keep_dir.name if keep_dir is not None else None})
+            row = {"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
+                   "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
+                   "spec_version": spec.get("version"), "recognise_s": self.recognise_s, "bench": bench,
+                   "keep": keep_dir.name if keep_dir is not None else None}
+            if begin is not None:
+                row["begin"] = begin                                 # B127: only under a cheat setup
+            self._row(row)
         threading.Thread(target=self._run, args=(token, game, reader, ended, spec), daemon=True,
                          name="h7-minigame").start()
-        return {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms,
-                "replaced": replaced, "keep": keep_dir.name if keep_dir is not None else None}
+        answer = {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms,
+                  "replaced": replaced, "keep": keep_dir.name if keep_dir is not None else None}
+        if begin is not None:
+            answer["begin"] = begin
+        return answer
 
     def bench_release(self, client_ip: str) -> dict:
         """B112: the running game's pause released with no stream (loopback, no client's stream up)."""

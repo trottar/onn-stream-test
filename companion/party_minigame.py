@@ -30,6 +30,16 @@ still `starting` after START_LIMIT_S is given up by the hub; END always works �
 STEP_GRACE_S the end runs without it.
 
 One row per step in the party log (logs/games/party.jsonl), field names and numbers only.
+
+B127 — a mini game **under the title's cheat setup** (the users' Extras setup, e.g. everything unlocked): the sidecar
+may carry `"cheat": {"source_index": n, "enabled_cheat_indexes": [...], "profile_id": "<the setup's id>"}` beside
+`players` / `scores` / `places_to_scores` (no cheat name); its begin is the setup's own `<game id>.<the profile_id's
+first 12 characters>.state` in the rules folder (listed only when it is there). The start checks the setup on the hub
+first (`cheat_profiles`: that `profile_id` with the same source and indexes, and B85's expansion giving them back) — else
+400 SETUP_GONE, nothing set aside or launched; the title is launched by **the plugin's own launch path with the onn's
+Extras query** (`id`, `cheat_source`, `cheat_indexes`), and the session's `profile_id` must then be the sidecar's (else
+given up, the title stopped). `h7-start` loads the setup's begin into the setup's own `states/<core>/` (B127 in
+`h7_minigame`). A sidecar without `cheat` → today.
 """
 from __future__ import annotations
 
@@ -37,10 +47,12 @@ import collections
 import hashlib
 import json
 import os
+import re
 import threading
 import time
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import quote
 
 import h7_live_read as live
 import party_session as party
@@ -66,6 +78,11 @@ PLANNED_GRACE_S = 3.0       # the planned-switch window stays open this long aft
 PLACES_VERSION = 3          # B123: an end-screen spec with a place for every player (B122)
 TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
          "stop": "end"}
+# B127
+SETUP_GONE = "the cheat setup this mini game names is not on the hub (or its cheats changed): nothing was launched"
+SETUP_CHECK_S = 1.5         # the setup check's one manager call: given up after this (the start refused, nothing done)
+NOT_UNDER_SETUP = "the title did not start under its cheat setup"
+_HEX64 = re.compile(r"^[0-9A-Fa-f]{64}$")
 
 _local = threading.local()
 
@@ -181,16 +198,22 @@ class PartyMinigames:
                 continue
             try:
                 spec, _arrays = endscreen().load_spec(folder / name)
-                state = folder / f"{game}.state"
+                side = json.loads((folder / f"{game}.party.json").read_text(encoding="utf-8"))
+                cheat = self._cheat_of(side)                            # B127: None without `cheat` (today)
+                if cheat is None:
+                    state = folder / f"{game}.state"
+                else:
+                    from h7_minigame import setup_begin_name
+                    state = folder / setup_begin_name(game, cheat["profile_id"])
                 if not state.is_file() or state.stat().st_size <= 0:
                     continue
-                side = json.loads((folder / f"{game}.party.json").read_text(encoding="utf-8"))
                 n = int(side["players"])
+                more = {"cheat": cheat} if cheat is not None else {}
                 if spec.get("version") == PLACES_VERSION or "places_to_scores" in side:
                     entry = self._places_entry(spec, side, n)          # B123: a place for every player
                     if entry is None or self.p._find_game_by_id(game) is None:
                         continue
-                    out[self._token(game)] = {"game": game, **entry}
+                    out[self._token(game)] = {"game": game, **entry, **more}
                     continue
                 scores = {str(k): [int(x) if float(x).is_integer() else float(x) for x in v]
                           for k, v in dict(side["scores"]).items()}
@@ -201,8 +224,28 @@ class PartyMinigames:
                     continue
             except Exception:
                 continue
-            out[self._token(game)] = {"game": game, "players": n, "scores": scores, "start_class": spec["start_class"]}
+            out[self._token(game)] = {"game": game, "players": n, "scores": scores, "start_class": spec["start_class"],
+                                      **more}
         return out
+
+    @staticmethod
+    def _cheat_of(side: dict) -> dict | None:
+        """B127: the sidecar's `cheat` (the setup the launch needs), checked; None without one; ValueError when malformed
+        (the title is then not listed, as any malformed sidecar)."""
+        if "cheat" not in side:
+            return None
+        c = side["cheat"]
+        if not isinstance(c, dict):
+            raise ValueError("cheat is an object")
+        src, idx, pid = c.get("source_index"), c.get("enabled_cheat_indexes"), c.get("profile_id")
+        if type(src) is not int or src < 0:
+            raise ValueError("source_index is a non-negative integer")
+        if (not isinstance(idx, list) or not idx or any(type(i) is not int or i < 0 for i in idx)
+                or len(set(idx)) != len(idx)):
+            raise ValueError("enabled_cheat_indexes are distinct non-negative integers")
+        if not isinstance(pid, str) or not _HEX64.match(pid):
+            raise ValueError("profile_id is the setup's id")
+        return {"source_index": src, "enabled_cheat_indexes": sorted(idx), "profile_id": pid.upper()}
 
     @staticmethod
     def _places_entry(spec: dict, side: dict, n: int) -> dict | None:
@@ -239,6 +282,11 @@ class PartyMinigames:
             raise ValueError("seats are numbers 1-4, comma-separated") from None
         if len(seats) != entry["players"] or len(set(seats)) != len(seats) or not all(1 <= s <= 4 for s in seats):
             raise ValueError(f"this mini game takes {entry['players']} different seats, 1-4")
+        if entry.get("cheat") is not None:                       # B127: the setup on the hub, before anything is done
+            check = self._setup_check(entry)
+            if check is not None:
+                self.row({"step": "minigame_refused", "why": "the cheat setup is not on the hub", "check": check})
+                raise ValueError(SETUP_GONE)
         now = self.clock()
         mg = {"state": "starting", "seats": seats, "entry": entry, "recognised": None, "class": None,
               "scores": None, "why": None, "places": None, "t0": now, "last_poll": now, "final_at": None,
@@ -252,6 +300,42 @@ class PartyMinigames:
         threading.Thread(target=self._actor, args=(mg,), daemon=True, name="party-minigame").start()
         threading.Thread(target=self._watch, args=(mg,), daemon=True, name="party-minigame-watch").start()
         return {"ok": True, "state": "starting", "seats": seats}
+
+    def _setup_check(self, entry: dict) -> str | None:
+        """B127: None when the sidecar's setup is on the hub as named — `cheat_profiles` lists that `profile_id`, valid,
+        with the same source and indexes, and the launch's own expansion (B85, as the launch route does it) gives the
+        indexes back (so the launch derives the same setup: no new folder). Else why, in a word. One manager call,
+        bounded by SETUP_CHECK_S."""
+        cheat = entry["cheat"]
+        game = self.p._find_game_by_id(entry["game"])
+        if game is None:
+            return "no_game"
+
+        def read():
+            import cheat_clean as cc
+            profiles = self.emu.cheat_profiles(game)
+            want = list(cheat["enabled_cheat_indexes"])
+            expanded = want
+            if cc.enabled():
+                expanded = cc.expand(cc.clean(self.emu.cheat_catalog(game), self.p.PROJECT_ROOT),
+                                     cheat["source_index"], want)
+            return profiles, sorted(expanded or [])
+        try:
+            profiles, expanded = self._emu_call(None, read, bound=SETUP_CHECK_S, abort=False)
+        except TimeoutError:
+            return "busy"
+        except Exception:
+            return "unreadable"
+        found = next((p for p in (profiles or {}).get("profiles", []) or []
+                      if str(p.get("profile_id", "")).strip().upper() == cheat["profile_id"]), None)
+        if found is None:
+            return "no_profile"
+        if (int(found.get("source_index", -1)) != cheat["source_index"]
+                or sorted(int(i) for i in found.get("enabled_cheat_indexes") or []) != cheat["enabled_cheat_indexes"]):
+            return "profile_differs"
+        if expanded != cheat["enabled_cheat_indexes"]:
+            return "cheats_changed"
+        return None
 
     @staticmethod
     def _finished(mg: dict) -> bool:
@@ -389,9 +473,13 @@ class PartyMinigames:
         mg["stash"] = self._step(mg, "stash", lambda: self._emu_call(mg, emu._party_stash_begin))
         emu._party_mg_stop_hook = lambda: self._end_by_stop(mg)
         game = self.p._find_game_by_id(mg["entry"]["game"])
+        cheat = mg["entry"].get("cheat")
 
         def launch():
-            emu.launch(game)
+            if cheat is None:
+                emu.launch(game)
+            else:                                    # B127: the onn's Extras launch, through the plugin's own path
+                self.p.handle_post("launch", self._cheat_query(mg["entry"]["game"], cheat))
             return emu.process
         proc = self._step(mg, "launch", lambda: self._emu_call(mg, launch))
         with self._lock:
@@ -400,7 +488,14 @@ class PartyMinigames:
         if late:                                     # the end ran while the title launched: it is not left running
             self._kill(proc)
             raise _Abort()
-        self.row({"step": "minigame_launch", "pid_owned": True})
+        if cheat is None:
+            self.row({"step": "minigame_launch", "pid_owned": True})
+        else:
+            from h7_minigame import session_profile_id
+            matches = session_profile_id(emu) == cheat["profile_id"]
+            self.row({"step": "minigame_launch", "pid_owned": True, "cheat": True, "profile_matches": matches})
+            if not matches:
+                raise RuntimeError(NOT_UNDER_SETUP)
         self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
         bridge = self._bridge()
         if bridge is not None:
@@ -418,6 +513,12 @@ class PartyMinigames:
             if mg["state"] == "starting":
                 mg["state"] = "playing"
         self.row({"step": "minigame_playing"})
+
+    @staticmethod
+    def _cheat_query(game_id: str, cheat: dict) -> str:
+        """B127: the onn's Extras launch query for a saved setup (`showExistingGameCheatProfileDialog`'s call)."""
+        return (f"id={quote(game_id, safe='')}&cheat_source={int(cheat['source_index'])}"
+                f"&cheat_indexes={','.join(str(int(i)) for i in cheat['enabled_cheat_indexes'])}")
 
     def _actor(self, mg: dict) -> None:
         try:

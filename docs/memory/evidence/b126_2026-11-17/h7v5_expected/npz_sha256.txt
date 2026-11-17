@@ -1,0 +1,4 @@
+# The arrays file is NOT byte-reproducible: learning T89 twice (same command, same pictures) gave the same JSON numbers,
+# the same masks and place references, but `end_ref` differed by at most 2.6e-6 in 15,771 of its values (float
+# rounding in a mean), so the .npz sha256 differs (8f859102… once, 56892948… the next). H7-V5 checks the learnt
+# numbers (thresholds, masks' sizes, the row, the places, the margin) and the score / replay answers — not this hash.

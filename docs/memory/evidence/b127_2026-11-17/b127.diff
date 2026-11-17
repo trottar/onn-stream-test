@@ -1,0 +1,737 @@
+diff --git a/companion/h7_minigame.py b/companion/h7_minigame.py
+index 3abb6a53..47b54176 100644
+--- a/companion/h7_minigame.py
++++ b/companion/h7_minigame.py
+@@ -25,6 +25,12 @@ the game untouched, one row; **`h7-start?keep=1`** saves every picture the watch
+ (seconds, utc, file, class, screen, margin, distances, keep_ms) under `runtime/h7_frames/<game id>_<UTC stamp>/`
+ (git-ignored); **`last`** carries the read's class and distances, the thresholds they are held against and the spec's
+ version; an old-measure spec is `no_spec` with B104's plain line.
++
++B127 (the same flag): **under a cheat setup** (the session's `cheat_session.profile_id` set — the onn's Extras launch,
++or a party mini game launched with its setup) the begin is the setup's own **`<game id>.<the profile_id's first 12
++characters>.state`** when the rules folder holds it, else `<game id>.state` as today; it is loaded through scratch slot
++8 of **the setup's own `states/<core>/`** (`_state_root()` is the setup's while its session runs — where RetroArch
++reads). The answer and the `watching` row carry `"begin": "setup" | "normal"` only under a setup; without one, today.
+ """
+ from __future__ import annotations
+ 
+@@ -32,6 +38,7 @@ import csv
+ import io
+ import json
+ import os
++import re
+ import subprocess
+ import sys
+ import threading
+@@ -53,9 +60,25 @@ LOOPBACK = ("127.0.0.1", "::1", "localhost")
+ RECOGNISE_S = 8.0           # B105: s after a start with the load within which a read must name the start class
+ KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
+ JPEG_QUALITY = 90
++SETUP_PREFIX = 12           # B127: a setup's begin is <game id>.<the profile_id's first 12 characters>.state
++_PROFILE_ID = re.compile(r"^[0-9A-F]{64}$")
+ _endscreen = None
+ 
+ 
++def setup_begin_name(game: str, profile_id: str) -> str:
++    """B127: the rules folder's name for a cheat setup's begin, beside the normal `<game id>.state`."""
++    return f"{game}.{str(profile_id).strip().upper()[:SETUP_PREFIX]}.state"
++
++
++def session_profile_id(emulator: Any) -> str | None:
++    """B127: the running session's cheat setup (`profile_id`, upper case), or None (no setup, or a mod session)."""
++    sess = getattr(emulator, "_active_cheat_session", None)
++    if not isinstance(sess, dict) or sess.get("session_kind", "cheat") != "cheat":
++        return None
++    pid = str(sess.get("profile_id") or "").strip().upper()
++    return pid if _PROFILE_ID.match(pid) else None
++
++
+ def endscreen():
+     """B102's learner (`tools/h7_endscreen.py`: PIL + numpy, both on the hub), imported at the first start or result —
+     not when the companion starts, so a companion whose tools/ lacks it still starts (B99 / B101 run as before)."""
+@@ -210,12 +233,20 @@ class MiniGame:
+         except ValueError as exc:
+             self._refused(str(exc))
+         loader = _Loader(self)
++        begin = None                                        # B127: "setup" / "normal" only under a cheat setup
+         if load:
+             if kind in ("pcsx2", "dolphin"):
+                 self._refused("not supported yet")
+             if system not in SYSTEMS:
+                 self._refused("not supported yet")
+             state = live.rules_folder(self._environ) / f"{game}.state"
++            setup = session_profile_id(self._emu)
++            if setup is not None:
++                own = live.rules_folder(self._environ) / setup_begin_name(game, setup)
++                if own.is_file() and own.stat().st_size > 0:
++                    state, begin = own, "setup"
++                else:
++                    begin = "normal"
+             if not state.is_file() or state.stat().st_size <= 0:
+                 self._refused("no state for this game's mini game")
+         if bench and self._stream_up():                     # B112: the bench only while no client's stream is up
+@@ -261,14 +292,20 @@ class MiniGame:
+                            "recognised": None, "reads": 0, "last": None, "loaded": load, "picture_failures": 0,
+                            "keep": ({"folder": keep_dir.name, "pictures": 0} if keep_dir is not None else None),
+                            "t0": self._clock(), "token": token, "_keep_dir": keep_dir}
+-            self._row({"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
+-                       "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
+-                       "spec_version": spec.get("version"), "recognise_s": self.recognise_s, "bench": bench,
+-                       "keep": keep_dir.name if keep_dir is not None else None})
++            row = {"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
++                   "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
++                   "spec_version": spec.get("version"), "recognise_s": self.recognise_s, "bench": bench,
++                   "keep": keep_dir.name if keep_dir is not None else None}
++            if begin is not None:
++                row["begin"] = begin                                 # B127: only under a cheat setup
++            self._row(row)
+         threading.Thread(target=self._run, args=(token, game, reader, ended, spec), daemon=True,
+                          name="h7-minigame").start()
+-        return {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms,
+-                "replaced": replaced, "keep": keep_dir.name if keep_dir is not None else None}
++        answer = {"ok": True, "watch": "started", "game": game, "loaded": load, "load_line_ms": line_ms,
++                  "replaced": replaced, "keep": keep_dir.name if keep_dir is not None else None}
++        if begin is not None:
++            answer["begin"] = begin
++        return answer
+ 
+     def bench_release(self, client_ip: str) -> dict:
+         """B112: the running game's pause released with no stream (loopback, no client's stream up)."""
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index fede4026..eaf37c80 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -30,6 +30,16 @@ still `starting` after START_LIMIT_S is given up by the hub; END always works 
+ STEP_GRACE_S the end runs without it.
+ 
+ One row per step in the party log (logs/games/party.jsonl), field names and numbers only.
++
++B127 — a mini game **under the title's cheat setup** (the users' Extras setup, e.g. everything unlocked): the sidecar
++may carry `"cheat": {"source_index": n, "enabled_cheat_indexes": [...], "profile_id": "<the setup's id>"}` beside
++`players` / `scores` / `places_to_scores` (no cheat name); its begin is the setup's own `<game id>.<the profile_id's
++first 12 characters>.state` in the rules folder (listed only when it is there). The start checks the setup on the hub
++first (`cheat_profiles`: that `profile_id` with the same source and indexes, and B85's expansion giving them back) — else
++400 SETUP_GONE, nothing set aside or launched; the title is launched by **the plugin's own launch path with the onn's
++Extras query** (`id`, `cheat_source`, `cheat_indexes`), and the session's `profile_id` must then be the sidecar's (else
++given up, the title stopped). `h7-start` loads the setup's begin into the setup's own `states/<core>/` (B127 in
++`h7_minigame`). A sidecar without `cheat` → today.
+ """
+ from __future__ import annotations
+ 
+@@ -37,10 +47,12 @@ import collections
+ import hashlib
+ import json
+ import os
++import re
+ import threading
+ import time
+ from pathlib import Path
+ from typing import Any, Callable
++from urllib.parse import quote
+ 
+ import h7_live_read as live
+ import party_session as party
+@@ -66,6 +78,11 @@ PLANNED_GRACE_S = 3.0       # the planned-switch window stays open this long aft
+ PLACES_VERSION = 3          # B123: an end-screen spec with a place for every player (B122)
+ TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
+          "stop": "end"}
++# B127
++SETUP_GONE = "the cheat setup this mini game names is not on the hub (or its cheats changed): nothing was launched"
++SETUP_CHECK_S = 1.5         # the setup check's one manager call: given up after this (the start refused, nothing done)
++NOT_UNDER_SETUP = "the title did not start under its cheat setup"
++_HEX64 = re.compile(r"^[0-9A-Fa-f]{64}$")
+ 
+ _local = threading.local()
+ 
+@@ -181,16 +198,22 @@ class PartyMinigames:
+                 continue
+             try:
+                 spec, _arrays = endscreen().load_spec(folder / name)
+-                state = folder / f"{game}.state"
++                side = json.loads((folder / f"{game}.party.json").read_text(encoding="utf-8"))
++                cheat = self._cheat_of(side)                            # B127: None without `cheat` (today)
++                if cheat is None:
++                    state = folder / f"{game}.state"
++                else:
++                    from h7_minigame import setup_begin_name
++                    state = folder / setup_begin_name(game, cheat["profile_id"])
+                 if not state.is_file() or state.stat().st_size <= 0:
+                     continue
+-                side = json.loads((folder / f"{game}.party.json").read_text(encoding="utf-8"))
+                 n = int(side["players"])
++                more = {"cheat": cheat} if cheat is not None else {}
+                 if spec.get("version") == PLACES_VERSION or "places_to_scores" in side:
+                     entry = self._places_entry(spec, side, n)          # B123: a place for every player
+                     if entry is None or self.p._find_game_by_id(game) is None:
+                         continue
+-                    out[self._token(game)] = {"game": game, **entry}
++                    out[self._token(game)] = {"game": game, **entry, **more}
+                     continue
+                 scores = {str(k): [int(x) if float(x).is_integer() else float(x) for x in v]
+                           for k, v in dict(side["scores"]).items()}
+@@ -201,9 +224,29 @@ class PartyMinigames:
+                     continue
+             except Exception:
+                 continue
+-            out[self._token(game)] = {"game": game, "players": n, "scores": scores, "start_class": spec["start_class"]}
++            out[self._token(game)] = {"game": game, "players": n, "scores": scores, "start_class": spec["start_class"],
++                                      **more}
+         return out
+ 
++    @staticmethod
++    def _cheat_of(side: dict) -> dict | None:
++        """B127: the sidecar's `cheat` (the setup the launch needs), checked; None without one; ValueError when malformed
++        (the title is then not listed, as any malformed sidecar)."""
++        if "cheat" not in side:
++            return None
++        c = side["cheat"]
++        if not isinstance(c, dict):
++            raise ValueError("cheat is an object")
++        src, idx, pid = c.get("source_index"), c.get("enabled_cheat_indexes"), c.get("profile_id")
++        if type(src) is not int or src < 0:
++            raise ValueError("source_index is a non-negative integer")
++        if (not isinstance(idx, list) or not idx or any(type(i) is not int or i < 0 for i in idx)
++                or len(set(idx)) != len(idx)):
++            raise ValueError("enabled_cheat_indexes are distinct non-negative integers")
++        if not isinstance(pid, str) or not _HEX64.match(pid):
++            raise ValueError("profile_id is the setup's id")
++        return {"source_index": src, "enabled_cheat_indexes": sorted(idx), "profile_id": pid.upper()}
++
+     @staticmethod
+     def _places_entry(spec: dict, side: dict, n: int) -> dict | None:
+         """B123: `{"players": n, "places_to_scores": [s1..sn]}` (left out: n, n-1, ..., 1) with a version-3 spec of n
+@@ -239,6 +282,11 @@ class PartyMinigames:
+             raise ValueError("seats are numbers 1-4, comma-separated") from None
+         if len(seats) != entry["players"] or len(set(seats)) != len(seats) or not all(1 <= s <= 4 for s in seats):
+             raise ValueError(f"this mini game takes {entry['players']} different seats, 1-4")
++        if entry.get("cheat") is not None:                       # B127: the setup on the hub, before anything is done
++            check = self._setup_check(entry)
++            if check is not None:
++                self.row({"step": "minigame_refused", "why": "the cheat setup is not on the hub", "check": check})
++                raise ValueError(SETUP_GONE)
+         now = self.clock()
+         mg = {"state": "starting", "seats": seats, "entry": entry, "recognised": None, "class": None,
+               "scores": None, "why": None, "places": None, "t0": now, "last_poll": now, "final_at": None,
+@@ -253,6 +301,42 @@ class PartyMinigames:
+         threading.Thread(target=self._watch, args=(mg,), daemon=True, name="party-minigame-watch").start()
+         return {"ok": True, "state": "starting", "seats": seats}
+ 
++    def _setup_check(self, entry: dict) -> str | None:
++        """B127: None when the sidecar's setup is on the hub as named — `cheat_profiles` lists that `profile_id`, valid,
++        with the same source and indexes, and the launch's own expansion (B85, as the launch route does it) gives the
++        indexes back (so the launch derives the same setup: no new folder). Else why, in a word. One manager call,
++        bounded by SETUP_CHECK_S."""
++        cheat = entry["cheat"]
++        game = self.p._find_game_by_id(entry["game"])
++        if game is None:
++            return "no_game"
++
++        def read():
++            import cheat_clean as cc
++            profiles = self.emu.cheat_profiles(game)
++            want = list(cheat["enabled_cheat_indexes"])
++            expanded = want
++            if cc.enabled():
++                expanded = cc.expand(cc.clean(self.emu.cheat_catalog(game), self.p.PROJECT_ROOT),
++                                     cheat["source_index"], want)
++            return profiles, sorted(expanded or [])
++        try:
++            profiles, expanded = self._emu_call(None, read, bound=SETUP_CHECK_S, abort=False)
++        except TimeoutError:
++            return "busy"
++        except Exception:
++            return "unreadable"
++        found = next((p for p in (profiles or {}).get("profiles", []) or []
++                      if str(p.get("profile_id", "")).strip().upper() == cheat["profile_id"]), None)
++        if found is None:
++            return "no_profile"
++        if (int(found.get("source_index", -1)) != cheat["source_index"]
++                or sorted(int(i) for i in found.get("enabled_cheat_indexes") or []) != cheat["enabled_cheat_indexes"]):
++            return "profile_differs"
++        if expanded != cheat["enabled_cheat_indexes"]:
++            return "cheats_changed"
++        return None
++
+     @staticmethod
+     def _finished(mg: dict) -> bool:
+         return bool(mg["closed"] and mg["actor_done"])
+@@ -389,9 +473,13 @@ class PartyMinigames:
+         mg["stash"] = self._step(mg, "stash", lambda: self._emu_call(mg, emu._party_stash_begin))
+         emu._party_mg_stop_hook = lambda: self._end_by_stop(mg)
+         game = self.p._find_game_by_id(mg["entry"]["game"])
++        cheat = mg["entry"].get("cheat")
+ 
+         def launch():
+-            emu.launch(game)
++            if cheat is None:
++                emu.launch(game)
++            else:                                    # B127: the onn's Extras launch, through the plugin's own path
++                self.p.handle_post("launch", self._cheat_query(mg["entry"]["game"], cheat))
+             return emu.process
+         proc = self._step(mg, "launch", lambda: self._emu_call(mg, launch))
+         with self._lock:
+@@ -400,7 +488,14 @@ class PartyMinigames:
+         if late:                                     # the end ran while the title launched: it is not left running
+             self._kill(proc)
+             raise _Abort()
+-        self.row({"step": "minigame_launch", "pid_owned": True})
++        if cheat is None:
++            self.row({"step": "minigame_launch", "pid_owned": True})
++        else:
++            from h7_minigame import session_profile_id
++            matches = session_profile_id(emu) == cheat["profile_id"]
++            self.row({"step": "minigame_launch", "pid_owned": True, "cheat": True, "profile_matches": matches})
++            if not matches:
++                raise RuntimeError(NOT_UNDER_SETUP)
+         self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
+         bridge = self._bridge()
+         if bridge is not None:
+@@ -419,6 +514,12 @@ class PartyMinigames:
+                 mg["state"] = "playing"
+         self.row({"step": "minigame_playing"})
+ 
++    @staticmethod
++    def _cheat_query(game_id: str, cheat: dict) -> str:
++        """B127: the onn's Extras launch query for a saved setup (`showExistingGameCheatProfileDialog`'s call)."""
++        return (f"id={quote(game_id, safe='')}&cheat_source={int(cheat['source_index'])}"
++                f"&cheat_indexes={','.join(str(int(i)) for i in cheat['enabled_cheat_indexes'])}")
++
+     def _actor(self, mg: dict) -> None:
+         try:
+             self._start_steps(mg)
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index 9caabb3c..baffb1b5 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -354,6 +354,25 @@ if args["mode"] == "today":
+     call("POST", "/plugins/games/stop")
+     finish()
+ 
++if args["mode"] == "cheat_today":
++    # B127: the onn's Extras launch and the routes B127 touches, as the flags leave them (HEAD's code against mine)
++    def _apply(self):
++        self._active_cheat_session["activation_verified"] = True
++        return dict(self._active_cheat_session)
++    em.EmulatorManager._apply_active_cheat_profile = _apply
++    for k, (meth, path) in {"launch_cheat": ("POST", f"/plugins/games/launch?id={title}&cheat_source=0&cheat_indexes=1"),
++                            "status_cheat": ("GET", "/plugins/games/status"),
++                            "h7_start": ("POST", "/plugins/games/h7-start?bench=1"),
++                            "h7_result": ("GET", "/plugins/games/h7-result"),
++                            "list": ("GET", "/plugins/games/party-minigames"),
++                            "start": ("POST", "/plugins/games/party-minigame-start?id=x&seats=1,2"),
++                            "stop_cheat": ("POST", "/plugins/games/stop"),
++                            "profiles": ("POST", f"/plugins/games/cheat-profiles?id={title}"),
++                            "launch_plain": ("POST", f"/plugins/games/launch?id={title}"),
++                            "stop_plain": ("POST", "/plugins/games/stop")}.items():
++        S[k] = call(meth, path)
++    finish()
++
+ rules_ = Path(rules); rules_.mkdir(parents=True, exist_ok=True)
+ for name in os.listdir(args["spec_dir"]):
+     shutil.copyfile(Path(args["spec_dir"], name), rules_ / name.replace("GAME", title))
+@@ -476,6 +495,201 @@ if args["mode"] == "four":
+                     if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
+     timed("end_onn", "POST", "/plugins/games/stop")
+     finish()
++if args["mode"] == "cheat":
++    # B127: the mini games under each title's cheat setup (the setups made by the onn's Extras launch from loopback)
++    n64 = args["n64_id"]
++    LAST, LOADS, POPENS, APPLIED, LQ = {}, [], [], [], []
++    _FR = em.subprocess.Popen
++    def _popen(cmd, **kw):                            # RetroArch's command line kept (its session config)
++        LAST["cmd"] = [str(c) for c in cmd]
++        POPENS.append(1)
++        return _FR(cmd, **kw)
++    em.subprocess.Popen = _popen
++    def _apply(self):                                 # RetroArch's network side of the cheat toggles (B83's stub)
++        APPLIED.append(self._active_cheat_session.get("profile_id"))
++        self._active_cheat_session["activation_verified"] = True
++        return dict(self._active_cheat_session)
++    em.EmulatorManager._apply_active_cheat_profile = _apply
++    _hp = g.handle_post
++    def _hp_kept(action, raw_query):
++        if action == "launch":
++            LQ.append(raw_query)
++        return _hp(action, raw_query)
++    g.handle_post = _hp_kept
++    def config_states():
++        """Where RetroArch itself reads states: the session config's one savestate_directory (the launch wrote it)."""
++        cmd = LAST["cmd"]
++        cfg = Path(cmd[cmd.index("--config") + 1])
++        cfg = cfg if cfg.is_absolute() else root / cfg
++        mm = re.search(r'(?m)^\s*savestate_directory\s*=\s*"([^"]*)"', cfg.read_text())
++        p = Path(mm.group(1))
++        return p if p.is_absolute() else root / p
++    def folder():                                     # the fake's slot folder: the config's + the core's own
++        d = config_states() / ("Mupen64Plus-Next" if m._n64_core else "Beetle PSX HW")
++        LOADS.append(str(d.resolve().relative_to(root.resolve())))
++        return d
++    def mem():
++        return [int.from_bytes(fake["ra"].mem[args["p1"]:args["p1"] + 2], "little"),
++                int.from_bytes(fake["ra"].mem[args["p2"]:args["p2"] + 2], "little")]
++    def tree_hashes(*rels):
++        outh = {}
++        for rel in rels:
++            base = root / rel
++            for p in sorted(base.rglob("*")) if base.is_dir() else []:
++                if p.is_file():
++                    outh[str(p.relative_to(root))] = hashlib.sha256(p.read_bytes()).hexdigest()
++        return outh
++    def scratch_anywhere():
++        return sorted(str(p.relative_to(root)) for p in (root / "data").rglob("*.state8"))
++    PROF = "data/games/retroarch/cheat_profiles"
++    import h7_minigame as h7m
++    # the N64 title's spec (B122's version 3) and its places sidecar beside the PS1 one (B124's)
++    v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
++    shutil.copyfile(v3.with_name(js4["arrays"]), rules_ / f"{n64}.endscreen.npz")
++    js4["arrays"] = f"{n64}.endscreen.npz"
++    (rules_ / f"{n64}.endscreen.json").write_text(json.dumps(js4))
++    # 1. the setups as the user made them: the onn's Extras launch from loopback, stopped; read back as the onn does
++    call("POST", "/plugins/games/stop")
++    wait_until(lambda: board_pid_now() is None, 10)
++    setups, stems = {}, {}
++    for key, gid, picks in (("ps1", title, "1"), ("n64", n64, "5")):
++        r = call("POST", f"/plugins/games/launch?id={gid}&cheat_source=0&cheat_indexes={picks}")
++        S[f"c_make_{key}"] = {"code": r["code"], "profile_id": ((r["body"].get("cheat_session") or {}).get("profile_id")),
++                              "error": r["body"].get("error")}
++        stems[key] = m._active_state_stem() if m.active_game else None
++        call("POST", "/plugins/games/stop")
++        profs = call("POST", f"/plugins/games/cheat-profiles?id={gid}")["body"].get("profiles") or []
++        S[f"c_profiles_{key}"] = len(profs)
++        p = profs[0]
++        setups[key] = {"source_index": p["source_index"], "enabled_cheat_indexes": p["enabled_cheat_indexes"],
++                       "profile_id": p["profile_id"]}
++        S[f"c_setup_{key}"] = {"source_index": p["source_index"], "enabled": p["enabled_cheat_indexes"],
++                               "same_id_as_launch": p["profile_id"] == S[f"c_make_{key}"]["profile_id"]}
++        sroot = root / PROF / gid / p["profile_id"]
++        core = "Mupen64Plus-Next" if key == "n64" else "Beetle PSX HW"
++        for sub, names in (("states", (".state", ".state1", ".state1.png")), ("saves", (".srm",))):
++            (sroot / sub / core).mkdir(parents=True, exist_ok=True)
++            for nm in names:
++                (sroot / sub / core / (stems[key] + nm)).write_bytes(os.urandom(96))
++    gid_of = {"ps1": title, "n64": n64}
++    (root / "data/games/retroarch/states/Beetle PSX HW").mkdir(parents=True, exist_ok=True)
++    (root / "data/games/retroarch/states/Beetle PSX HW" / (stems["ps1"] + ".state1")).write_bytes(os.urandom(64))
++    before = tree_hashes(PROF, "data/games/retroarch/states")
++    S["c_files_hashed"] = len(before)
++    dirs_before = sorted(str(p.relative_to(root)) for p in (root / PROF).glob("*/*"))
++    # 2. h7-start under each setup (bench: no stream), the begin the setup's own, into the setup's own folder
++    def setup_states(key):
++        return f"{PROF}/{gid_of[key]}/{setups[key]['profile_id']}/states"
++    q_ps1 = f"id={title}&cheat_source={setups['ps1']['source_index']}&cheat_indexes=" + \
++            ",".join(map(str, setups["ps1"]["enabled_cheat_indexes"]))
++    q_n64 = f"id={n64}&cheat_source={setups['n64']['source_index']}&cheat_indexes=" + \
++            ",".join(map(str, setups["n64"]["enabled_cheat_indexes"]))
++    call("POST", "/plugins/games/launch?" + q_ps1)
++    fake["ra"].paused = False
++    S["c_ps1_session"] = (m._active_cheat_session or {}).get("profile_id") == setups["ps1"]["profile_id"]
++    pic.set(["start"] * 3 + ["other"] * 200)
++    S["c_h7_ps1_normal"] = call("POST", "/plugins/games/h7-start?bench=1")["body"]
++    call("POST", "/plugins/games/h7-stop")
++    (rules_ / h7m.setup_begin_name(title, setups["ps1"]["profile_id"])).write_text(json.dumps({"P1": 7, "P2": 9}))
++    n0 = len(LOADS)
++    S["c_h7_ps1_setup"] = call("POST", "/plugins/games/h7-start?bench=1")["body"]
++    S["c_h7_ps1_loaded_from"] = LOADS[n0:]
++    S["c_h7_ps1_want"] = setup_states("ps1") + "/Beetle PSX HW"
++    S["c_h7_ps1_mem"] = mem()
++    S["c_h7_ps1_scratch"] = scratch_anywhere()
++    call("POST", "/plugins/games/h7-stop")
++    call("POST", "/plugins/games/stop")
++    call("POST", "/plugins/games/launch?" + q_n64)
++    ra = fake["ra"]; ra.paused = False
++    (rules_ / h7m.setup_begin_name(n64, setups["n64"]["profile_id"])).write_text(json.dumps({"P1": 3, "P2": 4}))
++    n0, l0 = len(LOADS), len(ra.log)
++    S["c_h7_n64_running"] = call("POST", "/plugins/games/h7-start?bench=1")
++    S["c_h7_n64_running_sent"] = [c for c in ra.log[l0:] if c == "LOAD_STATE_SLOT"]
++    ra.paused = True
++    S["c_h7_n64_paused"] = call("POST", "/plugins/games/h7-start?bench=1")["body"]
++    S["c_h7_n64_loaded_from"] = LOADS[n0:]
++    S["c_h7_n64_want"] = setup_states("n64") + "/Mupen64Plus-Next"
++    S["c_h7_n64_mem"] = mem()
++    S["c_h7_n64_scratch"] = scratch_anywhere()
++    call("POST", "/plugins/games/h7-stop")
++    call("POST", "/plugins/games/stop")
++    # 3. refusals: nothing launched, the board still the session, no new setup folder
++    board_up("c_ref")
++    side_ps1 = {"players": 2, "scores": {"end_P1": [1, 0], "end_P2": [0, 1]}, "cheat": setups["ps1"]}
++    side_n64 = {"players": 4, "cheat": setups["n64"]}
++    def refused(tag, side):
++        (rules_ / f"{title}.party.json").write_text(json.dumps(side))
++        lst = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
++        tk = next((e["id"] for e in lst if e["players"] == 2), None)
++        p0, r0 = len(POPENS), len(rows())
++        res = call("POST", f"/plugins/games/party-minigame-start?id={tk}&seats=1,2") if tk else {"code": None}
++        S[tag] = {"listed": tk is not None, "code": res["code"], "error": (res.get("body") or {}).get("error"),
++                  "popens": len(POPENS) - p0, "rows": [{k: v for k, v in r.items() if k in ("step", "why", "check")}
++                                                       for r in rows()[r0:]],
++                  "board_session": call("GET", "/plugins/games/status")["body"].get("launch_kind"),
++                  "mg": call("GET", "/plugins/games/party-minigame-result")["body"].get("state")}
++    gone_id = "0" * 64
++    (rules_ / h7m.setup_begin_name(title, gone_id)).write_text(json.dumps({"P1": 1, "P2": 1}))
++    refused("c_ref_no_profile", dict(side_ps1, cheat=dict(setups["ps1"], profile_id=gone_id)))
++    sdir = root / PROF / title / setups["ps1"]["profile_id"]
++    shutil.move(str(sdir), str(root / "moved_setup"))
++    refused("c_ref_folder_gone", side_ps1)
++    shutil.move(str(root / "moved_setup"), str(sdir))
++    refused("c_ref_indexes_changed", dict(side_ps1, cheat=dict(setups["ps1"], enabled_cheat_indexes=[1])))
++    (rules_ / f"{title}.party.json").write_text(json.dumps(dict(side_ps1, cheat=dict(setups["ps1"], profile_id="xyz"))))
++    S["c_malformed_listed"] = [e["players"] for e in call("GET", "/plugins/games/party-minigames")["body"]["minigames"]]
++    S["c_dirs_after_refusals"] = sorted(str(p.relative_to(root)) for p in (root / PROF).glob("*/*")) == dirs_before
++    # 4. two back to back with the onn's calls throughout: two-player under the PS1 setup, four-player under N64's
++    (rules_ / f"{title}.party.json").write_text(json.dumps(side_ps1))
++    (rules_ / f"{n64}.party.json").write_text(json.dumps(side_n64))
++    listed = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
++    S["c_list"] = sorted(e["players"] for e in listed)
++    tok2 = next(e["id"] for e in listed if e["players"] == 2)
++    tok4 = next(e["id"] for e in listed if e["players"] == 4)
++    pr = call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")["body"]
++    call("POST", "/plugins/games/native-stream-ready")
++    def under_setup(key, home_resume):
++        def during(tag):
++            S[tag + "_route_during"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
++            S[tag + "_session_profile"] = (m._active_cheat_session or {}).get("profile_id") == setups[key]["profile_id"]
++            st = call("GET", "/plugins/games/status")["body"]
++            S[tag + "_status_profile"] = (st.get("cheat_session") or {}).get("profile_id") == setups[key]["profile_id"]
++            S[tag + "_mem"] = mem()
++            if home_resume:
++                time.sleep(0.3)
++                timed("home", "POST", "/plugins/games/native-stream-stop")
++                client.in_stream = False
++                time.sleep(0.2)
++                rs = timed("resume_start", "POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1",
++                           timeout=30)
++                client.in_stream = True
++                timed("resume_ready", "POST", "/plugins/games/native-stream-ready", timeout=30)
++                S[tag + "_resume_ports"] = {"players": rs["body"].get("players"),
++                                            "ports": (rs["body"].get("ports_set") or {}).get("players")}
++        return during
++    R2143 = ["s4start"] * 4 + ["s4other"] * 8 + ["s4r2143"] * 40
++    for tag, seats, script, tk, key, hr in (("ca2", "2,1", END2, tok2, "ps1", False),
++                                            ("cb4", "3,1,4,2", R2143, tok4, "n64", True)):
++        q0, n0 = len(LQ), len(LOADS)
++        one(tag, seats, script, tok=tk, during=under_setup(key, hr))
++        S[tag + "_launch_queries"] = [x.replace(gid_of[key], "<id>") for x in LQ[q0:]]
++        S[tag + "_want_query"] = (q_ps1 if key == "ps1" else q_n64).replace(gid_of[key], "<id>")
++        S[tag + "_loaded_from"] = LOADS[n0:]
++        S[tag + "_want_folder"] = setup_states(key) + ("/Mupen64Plus-Next" if key == "n64" else "/Beetle PSX HW")
++        S[tag + "_launch_row"] = [{k: v for k, v in r.items() if k in ("cheat", "profile_matches", "pid_owned")}
++                                  for r in rows() if r["step"] == "minigame_launch"][-1]
++    S["c_applied"] = [a == setups["ps1"]["profile_id"] or a == setups["n64"]["profile_id"] for a in APPLIED]
++    S["abr_all"] = [[r.get("event"), r.get("source")] for r in abr_rows()
++                    if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
++    timed("end_onn", "POST", "/plugins/games/stop")
++    wait_until(lambda: board_pid_now() is None, 10)
++    # 5. the users' files byte-equal; no scratch; nothing running
++    after = tree_hashes(PROF, "data/games/retroarch/states")
++    S["c_files_same"] = after == before
++    S["c_files_diff"] = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
++    S["c_scratch_end"] = scratch_anywhere()
++    S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
++    finish()
+ if args["mode"] == "three":
+     def real_stall(tag):
+         """The client's video stops while the title plays, outside the switch windows: handled as today."""
+diff --git a/tests/b127_party_cheat_setups/test_b127.py b/tests/b127_party_cheat_setups/test_b127.py
+new file mode 100644
+index 00000000..e91d6481
+--- /dev/null
++++ b/tests/b127_party_cheat_setups/test_b127.py
+@@ -0,0 +1,198 @@
++#!/usr/bin/env python3
++"""B127 (host): the mini games under each title's cheat setup — through the real HTTP server on loopback, behind
++PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
++
++B114's harness (B108's stand-in board, B101 / B103's fake RetroArch, B103's fake pictures, the stream stub with its own
++lock, the onn's client thread and status / result / native-stream-status every 0.1 s) with the hub's adopted lines on;
++B124's two titles (the PS1 one with B103's two-player spec, the N64 one with B122's version-3 spec). **The fake
++RetroArch reads its states folder from the session config the launch wrote** (`savestate_directory` + the core's
++folder: where RetroArch itself would look); RetroArch's network side of the cheat toggles is stubbed as B83's harness
++does. The setups are made as the user made them — the onn's Extras launch from loopback (B85's made-up `.cht`: the PS1
++pick with its required code, the N64 split cheat with its required code) — and read back through `cheat-profiles`.
++
++Checked: `h7-start` under a setup loads the setup's own begin (`<game id>.<prefix>.state`, else the normal one) through
++the setup's own `states/<core>/<stem>.state8`, the scratch removed; N64 refused unless PAUSED (nothing sent); a sidecar
++whose setup is gone / not on the hub / whose indexes changed → 400 plainly, nothing launched, the board still the
++session, no new setup folder; a malformed `cheat` not listed; **two back to back** — two-player under the PS1 setup,
++four-player under the N64 setup with Home / RESUME — the launch's query the onn's Extras query, the session's
++`profile_id` the setup's, the begin from the setup's folder, the right class / places / scores, every hand-over
++planned, every route < 2 s while a mini game is on; **every file of both setups and the normal states byte-equal; no
++`.state8`**. Today: each flag absent → HEAD's answers through the real routes (the cheat launch, `cheat-profiles`, the
++H7 / party routes, status, stop; numbers of 4+ digits, decimals and times masked); **a sidecar without `cheat`** →
++B124's four-player run on HEAD's code and mine: the same rows and answers. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b127_party_cheat_setups -v
++"""
++from __future__ import annotations
++
++import json
++import re
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b114_party_minigame_hang", "b123_h7_n64_start", "b115_party_handovers", "b124_party_four_seats"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import test_b114 as b114  # noqa: E402  (harnesses; their tests are not collected here)
++import test_b115 as b115  # noqa: E402
++import test_b124 as b124  # noqa: E402
++
++HEAD = "d9e95e66"                     # queue AS's baseline (H7-C2 committed): the companion before B127
++GONE = "the cheat setup this mini game names is not on the hub (or its cheats changed): nothing was launched"
++MASK = re.compile(r'(?<![A-Za-z_])\d+\.\d+|\b\d{4,}\b|\d{4}-\d\d-\d\dT[0-9:.]+Z?')
++
++
++def extra(work: Path, frames: Path) -> dict:
++    more = b124.extra(work, frames)
++    return more
++
++
++class UnderSetups(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b114.b99.tree()
++        b124.IDS.update(ids)
++        cls.out = b114.run(root, b114.BOTH, ids, "cheat", extra=extra)
++        cls.s = cls.out["steps"]
++
++    def test_0_the_setups_made_as_the_user_made_them(self):
++        self.assertIsNone(self.out["hung"], self.out.get("mg_thread"))
++        for key, enabled in (("ps1", [0, 1]), ("n64", [2, 5, 6])):          # B85: the picks + parts + required
++            self.assertEqual(self.s[f"c_make_{key}"]["code"], 200, self.s[f"c_make_{key}"])
++            self.assertEqual(self.s[f"c_profiles_{key}"], 1)
++            self.assertEqual(self.s[f"c_setup_{key}"], {"source_index": 0, "enabled": enabled, "same_id_as_launch": True})
++        self.assertGreaterEqual(self.s["c_files_hashed"], 9)
++
++    def test_1_h7_start_loads_the_setups_begin_from_the_setups_folder(self):
++        s = self.s
++        self.assertTrue(s["c_ps1_session"])
++        self.assertEqual((s["c_h7_ps1_normal"].get("watch"), s["c_h7_ps1_normal"].get("begin")), ("started", "normal"))
++        self.assertEqual((s["c_h7_ps1_setup"].get("watch"), s["c_h7_ps1_setup"].get("loaded"),
++                          s["c_h7_ps1_setup"].get("begin")), ("started", True, "setup"))
++        self.assertEqual(s["c_h7_ps1_loaded_from"], [s["c_h7_ps1_want"]])
++        self.assertEqual(s["c_h7_ps1_mem"], [7, 9])                         # the setup's begin, not the normal one
++        self.assertEqual(s["c_h7_ps1_scratch"], [])
++
++    def test_2_n64_only_while_paused(self):
++        s = self.s
++        r = s["c_h7_n64_running"]
++        self.assertEqual(r["code"], 400)
++        self.assertIn("not paused", r["body"]["error"])
++        self.assertEqual(s["c_h7_n64_running_sent"], [])
++        self.assertEqual((s["c_h7_n64_paused"].get("loaded"), s["c_h7_n64_paused"].get("begin")), (True, "setup"))
++        self.assertEqual(s["c_h7_n64_loaded_from"], [s["c_h7_n64_want"]])
++        self.assertEqual(s["c_h7_n64_mem"], [3, 4])
++        self.assertEqual(s["c_h7_n64_scratch"], [])
++
++    def test_3_a_setup_not_on_the_hub_refused_plainly_nothing_launched(self):
++        for tag, check in (("c_ref_no_profile", "no_profile"), ("c_ref_folder_gone", "no_profile"),
++                           ("c_ref_indexes_changed", "profile_differs")):
++            r = self.s[tag]
++            self.assertTrue(r["listed"], tag)
++            self.assertEqual((r["code"], r["error"]), (400, GONE), (tag, r))
++            self.assertEqual(r["popens"], 0, tag)                             # no RetroArch started
++            self.assertEqual(r["rows"], [{"step": "minigame_refused", "why": "the cheat setup is not on the hub",
++                                          "check": check}], tag)
++            self.assertEqual((r["board_session"], r["mg"]), ("godot", "none"), tag)
++        self.assertTrue(self.s["c_dirs_after_refusals"])                      # no new setup folder
++        self.assertEqual(self.s["c_malformed_listed"], [])
++
++    def test_4_two_back_to_back_under_the_setups(self):
++        s = self.s
++        self.assertEqual(s["c_list"], [2, 4])
++        for tag in ("ca2", "cb4"):
++            self.assertEqual(s[tag + "_launch_queries"], [s[tag + "_want_query"]], tag)   # the onn's Extras query
++            self.assertIn("cheat_source=0&cheat_indexes=", s[tag + "_want_query"])
++            self.assertEqual(s[tag + "_launch_row"], {"pid_owned": True, "cheat": True, "profile_matches": True})
++            self.assertTrue(s[tag + "_session_profile"], tag)
++            self.assertTrue(s[tag + "_status_profile"], tag)
++            self.assertEqual(s[tag + "_loaded_from"], [s[tag + "_want_folder"]], tag)
++            self.assertTrue(s[tag + "_closed"] and s[tag + "_title_gone"], tag)
++            self.assertIsNone(s[tag + "_route_after"], tag)
++        self.assertEqual(s["ca2_mem"], [7, 9])
++        self.assertEqual(s["cb4_mem"], [3, 4])
++        self.assertEqual(s["ca2_route_during"], {"1": 0, "0": 1})
++        self.assertEqual(s["cb4_route_during"], {"2": 0, "0": 1, "3": 2, "1": 3})
++        a, b = s["ca2"], s["cb4"]
++        self.assertEqual((a["state"], a["class"], a["scores"]), ("ended", "end_P2", [0, 1]))
++        self.assertEqual((b["state"], b["class"], b["places"], b["scores"], b["seats"]),
++                         ("ended", "end", [2, 1, 4, 3], [3, 4, 1, 2], [3, 1, 4, 2]))
++        self.assertEqual(s["cb4_resume_ports"], {"players": 4, "ports": 4})
++        self.assertTrue(s["c_applied"] and all(s["c_applied"]))
++
++    def test_5_every_hand_over_planned_every_route_within_2_s(self):
++        for tag in ("ca2", "cb4"):
++            sw = [(x["window"], x["switched"], x.get("planned")) for x in self.s[tag + "_switches"]]
++            self.assertEqual(sw, [("minigame", True, True), ("board", True, True)], tag)
++            acts = [x for x in self.s[tag + "_rec"] if x in b115.RECOVERY_ACTS]
++            self.assertEqual(acts, [], (tag, self.s[tag + "_rec"]))
++            self.assertEqual(self.s[tag + "_keys_all"], [], tag)
++            self.assertTrue(self.s[tag + "_board_picture_back"], tag)
++        events = [e[0] for e in self.s["abr_all"]]
++        self.assertNotIn("escalation_armed", events)
++        self.assertNotIn("transition", events)
++        lat = self.out["lat"]
++        for kind in ("status", "result", "ns_status", "home", "board_end", "start"):
++            self.assertLess(lat[kind]["max"], b114.WITHIN_S, (kind, lat[kind]))
++
++    def test_6_the_users_files_byte_equal_no_scratch_nothing_running(self):
++        self.assertTrue(self.s["c_files_same"], self.s["c_files_diff"])
++        self.assertEqual(self.s["c_scratch_end"], [])
++        self.assertEqual(self.s["c_running_after"], [False, None])
++
++
++def masked(step: dict) -> tuple:
++    return step["code"], MASK.sub("<n>", b114.CLOCK.sub("<ms>", step["raw"]))
++
++
++class Today(unittest.TestCase):
++    def test_each_flag_absent_is_heads(self):
++        code = b114.code_of(HEAD)
++        if code is None:
++            self.skipTest("git is absent")
++        for env in ({**b114.b85.FLAGS, **b114.ADOPTED}, {**b114.b85.FLAGS, **b114.ADOPTED, "PRIVYHUB_PARTY": "1"},
++                    {**b114.b85.FLAGS, **b114.ADOPTED, "PRIVYHUB_H7": "1"}):
++            root, ids = b114.b99.tree(code)
++            base = b114.run(root, env, ids, "cheat_today")["steps"]
++            root2, ids2 = b114.b99.tree()
++            mine = b114.run(root2, env, ids2, "cheat_today")["steps"]
++            routes = [k for k in base if isinstance(base[k], dict) and "code" in base[k]]
++            self.assertEqual(len(routes), 10)
++            for k in routes:
++                self.assertEqual(masked(mine[k]), masked(base[k]), (sorted(env), k))
++            self.assertEqual(base["launch_cheat"]["code"], 200)
++            self.assertEqual(base["profiles"]["code"], 200)
++
++    def test_a_sidecar_without_cheat_is_heads(self):
++        """B124's four-player run (no `cheat` anywhere) on HEAD's companion and on mine: the same rows and answers."""
++        code = b114.code_of(HEAD)
++        if code is None:
++            self.skipTest("git is absent")
++        outs = []
++        for c in (code, None):
++            root, ids = b114.b99.tree(c)
++            b124.IDS.clear()
++            b124.IDS.update(ids)
++            outs.append(b114.run(root, b114.BOTH, ids, "four", extra=b124.extra)["steps"])
++        base, mine = outs
++        for tag in ("a2", "b4", "c2", "d4"):
++            keep = ("state", "class", "scores", "places", "seats", "recognised", "why", "closed")
++            self.assertEqual({k: mine[tag].get(k) for k in keep}, {k: base[tag].get(k) for k in keep}, tag)
++            # the switch-window rows land 3 s after each switch (B115), after B114's row snapshot or before it as the
++            # machine's load has it: compared from the waited-for list below, not from the snapshot
++            late = "minigame_switch_window"
++            self.assertEqual([r for r in mine[tag + "_rows"] if r != late], [r for r in base[tag + "_rows"] if r != late],
++                             tag)
++            self.assertEqual([sorted(w) for w in mine[tag + "_windows"]], [sorted(w) for w in base[tag + "_windows"]], tag)
++            self.assertEqual(mine[tag + "_route_during"], base[tag + "_route_during"], tag)
++            self.assertEqual([(x["window"], x["switched"], x.get("planned")) for x in mine[tag + "_switches"]],
++                             [(x["window"], x["switched"], x.get("planned")) for x in base[tag + "_switches"]], tag)
++        self.assertEqual(mine["four_list"], base["four_list"])
++        for k in ("refuse_4p_two_seats", "refuse_2p_four_seats"):
++            self.assertEqual((mine[k]["code"], mine[k]["raw"]), (base[k]["code"], base[k]["raw"]), k)
++
++
++if __name__ == "__main__":
++    unittest.main()

@@ -354,6 +354,25 @@ if args["mode"] == "today":
     call("POST", "/plugins/games/stop")
     finish()
 
+if args["mode"] == "cheat_today":
+    # B127: the onn's Extras launch and the routes B127 touches, as the flags leave them (HEAD's code against mine)
+    def _apply(self):
+        self._active_cheat_session["activation_verified"] = True
+        return dict(self._active_cheat_session)
+    em.EmulatorManager._apply_active_cheat_profile = _apply
+    for k, (meth, path) in {"launch_cheat": ("POST", f"/plugins/games/launch?id={title}&cheat_source=0&cheat_indexes=1"),
+                            "status_cheat": ("GET", "/plugins/games/status"),
+                            "h7_start": ("POST", "/plugins/games/h7-start?bench=1"),
+                            "h7_result": ("GET", "/plugins/games/h7-result"),
+                            "list": ("GET", "/plugins/games/party-minigames"),
+                            "start": ("POST", "/plugins/games/party-minigame-start?id=x&seats=1,2"),
+                            "stop_cheat": ("POST", "/plugins/games/stop"),
+                            "profiles": ("POST", f"/plugins/games/cheat-profiles?id={title}"),
+                            "launch_plain": ("POST", f"/plugins/games/launch?id={title}"),
+                            "stop_plain": ("POST", "/plugins/games/stop")}.items():
+        S[k] = call(meth, path)
+    finish()
+
 rules_ = Path(rules); rules_.mkdir(parents=True, exist_ok=True)
 for name in os.listdir(args["spec_dir"]):
     shutil.copyfile(Path(args["spec_dir"], name), rules_ / name.replace("GAME", title))
@@ -475,6 +494,201 @@ if args["mode"] == "four":
     S["abr_all"] = [[r.get("event"), r.get("source")] for r in abr_rows()
                     if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
     timed("end_onn", "POST", "/plugins/games/stop")
+    finish()
+if args["mode"] == "cheat":
+    # B127: the mini games under each title's cheat setup (the setups made by the onn's Extras launch from loopback)
+    n64 = args["n64_id"]
+    LAST, LOADS, POPENS, APPLIED, LQ = {}, [], [], [], []
+    _FR = em.subprocess.Popen
+    def _popen(cmd, **kw):                            # RetroArch's command line kept (its session config)
+        LAST["cmd"] = [str(c) for c in cmd]
+        POPENS.append(1)
+        return _FR(cmd, **kw)
+    em.subprocess.Popen = _popen
+    def _apply(self):                                 # RetroArch's network side of the cheat toggles (B83's stub)
+        APPLIED.append(self._active_cheat_session.get("profile_id"))
+        self._active_cheat_session["activation_verified"] = True
+        return dict(self._active_cheat_session)
+    em.EmulatorManager._apply_active_cheat_profile = _apply
+    _hp = g.handle_post
+    def _hp_kept(action, raw_query):
+        if action == "launch":
+            LQ.append(raw_query)
+        return _hp(action, raw_query)
+    g.handle_post = _hp_kept
+    def config_states():
+        """Where RetroArch itself reads states: the session config's one savestate_directory (the launch wrote it)."""
+        cmd = LAST["cmd"]
+        cfg = Path(cmd[cmd.index("--config") + 1])
+        cfg = cfg if cfg.is_absolute() else root / cfg
+        mm = re.search(r'(?m)^\s*savestate_directory\s*=\s*"([^"]*)"', cfg.read_text())
+        p = Path(mm.group(1))
+        return p if p.is_absolute() else root / p
+    def folder():                                     # the fake's slot folder: the config's + the core's own
+        d = config_states() / ("Mupen64Plus-Next" if m._n64_core else "Beetle PSX HW")
+        LOADS.append(str(d.resolve().relative_to(root.resolve())))
+        return d
+    def mem():
+        return [int.from_bytes(fake["ra"].mem[args["p1"]:args["p1"] + 2], "little"),
+                int.from_bytes(fake["ra"].mem[args["p2"]:args["p2"] + 2], "little")]
+    def tree_hashes(*rels):
+        outh = {}
+        for rel in rels:
+            base = root / rel
+            for p in sorted(base.rglob("*")) if base.is_dir() else []:
+                if p.is_file():
+                    outh[str(p.relative_to(root))] = hashlib.sha256(p.read_bytes()).hexdigest()
+        return outh
+    def scratch_anywhere():
+        return sorted(str(p.relative_to(root)) for p in (root / "data").rglob("*.state8"))
+    PROF = "data/games/retroarch/cheat_profiles"
+    import h7_minigame as h7m
+    # the N64 title's spec (B122's version 3) and its places sidecar beside the PS1 one (B124's)
+    v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+    shutil.copyfile(v3.with_name(js4["arrays"]), rules_ / f"{n64}.endscreen.npz")
+    js4["arrays"] = f"{n64}.endscreen.npz"
+    (rules_ / f"{n64}.endscreen.json").write_text(json.dumps(js4))
+    # 1. the setups as the user made them: the onn's Extras launch from loopback, stopped; read back as the onn does
+    call("POST", "/plugins/games/stop")
+    wait_until(lambda: board_pid_now() is None, 10)
+    setups, stems = {}, {}
+    for key, gid, picks in (("ps1", title, "1"), ("n64", n64, "5")):
+        r = call("POST", f"/plugins/games/launch?id={gid}&cheat_source=0&cheat_indexes={picks}")
+        S[f"c_make_{key}"] = {"code": r["code"], "profile_id": ((r["body"].get("cheat_session") or {}).get("profile_id")),
+                              "error": r["body"].get("error")}
+        stems[key] = m._active_state_stem() if m.active_game else None
+        call("POST", "/plugins/games/stop")
+        profs = call("POST", f"/plugins/games/cheat-profiles?id={gid}")["body"].get("profiles") or []
+        S[f"c_profiles_{key}"] = len(profs)
+        p = profs[0]
+        setups[key] = {"source_index": p["source_index"], "enabled_cheat_indexes": p["enabled_cheat_indexes"],
+                       "profile_id": p["profile_id"]}
+        S[f"c_setup_{key}"] = {"source_index": p["source_index"], "enabled": p["enabled_cheat_indexes"],
+                               "same_id_as_launch": p["profile_id"] == S[f"c_make_{key}"]["profile_id"]}
+        sroot = root / PROF / gid / p["profile_id"]
+        core = "Mupen64Plus-Next" if key == "n64" else "Beetle PSX HW"
+        for sub, names in (("states", (".state", ".state1", ".state1.png")), ("saves", (".srm",))):
+            (sroot / sub / core).mkdir(parents=True, exist_ok=True)
+            for nm in names:
+                (sroot / sub / core / (stems[key] + nm)).write_bytes(os.urandom(96))
+    gid_of = {"ps1": title, "n64": n64}
+    (root / "data/games/retroarch/states/Beetle PSX HW").mkdir(parents=True, exist_ok=True)
+    (root / "data/games/retroarch/states/Beetle PSX HW" / (stems["ps1"] + ".state1")).write_bytes(os.urandom(64))
+    before = tree_hashes(PROF, "data/games/retroarch/states")
+    S["c_files_hashed"] = len(before)
+    dirs_before = sorted(str(p.relative_to(root)) for p in (root / PROF).glob("*/*"))
+    # 2. h7-start under each setup (bench: no stream), the begin the setup's own, into the setup's own folder
+    def setup_states(key):
+        return f"{PROF}/{gid_of[key]}/{setups[key]['profile_id']}/states"
+    q_ps1 = f"id={title}&cheat_source={setups['ps1']['source_index']}&cheat_indexes=" + \
+            ",".join(map(str, setups["ps1"]["enabled_cheat_indexes"]))
+    q_n64 = f"id={n64}&cheat_source={setups['n64']['source_index']}&cheat_indexes=" + \
+            ",".join(map(str, setups["n64"]["enabled_cheat_indexes"]))
+    call("POST", "/plugins/games/launch?" + q_ps1)
+    fake["ra"].paused = False
+    S["c_ps1_session"] = (m._active_cheat_session or {}).get("profile_id") == setups["ps1"]["profile_id"]
+    pic.set(["start"] * 3 + ["other"] * 200)
+    S["c_h7_ps1_normal"] = call("POST", "/plugins/games/h7-start?bench=1")["body"]
+    call("POST", "/plugins/games/h7-stop")
+    (rules_ / h7m.setup_begin_name(title, setups["ps1"]["profile_id"])).write_text(json.dumps({"P1": 7, "P2": 9}))
+    n0 = len(LOADS)
+    S["c_h7_ps1_setup"] = call("POST", "/plugins/games/h7-start?bench=1")["body"]
+    S["c_h7_ps1_loaded_from"] = LOADS[n0:]
+    S["c_h7_ps1_want"] = setup_states("ps1") + "/Beetle PSX HW"
+    S["c_h7_ps1_mem"] = mem()
+    S["c_h7_ps1_scratch"] = scratch_anywhere()
+    call("POST", "/plugins/games/h7-stop")
+    call("POST", "/plugins/games/stop")
+    call("POST", "/plugins/games/launch?" + q_n64)
+    ra = fake["ra"]; ra.paused = False
+    (rules_ / h7m.setup_begin_name(n64, setups["n64"]["profile_id"])).write_text(json.dumps({"P1": 3, "P2": 4}))
+    n0, l0 = len(LOADS), len(ra.log)
+    S["c_h7_n64_running"] = call("POST", "/plugins/games/h7-start?bench=1")
+    S["c_h7_n64_running_sent"] = [c for c in ra.log[l0:] if c == "LOAD_STATE_SLOT"]
+    ra.paused = True
+    S["c_h7_n64_paused"] = call("POST", "/plugins/games/h7-start?bench=1")["body"]
+    S["c_h7_n64_loaded_from"] = LOADS[n0:]
+    S["c_h7_n64_want"] = setup_states("n64") + "/Mupen64Plus-Next"
+    S["c_h7_n64_mem"] = mem()
+    S["c_h7_n64_scratch"] = scratch_anywhere()
+    call("POST", "/plugins/games/h7-stop")
+    call("POST", "/plugins/games/stop")
+    # 3. refusals: nothing launched, the board still the session, no new setup folder
+    board_up("c_ref")
+    side_ps1 = {"players": 2, "scores": {"end_P1": [1, 0], "end_P2": [0, 1]}, "cheat": setups["ps1"]}
+    side_n64 = {"players": 4, "cheat": setups["n64"]}
+    def refused(tag, side):
+        (rules_ / f"{title}.party.json").write_text(json.dumps(side))
+        lst = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
+        tk = next((e["id"] for e in lst if e["players"] == 2), None)
+        p0, r0 = len(POPENS), len(rows())
+        res = call("POST", f"/plugins/games/party-minigame-start?id={tk}&seats=1,2") if tk else {"code": None}
+        S[tag] = {"listed": tk is not None, "code": res["code"], "error": (res.get("body") or {}).get("error"),
+                  "popens": len(POPENS) - p0, "rows": [{k: v for k, v in r.items() if k in ("step", "why", "check")}
+                                                       for r in rows()[r0:]],
+                  "board_session": call("GET", "/plugins/games/status")["body"].get("launch_kind"),
+                  "mg": call("GET", "/plugins/games/party-minigame-result")["body"].get("state")}
+    gone_id = "0" * 64
+    (rules_ / h7m.setup_begin_name(title, gone_id)).write_text(json.dumps({"P1": 1, "P2": 1}))
+    refused("c_ref_no_profile", dict(side_ps1, cheat=dict(setups["ps1"], profile_id=gone_id)))
+    sdir = root / PROF / title / setups["ps1"]["profile_id"]
+    shutil.move(str(sdir), str(root / "moved_setup"))
+    refused("c_ref_folder_gone", side_ps1)
+    shutil.move(str(root / "moved_setup"), str(sdir))
+    refused("c_ref_indexes_changed", dict(side_ps1, cheat=dict(setups["ps1"], enabled_cheat_indexes=[1])))
+    (rules_ / f"{title}.party.json").write_text(json.dumps(dict(side_ps1, cheat=dict(setups["ps1"], profile_id="xyz"))))
+    S["c_malformed_listed"] = [e["players"] for e in call("GET", "/plugins/games/party-minigames")["body"]["minigames"]]
+    S["c_dirs_after_refusals"] = sorted(str(p.relative_to(root)) for p in (root / PROF).glob("*/*")) == dirs_before
+    # 4. two back to back with the onn's calls throughout: two-player under the PS1 setup, four-player under N64's
+    (rules_ / f"{title}.party.json").write_text(json.dumps(side_ps1))
+    (rules_ / f"{n64}.party.json").write_text(json.dumps(side_n64))
+    listed = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
+    S["c_list"] = sorted(e["players"] for e in listed)
+    tok2 = next(e["id"] for e in listed if e["players"] == 2)
+    tok4 = next(e["id"] for e in listed if e["players"] == 4)
+    pr = call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")["body"]
+    call("POST", "/plugins/games/native-stream-ready")
+    def under_setup(key, home_resume):
+        def during(tag):
+            S[tag + "_route_during"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+            S[tag + "_session_profile"] = (m._active_cheat_session or {}).get("profile_id") == setups[key]["profile_id"]
+            st = call("GET", "/plugins/games/status")["body"]
+            S[tag + "_status_profile"] = (st.get("cheat_session") or {}).get("profile_id") == setups[key]["profile_id"]
+            S[tag + "_mem"] = mem()
+            if home_resume:
+                time.sleep(0.3)
+                timed("home", "POST", "/plugins/games/native-stream-stop")
+                client.in_stream = False
+                time.sleep(0.2)
+                rs = timed("resume_start", "POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1",
+                           timeout=30)
+                client.in_stream = True
+                timed("resume_ready", "POST", "/plugins/games/native-stream-ready", timeout=30)
+                S[tag + "_resume_ports"] = {"players": rs["body"].get("players"),
+                                            "ports": (rs["body"].get("ports_set") or {}).get("players")}
+        return during
+    R2143 = ["s4start"] * 4 + ["s4other"] * 8 + ["s4r2143"] * 40
+    for tag, seats, script, tk, key, hr in (("ca2", "2,1", END2, tok2, "ps1", False),
+                                            ("cb4", "3,1,4,2", R2143, tok4, "n64", True)):
+        q0, n0 = len(LQ), len(LOADS)
+        one(tag, seats, script, tok=tk, during=under_setup(key, hr))
+        S[tag + "_launch_queries"] = [x.replace(gid_of[key], "<id>") for x in LQ[q0:]]
+        S[tag + "_want_query"] = (q_ps1 if key == "ps1" else q_n64).replace(gid_of[key], "<id>")
+        S[tag + "_loaded_from"] = LOADS[n0:]
+        S[tag + "_want_folder"] = setup_states(key) + ("/Mupen64Plus-Next" if key == "n64" else "/Beetle PSX HW")
+        S[tag + "_launch_row"] = [{k: v for k, v in r.items() if k in ("cheat", "profile_matches", "pid_owned")}
+                                  for r in rows() if r["step"] == "minigame_launch"][-1]
+    S["c_applied"] = [a == setups["ps1"]["profile_id"] or a == setups["n64"]["profile_id"] for a in APPLIED]
+    S["abr_all"] = [[r.get("event"), r.get("source")] for r in abr_rows()
+                    if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
+    timed("end_onn", "POST", "/plugins/games/stop")
+    wait_until(lambda: board_pid_now() is None, 10)
+    # 5. the users' files byte-equal; no scratch; nothing running
+    after = tree_hashes(PROF, "data/games/retroarch/states")
+    S["c_files_same"] = after == before
+    S["c_files_diff"] = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+    S["c_scratch_end"] = scratch_anywhere()
+    S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
     finish()
 if args["mode"] == "three":
     def real_stall(tag):
