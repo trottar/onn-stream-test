@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **H7-C1 NOT MET by one clause** (`evidence/H7_C1_2026-11-17.md`): T89's four-player pictures (794, no gap) and two
-  SAVEs kept; the hub's `.state` followed each SAVE. No flag; eighteen lines. PP-H3b MET.
+- **H7-C2 MET** (`evidence/H7_C2_2026-11-17.md`): both mini-game titles launched with the users' cheat setups, 243
+  pictures of the unlocked screens. Flag off; eighteen lines. H7-C1 NOT MET by one clause; PP-H3b MET.
 
 ## Verified State
 
@@ -87,8 +87,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — Cowork labels H7-C1's pictures** (a placement per player), then B's queue for four seats and placements
-   (`docs/ROADMAP.md` §H7). Beside it: the faster switch; B's no-client watcher.
+1. **H7 — Cowork labels H7-C2's pictures** (the unlocked screens), then B: the readers taught them, the mini games
+   launched with the cheat setups (`docs/ROADMAP.md` §H7). Beside it: the faster switch; B's no-client watcher.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
