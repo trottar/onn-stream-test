@@ -346,6 +346,12 @@ if args["mode"] == "today":
                             "home_idle": ("POST", "/plugins/games/native-stream-stop"),
                             "stop_idle": ("POST", "/plugins/games/stop")}.items():
         S[k] = call(meth, path)
+    # B124: a title's start with the prompt answers its players and ports as today (no board without the flag)
+    call("POST", f"/plugins/games/launch?id={title}")
+    pr = call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")["body"]
+    S["ports_today"] = {"players": pr.get("players"), "players_source": pr.get("players_source"),
+                        "ports_set": pr.get("ports_set")}
+    call("POST", "/plugins/games/stop")
     finish()
 
 rules_ = Path(rules); rules_.mkdir(parents=True, exist_ok=True)
@@ -363,11 +369,11 @@ LIMITS = ("start_limit_s", "switch_limit_s", "step_grace_s")
 S["limits_present"] = [k for k in LIMITS if hasattr(layer, k)]
 
 
-def one(tag, seats, script, during=None, home_resume=False):
+def one(tag, seats, script, during=None, home_resume=False, tok=None):
     pic.set(script)
     r0, q0, k0 = len(rows()), len(rec_rows()), len(keys())
     a0, e0 = len(abr_rows()), len(stream.events)
-    S[tag + "_start"] = timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats={seats}")
+    S[tag + "_start"] = timed("start", "POST", f"/plugins/games/party-minigame-start?id={tok or token}&seats={seats}")
     p = wait_for(lambda b: b.get("state") in ("playing", "ended", "given_up"), 25)
     S[tag + "_playing"] = p
     if p.get("timeout"):
@@ -426,6 +432,50 @@ END2 = ["start"] * 3 + ["other"] * 30 + ["end_P2"] * 40
 END3 = ["start"] * 3 + ["other"] * 60 + ["end_P1"] * 40
 board_pid = board_up("b1")
 out["board_pid"] = board_pid
+if args["mode"] == "four":
+    # B124: a four-player title (an N64 one, B122's version-3 spec, B123's places sidecar) beside the two-player one
+    n64 = args["n64_id"]
+    v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+    shutil.copyfile(v3.with_name(js4["arrays"]), rules_ / f"{n64}.endscreen.npz")
+    js4["arrays"] = f"{n64}.endscreen.npz"
+    (rules_ / f"{n64}.endscreen.json").write_text(json.dumps(js4))
+    (rules_ / f"{n64}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
+    (rules_ / f"{n64}.party.json").write_text(json.dumps({"players": 4}))      # places_to_scores left out: 4,3,2,1
+    def folder():                                     # the fake's slot folder: the running title's core's own
+        return m._state_root() / ("Mupen64Plus-Next" if m._n64_core else "Beetle PSX HW")
+    listed = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
+    S["four_list"] = sorted(e["players"] for e in listed)
+    tok2 = next(e["id"] for e in listed if e["players"] == 2)
+    tok4 = next(e["id"] for e in listed if e["players"] == 4)
+    pr = call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")["body"]
+    call("POST", "/plugins/games/native-stream-ready")
+    S["board_ports"] = {"players": pr.get("players"), "players_source": pr.get("players_source"),
+                        "ports_set": pr.get("ports_set")}
+    S["on_hub_word"] = party.launch_env({}).get("PRIVYPARTY_ON_HUB") if party is not None else None
+    S["refuse_4p_two_seats"] = call("POST", f"/plugins/games/party-minigame-start?id={tok4}&seats=1,2")
+    S["refuse_2p_four_seats"] = call("POST", f"/plugins/games/party-minigame-start?id={tok2}&seats=1,2,3,4")
+    R2143 = ["s4start"] * 4 + ["s4other"] * 8 + ["s4r2143"] * 40
+    def four_during(tag):
+        S[tag + "_route_during"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+        time.sleep(0.3)
+        timed("home", "POST", "/plugins/games/native-stream-stop")
+        client.in_stream = False
+        time.sleep(0.2)
+        rs = timed("resume_start", "POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1", timeout=30)
+        client.in_stream = True
+        timed("resume_ready", "POST", "/plugins/games/native-stream-ready", timeout=30)
+        S[tag + "_resume_ports"] = {"players": rs["body"].get("players"),
+                                    "ports": (rs["body"].get("ports_set") or {}).get("players")}
+    def two_during(tag):
+        S[tag + "_route_during"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+    one("a2", "1,2", END1, tok=tok2, during=two_during)
+    one("b4", "3,1,4,2", R2143, tok=tok4, during=four_during)
+    one("c2", "2,1", END2, tok=tok2, during=two_during)
+    one("d4", "1,2,3,4", R2143, tok=tok4, during=two_during)
+    S["abr_all"] = [[r.get("event"), r.get("source")] for r in abr_rows()
+                    if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
+    timed("end_onn", "POST", "/plugins/games/stop")
+    finish()
 if args["mode"] == "three":
     def real_stall(tag):
         """The client's video stops while the title plays, outside the switch windows: handled as today."""

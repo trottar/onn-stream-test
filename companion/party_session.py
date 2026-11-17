@@ -106,10 +106,14 @@ def command(cfg: dict[str, str]) -> list[str]:
             "--rendering-driver", RENDERERS[cfg["renderer"]], "--fullscreen", "--", "--content=" + cfg["pictures"]]
 
 
+ON_HUB = "PRIVYPARTY_ON_HUB"          # B124: the board knows it runs on the hub (its picker may prefer the hub's games)
+
+
 def launch_env(environ=os.environ) -> dict[str, str]:
     env = dict(environ)
     have = env.get("SDL_GAMECONTROLLERCONFIG", "")
     env["SDL_GAMECONTROLLERCONFIG"] = (have + "\n" if have else "") + SDL_MAPPING
+    env[ON_HUB] = "1"
     return env
 
 

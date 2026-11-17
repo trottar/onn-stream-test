@@ -346,8 +346,8 @@ class MiniGame(unittest.TestCase):
         self.assertEqual(self.err(self.s["start_no_state"]), (400, "no state for this game's mini game"))
         self.assertEqual(self.err(self.s["start_bad_load_word"]), (400, "load is 0 or 1"))
         self.assertEqual(self.err(self.s["start_no_stream"]), (400, "the stream is not up"))
-        self.assertEqual(self.err(self.s["start_n64"]),
-                         (400, "not supported yet — a state cannot be loaded into a running N64 game"))
+        # B123: N64 loads now (into a paused core); this PS1 session renamed n64 has no N64 core: the core's refusal
+        self.assertEqual(self.err(self.s["start_n64"]), (400, "not supported yet with this game's core"))
         self.assertEqual(self.err(self.s["start_ps2"]), (400, "not supported yet"))
         self.assertEqual(self.err(self.s["load_refused"]), (503, "the mini game's state did not load; the game is as it was"))
         self.assertEqual(self.s["load_refused_mem"], [77, 33])

@@ -66,7 +66,8 @@ def child() -> str:
     return b103.CHILD.split('out = {"steps": {}}')[0] + SCENARIO
 
 
-def run(root: Path, env: dict, ids: dict, mode: str, timeout: int = 600) -> dict:
+def run(root: Path, env: dict, ids: dict, mode: str, timeout: int = 600, extra=None) -> dict:
+    """`extra(work, frames) -> dict` (B124): more args for the child, made beside the fixtures (removed with them)."""
     child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
     child_env.update(env)
     xdg = root / "xdg"
@@ -78,10 +79,12 @@ def run(root: Path, env: dict, ids: dict, mode: str, timeout: int = 600) -> dict
     (root / "tools").mkdir(exist_ok=True)
     shutil.copyfile(ROOT / "tools" / "h7_endscreen.py", root / "tools" / "h7_endscreen.py")
     frames, spec_dir, js = b103.fixtures(work)
+    more = extra(work, frames) if extra is not None else {}
     try:
         r = subprocess.run([sys.executable, "-I", "-B", "-c", child(), str(root),
                             json.dumps({"id": ids[b85.PS1_TITLE], "mode": mode, "p1": b99.P1, "p2": b99.P2,
-                                        "frames": str(frames), "spec_dir": str(spec_dir), "start_s": 0.6, **fx})],
+                                        "frames": str(frames), "spec_dir": str(spec_dir), "start_s": 0.6, **fx,
+                                        **more})],
                            cwd=root, env=child_env, capture_output=True, text=True, timeout=timeout)
     finally:
         # the stand-in board, if a hung run left it, is ended with the child (it exits by itself after 120 s)
@@ -193,6 +196,8 @@ class FlagsAbsentAreToday(unittest.TestCase):
                 self.assertEqual((mine["steps"][k]["code"], CLOCK.sub("<ms>", mine["steps"][k]["raw"])),
                                  (base["steps"][k]["code"], CLOCK.sub("<ms>", base["steps"][k]["raw"])), (env, k))
             self.assertIn("Unknown Games plugin", base["steps"]["start"]["body"]["error"])
+            self.assertEqual(mine["steps"]["ports_today"], base["steps"]["ports_today"], env)     # B124
+            self.assertEqual(base["steps"]["ports_today"]["ports_set"]["players"], 2)
 
 
 if __name__ == "__main__":

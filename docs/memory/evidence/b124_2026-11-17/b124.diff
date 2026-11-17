@@ -1,0 +1,355 @@
+diff --git a/companion/party_session.py b/companion/party_session.py
+index 6bffcda..6201bd8 100644
+--- a/companion/party_session.py
++++ b/companion/party_session.py
+@@ -106,10 +106,14 @@ def command(cfg: dict[str, str]) -> list[str]:
+             "--rendering-driver", RENDERERS[cfg["renderer"]], "--fullscreen", "--", "--content=" + cfg["pictures"]]
+ 
+ 
++ON_HUB = "PRIVYPARTY_ON_HUB"          # B124: the board knows it runs on the hub (its picker may prefer the hub's games)
++
++
+ def launch_env(environ=os.environ) -> dict[str, str]:
+     env = dict(environ)
+     have = env.get("SDL_GAMECONTROLLERCONFIG", "")
+     env["SDL_GAMECONTROLLERCONFIG"] = (have + "\n" if have else "") + SDL_MAPPING
++    env[ON_HUB] = "1"
+     return env
+ 
+ 
+diff --git a/companion/player_count.py b/companion/player_count.py
+index 5fbfa20..2d6cecc 100644
+--- a/companion/player_count.py
++++ b/companion/player_count.py
+@@ -37,6 +37,10 @@ def for_start(plugin: Any, game_status: dict[str, Any] | None) -> dict[str, Any]
+     """{"players": n, "players_source": src} for the running title; 2 / "default" on any failure."""
+     try:
+         emulator = getattr(plugin, "_emulator", None)
++        # B124: the board game takes four players (only with PRIVYHUB_PARTY=1; also while a mini game sets it aside)
++        import players_session as _ps
++        if _ps._party_board(emulator):
++            return {"players": 4, "players_source": "party"}
+         game = getattr(emulator, "active_game", None) or (game_status or {}).get("game")
+         if not isinstance(game, dict) or not game.get("id"):
+             return {"players": DEFAULT, "players_source": "default"}
+diff --git a/companion/players_session.py b/companion/players_session.py
+index a7c16d0..e2ea306 100644
+--- a/companion/players_session.py
++++ b/companion/players_session.py
+@@ -95,9 +95,27 @@ def plan(system: str, players_chosen: int, libretro_device: int | None, source:
+     return out
+ 
+ 
++def _party_board(emulator: Any) -> bool:
++    """B124: the board game is the session, or a party mini game has set it aside. Imported only when present (the
++    module is loaded with PRIVYHUB_PARTY=1); else False — today."""
++    import sys
++    party = sys.modules.get("party_session")
++    if party is None:
++        return False
++    try:
++        return bool(party.active(emulator) or getattr(emulator, "_party_stash", None) is not None)
++    except Exception:
++        return False
++
++
+ def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, Any]:
+     """The start response's echo: the launch's plan, else the metadata's ports (4 with the PS1 multitap on, else 2)."""
+     try:
++        # B124: the board game takes four pads, also while a mini game has set it aside (only with PRIVYHUB_PARTY=1:
++        # no party session exists without it)
++        if _party_board(emulator):
++            return {"ports_set": {"players": 4, "ports": 4, "multitap": False, "multitap_available": False,
++                                  "source": "party"}}
+         session = getattr(emulator, "_players_session", None)
+         # B54: a hold-to-join launch (`join`) and a mid-session relaunch (`relaunch`) are plans too
+         # B59: an N64 launch's four ports are a plan too (`n64`; reached only with PRIVYHUB_N64=1)
+diff --git a/tests/b111_party_board/test_b111.py b/tests/b111_party_board/test_b111.py
+index b1b107c..b33fb57 100644
+--- a/tests/b111_party_board/test_b111.py
++++ b/tests/b111_party_board/test_b111.py
+@@ -52,7 +52,10 @@ class FakeHub:
+                 action = path.split("/plugins/games/", 1)[-1].split("?", 1)[0]
+                 code, body = 200, {"ok": True}
+                 if action == "party-minigames":
+-                    body["minigames"] = [{"id": "mg_one", "players": 4 if scenario == "four" else 2}]
++                    if scenario.startswith("mix"):                    # B124: a two- and a four-player game
++                        body["minigames"] = [{"id": "mg_two", "players": 2}, {"id": "mg_four", "players": 4}]
++                    else:
++                        body["minigames"] = [{"id": "mg_one", "players": 4 if scenario == "four" else 2}]
+                 elif action == "party-minigame-start":
+                     if scenario == "refused":
+                         code, body = 400, {"ok": False, "error": "a mini game is already on"}
+@@ -66,6 +69,8 @@ class FakeHub:
+                         body.update(state="playing", recognised=True)
+                     elif scenario == "giveup":
+                         body.update(state="given_up", why="no end within 900 s", scores=None)
++                    elif scenario == "mix4":
++                        body.update(state="ended", places=[2, 4, 1, 3], scores=[4, 2, 3, 1])
+                     else:
+                         body.update({"state": "ended", "class": "end_P1",
+                                      "scores": [0, 1] if scenario in ("win2", "slow") else [1, 0]})
+@@ -119,7 +124,7 @@ class BoardCheck(unittest.TestCase):
+     def test_with_the_checks_own_stand_in_hub(self):
+         r = run_check({})
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+-        self.assertIn("HUB MINIGAME CHECK: PASS (34 assertions)", r.stdout)   # B116: 20 + 14 on the frame rate
++        self.assertIn("HUB MINIGAME CHECK: PASS (40 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats
+ 
+     def test_against_this_tests_fake_hub(self):
+         hub = FakeHub()
+@@ -128,11 +133,14 @@ class BoardCheck(unittest.TestCase):
+         finally:
+             hub.close()
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+-        # its five "asked" ones, "listens" and (B116) the five frame-rate ones it reads at its own hub are ours here
+-        self.assertIn("HUB MINIGAME CHECK: PASS (23 assertions)", r.stdout)
++        # its eight "asked" ones (B124: +3), "listens" and (B116) the five frame-rate ones are ours here
++        self.assertIn("HUB MINIGAME CHECK: PASS (26 assertions)", r.stdout)
+         starts = [c for c in hub.calls if "party-minigame-start" in c]
+         self.assertIn("/s/win1/plugins/games/party-minigame-start?id=mg_one&seats=1,2", starts)
+-        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 8)   # every started one
++        self.assertIn("/s/mix4/plugins/games/party-minigame-start?id=mg_four&seats=3,1,4,2", starts)   # B124
++        self.assertIn("/s/mix2/plugins/games/party-minigame-start?id=mg_two&seats=1,2", starts)
++        self.assertFalse(any(c.startswith("/s/mix3/") for c in starts))
++        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 10)   # every started one
+         self.assertIn("PrivyParty: hub mini game: a draw: the hub stopped answering", r.stdout)   # B116's silent hub
+         self.assertFalse(any(c.startswith("/s/refused/") and c.endswith("party-minigame-end") for c in hub.calls))
+         self.assertIn("PrivyParty: hub mini game: a draw: the hub gave it up (no end within 900 s)", r.stdout)
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index e0729b4..9caabb3 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -346,6 +346,12 @@ if args["mode"] == "today":
+                             "home_idle": ("POST", "/plugins/games/native-stream-stop"),
+                             "stop_idle": ("POST", "/plugins/games/stop")}.items():
+         S[k] = call(meth, path)
++    # B124: a title's start with the prompt answers its players and ports as today (no board without the flag)
++    call("POST", f"/plugins/games/launch?id={title}")
++    pr = call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")["body"]
++    S["ports_today"] = {"players": pr.get("players"), "players_source": pr.get("players_source"),
++                        "ports_set": pr.get("ports_set")}
++    call("POST", "/plugins/games/stop")
+     finish()
+ 
+ rules_ = Path(rules); rules_.mkdir(parents=True, exist_ok=True)
+@@ -363,11 +369,11 @@ LIMITS = ("start_limit_s", "switch_limit_s", "step_grace_s")
+ S["limits_present"] = [k for k in LIMITS if hasattr(layer, k)]
+ 
+ 
+-def one(tag, seats, script, during=None, home_resume=False):
++def one(tag, seats, script, during=None, home_resume=False, tok=None):
+     pic.set(script)
+     r0, q0, k0 = len(rows()), len(rec_rows()), len(keys())
+     a0, e0 = len(abr_rows()), len(stream.events)
+-    S[tag + "_start"] = timed("start", "POST", f"/plugins/games/party-minigame-start?id={token}&seats={seats}")
++    S[tag + "_start"] = timed("start", "POST", f"/plugins/games/party-minigame-start?id={tok or token}&seats={seats}")
+     p = wait_for(lambda b: b.get("state") in ("playing", "ended", "given_up"), 25)
+     S[tag + "_playing"] = p
+     if p.get("timeout"):
+@@ -426,6 +432,50 @@ END2 = ["start"] * 3 + ["other"] * 30 + ["end_P2"] * 40
+ END3 = ["start"] * 3 + ["other"] * 60 + ["end_P1"] * 40
+ board_pid = board_up("b1")
+ out["board_pid"] = board_pid
++if args["mode"] == "four":
++    # B124: a four-player title (an N64 one, B122's version-3 spec, B123's places sidecar) beside the two-player one
++    n64 = args["n64_id"]
++    v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
++    shutil.copyfile(v3.with_name(js4["arrays"]), rules_ / f"{n64}.endscreen.npz")
++    js4["arrays"] = f"{n64}.endscreen.npz"
++    (rules_ / f"{n64}.endscreen.json").write_text(json.dumps(js4))
++    (rules_ / f"{n64}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
++    (rules_ / f"{n64}.party.json").write_text(json.dumps({"players": 4}))      # places_to_scores left out: 4,3,2,1
++    def folder():                                     # the fake's slot folder: the running title's core's own
++        return m._state_root() / ("Mupen64Plus-Next" if m._n64_core else "Beetle PSX HW")
++    listed = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
++    S["four_list"] = sorted(e["players"] for e in listed)
++    tok2 = next(e["id"] for e in listed if e["players"] == 2)
++    tok4 = next(e["id"] for e in listed if e["players"] == 4)
++    pr = call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")["body"]
++    call("POST", "/plugins/games/native-stream-ready")
++    S["board_ports"] = {"players": pr.get("players"), "players_source": pr.get("players_source"),
++                        "ports_set": pr.get("ports_set")}
++    S["on_hub_word"] = party.launch_env({}).get("PRIVYPARTY_ON_HUB") if party is not None else None
++    S["refuse_4p_two_seats"] = call("POST", f"/plugins/games/party-minigame-start?id={tok4}&seats=1,2")
++    S["refuse_2p_four_seats"] = call("POST", f"/plugins/games/party-minigame-start?id={tok2}&seats=1,2,3,4")
++    R2143 = ["s4start"] * 4 + ["s4other"] * 8 + ["s4r2143"] * 40
++    def four_during(tag):
++        S[tag + "_route_during"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
++        time.sleep(0.3)
++        timed("home", "POST", "/plugins/games/native-stream-stop")
++        client.in_stream = False
++        time.sleep(0.2)
++        rs = timed("resume_start", "POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1", timeout=30)
++        client.in_stream = True
++        timed("resume_ready", "POST", "/plugins/games/native-stream-ready", timeout=30)
++        S[tag + "_resume_ports"] = {"players": rs["body"].get("players"),
++                                    "ports": (rs["body"].get("ports_set") or {}).get("players")}
++    def two_during(tag):
++        S[tag + "_route_during"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
++    one("a2", "1,2", END1, tok=tok2, during=two_during)
++    one("b4", "3,1,4,2", R2143, tok=tok4, during=four_during)
++    one("c2", "2,1", END2, tok=tok2, during=two_during)
++    one("d4", "1,2,3,4", R2143, tok=tok4, during=two_during)
++    S["abr_all"] = [[r.get("event"), r.get("source")] for r in abr_rows()
++                    if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
++    timed("end_onn", "POST", "/plugins/games/stop")
++    finish()
+ if args["mode"] == "three":
+     def real_stall(tag):
+         """The client's video stops while the title plays, outside the switch windows: handled as today."""
+diff --git a/tests/b114_party_minigame_hang/test_b114.py b/tests/b114_party_minigame_hang/test_b114.py
+index 54b90f6..12fc783 100644
+--- a/tests/b114_party_minigame_hang/test_b114.py
++++ b/tests/b114_party_minigame_hang/test_b114.py
+@@ -66,7 +66,8 @@ def child() -> str:
+     return b103.CHILD.split('out = {"steps": {}}')[0] + SCENARIO
+ 
+ 
+-def run(root: Path, env: dict, ids: dict, mode: str, timeout: int = 600) -> dict:
++def run(root: Path, env: dict, ids: dict, mode: str, timeout: int = 600, extra=None) -> dict:
++    """`extra(work, frames) -> dict` (B124): more args for the child, made beside the fixtures (removed with them)."""
+     child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
+     child_env.update(env)
+     xdg = root / "xdg"
+@@ -78,10 +79,12 @@ def run(root: Path, env: dict, ids: dict, mode: str, timeout: int = 600) -> dict
+     (root / "tools").mkdir(exist_ok=True)
+     shutil.copyfile(ROOT / "tools" / "h7_endscreen.py", root / "tools" / "h7_endscreen.py")
+     frames, spec_dir, js = b103.fixtures(work)
++    more = extra(work, frames) if extra is not None else {}
+     try:
+         r = subprocess.run([sys.executable, "-I", "-B", "-c", child(), str(root),
+                             json.dumps({"id": ids[b85.PS1_TITLE], "mode": mode, "p1": b99.P1, "p2": b99.P2,
+-                                        "frames": str(frames), "spec_dir": str(spec_dir), "start_s": 0.6, **fx})],
++                                        "frames": str(frames), "spec_dir": str(spec_dir), "start_s": 0.6, **fx,
++                                        **more})],
+                            cwd=root, env=child_env, capture_output=True, text=True, timeout=timeout)
+     finally:
+         # the stand-in board, if a hung run left it, is ended with the child (it exits by itself after 120 s)
+@@ -193,6 +196,8 @@ class FlagsAbsentAreToday(unittest.TestCase):
+                 self.assertEqual((mine["steps"][k]["code"], CLOCK.sub("<ms>", mine["steps"][k]["raw"])),
+                                  (base["steps"][k]["code"], CLOCK.sub("<ms>", base["steps"][k]["raw"])), (env, k))
+             self.assertIn("Unknown Games plugin", base["steps"]["start"]["body"]["error"])
++            self.assertEqual(mine["steps"]["ports_today"], base["steps"]["ports_today"], env)     # B124
++            self.assertEqual(base["steps"]["ports_today"]["ports_set"]["players"], 2)
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/b124_party_four_seats/test_b124.py b/tests/b124_party_four_seats/test_b124.py
+new file mode 100644
+index 0000000..d1ad96d
+--- /dev/null
++++ b/tests/b124_party_four_seats/test_b124.py
+@@ -0,0 +1,112 @@
++#!/usr/bin/env python3
++"""B124 (host): four seats on the board and who plays what — through the real HTTP server on loopback, behind
++PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
++
++B114's harness (B108's stand-in board, B101's fake RetroArch, B103's fake pictures, the stream stub with its own lock,
++the onn's client thread and status / result / native-stream-status every 0.1 s) with the hub's adopted lines on, and
++**two mini games in the rules folder**: the fixture's PS1 title with B103's two-player spec and sidecar, and the
++fixture's **N64 title with a real version-3 spec** (B122, learnt here from B122's synthetic pictures) **and the places
++sidecar** (`{"players": 4}`: 4, 3, 2, 1). Checked: the board's start answers **four players and four ports**; the
++board's launch environment carries `PRIVYPARTY_ON_HUB=1`; a four-player title with two seats and a two-player one with
++four refused; **four back to back — two-player (1,2), four-player (3,1,4,2) with Home / RESUME, two-player (2,1),
++four-player (1,2,3,4)** — the route seat → port in the order given, the four-player end read as places and turned
++into scores in the seats' order, a RESUME during a four-player game still answering four ports, every hand-over
++planned (B115: two switches, no recovery act, no key to the board), no escalation, every route < 2 s while a mini game
++is on. Each flag absent → today (B114's and B123's flag tests). Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b124_party_four_seats -v
++"""
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b114_party_minigame_hang", "b123_h7_n64_start", "b115_party_handovers"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import test_b114 as b114  # noqa: E402  (harnesses; their tests are not collected here)
++import test_b123 as b123  # noqa: E402
++import test_b115 as b115  # noqa: E402
++
++
++def extra(work: Path, frames: Path) -> dict:
++    import numpy as np
++    rng = np.random.default_rng(124)
++    for i in range(6):
++        b123.b122.start(i, rng).save(frames / f"s4start_{i}.png")
++        b123.b122.other(i, rng).save(frames / f"s4other_{i}.png")
++        b123.b122.results(i, "2143", 40, rng).save(frames / f"s4r2143_{i}.png")
++    return {"n64_id": IDS[b114.b85.N64_TITLE], "v3": str(b123.v3_spec(work))}
++
++
++IDS: dict = {}
++
++
++class FourSeats(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b114.b99.tree()
++        IDS.update(ids)
++        cls.out = b114.run(root, b114.BOTH, ids, "four", extra=extra)
++        cls.s = cls.out["steps"]
++
++    def test_0_the_board_takes_four_pads(self):
++        self.assertIsNone(self.out["hung"], self.out.get("mg_thread"))
++        bp = self.s["board_ports"]
++        self.assertEqual((bp["players"], bp["players_source"]), (4, "party"))
++        self.assertEqual((bp["ports_set"]["players"], bp["ports_set"]["ports"], bp["ports_set"]["source"]),
++                         (4, 4, "party"))
++        self.assertEqual(self.s["on_hub_word"], "1")
++        self.assertEqual(self.s["four_list"], [2, 4])
++
++    def test_1_seats_must_fit_the_title(self):
++        for k in ("refuse_4p_two_seats", "refuse_2p_four_seats"):
++            r = self.s[k]
++            self.assertEqual(r["code"], 400, (k, r))
++            self.assertIn("different seats, 1-4", r["body"]["error"])
++        self.assertIn("takes 4", self.s["refuse_4p_two_seats"]["body"]["error"])
++        self.assertIn("takes 2", self.s["refuse_2p_four_seats"]["body"]["error"])
++
++    def test_2_the_route_seat_to_port_in_the_order_given(self):
++        self.assertEqual(self.s["a2_route_during"], {"0": 0, "1": 1})
++        self.assertEqual(self.s["b4_route_during"], {"2": 0, "0": 1, "3": 2, "1": 3})   # seat 3 -> port 1 ...
++        self.assertEqual(self.s["c2_route_during"], {"1": 0, "0": 1})
++        self.assertEqual(self.s["d4_route_during"], {"0": 0, "1": 1, "2": 2, "3": 3})
++        for tag in ("a2", "b4", "c2", "d4"):
++            self.assertIsNone(self.s[tag + "_route_after"], tag)
++
++    def test_3_places_to_scores_in_the_seats_order(self):
++        # the pictures' Place row: port 1 2nd, port 2 1st, port 3 4th, port 4 3rd; seat k plays port k
++        for tag, seats in (("b4", [3, 1, 4, 2]), ("d4", [1, 2, 3, 4])):
++            r = self.s[tag]
++            self.assertEqual((r["state"], r["class"], r["places"], r["scores"], r["seats"]),
++                             ("ended", "end", [2, 1, 4, 3], [3, 4, 1, 2], seats), (tag, r))
++        for tag, cls_, scores in (("a2", "end_P1", [1, 0]), ("c2", "end_P2", [0, 1])):
++            r = self.s[tag]
++            self.assertEqual((r["state"], r["class"], r["scores"]), ("ended", cls_, scores), (tag, r))
++            self.assertNotIn("places", r)                                 # the two-player answer as before
++
++    def test_4_every_hand_over_planned_and_the_recovery_out(self):
++        for tag in ("a2", "b4", "c2", "d4"):
++            sw = [(x["window"], x["switched"], x.get("planned")) for x in self.s[tag + "_switches"]]
++            self.assertEqual(sw, [("minigame", True, True), ("board", True, True)], tag)
++            acts = [x for x in self.s[tag + "_rec"] if x in b115.RECOVERY_ACTS]
++            self.assertEqual(acts, [], (tag, self.s[tag + "_rec"]))
++            self.assertEqual(self.s[tag + "_keys_all"], [], tag)
++            self.assertTrue(self.s[tag + "_board_picture_back"], tag)
++            self.assertTrue(self.s[tag + "_title_gone"], tag)
++        events = [e[0] for e in self.s["abr_all"]]
++        self.assertNotIn("escalation_armed", events)
++        self.assertNotIn("transition", events)
++
++    def test_5_resume_during_a_four_player_game_and_the_two_second_rule(self):
++        self.assertEqual(self.s["b4_resume_ports"], {"players": 4, "ports": 4})
++        lat = self.out["lat"]
++        for kind in ("status", "result", "ns_status", "home", "board_end", "start"):
++            self.assertLess(lat[kind]["max"], b114.WITHIN_S, (kind, lat[kind]))
++
++
++if __name__ == "__main__":
++    unittest.main()

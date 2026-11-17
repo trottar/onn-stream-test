@@ -32,7 +32,8 @@ ARM_POLL = 0.25                # s
 SAMPLE_EVERY = 1.0             # s
 LOG_RELATIVE = "logs/games/h7_contests.jsonl"
 CORE_FOLDERS = {"mednafen_psx_hw_libretro": "Beetle PSX HW", "mednafen_psx_libretro": "Beetle PSX",
-                "snes9x_libretro": "Snes9x", "bsnes_libretro": "bsnes"}          # RetroArch's per-core state folders
+                "snes9x_libretro": "Snes9x", "bsnes_libretro": "bsnes",
+                "mupen64plus_next_libretro": "Mupen64Plus-Next"}   # RetroArch's per-core state folders (B123: N64)
 LOADING = re.compile(r'\[State\] Loading state ".*", (\d+) bytes\.')
 SYSTEMS = ("ps1", "snes")
 

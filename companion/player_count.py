@@ -37,6 +37,10 @@ def for_start(plugin: Any, game_status: dict[str, Any] | None) -> dict[str, Any]
     """{"players": n, "players_source": src} for the running title; 2 / "default" on any failure."""
     try:
         emulator = getattr(plugin, "_emulator", None)
+        # B124: the board game takes four players (only with PRIVYHUB_PARTY=1; also while a mini game sets it aside)
+        import players_session as _ps
+        if _ps._party_board(emulator):
+            return {"players": 4, "players_source": "party"}
         game = getattr(emulator, "active_game", None) or (game_status or {}).get("game")
         if not isinstance(game, dict) or not game.get("id"):
             return {"players": DEFAULT, "players_source": "default"}

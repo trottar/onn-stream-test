@@ -95,9 +95,27 @@ def plan(system: str, players_chosen: int, libretro_device: int | None, source: 
     return out
 
 
+def _party_board(emulator: Any) -> bool:
+    """B124: the board game is the session, or a party mini game has set it aside. Imported only when present (the
+    module is loaded with PRIVYHUB_PARTY=1); else False — today."""
+    import sys
+    party = sys.modules.get("party_session")
+    if party is None:
+        return False
+    try:
+        return bool(party.active(emulator) or getattr(emulator, "_party_stash", None) is not None)
+    except Exception:
+        return False
+
+
 def ports_set(emulator: Any, game_status: dict[str, Any] | None) -> dict[str, Any]:
     """The start response's echo: the launch's plan, else the metadata's ports (4 with the PS1 multitap on, else 2)."""
     try:
+        # B124: the board game takes four pads, also while a mini game has set it aside (only with PRIVYHUB_PARTY=1:
+        # no party session exists without it)
+        if _party_board(emulator):
+            return {"ports_set": {"players": 4, "ports": 4, "multitap": False, "multitap_available": False,
+                                  "source": "party"}}
         session = getattr(emulator, "_players_session", None)
         # B54: a hold-to-join launch (`join`) and a mid-session relaunch (`relaunch`) are plans too
         # B59: an N64 launch's four ports are a plan too (`n64`; reached only with PRIVYHUB_N64=1)

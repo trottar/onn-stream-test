@@ -63,6 +63,7 @@ MANAGER_BOUND_S = 10.0      # the end's manager calls: give up the wait after th
 # B115
 PLANNED_GRACE_S = 3.0       # the planned-switch window stays open this long after the switch's start returns
 # the onn's calls taken while a mini game is on (route → kind)
+PLACES_VERSION = 3          # B123: an end-screen spec with a place for every player (B122)
 TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
          "stop": "end"}
 
@@ -185,6 +186,12 @@ class PartyMinigames:
                     continue
                 side = json.loads((folder / f"{game}.party.json").read_text(encoding="utf-8"))
                 n = int(side["players"])
+                if spec.get("version") == PLACES_VERSION or "places_to_scores" in side:
+                    entry = self._places_entry(spec, side, n)          # B123: a place for every player
+                    if entry is None or self.p._find_game_by_id(game) is None:
+                        continue
+                    out[self._token(game)] = {"game": game, **entry}
+                    continue
                 scores = {str(k): [int(x) if float(x).is_integer() else float(x) for x in v]
                           for k, v in dict(side["scores"]).items()}
                 ends = list(spec["end_classes"])
@@ -196,6 +203,20 @@ class PartyMinigames:
                 continue
             out[self._token(game)] = {"game": game, "players": n, "scores": scores, "start_class": spec["start_class"]}
         return out
+
+    @staticmethod
+    def _places_entry(spec: dict, side: dict, n: int) -> dict | None:
+        """B123: `{"players": n, "places_to_scores": [s1..sn]}` (left out: n, n-1, ..., 1) with a version-3 spec of n
+        ports -> the entry, else None (not listed)."""
+        if spec.get("version") != PLACES_VERSION or "scores" in side or not 2 <= n <= 4:
+            return None
+        if int((spec.get("places") or {}).get("ports", 0)) != n:
+            return None
+        raw = side.get("places_to_scores", list(range(n, 0, -1)))
+        if not isinstance(raw, list) or len(raw) != n:
+            return None
+        p2s = [int(x) if float(x).is_integer() else float(x) for x in raw]
+        return {"players": n, "scores": None, "places_to_scores": p2s, "start_class": spec["start_class"]}
 
     def listing(self) -> dict:
         return {"ok": True, "minigames": [{"id": t, "players": e["players"]} for t, e in sorted(self._entries().items())]}
@@ -220,7 +241,7 @@ class PartyMinigames:
             raise ValueError(f"this mini game takes {entry['players']} different seats, 1-4")
         now = self.clock()
         mg = {"state": "starting", "seats": seats, "entry": entry, "recognised": None, "class": None,
-              "scores": None, "why": None, "t0": now, "last_poll": now, "final_at": None,
+              "scores": None, "why": None, "places": None, "t0": now, "last_poll": now, "final_at": None,
               "stash": None, "launched": False, "routed": False, "ended_by": None, "closed": False,
               # B114: the actor's step, the taken calls, the end's owner
               "step": None, "step_since": None, "queue": collections.deque(), "end_req": None, "ending": False,
@@ -247,7 +268,8 @@ class PartyMinigames:
             if mg["state"] in FINAL or mg["closed"]:
                 return
             mg.update(state=state, final_at=self.clock(), **fields)
-        self.row({"step": "minigame_" + state, **{k: v for k, v in fields.items() if k in ("class", "scores", "why")}})
+        self.row({"step": "minigame_" + state, **{k: v for k, v in fields.items()
+                                                  if k in ("class", "scores", "why", "places")}})
 
     # --- B114: bounded calls ------------------------------------------------------------------------------------------
     def _emu_call(self, mg: dict | None, fn: Callable[[], Any], bound: float | None = None, abort: bool = True):
@@ -578,6 +600,16 @@ class PartyMinigames:
                 continue
             if r.get("state") == "ended":
                 cls = r.get("class")
+                if mg["entry"].get("places_to_scores") is not None:      # B123: the row of places -> the seats' scores
+                    places = r.get("places")
+                    n = mg["entry"]["players"]
+                    if not isinstance(places, list) or sorted(places) != list(range(1, n + 1)):
+                        self._final(mg, "given_up", why="an end the places do not name")
+                    else:
+                        p2s = mg["entry"]["places_to_scores"]
+                        self._final(mg, "ended", **{"class": cls, "places": list(places),
+                                                    "scores": [p2s[q - 1] for q in places]})
+                    continue
                 scores = mg["entry"]["scores"].get(cls)
                 if scores is None:
                     self._final(mg, "given_up", why="an end the sidecar does not name")
@@ -601,9 +633,12 @@ class PartyMinigames:
             if mg is None:
                 return {"ok": True, "state": "none"}
             mg["last_poll"] = self.clock()
-            return {"ok": True, "state": mg["state"], "seats": mg["seats"], "recognised": mg["recognised"],
-                    "class": mg["class"], "scores": mg["scores"], "why": mg["why"], "closed": mg["closed"],
-                    "since_s": round(self.clock() - mg["t0"], 1)}
+            out = {"ok": True, "state": mg["state"], "seats": mg["seats"], "recognised": mg["recognised"],
+                   "class": mg["class"], "scores": mg["scores"], "why": mg["why"], "closed": mg["closed"],
+                   "since_s": round(self.clock() - mg["t0"], 1)}
+            if mg["entry"].get("places_to_scores") is not None:   # B123: the places read, port by port
+                out["places"] = mg["places"]
+            return out
 
     def end(self, by: str = "board") -> dict:
         """The board's end: taken at once, acted on in order; answered with the end done if it is within TAKE_WAIT_S."""

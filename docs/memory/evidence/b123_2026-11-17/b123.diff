@@ -1,0 +1,413 @@
+diff --git a/companion/h7_contest.py b/companion/h7_contest.py
+index f97bad0..ee672aa 100644
+--- a/companion/h7_contest.py
++++ b/companion/h7_contest.py
+@@ -32,7 +32,8 @@ ARM_POLL = 0.25                # s
+ SAMPLE_EVERY = 1.0             # s
+ LOG_RELATIVE = "logs/games/h7_contests.jsonl"
+ CORE_FOLDERS = {"mednafen_psx_hw_libretro": "Beetle PSX HW", "mednafen_psx_libretro": "Beetle PSX",
+-                "snes9x_libretro": "Snes9x", "bsnes_libretro": "bsnes"}          # RetroArch's per-core state folders
++                "snes9x_libretro": "Snes9x", "bsnes_libretro": "bsnes",
++                "mupen64plus_next_libretro": "Mupen64Plus-Next"}   # RetroArch's per-core state folders (B123: N64)
+ LOADING = re.compile(r'\[State\] Loading state ".*", (\d+) bytes\.')
+ SYSTEMS = ("ps1", "snes")
+ 
+diff --git a/companion/h7_minigame.py b/companion/h7_minigame.py
+index f1999a2..3abb6a5 100644
+--- a/companion/h7_minigame.py
++++ b/companion/h7_minigame.py
+@@ -44,7 +44,8 @@ import h7_live_read as live
+ 
+ READ_EVERY = 1.0            # s: one picture a second
+ LOG_RELATIVE = "logs/games/h7_results.jsonl"
+-SYSTEMS = ("ps1", "snes")   # the load; the watcher alone (load=0) on any system
++SYSTEMS = ("ps1", "snes", "n64")   # the load (B123: N64, only into a paused core); the watcher alone on any system
++N64_NOT_PAUSED = "the N64 game is not paused: its state is loaded only into a paused core; nothing was sent"
+ XDOTOOL_WAIT = 1.0
+ BENCH_STREAM_UP = "a client's stream is up: not on the bench"   # B112
+ BENCH_LOOPBACK = "the bench is for loopback callers only"          # B112
+@@ -212,8 +213,6 @@ class MiniGame:
+         if load:
+             if kind in ("pcsx2", "dolphin"):
+                 self._refused("not supported yet")
+-            if system == "n64":
+-                self._refused("not supported yet — a state cannot be loaded into a running N64 game")
+             if system not in SYSTEMS:
+                 self._refused("not supported yet")
+             state = live.rules_folder(self._environ) / f"{game}.state"
+@@ -226,11 +225,21 @@ class MiniGame:
+         line_ms = None
+         if load:
+             core = loader._core_file(system)
++            if system == "n64":                                  # B123: the running session's own core (B59's)
++                core = str(getattr(self._emu, "_n64_core", None) or core)
+             folder_name = contest.CORE_FOLDERS.get(core[:-len(".so")] if core.endswith(".so") else core)
+             if folder_name is None:
+                 self._refused("not supported yet with this game's core")
+             stem = self._emu._active_state_stem()
+             folder = self._emu._state_root() / folder_name
++            # B123: an N64 state only into a core that answers PAUSED (B61 / B65: a running N64 core hangs RetroArch)
++            if system == "n64":
++                try:
++                    paused = self._emu._retroarch_network_status() == "PAUSED"
++                except Exception:
++                    paused = False
++                if not paused:
++                    self._refused(N64_NOT_PAUSED)
+             try:
+                 line_ms = loader._load(game, state, folder, stem)
+             except live.Busy:
+@@ -398,7 +407,7 @@ class MiniGame:
+                     continue
+                 r = reader.read(img)
+                 seen_before = ended.seen_start
+-                done = ended.feed(r["class"])
++                done = ended.feed(r["class"], r.get("places"))         # B123: version 3 ends on the whole row
+                 with self._lock:
+                     w = self._current(token)
+                     if w is None:
+@@ -418,13 +427,16 @@ class MiniGame:
+                             self._settle(w, False, since, r)
+                     if done:
+                         w.update(state="ended", **{"class": done}, ended_after_s=since)
++                        if getattr(ended, "places", None):              # B123: a version-3 spec's row of places
++                            w["places"] = list(ended.places)
+                     if ended.seen_start and not seen_before:
+                         self._row({"step": "start_seen", "game": game, "after_s": since, "reads": reads})
+                     if r["class"] == endscreen().UNKNOWN and last_class != endscreen().UNKNOWN:
+                         self._row({"step": "unknown_screen", "game": game, "after_s": since,
+                                    "distances": r["distances"], "margin": r["margin"]})
+                     if done:
+-                        self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads})
++                        self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads,
++                                   **({"places": list(ended.places)} if getattr(ended, "places", None) else {})})
+                 last_class = r["class"]
+                 if keep_dir is not None:
+                     self._keep(token, keep_dir, img, since, r)
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index f96e8fa..fede402 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -63,6 +63,7 @@ MANAGER_BOUND_S = 10.0      # the end's manager calls: give up the wait after th
+ # B115
+ PLANNED_GRACE_S = 3.0       # the planned-switch window stays open this long after the switch's start returns
+ # the onn's calls taken while a mini game is on (route → kind)
++PLACES_VERSION = 3          # B123: an end-screen spec with a place for every player (B122)
+ TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
+          "stop": "end"}
+ 
+@@ -185,6 +186,12 @@ class PartyMinigames:
+                     continue
+                 side = json.loads((folder / f"{game}.party.json").read_text(encoding="utf-8"))
+                 n = int(side["players"])
++                if spec.get("version") == PLACES_VERSION or "places_to_scores" in side:
++                    entry = self._places_entry(spec, side, n)          # B123: a place for every player
++                    if entry is None or self.p._find_game_by_id(game) is None:
++                        continue
++                    out[self._token(game)] = {"game": game, **entry}
++                    continue
+                 scores = {str(k): [int(x) if float(x).is_integer() else float(x) for x in v]
+                           for k, v in dict(side["scores"]).items()}
+                 ends = list(spec["end_classes"])
+@@ -197,6 +204,20 @@ class PartyMinigames:
+             out[self._token(game)] = {"game": game, "players": n, "scores": scores, "start_class": spec["start_class"]}
+         return out
+ 
++    @staticmethod
++    def _places_entry(spec: dict, side: dict, n: int) -> dict | None:
++        """B123: `{"players": n, "places_to_scores": [s1..sn]}` (left out: n, n-1, ..., 1) with a version-3 spec of n
++        ports -> the entry, else None (not listed)."""
++        if spec.get("version") != PLACES_VERSION or "scores" in side or not 2 <= n <= 4:
++            return None
++        if int((spec.get("places") or {}).get("ports", 0)) != n:
++            return None
++        raw = side.get("places_to_scores", list(range(n, 0, -1)))
++        if not isinstance(raw, list) or len(raw) != n:
++            return None
++        p2s = [int(x) if float(x).is_integer() else float(x) for x in raw]
++        return {"players": n, "scores": None, "places_to_scores": p2s, "start_class": spec["start_class"]}
++
+     def listing(self) -> dict:
+         return {"ok": True, "minigames": [{"id": t, "players": e["players"]} for t, e in sorted(self._entries().items())]}
+ 
+@@ -220,7 +241,7 @@ class PartyMinigames:
+             raise ValueError(f"this mini game takes {entry['players']} different seats, 1-4")
+         now = self.clock()
+         mg = {"state": "starting", "seats": seats, "entry": entry, "recognised": None, "class": None,
+-              "scores": None, "why": None, "t0": now, "last_poll": now, "final_at": None,
++              "scores": None, "why": None, "places": None, "t0": now, "last_poll": now, "final_at": None,
+               "stash": None, "launched": False, "routed": False, "ended_by": None, "closed": False,
+               # B114: the actor's step, the taken calls, the end's owner
+               "step": None, "step_since": None, "queue": collections.deque(), "end_req": None, "ending": False,
+@@ -247,7 +268,8 @@ class PartyMinigames:
+             if mg["state"] in FINAL or mg["closed"]:
+                 return
+             mg.update(state=state, final_at=self.clock(), **fields)
+-        self.row({"step": "minigame_" + state, **{k: v for k, v in fields.items() if k in ("class", "scores", "why")}})
++        self.row({"step": "minigame_" + state, **{k: v for k, v in fields.items()
++                                                  if k in ("class", "scores", "why", "places")}})
+ 
+     # --- B114: bounded calls ------------------------------------------------------------------------------------------
+     def _emu_call(self, mg: dict | None, fn: Callable[[], Any], bound: float | None = None, abort: bool = True):
+@@ -578,6 +600,16 @@ class PartyMinigames:
+                 continue
+             if r.get("state") == "ended":
+                 cls = r.get("class")
++                if mg["entry"].get("places_to_scores") is not None:      # B123: the row of places -> the seats' scores
++                    places = r.get("places")
++                    n = mg["entry"]["players"]
++                    if not isinstance(places, list) or sorted(places) != list(range(1, n + 1)):
++                        self._final(mg, "given_up", why="an end the places do not name")
++                    else:
++                        p2s = mg["entry"]["places_to_scores"]
++                        self._final(mg, "ended", **{"class": cls, "places": list(places),
++                                                    "scores": [p2s[q - 1] for q in places]})
++                    continue
+                 scores = mg["entry"]["scores"].get(cls)
+                 if scores is None:
+                     self._final(mg, "given_up", why="an end the sidecar does not name")
+@@ -601,9 +633,12 @@ class PartyMinigames:
+             if mg is None:
+                 return {"ok": True, "state": "none"}
+             mg["last_poll"] = self.clock()
+-            return {"ok": True, "state": mg["state"], "seats": mg["seats"], "recognised": mg["recognised"],
+-                    "class": mg["class"], "scores": mg["scores"], "why": mg["why"], "closed": mg["closed"],
+-                    "since_s": round(self.clock() - mg["t0"], 1)}
++            out = {"ok": True, "state": mg["state"], "seats": mg["seats"], "recognised": mg["recognised"],
++                   "class": mg["class"], "scores": mg["scores"], "why": mg["why"], "closed": mg["closed"],
++                   "since_s": round(self.clock() - mg["t0"], 1)}
++            if mg["entry"].get("places_to_scores") is not None:   # B123: the places read, port by port
++                out["places"] = mg["places"]
++            return out
+ 
+     def end(self, by: str = "board") -> dict:
+         """The board's end: taken at once, acted on in order; answered with the end done if it is within TAKE_WAIT_S."""
+diff --git a/tests/b103_h7_minigame/test_b103.py b/tests/b103_h7_minigame/test_b103.py
+index 89f9b60..447ff88 100644
+--- a/tests/b103_h7_minigame/test_b103.py
++++ b/tests/b103_h7_minigame/test_b103.py
+@@ -346,8 +346,8 @@ class MiniGame(unittest.TestCase):
+         self.assertEqual(self.err(self.s["start_no_state"]), (400, "no state for this game's mini game"))
+         self.assertEqual(self.err(self.s["start_bad_load_word"]), (400, "load is 0 or 1"))
+         self.assertEqual(self.err(self.s["start_no_stream"]), (400, "the stream is not up"))
+-        self.assertEqual(self.err(self.s["start_n64"]),
+-                         (400, "not supported yet — a state cannot be loaded into a running N64 game"))
++        # B123: N64 loads now (into a paused core); this PS1 session renamed n64 has no N64 core: the core's refusal
++        self.assertEqual(self.err(self.s["start_n64"]), (400, "not supported yet with this game's core"))
+         self.assertEqual(self.err(self.s["start_ps2"]), (400, "not supported yet"))
+         self.assertEqual(self.err(self.s["load_refused"]), (503, "the mini game's state did not load; the game is as it was"))
+         self.assertEqual(self.s["load_refused_mem"], [77, 33])
+diff --git a/tests/b123_h7_n64_start/test_b123.py b/tests/b123_h7_n64_start/test_b123.py
+new file mode 100644
+index 0000000..a6eaa45
+--- /dev/null
++++ b/tests/b123_h7_n64_start/test_b123.py
+@@ -0,0 +1,208 @@
++#!/usr/bin/env python3
++"""B123 (host): `h7-start`'s load for an N64 title, and the watch ending on a row of places — through the real HTTP
++server on loopback, behind PRIVYHUB_H7=1.
++
++B103's harness (a child `python3 -I` on B82 / B83's fixture tree, B101's fake RetroArch, B103's fake pictures), with
++the fixture's **N64 title launched** (B59's N64 session: `_n64_core` = the Mupen64Plus-Next core): the kept
++`<game id>.state` through scratch slot 8 in the core's own folder (`Mupen64Plus-Next/<stem>.state8`), RetroArch's own
++load line, the scratch removed, the users' slots there byte-equal, no `.state8` left; **a core answering PLAYING →
++refused plainly, no load sent**; the watch with a **real version-3 spec** (B122, learnt here from B122's synthetic
++pictures) reading synthetic results pictures → `ended` with `places`. Each flag absent → today: `h7-start` and
++`h7-result` answered as HEAD's code answers. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b123_h7_n64_start -v
++"""
++from __future__ import annotations
++
++import io
++import json
++import os
++import shutil
++import subprocess
++import sys
++import tarfile
++import tempfile
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("art_systems", "b99_h7_live_read", "b102_h7_endscreen", "b103_h7_minigame", "b122_h7_places"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import _tmp_cleanup  # noqa: E402,F401
++import test_b85 as b85  # noqa: E402
++import test_b99 as b99  # noqa: E402
++import test_b103 as b103  # noqa: E402
++import test_b122 as b122  # noqa: E402
++
++BASELINE = "cb16e0c8"
++N64_NOT_PAUSED = "the N64 game is not paused: its state is loaded only into a paused core; nothing was sent"
++
++SCENARIO = r'''
++import shutil
++out = {"steps": {}}
++S = out["steps"]
++gid = args["n64"]
++def folder():                                            # the fake's slot folder: the N64 core's own
++    return m._state_root() / "Mupen64Plus-Next"
++if args["mode"] == "today":
++    S["start"] = start(); S["result"] = call("GET", "/plugins/games/h7-result")
++    print(json.dumps(out)); raise SystemExit(0)
++rules_ = Path(rules); rules_.mkdir(parents=True, exist_ok=True)
++v3 = Path(args["v3"])
++js_ = json.loads(v3.read_text()); npz = v3.with_name(js_["arrays"])
++shutil.copyfile(npz, rules_ / f"{gid}.endscreen.npz")
++js_["arrays"] = f"{gid}.endscreen.npz"
++(rules_ / f"{gid}.endscreen.json").write_text(json.dumps(js_))
++(rules_ / f"{gid}.state").write_text(json.dumps({"P1": 5, "P2": 7}))
++S["launch"] = call("POST", f"/plugins/games/launch?id={gid}")["code"]
++S["n64_session"] = bool(m._n64_core)
++sf = folder(); sf.mkdir(parents=True, exist_ok=True)
++stem = m._active_state_stem()
++for i, x in enumerate((".state", ".state1", ".state2", ".state3")):
++    (sf / (stem + x)).write_bytes(os.urandom(64) + bytes([i]))
++def slots():
++    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(sf.iterdir()) if not p.name.endswith(".state8")}
++before = slots()
++mini = g._h7_minigame_runner(); mini.picture = pic; mini.read_every = 0.2; mini.recognise_s = 1.6
++ra = fake["ra"]
++S["paused_before"] = ra.paused
++pic.set(["s4start"] * 4 + ["s4other"] * 3 + ["s4r2143"] * 20)
++n0 = len(ra.log)
++S["load"] = start()
++S["ra_log"] = ra.log[n0:]
++S["mem"] = [int.from_bytes(ra.mem[P1:P1 + 2], "little"), int.from_bytes(ra.mem[P2:P2 + 2], "little")]
++S["scratch"] = sorted(p.name for p in sf.iterdir() if p.name.endswith(".state8"))
++end = time.monotonic() + 20; b = {}
++while time.monotonic() < end:
++    b = result()
++    if b.get("state") == "ended":
++        break
++    time.sleep(0.05)
++S["ended"] = {k: b.get(k) for k in ("state", "class", "places", "recognised", "seen_start")}
++S["slots_equal"] = slots() == before
++S["slots_n"] = len(before)
++call("POST", "/plugins/games/h7-stop")
++ra.paused = False                                         # the core running: no load is ever sent into it
++n1 = len(ra.log)
++S["load_playing"] = start()
++S["ra_log_playing"] = ra.log[n1:]
++S["scratch_after"] = sorted(p.name for p in sf.iterdir() if p.name.endswith(".state8"))
++S["rows"] = [json.loads(l).get("step") for l in (root / "logs/games/h7_results.jsonl").read_text().splitlines()]
++print(json.dumps(out))
++'''
++
++
++def frames_with_places(work: Path) -> Path:
++    """B103's fixture frames plus B122's synthetic four-player pictures (tokens s4start, s4other, s4r2143)."""
++    frames, _spec_dir, _js = b103.fixtures(work)
++    import numpy as np
++    rng = np.random.default_rng(123)
++    for i in range(6):
++        b122.start(i, rng).save(frames / f"s4start_{i}.png")
++        b122.other(i, rng).save(frames / f"s4other_{i}.png")
++        b122.results(i, "2143", 40, rng).save(frames / f"s4r2143_{i}.png")
++    return frames
++
++
++def v3_spec(work: Path) -> Path:
++    plan = []
++    for k, row in enumerate(b122.TRAIN):
++        plan += [("start", 10, None, 0), ("other", 10, None, 0), (f"end_r{row}", 14, row, 20 * (k + 1))]
++    runs, labels = b122.write_run(work, plan)
++    spec, arrays, _rep = b122.E.learn(runs, labels, name="four")
++    return b122.E.save_spec(spec, arrays, work / "four.endscreen.json")
++
++
++def run(root: Path, env: dict, ids: dict, mode: str) -> dict:
++    child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    child_env.update(env)
++    xdg = root / "xdg"
++    xdg.mkdir(exist_ok=True)
++    child_env.update({"XDG_CONFIG_HOME": str(xdg), "HOME": str(xdg), "PRIVYHUB_H7_RULES": str(root / "h7rules")})
++    (root / "tools").mkdir(exist_ok=True)
++    shutil.copyfile(ROOT / "tools" / "h7_endscreen.py", root / "tools" / "h7_endscreen.py")
++    work = Path(tempfile.mkdtemp(prefix="b123_fx_"))
++    try:
++        frames = frames_with_places(work)
++        spec = v3_spec(work) if mode != "today" else work / "none"
++        child = b103.CHILD.split('out = {"steps": {}}')[0] + SCENARIO
++        r = subprocess.run([sys.executable, "-I", "-B", "-c", child, str(root),
++                            json.dumps({"n64": ids[b85.N64_TITLE], "mode": mode, "p1": b99.P1, "p2": b99.P2,
++                                        "frames": str(frames), "v3": str(spec)})],
++                           cwd=root, env=child_env, capture_output=True, text=True, timeout=600)
++    finally:
++        shutil.rmtree(work, ignore_errors=True)
++    assert r.returncode == 0, r.stderr[-4000:]
++    text = r.stdout.strip().splitlines()[-1]
++    for form in {str(root), str(root.resolve())}:
++        text = text.replace(form, "<root>")
++    return json.loads(text)
++
++
++def code_of(rev: str) -> Path | None:
++    try:
++        data = subprocess.run(["git", "-C", os.environ.get("H7_GIT_REPO") or str(ROOT), "archive", rev, "companion"],
++                              capture_output=True, timeout=120, check=True).stdout
++    except (OSError, subprocess.SubprocessError):
++        return None
++    d = Path(tempfile.mkdtemp(prefix="b123_head_"))
++    with tarfile.open(fileobj=io.BytesIO(data)) as tf:
++        tf.extractall(d, filter="data")
++    return d
++
++
++class N64Start(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, cls.ids = b99.tree()
++        cls.s = run(root, {**b85.FLAGS, "PRIVYHUB_H7": "1"}, cls.ids, "n64")["steps"]
++
++    def test_an_n64_session(self):
++        self.assertEqual(self.s["launch"], 200)
++        self.assertTrue(self.s["n64_session"])
++        self.assertIs(self.s["paused_before"], True)                       # launched paused (the start's own)
++
++    def test_the_begin_state_loads_into_the_paused_core(self):
++        self.assertEqual(self.s["load"]["code"], 200, self.s["load"]["body"])
++        self.assertTrue(self.s["load"]["body"]["loaded"])
++        self.assertIsNotNone(self.s["load"]["body"]["load_line_ms"])       # RetroArch's own load line
++        log = self.s["ra_log"]
++        self.assertIn("LOAD_STATE_SLOT", log)
++        self.assertLess(log.index("GET_STATUS"), log.index("LOAD_STATE_SLOT"))   # asked PAUSED first
++        self.assertEqual(self.s["mem"], [5, 7])                            # the kept state is what loaded
++        self.assertEqual(self.s["scratch"], [])                            # the scratch slot 8 removed
++
++    def test_the_users_slots_untouched(self):
++        self.assertEqual(self.s["slots_n"], 4)
++        self.assertTrue(self.s["slots_equal"])
++        self.assertEqual(self.s["scratch_after"], [])
++
++    def test_a_running_core_is_refused_and_nothing_sent(self):
++        self.assertEqual((self.s["load_playing"]["code"], self.s["load_playing"]["body"].get("error")),
++                         (400, N64_NOT_PAUSED))
++        self.assertNotIn("LOAD_STATE_SLOT", self.s["ra_log_playing"])
++        self.assertIn("refused", self.s["rows"])
++
++    def test_the_watch_ends_on_the_row_of_places(self):
++        e = self.s["ended"]
++        self.assertEqual((e["state"], e["class"], e["places"], e["recognised"]), ("ended", "end", [2, 1, 4, 3], True), e)
++
++
++class FlagAbsentIsToday(unittest.TestCase):
++    def test_h7_absent(self):
++        code = code_of(BASELINE)
++        if code is None:
++            self.skipTest("git is absent")
++        for env in (b85.FLAGS, {**b85.FLAGS, "PRIVYHUB_H7": "0"}, {**b85.FLAGS, "PRIVYHUB_PARTY": "1"}):
++            root, ids = b99.tree(code)
++            base = run(root, env, ids, "today")["steps"]
++            root2, ids2 = b99.tree()
++            mine = run(root2, env, ids2, "today")["steps"]
++            for k in ("start", "result"):
++                self.assertEqual((mine[k]["code"], mine[k]["raw"]), (base[k]["code"], base[k]["raw"]), (env, k))
++            self.assertIn("Unknown Games plugin", base["start"]["body"]["error"])
++
++
++if __name__ == "__main__":
++    unittest.main()

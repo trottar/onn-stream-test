@@ -44,7 +44,8 @@ import h7_live_read as live
 
 READ_EVERY = 1.0            # s: one picture a second
 LOG_RELATIVE = "logs/games/h7_results.jsonl"
-SYSTEMS = ("ps1", "snes")   # the load; the watcher alone (load=0) on any system
+SYSTEMS = ("ps1", "snes", "n64")   # the load (B123: N64, only into a paused core); the watcher alone on any system
+N64_NOT_PAUSED = "the N64 game is not paused: its state is loaded only into a paused core; nothing was sent"
 XDOTOOL_WAIT = 1.0
 BENCH_STREAM_UP = "a client's stream is up: not on the bench"   # B112
 BENCH_LOOPBACK = "the bench is for loopback callers only"          # B112
@@ -212,8 +213,6 @@ class MiniGame:
         if load:
             if kind in ("pcsx2", "dolphin"):
                 self._refused("not supported yet")
-            if system == "n64":
-                self._refused("not supported yet — a state cannot be loaded into a running N64 game")
             if system not in SYSTEMS:
                 self._refused("not supported yet")
             state = live.rules_folder(self._environ) / f"{game}.state"
@@ -226,11 +225,21 @@ class MiniGame:
         line_ms = None
         if load:
             core = loader._core_file(system)
+            if system == "n64":                                  # B123: the running session's own core (B59's)
+                core = str(getattr(self._emu, "_n64_core", None) or core)
             folder_name = contest.CORE_FOLDERS.get(core[:-len(".so")] if core.endswith(".so") else core)
             if folder_name is None:
                 self._refused("not supported yet with this game's core")
             stem = self._emu._active_state_stem()
             folder = self._emu._state_root() / folder_name
+            # B123: an N64 state only into a core that answers PAUSED (B61 / B65: a running N64 core hangs RetroArch)
+            if system == "n64":
+                try:
+                    paused = self._emu._retroarch_network_status() == "PAUSED"
+                except Exception:
+                    paused = False
+                if not paused:
+                    self._refused(N64_NOT_PAUSED)
             try:
                 line_ms = loader._load(game, state, folder, stem)
             except live.Busy:
@@ -398,7 +407,7 @@ class MiniGame:
                     continue
                 r = reader.read(img)
                 seen_before = ended.seen_start
-                done = ended.feed(r["class"])
+                done = ended.feed(r["class"], r.get("places"))         # B123: version 3 ends on the whole row
                 with self._lock:
                     w = self._current(token)
                     if w is None:
@@ -418,13 +427,16 @@ class MiniGame:
                             self._settle(w, False, since, r)
                     if done:
                         w.update(state="ended", **{"class": done}, ended_after_s=since)
+                        if getattr(ended, "places", None):              # B123: a version-3 spec's row of places
+                            w["places"] = list(ended.places)
                     if ended.seen_start and not seen_before:
                         self._row({"step": "start_seen", "game": game, "after_s": since, "reads": reads})
                     if r["class"] == endscreen().UNKNOWN and last_class != endscreen().UNKNOWN:
                         self._row({"step": "unknown_screen", "game": game, "after_s": since,
                                    "distances": r["distances"], "margin": r["margin"]})
                     if done:
-                        self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads})
+                        self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads,
+                                   **({"places": list(ended.places)} if getattr(ended, "places", None) else {})})
                 last_class = r["class"]
                 if keep_dir is not None:
                     self._keep(token, keep_dir, img, since, r)

@@ -1,0 +1,924 @@
+diff --git a/tests/b122_h7_places/test_b122.py b/tests/b122_h7_places/test_b122.py
+new file mode 100644
+index 0000000..202c33c
+--- /dev/null
++++ b/tests/b122_h7_places/test_b122.py
+@@ -0,0 +1,280 @@
++#!/usr/bin/env python3
++"""B122 (host): a place for every player — `tools/h7_endscreen.py`'s spec version 3, on synthetic pictures drawn here
++(no game art).
++
++The results screen: a 640 × 480 picture with a still frame (a title bar, a label box, four markers) and a **row of four
++seven-segment place digits (1-4) under the four markers**, over a **moving scene** (a striped background whose offset
++and tone change every frame, a "stage" shade per match, drifting blobs); the start screen: a select screen of its own
++(a grid of boxes, four slots, a moving cursor; the title bar shared); `other`: moving shapes. Training rows: 1234, 2341, 3412 — so every column has seen
++three places and missed one. Read: 4123 (never seen whole, and every column's place one it never showed), 2143 (never
++seen whole; two columns' places never shown there); a duplicated place → `unknown`; a half-drawn row → never `ended`;
++K; the spec on disk (version 3, and a version-2 spec still loads); a place shown in no column → learning refuses.
++Temp folders removed at exit.
++
++    python3 -m unittest discover -s tests/b122_h7_places -v
++"""
++from __future__ import annotations
++
++import csv
++import json
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++import numpy as np
++from PIL import Image, ImageDraw
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "art_systems"))
++sys.path.insert(0, str(ROOT / "tools"))
++import _tmp_cleanup  # noqa: E402,F401
++import h7_endscreen as E  # noqa: E402
++
++W, H = 640, 480
++COLS = [210 + 90 * j for j in range(4)]           # each column's digit left edge
++ROW_Y = 150
++SEG = {"1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc"}
++
++
++def digit(d: ImageDraw.ImageDraw, x: int, y: int, ch: str, fill: int = 240) -> None:
++    """A seven-segment digit 28 × 48, segments 7 px thick, with a black outline box behind it."""
++    d.rectangle((x - 4, y - 4, x + 32, y + 52), fill=10)
++    b = {"a": (x, y, x + 28, y + 7), "b": (x + 21, y, x + 28, y + 24), "c": (x + 21, y + 24, x + 28, y + 48),
++         "d": (x, y + 41, x + 28, y + 48), "e": (x, y + 24, x + 7, y + 48), "f": (x, y, x + 7, y + 24),
++         "g": (x, y + 21, x + 28, y + 28)}
++    for k in SEG[ch]:
++        d.rectangle(b[k], fill=fill)
++
++
++def scene(i: int, stage: int, rng: np.random.Generator) -> tuple[Image.Image, ImageDraw.ImageDraw]:
++    im = Image.new("L", (W, H), 60 + stage)
++    d = ImageDraw.Draw(im)
++    off = (i * 11) % 60
++    for x in range(-60, W + 60, 60):                                   # the moving stripes
++        d.rectangle((x + off, 0, x + off + 25, H), fill=(90 + stage + (i * 7) % 50) % 256)
++    for _ in range(5):                                                 # drifting blobs (confetti, characters)
++        x, y = int(rng.integers(0, W - 40)), int(rng.integers(260, H - 40))
++        d.ellipse((x, y, x + 40, y + 40), fill=int(rng.integers(0, 255)))
++    d.rectangle((40, 20, 600, 50), fill=200)                           # the still frame: title bar
++    d.rectangle((40, 150, 170, 200), fill=30)                          # the label box
++    d.rectangle((170, 214, 600, 219), fill=235)                        # the rule under the row
++    d.rectangle((40, 232, 170, 276), fill=30)                          # a second label box
++    d.rectangle((40, 60, 600, 66), fill=235)                           # the rule under the title
++    for x in COLS:
++        d.polygon([(x - 2, 110), (x + 30, 110), (x + 14, 134)], fill=170)   # the markers
++    return im, d
++
++
++def results(i: int, row: str, stage: int, rng: np.random.Generator, drawn: int = 4) -> Image.Image:
++    im, d = scene(i, stage, rng)
++    for j, ch in enumerate(row[:drawn]):
++        digit(d, COLS[j], ROW_Y, ch, fill=250 if ch == "1" else 235)
++    return noisy(im, rng)
++
++
++def start(i: int, rng: np.random.Generator) -> Image.Image:
++    """The select screen: its own steady layout (a grid of boxes, four slots), the title bar shared with the results
++    screen, a small moving cursor."""
++    im = Image.new("L", (W, H), 45)
++    d = ImageDraw.Draw(im)
++    d.rectangle((40, 20, 600, 50), fill=200)                           # the title bar (shared)
++    for r_ in range(3):
++        for c_ in range(6):
++            d.rectangle((60 + 90 * c_, 80 + 70 * r_, 130 + 90 * c_, 135 + 70 * r_), fill=110 + 20 * ((r_ + c_) % 4))
++    for j in range(4):
++        d.rectangle((50 + 140 * j, 320, 170 + 140 * j, 460), fill=180 - 25 * j)   # the four players' slots
++    cx = 60 + (i * 37) % 500
++    d.ellipse((cx, 290, cx + 20, 310), fill=250)                       # the moving cursor
++    return noisy(im, rng)
++
++
++def other(i: int, rng: np.random.Generator) -> Image.Image:
++    im = Image.new("L", (W, H), int(rng.integers(90, 190)))
++    d = ImageDraw.Draw(im)
++    for _ in range(8):
++        x, y = int(rng.integers(0, W - 90)), int(rng.integers(0, H - 90))
++        d.ellipse((x, y, x + int(rng.integers(30, 120)), y + int(rng.integers(30, 120))), fill=int(rng.integers(0, 255)))
++    return noisy(im, rng)
++
++
++def noisy(im: Image.Image, rng: np.random.Generator) -> Image.Image:
++    a = np.asarray(im, dtype=np.int16) + rng.integers(-2, 3, size=(H, W))
++    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "L")
++
++
++TRAIN = ("1234", "2341", "3412")
++
++
++def write_run(root: Path, plan: list, name: str = "run", seed: int = 122) -> tuple[Path, dict]:
++    """plan: [(label, n, row or None, stage)] -> runs/<name>/ (PNG + index.csv) and its labels."""
++    rng = np.random.default_rng(seed)
++    d = root / "runs" / name
++    d.mkdir(parents=True)
++    rows, ranges, t, i = [], [], 0.0, 0
++    for label, n, row, stage in plan:
++        ranges.append({"from": t, "to": t + (n - 1), "label": label})
++        for _ in range(n):
++            img = (results(i, row, stage, rng) if row else start(i, rng) if label == "start" else other(i, rng))
++            fname = f"f{i:04d}.png"
++            img.save(d / fname)
++            rows.append({"seconds": f"{t:.1f}", "file": fname})
++            t += 1.0
++            i += 1
++    with (d / "index.csv").open("w", newline="") as fh:
++        w = csv.DictWriter(fh, fieldnames=["seconds", "file"])
++        w.writeheader()
++        w.writerows(rows)
++    classes = {"start": "the select screen", "other": "anything else", "ignore": "not used"}
++    classes.update({lab: "a place row" for lab, _n, _r, _s in plan if lab.startswith("end_r")})
++    return root / "runs", {"classes": classes, "runs": {name: ranges}}
++
++
++class Places(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.tmp = Path(tempfile.mkdtemp(prefix="b122_"))
++        plan = []
++        for k, row in enumerate(TRAIN):
++            plan += [("start", 10, None, 0), ("other", 10, None, 0), (f"end_r{row}", 14, row, 20 * (k + 1))]
++        cls.runs, cls.labels = write_run(cls.tmp, plan)
++        cls.spec, cls.arrays, cls.report = E.learn(cls.runs, cls.labels, name="syn")
++        cls.rng = np.random.default_rng(7)
++
++    def read(self, img, reader=None):
++        return (reader or E.Reader(self.spec, self.arrays)).read(img)
++
++    def test_version_3_and_the_row_learnt(self):
++        self.assertEqual(self.spec["version"], 3)
++        self.assertEqual((self.spec["classes"], self.spec["end_classes"]), (["start", "end"], ["end"]))
++        pl = self.spec["places"]
++        self.assertEqual(pl["ports"], 4)
++        self.assertEqual(pl["spacing_px_320"], 45)                       # 90 px of 640 = 45 of 320
++        xs = [x for _y, x in pl["offsets_px_320"]]
++        self.assertEqual([b - a for a, b in zip(xs, xs[1:])], [45, 45, 45])
++        self.assertTrue(all(pl["separable"].values()))
++        self.assertTrue(self.spec["usable"])
++        self.assertEqual(pl["seen_in_column"], {"1": [1, 2, 3], "2": [2, 3, 4], "3": [1, 3, 4], "4": [1, 2, 4]})
++
++    def test_the_training_rows_read_back(self):
++        for k, row in enumerate(TRAIN):
++            r = self.read(results(500 + k, row, 20 * (k + 1), self.rng))
++            self.assertEqual((r["class"], r["places"]), ("end", [int(c) for c in row]), (row, r))
++
++    def test_a_row_never_seen_whole_every_place_new_to_its_column(self):
++        for k in range(4):
++            r = self.read(results(600 + k, "4123", 15 + 9 * k, self.rng))
++            self.assertEqual((r["class"], r["places"]), ("end", [4, 1, 2, 3]), r)
++
++    def test_a_place_never_seen_in_a_column(self):
++        r = self.read(results(700, "2143", 33, self.rng))
++        self.assertEqual((r["class"], r["places"]), ("end", [2, 1, 4, 3]), r)
++
++    def test_a_duplicated_place_is_unknown(self):
++        r = self.read(results(800, "1134", 20, self.rng))
++        self.assertEqual((r["class"], r["places"]), ("unknown", None), r)
++        self.assertEqual(r["ports"][2:], [3, 4])                           # each column's own read is kept
++
++    def test_a_half_drawn_row_is_unknown_and_never_ends(self):
++        reader = E.Reader(self.spec, self.arrays)
++        ended = E.Ended(self.spec, 3)
++        ended.start_loaded()
++        for i in range(6):
++            r = reader.read(results(900 + i, "3412", 60, self.rng, drawn=2))
++            self.assertIn(r["class"], ("unknown", "other"), r)            # never `end`, never a place row
++            self.assertIsNone(r["places"])
++            self.assertIsNone(ended.feed(r["class"], r["places"]))
++
++    def test_k_agreeing_reads_of_the_whole_row(self):
++        reader = E.Reader(self.spec, self.arrays)
++        ended = E.Ended(self.spec, 3)
++        r0 = reader.read(start(950, self.rng))
++        self.assertEqual(r0["class"], "start")
++        for _ in range(3):
++            ended.feed("start")
++        seq = [("2143", None), ("2143", None), ("4123", None), ("4123", None), ("4123", "end")]
++        for i, (row, want) in enumerate(seq):
++            r = reader.read(results(960 + i, row, 40, self.rng))
++            self.assertEqual(ended.feed(r["class"], r["places"]), want, (i, row))
++        self.assertEqual(ended.places, [4, 1, 2, 3])
++        two = E.Ended(self.spec, 2)
++        two.start_loaded()
++        r = reader.read(results(990, "2143", 40, self.rng))
++        two.feed(r["class"], r["places"])
++        self.assertEqual(two.feed(r["class"], r["places"]), "end")
++
++    def test_the_start_and_other_pictures(self):
++        self.assertEqual(self.read(start(1000, self.rng))["class"], "start")
++        for i in range(20):
++            r = self.read(other(1100 + i, self.rng))
++            self.assertFalse(r["screen"], r)
++            self.assertIsNone(r["places"])
++
++    def test_the_spec_on_disk_and_the_score(self):
++        p = E.save_spec(self.spec, self.arrays, self.tmp / "syn.endscreen.json")
++        spec, arrays = E.load_spec(p)
++        self.assertEqual(spec["version"], 3)
++        r = E.Reader(spec, arrays).read(results(1200, "4123", 25, self.rng))
++        self.assertEqual(r["places"], [4, 1, 2, 3])
++        sc = E.score_places(self.runs, self.labels, spec, arrays)
++        self.assertEqual(sc["places_wrong"], 0)
++        self.assertEqual(sc["other_read_as_screen"], 0)
++        for row in TRAIN:
++            self.assertEqual(sc["rows"][f"end_r{row}"]["right"], 14, sc["rows"])
++
++    def test_replay_names_the_places(self):
++        tmp = Path(tempfile.mkdtemp(prefix="b122_rp_"))
++        plan = [("start", 6, None, 0), ("other", 6, None, 0), ("end_r4123", 6, "4123", 50),
++                ("start", 6, None, 0), ("other", 6, None, 0), ("end_r2143", 6, "2143", 70)]
++        runs, labels = write_run(tmp, plan, seed=9)
++        rp = E.replay(runs / "run", self.spec, self.arrays, 3, labels)
++        self.assertEqual([(e["class"], e["places"]) for e in rp["ended"]], [("end", [4, 1, 2, 3]), ("end", [2, 1, 4, 3])])
++        self.assertEqual([e["after_end_screen_s"] for e in rp["ended"]], [2.0, 2.0])   # K = 3 at one a second
++
++    def test_a_place_shown_in_no_column_is_refused(self):
++        tmp = Path(tempfile.mkdtemp(prefix="b122_no4_"))
++        plan = [("start", 6, None, 0), ("other", 6, None, 0), ("end_r1231", 2, None, 0)]
++        with self.assertRaises(ValueError):                               # not a permutation
++            E.place_ports(["start", "other", "end_r1231"])
++        with self.assertRaises(ValueError) as cm:
++            E.learn_places({(1, 2, 3): [np.zeros((240, 320), np.float32)], (2, 1, 3): [np.zeros((240, 320), np.float32)]}, 4)
++        self.assertIn("place 4 is never shown", str(cm.exception))
++        del plan, tmp
++
++    def test_mixed_labels_refused_and_version_2_unchanged(self):
++        with self.assertRaises(ValueError):
++            E.place_ports(["start", "other", "end_r12", "end_P1"])
++        self.assertIsNone(E.place_ports(["start", "other", "end_P1", "end_P2"]))
++        # a version-2 spec (two-player labels) learns and loads as before
++        tmp = Path(tempfile.mkdtemp(prefix="b122_v2_"))
++        rng = np.random.default_rng(3)
++        d = tmp / "runs" / "v2"
++        d.mkdir(parents=True)
++        rows, ranges, t, i = [], [], 0.0, 0
++        # two-player labels on one layout (as T88's): the start and both ends differ only in the row
++        for label, n, row in (("start", 10, "4444"), ("other", 10, None), ("end_P1", 10, "1234"), ("end_P2", 10, "4321")):
++            ranges.append({"from": t, "to": t + n - 1, "label": label})
++            for _ in range(n):
++                img = results(i, row, 30, rng) if row else other(i, rng)
++                img.save(d / f"f{i:04d}.png")
++                rows.append({"seconds": f"{t:.1f}", "file": f"f{i:04d}.png"})
++                t += 1
++                i += 1
++        with (d / "index.csv").open("w", newline="") as fh:
++            w = csv.DictWriter(fh, fieldnames=["seconds", "file"])
++            w.writeheader()
++            w.writerows(rows)
++        labels = {"classes": {"start": "s", "other": "o", "end_P1": "p1", "end_P2": "p2"}, "runs": {"v2": ranges}}
++        spec, arrays, _rep = E.learn(tmp / "runs", labels, name="two")
++        self.assertEqual(spec["version"], 2)
++        self.assertNotIn("places", spec)
++        p = E.save_spec(spec, arrays, tmp / "two.endscreen.json")
++        spec2, arrays2 = E.load_spec(p)
++        r = E.Reader(spec2, arrays2).read(results(99, "1234", 30, rng))
++        self.assertEqual(r["class"], "end_P1")
++        self.assertNotIn("places", r)                                     # version 2's read has no new key
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tools/h7_endscreen.py b/tools/h7_endscreen.py
+index 0a2764e..d21cfb7 100644
+--- a/tools/h7_endscreen.py
++++ b/tools/h7_endscreen.py
+@@ -34,6 +34,20 @@ No hand-drawn boxes: everything comes from the labelled frames (the same has to
+ A version-1 spec (absolute grey levels) is refused: learn it again. PIL + numpy only (both on the hub as Debian
+ packages). Nothing is written beside the frames.
+ 
++B122 — a place for every player (spec version 3, only when every end class is a place row `end_r<d1..dn>`: the Place
++row read left to right, port 1 first, a permutation of 1..n; any other labels learn version 2 exactly as before):
++  the screen — today's learner on `start`, one end class `end` (every place row merged) and `other`.
++  the row   — learnt from the labels alone: on the end pictures' ranks at 320 x 240 (against the screen mask), the
++           matches' mean pictures; for every spacing and cell size, the per-pixel ratio of between-place to
++           within-place variance (each place's values from whichever columns showed it), box-averaged -> the row's
++           spacing, origin and cell; the glyph mask (ratio > 1 in the padded cell); each column's cell refined +/-3 px.
++  a place   — one reference per place pooled over every column that showed it: a place never shown in a column is
++           read there with the reference learnt in the others, at that column's own learnt position (+/-1 px). A
++           place shown in no column cannot be learnt (refused: the pictures need it).
++  a read    — the screen and its class as before; for `end` every column's place (the nearest reference by the mean
++           rank distance over the glyph mask, under its threshold, with the margin); any column unread or two columns the same place -> `unknown`, `places` null.
++  Ended     — K agreeing reads of the whole row (the class and the places).
++
+ usage: h7_endscreen.py learn <runs> <labels> [<runs> <labels> ...] <out.endscreen.json> [--half first]
+        h7_endscreen.py score <runs> <labels> [<runs> <labels> ...] <spec.endscreen.json> [--half second]
+        h7_endscreen.py read  <spec.endscreen.json> <picture>
+@@ -45,6 +59,7 @@ import csv
+ import hashlib
+ import io
+ import json
++import re
+ import sys
+ import time
+ from pathlib import Path
+@@ -75,6 +90,16 @@ COARSE_SHIFTS = (-4, -2, 0, 2, 4)                # px of the 320 × 240 step (±
+ FINE_SCALE, FINE_SHIFT = 0.0125, 1
+ START, OTHER, IGNORE, UNKNOWN = "start", "other", "ignore", "unknown"
+ IDENTITY = (1.0, 0.0, 0.0)
++# B122: places (spec version 3)
++VERSION_PLACES = 3
++END = "end"                                       # a version-3 spec's one end class
++PLACE_LABEL = re.compile(r"^end_r([1-9]+)$")      # a place row: end_r1234 = port 1 is 1st, port 2 2nd, ...
++PLACE_CELLS = ((12, 8), (16, 12), (20, 16), (24, 20))   # cell sizes tried (rows x columns of the 320 x 240 picture)
++PLACE_MIN_SPACING = 8                             # px of 320
++PLACE_PAD = 4                                     # the cell padded by this on every side
++PLACE_FISHER = 1.0                                # a glyph pixel: between-place / within-place variance above this
++PLACE_REFINE = 3                                  # each column's cell refined within +/- this many px
++PLACE_SEARCH = 1                                  # a read's cell searched within +/- this many px
+ 
+ 
+ # --- the picture --------------------------------------------------------------------------------------------------
+@@ -330,6 +355,201 @@ def learn_arrays(frames: dict[str, list[np.ndarray]], aspect: float, start_class
+     return spec, arrays, report
+ 
+ 
++# --- B122: places (spec version 3) -------------------------------------------------------------------------------
++def place_ports(classes) -> int | None:
++    """n when every end class (not start / other / ignore) is a place row `end_r<d1..dn>` (a permutation of 1..n,
++    n 2-4, one n for all); None when none is (today's version 2); ValueError when they are mixed."""
++    ends = [c for c in classes if c not in (START, OTHER, IGNORE)]
++    rows = [c for c in ends if PLACE_LABEL.match(c)]
++    if not rows:
++        return None
++    if len(rows) != len(ends):
++        raise ValueError("some end classes are place rows and some are not: label them one way")
++    ns = set()
++    for c in rows:
++        d = PLACE_LABEL.match(c).group(1)
++        if not 2 <= len(d) <= 4 or sorted(int(x) for x in d) != list(range(1, len(d) + 1)):
++            raise ValueError(f"a place row names each place 1..n once: {c}")
++        ns.add(len(d))
++    if len(ns) != 1:
++        raise ValueError("the place rows name different numbers of ports")
++    return ns.pop()
++
++
++def place_row(label: str) -> list[int]:
++    return [int(x) for x in PLACE_LABEL.match(label).group(1)]
++
++
++def mask320(screen_mask: np.ndarray) -> np.ndarray:
++    """The 160 x 120 screen mask at the 320 x 240 step (each value twice each way)."""
++    return np.kron(screen_mask.astype(np.uint8), np.ones((2, 2), dtype=np.uint8)).astype(bool)
++
++
++def mid_ranks(im_mid: Image.Image, screen_mask: np.ndarray, align=IDENTITY) -> np.ndarray:
++    """B122: the 320 x 240 picture (aligned) ranked against its own screen-mask tone (B104's measure)."""
++    a = np.asarray(_moved(im_mid, align), dtype=np.float32)
++    return ranks(a, mask320(screen_mask))[0]
++
++
++def _fisher(groups: list[list[np.ndarray]]) -> np.ndarray:
++    gm = np.stack([np.mean(g, axis=0) for g in groups])
++    within = np.mean([((np.stack(g) - np.mean(g, axis=0)) ** 2).mean(axis=0) for g in groups], axis=0)
++    return gm.var(axis=0) / (within + 1e-3)
++
++
++def _box_best(fis: np.ndarray, ch: int, cw: int) -> tuple[float, int, int]:
++    """The (mean, y, x) of the ch x cw window with the highest mean (an integral image)."""
++    h, w = fis.shape
++    if h < ch or w < cw:
++        return float("-inf"), 0, 0
++    ii = np.zeros((h + 1, w + 1), dtype=np.float64)
++    ii[1:, 1:] = fis.cumsum(0).cumsum(1)
++    box = (ii[ch:, cw:] - ii[:-ch, cw:] - ii[ch:, :-cw] + ii[:-ch, :-cw]) / (ch * cw)
++    i = np.unravel_index(int(np.argmax(box)), box.shape)
++    return float(box[i]), int(i[0]), int(i[1])
++
++
++def _cell(r: np.ndarray, oy: int, ox: int, ch: int, cw: int) -> np.ndarray | None:
++    h, w = r.shape
++    if oy < 0 or ox < 0 or oy + ch > h or ox + cw > w:
++        return None
++    return r[oy:oy + ch, ox:ox + cw]
++
++
++def _cell_dists(r: np.ndarray, oy: int, ox: int, ch: int, cw: int, glyph: np.ndarray, refs: np.ndarray,
++                search: int = PLACE_SEARCH) -> np.ndarray:
++    """A column's distance to each place: the mean |rank - reference| over the glyph mask (as B102's outcome
++    distance), the least over the +/- `search` px shifts (inf when the cell falls off the picture)."""
++    best = np.full(refs.shape[0], np.inf, dtype=np.float64)
++    for dy in range(-search, search + 1):
++        for dx in range(-search, search + 1):
++            c = _cell(r, oy + dy, ox + dx, ch, cw)
++            if c is None:
++                continue
++            d = np.abs(c[None, :, :] - refs)[:, glyph].mean(axis=1)
++            best = np.minimum(best, d)
++    return best
++
++
++def learn_places(rows: dict[tuple, list[np.ndarray]], n: int) -> tuple[dict, dict, dict]:
++    """From {place row: [320 x 240 rank pictures]} -> (the spec's `places`, its arrays, a report). The row's spacing,
++    origin and cell from the between- / within-place variance of the matches' mean pictures; one reference per place
++    pooled over every column that showed it."""
++    if len(rows) < 2:
++        raise ValueError("places need at least two different place rows")
++    seen = {q for row in rows for q in row}
++    missing = [q for q in range(1, n + 1) if q not in seen]
++    if missing:
++        raise ValueError(f"place {missing[0]} is never shown: the pictures need a match where someone is {missing[0]}-th")
++    orders = sorted(rows)
++    means = np.stack([np.mean(rows[o], axis=0) for o in orders])
++    h, w = means.shape[1:]
++    best = None
++    for s in range(PLACE_MIN_SPACING, w // (n - 1) + 1):
++        xs = w - (n - 1) * s
++        if xs <= 0:
++            break
++        groups: list[list[np.ndarray]] = [[] for _ in range(n)]
++        for m, o in enumerate(orders):
++            for j in range(n):
++                groups[o[j] - 1].append(means[m, :, j * s: j * s + xs])
++        fis = _fisher(groups)
++        for ch, cw in PLACE_CELLS:
++            v, y, x = _box_best(fis, ch, cw)
++            if best is None or v > best[0]:
++                best = (v, s, y, x, ch, cw, fis)
++    score_, s, y0, x0, ch, cw, fis = best
++    cy, cx, hh, ww = y0 - PLACE_PAD, x0 - PLACE_PAD, ch + 2 * PLACE_PAD, cw + 2 * PLACE_PAD
++    cy, cx = max(0, cy), max(0, cx)
++    glyph = fis[cy:cy + hh, cx:cx + ww] > PLACE_FISHER
++    hh, ww = glyph.shape
++    if not glyph.any():
++        raise ValueError("no pixels carry the places in these pictures")
++    offs = [(cy, cx + j * s) for j in range(n)]
++    cells = [(r, list(o)) for o in orders for r in rows[o]]
++
++    def refs_at(offs_):
++        out = []
++        for q in range(1, n + 1):
++            got = [c for r, o in cells for j in range(n) if o[j] == q
++                   for c in [_cell(r, offs_[j][0], offs_[j][1], hh, ww)] if c is not None]
++            out.append(np.mean(got, axis=0))
++        return np.stack(out).astype(np.float32)
++
++    for _ in range(2):
++        refs = refs_at(offs)
++        new = []
++        for j in range(n):
++            pick = None
++            for dy in range(-PLACE_REFINE, PLACE_REFINE + 1):
++                for dx in range(-PLACE_REFINE, PLACE_REFINE + 1):
++                    oy, ox = offs[j][0] + dy, offs[j][1] + dx
++                    ds = []
++                    for r, o in cells:
++                        c = _cell(r, oy, ox, hh, ww)
++                        if c is None:
++                            ds = None
++                            break
++                        ds.append(float(np.abs(c - refs[o[j] - 1])[glyph].mean()))
++                    if ds is None:
++                        continue
++                    d = float(np.mean(ds))
++                    if pick is None or d < pick[0]:
++                        pick = (d, (oy, ox))
++            new.append(pick[1] if pick else offs[j])
++        offs = new
++    refs = refs_at(offs)
++    own: dict[int, list[float]] = {q: [] for q in range(1, n + 1)}
++    foreign: dict[int, list[float]] = {q: [] for q in range(1, n + 1)}
++    margins = []
++    for r, o in cells:
++        for j in range(n):
++            d = _cell_dists(r, offs[j][0], offs[j][1], hh, ww, glyph, refs)
++            q = o[j]
++            if int(np.argmin(d)) + 1 == q:
++                own[q].append(float(d[q - 1]))
++                margins.append(float(np.sort(d)[1] - d[q - 1]))
++            for k in range(1, n + 1):
++                if k != q:
++                    foreign[k].append(float(d[k - 1]))
++    gaps = {q: _gap(max(own[q]) if own[q] else float("inf"), min(foreign[q]) if foreign[q] else float("inf"))
++            for q in range(1, n + 1)}
++    need = round(SAFETY * min(margins), 4) if margins else None
++    seen_in = {str(j + 1): sorted({o[j] for o in orders}) for j in range(n)}
++    places = {"ports": n, "spacing_px_320": int(s), "cell": [int(hh), int(ww)],
++              "offsets_px_320": [[int(a), int(b)] for a, b in offs], "row_score": round(score_, 2),
++              "glyph_px": int(glyph.sum()), "thresholds": {str(q): gaps[q]["threshold"] for q in gaps},
++              "separable": {str(q): gaps[q]["verdict"] == "separable" for q in gaps}, "margin_needed": need,
++              "search_px": PLACE_SEARCH, "rows": ["".join(map(str, o)) for o in orders],
++              "frames": {"".join(map(str, o)): len(rows[o]) for o in orders}, "seen_in_column": seen_in}
++    report = {"row": {"spacing_px_320": int(s), "origin_px_320": [int(y0), int(x0)], "cell": [int(ch), int(cw)],
++                      "score": round(score_, 2)}, "offsets_px_320": places["offsets_px_320"],
++              "glyph_px": places["glyph_px"], "places": gaps, "margin_needed": need,
++              "smallest_margin_seen": round(min(margins), 4) if margins else None, "seen_in_column": seen_in}
++    return places, {"place_mask": glyph, "place_refs": refs}, report
++
++
++def read_places(r320: np.ndarray, places: dict, glyph: np.ndarray, refs: np.ndarray) -> dict:
++    """Every column's place: {"places": [..] | None (any unread or a place twice), "ports": [p or None per column],
++    "distances": [[per place] per column], "margins": [per column]}."""
++    hh, ww = places["cell"]
++    got, dists, margins = [], [], []
++    for oy, ox in places["offsets_px_320"]:
++        d = _cell_dists(r320, oy, ox, hh, ww, glyph, refs, int(places.get("search_px", PLACE_SEARCH)))
++        order = np.argsort(d)
++        q = int(order[0]) + 1
++        margin = float(d[order[1]] - d[order[0]]) if len(d) > 1 else float("inf")
++        thr = places["thresholds"].get(str(q))
++        need = places.get("margin_needed")
++        ok = (places["separable"].get(str(q)) and thr is not None and np.isfinite(d[q - 1]) and d[q - 1] <= thr
++              and need is not None and margin >= need)
++        got.append(q if ok else None)
++        dists.append([round(float(x), 4) if np.isfinite(x) else None for x in d])
++        margins.append(round(margin, 4) if np.isfinite(margin) else None)
++    whole = None if (None in got or len(set(got)) != len(got)) else got
++    return {"places": whole, "ports": got, "distances": dists, "margins": margins}
++
++
+ def _sources(runs, labels) -> list:
+     """[(runs folder, labels dict or path)] from one pair or a list of pairs."""
+     if labels is None:
+@@ -367,6 +587,9 @@ def learn(runs, labels=None, half: str | None = None, start_class: str = START,
+         if not ps:
+             raise ValueError(f"the labels name a class with no frames: {c}")
+     aspect = _cut_aspect([p for ps in paths.values() for p in ps])
++    n = place_ports(paths)
++    if n is not None:                                     # B122: place rows -> version 3
++        return _learn_v3(paths, ids, per_source, aspect, start_class, name, n, t0)
+     frames = {}
+     for c, ps in paths.items():
+         frames[c] = []
+@@ -379,6 +602,79 @@ def learn(runs, labels=None, half: str | None = None, start_class: str = START,
+     return spec, arrays, report
+ 
+ 
++SHARED_NEAR, SHARED_SHARE = 0.1, 0.5   # B122 am. 2, 3: a pixel half a foreign class ranks this near is shared
++
++
++def _learn_one_screen(stack: np.ndarray, foreign: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray, dict]:
++    """B122 (amendments 2, 3): one screen class's own mask (steady in its pictures, minus the pixels it shares with
++    either foreign class — the `other` pictures, the other screen), its reference and its threshold (halfway to the
++    nearest foreign picture)."""
++    m = _learn_screen_mask(stack)
++    ref = np.stack([ranks(a, m)[0] for a in stack]).mean(axis=0)
++    shared = np.zeros(m.shape, dtype=bool)
++    for st in foreign:
++        near = (np.abs(np.stack([ranks(a, m)[0] for a in st]) - ref) < SHARED_NEAR).mean(axis=0)
++        shared |= near >= SHARED_SHARE
++    mask = m & ~shared
++    if not mask.any():
++        raise ValueError("no pixels tell this screen from the other pictures")
++    ref = np.stack([ranks(a, mask)[0] for a in stack]).mean(axis=0).astype(np.float32)
++
++    def sd(a):
++        r, f = ranks(a, mask)
++        return _screen_dist(r, f, mask, ref[mask])
++    own = max(sd(a) for a in stack)
++    best = min(sd(a) for st in foreign for a in st)
++    return mask, ref, dict(_gap(own, best), mask_px=int(mask.sum()), shared_px_left_out=int((m & ~mask).sum()))
++
++
++def _learn_v3(paths, ids, per_source, aspect, start_class, name, n, t0):
++    """B122: one screen per screen class (start, end — every place row merged), then the places on the end screen."""
++    frames: dict[str, list[np.ndarray]] = {}
++    mids: dict[tuple, list[Image.Image]] = {}
++    for c, ps in paths.items():
++        key = END if PLACE_LABEL.match(c) else c
++        frames.setdefault(key, [])
++        for p in ps:
++            with Image.open(p) as im:
++                m = mid(im)
++            frames[key].append(_final(m))
++            if key == END:
++                mids.setdefault(tuple(place_row(c)), []).append(m)
++    for c in (start_class, END, OTHER):
++        if not frames.get(c):
++            raise ValueError(f"the labels name no {c} frames")
++    st = {c: np.stack(v).astype(np.float32) for c, v in frames.items()}
++    screens, arrays = {}, {}
++    for c, other_screen in ((start_class, END), (END, start_class)):
++        mask, ref, gap = _learn_one_screen(st[c], [st[OTHER], st[other_screen]])
++        screens[c] = gap
++        arrays[f"{c}_mask"], arrays[f"{c}_ref"] = mask, ref
++    rows = {o: [mid_ranks(m, arrays[f"{END}_mask"]) for m in ms] for o, ms in mids.items()}
++    places, parrays, preport = learn_places(rows, n)
++    arrays.update(parrays)
++    usable = (all(g["threshold"] is not None for g in screens.values()) and all(places["separable"].values())
++              and bool(places["margin_needed"]))
++    spec = {
++        "version": VERSION_PLACES, "kind": "privyhub-h7-endscreen", "measure": MEASURE, "size": list(SIZE),
++        "aspect": round(float(aspect), 5), "classes": [start_class, END], "start_class": start_class,
++        "end_classes": [END], "screens": {c: {"threshold": g["threshold"], "own_worst": g["worst_own"],
++                                              "mask_px": g["mask_px"]} for c, g in screens.items()},
++        "places": places, "usable": usable, "steady_r": STEADY_R, "shared_near": SHARED_NEAR,
++        "shared_share": SHARED_SHARE, "tol": TOL, "quant": 1.0 / QUANT, "flat": FLAT, "bar_max": BAR_MAX,
++        "bar_share": BAR_SHARE, "k": K, "search_every_s": SEARCH_EVERY,
++        "search": {"coarse_scales": list(COARSE_SCALES), "coarse_shifts_px_320": list(COARSE_SHIFTS),
++                   "fine_scale": FINE_SCALE, "fine_shift_px_320": FINE_SHIFT},
++        "frames": {c: len(v) for c, v in frames.items()},
++        "arrays": f"{name}.endscreen.npz" if name else None, "arrays_sha256": None,
++    }
++    if len(per_source) > 1:
++        spec["frames_per_source"] = per_source
++    report = {"measure": MEASURE, "frames_per_class": spec["frames"], "screens": screens, "places": preport,
++              "usable": usable, "learn_s": round(time.perf_counter() - t0, 2)}
++    return spec, arrays, report
++
++
+ # --- the spec on disk ---------------------------------------------------------------------------------------------
+ def _npz_bytes(arrays: dict) -> bytes:
+     buf = io.BytesIO()
+@@ -405,8 +701,10 @@ def check_spec(spec: dict) -> None:
+         raise ValueError("not an end-screen spec this tool reads")
+     if spec.get("version") == 1:
+         raise ValueError(OLD_MEASURE)
+-    if spec.get("version") != VERSION or spec.get("measure") != MEASURE:
++    if spec.get("version") not in (VERSION, VERSION_PLACES) or spec.get("measure") != MEASURE:
+         raise ValueError("not an end-screen spec this tool reads")
++    if spec.get("version") == VERSION_PLACES and not isinstance(spec.get("places"), dict):
++        raise ValueError("a version-3 spec names its places")
+ 
+ 
+ def load_spec(json_path) -> tuple[dict, dict]:
+@@ -419,16 +717,33 @@ def load_spec(json_path) -> tuple[dict, dict]:
+     data = (json_path.parent / name).read_bytes()
+     if hashlib.sha256(data).hexdigest() != spec.get("arrays_sha256"):
+         raise ValueError("the spec's arrays file does not match the spec")
++    v3 = spec.get("version") == VERSION_PLACES
++    keys = (tuple(f"{c}_{k}" for c in spec["classes"] for k in ("mask", "ref")) + ("place_mask", "place_refs")
++            if v3 else ("screen_mask", "screen_ref", "outcome_mask", "refs"))
+     with np.load(io.BytesIO(data), allow_pickle=False) as z:
+-        arrays = {k: z[k] for k in ("screen_mask", "screen_ref", "outcome_mask", "refs")}
+-    if arrays["screen_mask"].shape != (SIZE[1], SIZE[0]) or arrays["refs"].shape[0] != len(spec["classes"]):
++        arrays = {k: z[k] for k in keys}
++    if v3:
++        if any(arrays[f"{c}_mask"].shape != (SIZE[1], SIZE[0]) for c in spec["classes"]):
++            raise ValueError("the spec's arrays do not fit the spec")
++    elif arrays["screen_mask"].shape != (SIZE[1], SIZE[0]) or arrays["refs"].shape[0] != len(spec["classes"]):
+         raise ValueError("the spec's arrays do not fit the spec")
++    if v3:
++        pl = spec["places"]
++        if (list(arrays["place_mask"].shape) != list(pl["cell"]) or arrays["place_refs"].shape[0] != pl["ports"]
++                or len(pl["offsets_px_320"]) != pl["ports"]):
++            raise ValueError("the spec's arrays do not fit the spec")
+     return spec, arrays
+ 
+ 
+ # --- read ---------------------------------------------------------------------------------------------------------
+ class Reader:
+-    """Reads pictures against one spec; keeps the alignment a search found (the window does not move in a game)."""
++    """Reads pictures against one spec; keeps the alignment a search found (the window does not move in a game).
++    A version-3 spec (B122) is read by `ReaderPlaces`."""
++
++    def __new__(cls, spec: dict, arrays: dict, clock=time.monotonic):
++        if cls is Reader and isinstance(spec, dict) and spec.get("version") == VERSION_PLACES:
++            return super().__new__(ReaderPlaces)
++        return super().__new__(cls)
+ 
+     def __init__(self, spec: dict, arrays: dict, clock=time.monotonic):
+         check_spec(spec)
+@@ -519,6 +834,87 @@ class Reader:
+         return out
+ 
+ 
++class ReaderPlaces(Reader):
++    """B122 (amendment 2): a version-3 spec — one screen per class (start, end), the places on the end screen."""
++
++    def __init__(self, spec: dict, arrays: dict, clock=time.monotonic):
++        check_spec(spec)
++        self.spec, self.clock = spec, clock
++        self.classes = list(spec["classes"])
++        self.masks = {c: arrays[f"{c}_mask"].astype(bool) for c in self.classes}
++        self.srefs = {c: arrays[f"{c}_ref"][self.masks[c]].astype(np.float32) for c in self.classes}
++        self.thr = {c: spec["screens"][c]["threshold"] for c in self.classes}
++        self.own_worst = {c: spec["screens"][c].get("own_worst") for c in self.classes}     # amendment 4
++        self.places = spec["places"]
++        self.place_mask = arrays["place_mask"].astype(bool)
++        self.place_refs = arrays["place_refs"].astype(np.float32)
++        self.align = IDENTITY
++        self.last_search: float | None = None
++
++    def _dist(self, a: np.ndarray, c: str, mean: bool = False) -> float:
++        r, flat = ranks(a, self.masks[c])
++        if flat:
++            return 1.0
++        d = np.abs(r[self.masks[c]] - self.srefs[c])
++        return float(d.mean() if mean else np.median(d))
++
++    def _match(self, a: np.ndarray) -> tuple[str | None, dict]:
++        ds = {c: self._dist(a, c) for c in self.classes}
++        ok = [c for c in self.classes if self.thr[c] is not None and ds[c] <= self.thr[c]]
++        return (min(ok, key=lambda c: ds[c] / max(self.thr[c], 1e-9)) if ok else None), ds
++
++    def _search_v3(self, im_mid: Image.Image) -> tuple:
++        """The alignment that brings the picture nearest (by the mean) to the screen it is already nearest to."""
++        a0 = _final(_moved(im_mid, self.align))
++        c = min(self.classes, key=lambda k: self._dist(a0, k, True))
++        best = (float("inf"), IDENTITY)
++        for sc in COARSE_SCALES:
++            for dx in COARSE_SHIFTS:
++                for dy in COARSE_SHIFTS:
++                    m = self._dist(_final(_moved(im_mid, (sc, float(dx), float(dy)))), c, True)
++                    if m < best[0]:
++                        best = (m, (sc, float(dx), float(dy)))
++        s0, x0, y0 = best[1]
++        for sc in (s0 - FINE_SCALE, s0, s0 + FINE_SCALE):
++            for dx in (x0 - FINE_SHIFT, x0, x0 + FINE_SHIFT):
++                for dy in (y0 - FINE_SHIFT, y0, y0 + FINE_SHIFT):
++                    al = (round(sc, 4), float(dx), float(dy))
++                    m = self._dist(_final(_moved(im_mid, al)), c, True)
++                    if m < best[0]:
++                        best = (m, al)
++        return best[1]
++
++    def read(self, img: Image.Image, now: float | None = None, search: bool = True) -> dict:
++        im_mid = mid(img)
++        a = _final(_moved(im_mid, self.align))
++        cls, ds = self._match(a)
++        searched = False
++        if cls is None and search and any(t is not None for t in self.thr.values()):
++            now = self.clock() if now is None else now
++            if self.last_search is None or now - self.last_search >= SEARCH_EVERY:
++                self.last_search, searched = now, True
++                al = self._search_v3(im_mid)
++                c2, ds2 = self._match(_final(_moved(im_mid, al)))
++                worst = self.own_worst.get(c2) if c2 is not None else None
++                if c2 is not None and worst is not None and ds2[c2] <= worst:   # amendment 4: as close as its own
++                    self.align, cls, ds = al, c2, ds2
++        out = {"screen": cls is not None, "class": cls or OTHER,
++               "distances": {"screen": round(min(ds.values()), 4), **{c: round(v, 4) for c, v in ds.items()}},
++               "margin": None, "flat": False, "align": [round(self.align[0], 4), self.align[1], self.align[2]],
++               "searched": searched, "places": None}
++        if cls == END:
++            pr = read_places(mid_ranks(im_mid, self.masks[END], self.align), self.places, self.place_mask,
++                             self.place_refs)
++            ms = [m for m in pr["margins"] if m is not None]
++            out.update(place_distances=pr["distances"], place_margins=pr["margins"], ports=pr["ports"],
++                       margin=min(ms) if ms else None)
++            if pr["places"] is None:
++                out["class"] = UNKNOWN
++            else:
++                out["places"] = pr["places"]
++        return out
++
++
+ def read(spec: dict, arrays: dict, img: Image.Image) -> dict:
+     """One picture, read by a fresh Reader (a non-screen picture gets the full search)."""
+     return Reader(spec, arrays).read(img)
+@@ -526,6 +922,10 @@ def read(spec: dict, arrays: dict, img: Image.Image) -> dict:
+ 
+ def thresholds(spec: dict) -> dict:
+     """What a read's distances are held against (B105's `last`)."""
++    if spec.get("version") == VERSION_PLACES:              # B122
++        pl = spec["places"]
++        return {"screens": {c: v["threshold"] for c, v in spec["screens"].items()},
++                "places": dict(pl["thresholds"]), "margin_needed": pl["margin_needed"]}
+     return {"screen": spec.get("screen_threshold"), "classes": dict(spec.get("class_thresholds") or {}),
+             "margin_needed": spec.get("margin_needed")}
+ 
+@@ -540,23 +940,27 @@ class Ended:
+         self.seen_start = False
+         self.run_class, self.run = None, 0
+         self.ended: str | None = None
++        self.places: list[int] | None = None          # B122: the row the end was said with (version 3)
+ 
+     def start_loaded(self) -> None:
+         self.seen_start = True
+ 
+-    def feed(self, cls: str) -> str | None:
+-        """One read's class -> the end class once ended, else None."""
++    def feed(self, cls: str, places=None) -> str | None:
++        """One read's class (and, version 3, its places) -> the end class once ended, else None. K agreeing reads of
++        the whole row: the same class and the same places."""
+         if self.ended:
+             return self.ended
+-        if cls == self.run_class:
++        key = (cls, tuple(places) if places else None)
++        if key == self.run_class:
+             self.run += 1
+         else:
+-            self.run_class, self.run = cls, 1
++            self.run_class, self.run = key, 1
+         if self.run >= self.k:
+             if cls == self.start:
+                 self.seen_start = True
+             elif cls in self.ends and self.seen_start:
+                 self.ended = cls
++                self.places = list(places) if places else None
+         return self.ended
+ 
+ 
+@@ -609,6 +1013,63 @@ def score(runs, labels, spec: dict, arrays: dict, half: str | None = None, trans
+     return out
+ 
+ 
++def score_places(runs, labels, spec: dict, arrays: dict, half: str | None = None, transform=None,
++                 search: bool = True, keep_reads: bool = False) -> dict:
++    """B122: a version-3 spec against labels with place rows. Per labelled class: rows read right / unknown / wrong /
++    other (a place row: `end` with exactly its places; `start` / `other`: that class); per port: places right / unread
++    / wrong (each column's own read, also inside an `unknown` row); `other` read as the screen (must be 0); the time
++    to read one picture. Each picture read by a fresh Reader."""
++    sources = _sources(runs, labels)
++    n = spec["places"]["ports"]
++    rows: dict[str, dict[str, int]] = {}
++    ports = {str(j + 1): {"right": 0, "unread": 0, "wrong": 0} for j in range(n)}
++    times, other_screen = [], 0
++    reads = []
++    for rf, lb in sources:
++        paths = labelled_frames(rf, load_labels(lb), "second" if half == "second" else None)
++        for c, ps in paths.items():
++            row = place_row(c) if PLACE_LABEL.match(c) else None
++            tally = rows.setdefault(c, {"right": 0, "unknown": 0, "wrong": 0, "other": 0, "n": 0})
++            for p in ps:
++                with Image.open(p) as im:
++                    img = im.convert("L")
++                if transform is not None:
++                    img = transform(img)
++                t0 = time.perf_counter()
++                r = Reader(spec, arrays).read(img, search=search)
++                times.append((time.perf_counter() - t0) * 1000.0)
++                tally["n"] += 1
++                if keep_reads:
++                    reads.append([p.name, c, r["class"], r.get("places")])
++                if c == OTHER and r["screen"]:
++                    other_screen += 1
++                if row is None:
++                    want = c
++                    tally["right" if r["class"] == want else ("unknown" if r["class"] == UNKNOWN else
++                                                             ("other" if r["class"] == OTHER else "wrong"))] += 1
++                    continue
++                if r["class"] == END and r.get("places") == row:
++                    tally["right"] += 1
++                elif r["class"] == UNKNOWN:
++                    tally["unknown"] += 1
++                elif r["class"] == OTHER:
++                    tally["other"] += 1
++                else:
++                    tally["wrong"] += 1
++                got = r.get("ports")
++                if got is not None:
++                    for j in range(n):
++                        k = "unread" if got[j] is None else ("right" if got[j] == row[j] else "wrong")
++                        ports[str(j + 1)][k] += 1
++    out = {"rows": rows, "ports": ports, "other_read_as_screen": other_screen,
++           "places_wrong": sum(v["wrong"] for v in ports.values()),
++           "read_ms": {"median": round(float(np.median(times)), 2), "worst": round(float(max(times)), 2),
++                       "n": len(times)} if times else None}
++    if keep_reads:
++        out["reads"] = reads
++    return out
++
++
+ # --- replay -------------------------------------------------------------------------------------------------------
+ def _index(run_folder: Path) -> list[tuple[float, str]]:
+     index = run_folder / "index.csv"
+@@ -652,17 +1113,21 @@ def replay(run_folder, spec: dict, arrays: dict, k: int | None = None, labels=No
+         with Image.open(run_folder / f) as im:
+             r = reader.read(im.convert("L"), now=t)
+         reads.append([t, r["class"], r["distances"]["screen"]])
+-        if r["class"] != last:
+-            changes.append([t, r["class"]])
+-            last = r["class"]
+-        done = ended.feed(r["class"])
++        here = (r["class"], tuple(r["places"]) if r.get("places") else None)
++        if here != last:
++            changes.append([t, r["class"]] + ([r["places"]] if r.get("places") else []))
++            last = here
++        done = ended.feed(r["class"], r.get("places"))
+         if done:
+-            ends.append({"seconds": t, "class": done})
++            ends.append({"seconds": t, "class": done, **({"places": ended.places} if ended.places else {})})
+             ended = Ended(spec, k)
+     arrivals = []
+     if labels is not None:
+         lab = load_labels(labels)
+-        arrivals = _end_arrivals(rows, lab, run_folder.name, set(spec["end_classes"]))
++        ends_set = set(spec["end_classes"])
++        if spec.get("version") == VERSION_PLACES:          # B122: the labels name the place rows
++            ends_set = {c for c in lab["classes"] if PLACE_LABEL.match(c)}
++        arrivals = _end_arrivals(rows, lab, run_folder.name, ends_set)
+         for e in ends:
+             before = [a for a in arrivals if a <= e["seconds"]]
+             e["end_screen_from_s"] = before[-1] if before else None
+@@ -702,7 +1167,8 @@ def main(argv: list[str]) -> int:
+         return 0
+     if len(argv) >= 4 and argv[0] == "score":
+         spec, arrays = load_spec(argv[-1])
+-        print(json.dumps(score(_pairs(argv[1:-1]), None, spec, arrays, half), indent=1, sort_keys=True))
++        fn = score_places if spec.get("version") == VERSION_PLACES else score
++        print(json.dumps(fn(_pairs(argv[1:-1]), None, spec, arrays, half), indent=1, sort_keys=True))
+         return 0
+     if len(argv) == 3 and argv[0] == "read":
+         spec, arrays = load_spec(argv[1])
+@@ -717,10 +1183,10 @@ def main(argv: list[str]) -> int:
+         out = replay(folder, spec, arrays, int(k) if k else None, labels)
+         for t, c, d in out["reads"]:
+             print(json.dumps({"seconds": t, "class": c, "screen": d}))
+-        for t, c in out["changes"]:
+-            print(json.dumps({"change": c, "seconds": t}))
++        for ch in out["changes"]:
++            print(json.dumps({"change": ch[1], "seconds": ch[0], **({"places": ch[2]} if len(ch) > 2 else {})}))
+         for e in out["ended"]:
+-            print(json.dumps({"ended": e["class"], **e}))
++            print(json.dumps({"ended": e["class"], **e}))           # version 3: with its places
+         print(json.dumps({"summary": {"k": out["k"], "pictures": out["pictures"], "ended": len(out["ended"]),
+                                       "end_screen_arrivals_s": out["end_screen_arrivals_s"]}}))
+         return 0
