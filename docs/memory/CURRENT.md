@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **H7-D1 MET** (`evidence/H7_D1_2026-11-17.md`): why H7-V5 missed — T88 RetroArch's notices for ~8 s; T89 the
-  watcher reads the desktop, not the game's window. Flag off; eighteen lines. H7-V5 NOT MET.
+- **H7-V5b MET** (`evidence/H7_V5B_2026-11-17.md`): both mini games under the cheat setups from the board — T88 at
+  10 s, T89 at 2 s, results right, SAVE / LOAD refused. Flags off; eighteen lines. H7-D1 MET.
 
 ## Verified State
 
@@ -87,8 +87,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — Cowork reads H7-D1's pictures**, then B: the watcher on T89's game window, T88's start after the notices;
-   then H7-V5 again; PP-H4 waits. Beside it: the faster switch.
+1. **H7 — PP-H4**, the four-person sitting with everything unlocked (B132's / B128's lines), offered now that H7-V5b
+   is MET. Beside it: the faster switch.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
