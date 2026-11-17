@@ -82,6 +82,9 @@ TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "n
 SETUP_GONE = "the cheat setup this mini game names is not on the hub (or its cheats changed): nothing was launched"
 SETUP_CHECK_S = 1.5         # the setup check's one manager call: given up after this (the start refused, nothing done)
 NOT_UNDER_SETUP = "the title did not start under its cheat setup"
+# B131: the onn's SAVE / LOAD while a mini game is starting or playing
+STATE_REFUSED = {"save-state": "not during a mini game: nothing was saved",
+                 "load-state": "not during a mini game: nothing was loaded"}
 _HEX64 = re.compile(r"^[0-9A-Fa-f]{64}$")
 
 _local = threading.local()
@@ -617,6 +620,21 @@ class PartyMinigames:
         if isinstance(res, dict) and kind in ("home", "end"):
             res = {**res, "taken": kind}
         return res
+
+    def state_refusal(self, action: str) -> str | None:
+        """B131: the onn's SAVE / LOAD while a mini game is starting or playing → the plain line (one row); else None
+        (today's path: the manager's own refusal for the board, B108 / B110)."""
+        line = STATE_REFUSED.get(action)
+        if line is None:
+            return None
+        with self._lock:
+            mg = self.mg
+            if mg is None or mg["closed"] or mg["state"] not in ("starting", "playing"):
+                return None
+            state = mg["state"]
+        self.row({"step": "minigame_state_refused", "what": "save" if action == "save-state" else "load",
+                  "state": state})
+        return line
 
     def bounded_read(self, action: str, fn: Callable[[], Any]) -> dict | None:
         """`status` / `native-stream-status` while a mini game is on: today's answer if it comes within READ_WAIT_S,

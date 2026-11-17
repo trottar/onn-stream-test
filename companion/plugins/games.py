@@ -3672,6 +3672,12 @@ class GamesPlugin:
             keep_blank_values=False,
         )
 
+        # B131: the onn's SAVE / LOAD while a hub mini game is starting or playing: refused plainly, nothing sent
+        if (_party_minigame is not None and action in ("save-state", "load-state")
+                and getattr(self, "_party_minigame_obj", None) is not None and not _party_minigame.inside()):
+            refused = self._party_minigame_obj.state_refusal(action)
+            if refused is not None:
+                raise ValueError(refused)
         # B114: with a party mini game on, Home / RESUME / END are taken at once onto its queue, acted on in order
         if (_party_minigame is not None and action in _party_minigame.TAKEN
                 and getattr(self, "_party_minigame_obj", None) is not None and not _party_minigame.inside()):

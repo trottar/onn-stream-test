@@ -1,0 +1,412 @@
+diff --git a/companion/h7_minigame.py b/companion/h7_minigame.py
+index 47b54176..f6b69cb8 100644
+--- a/companion/h7_minigame.py
++++ b/companion/h7_minigame.py
+@@ -31,6 +31,12 @@ or a party mini game launched with its setup) the begin is the setup's own **`<g
+ characters>.state`** when the rules folder holds it, else `<game id>.state` as today; it is loaded through scratch slot
+ 8 of **the setup's own `states/<core>/`** (`_state_root()` is the setup's while its session runs — where RetroArch
+ reads). The answer and the `watching` row carry `"begin": "setup" | "normal"` only under a setup; without one, today.
++
++B129 (the same flag): the watcher's picture is the largest visible window **owned by the game's own process**
++(`getwindowpid`, the stream's own rule), found again for every new game process (and after a failed grab, and every
++10 s) — never a rectangle kept from another process; no such window → a picture failure, no read.
++B130 (the same flag): a watch begun with the load under a cheat setup waits RECOGNISE_SETUP_S (15 s) for the start
++before `recognised` is false; every other watch RECOGNISE_S (8 s), as today.
+ """
+ from __future__ import annotations
+ 
+@@ -58,6 +64,8 @@ BENCH_STREAM_UP = "a client's stream is up: not on the bench"   # B112
+ BENCH_LOOPBACK = "the bench is for loopback callers only"          # B112
+ LOOPBACK = ("127.0.0.1", "::1", "localhost")
+ RECOGNISE_S = 8.0           # B105: s after a start with the load within which a read must name the start class
++RECOGNISE_SETUP_S = 15.0    # B130: the same under a cheat setup (RetroArch's notices: T88's first start 9.00 s)
++REFIND_S = 10.0             # B129: the game's window found again at most this often (and at every new process)
+ KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
+ JPEG_QUALITY = 90
+ SETUP_PREFIX = 12           # B127: a setup's begin is <game id>.<the profile_id's first 12 characters>.state
+@@ -94,12 +102,20 @@ def endscreen():
+ 
+ class WindowPicture:
+     """The game's window, read in process: the manager's process → its largest visible window (xdotool, as the
+-    stream's capture finds it) → Pillow's X11 grab of that area on the companion's display. Writes nothing."""
++    stream's capture finds it) → Pillow's X11 grab of that area on the companion's display. Writes nothing.
++
++    B129: the window must be owned by the game's own process (`getwindowpid`, the stream's own check), and it is found
++    again whenever the game's process changes (the cached rectangle belonged to one process: T89's watches had grabbed
++    T88's full-screen rectangle — the desktop), after a failed grab and at most every REFIND_S. No window owned by the
++    process → the grab raises (the watcher's `picture_failed` row), never a read of another rectangle."""
+ 
+-    def __init__(self, emulator: Any, environ=os.environ):
++    def __init__(self, emulator: Any, environ=os.environ, clock=time.monotonic):
+         self._emu = emulator
+         self._environ = environ
++        self._clock = clock
+         self._window: tuple[int, tuple[int, int, int, int]] | None = None
++        self._pid: int | None = None                  # B129: the process the cached window belongs to
++        self._found_at: float | None = None
+ 
+     def _find(self, pid: int, display: str) -> tuple[int, tuple[int, int, int, int]]:
+         env = dict(os.environ, DISPLAY=display)
+@@ -107,6 +123,13 @@ class WindowPicture:
+                            text=True, timeout=XDOTOOL_WAIT, env=env, check=False)
+         best = None
+         for w in r.stdout.split():
++            o = subprocess.run(["xdotool", "getwindowpid", w], capture_output=True, text=True,
++                               timeout=XDOTOOL_WAIT, env=env, check=False)
++            try:
++                if o.returncode != 0 or int(o.stdout.strip()) != pid:      # B129: owned by the game's process
++                    continue
++            except ValueError:
++                continue
+             g = subprocess.run(["xdotool", "getwindowgeometry", "--shell", w], capture_output=True, text=True,
+                                timeout=XDOTOOL_WAIT, env=env, check=False)
+             kv = dict(line.split("=", 1) for line in g.stdout.splitlines() if "=" in line)
+@@ -131,12 +154,17 @@ class WindowPicture:
+         if proc is None:
+             raise RuntimeError("no game process")
+         try:
+-            if self._window is None:
+-                self._window = self._find(int(proc.pid), display)
++            pid = int(proc.pid)
++            now = self._clock()
++            if (self._window is None or self._pid != pid or self._found_at is None
++                    or now - self._found_at >= REFIND_S):                    # B129: found again
++                self._window, self._pid, self._found_at = None, None, None
++                self._window = self._find(pid, display)
++                self._pid, self._found_at = pid, now
+             x, y, w, h = self._window[1]
+             return ImageGrab.grab(bbox=(x, y, x + w, y + h), xdisplay=display)
+         except Exception as exc:
+-            self._window = None                                 # found again at the next picture
++            self._window, self._pid, self._found_at = None, None, None     # found again at the next picture
+             raise RuntimeError(f"the picture was not read: {exc}") from exc
+ 
+ 
+@@ -163,6 +191,7 @@ class MiniGame:
+         self.picture = WindowPicture(emulator, environ)
+         self.read_every = READ_EVERY
+         self.recognise_s = RECOGNISE_S
++        self.recognise_setup_s = RECOGNISE_SETUP_S      # B130
+         self._watch: dict | None = None
+         self._stopped: str | None = None
+         self._start_lock = threading.Lock()          # B105: starts one at a time (a replace cannot race a replace)
+@@ -234,6 +263,7 @@ class MiniGame:
+             self._refused(str(exc))
+         loader = _Loader(self)
+         begin = None                                        # B127: "setup" / "normal" only under a cheat setup
++        setup = None
+         if load:
+             if kind in ("pcsx2", "dolphin"):
+                 self._refused("not supported yet")
+@@ -275,6 +305,9 @@ class MiniGame:
+                 line_ms = loader._load(game, state, folder, stem)
+             except live.Busy:
+                 raise live.Busy("the mini game's state did not load; the game is as it was") from None
++        # B130: a watch begun with the load under a cheat setup waits RECOGNISE_SETUP_S for the start (RetroArch's
++        # notices cover the screen for ~8 s after a setup's launch); every other watch today's RECOGNISE_S
++        recognise_s = self.recognise_setup_s if (load and setup is not None) else self.recognise_s
+         reader = endscreen().Reader(spec, arrays, clock=self._clock)
+         ended = endscreen().Ended(spec)
+         if load:
+@@ -291,10 +324,11 @@ class MiniGame:
+             self._watch = {"state": "watching", "game": game, "class": None, "seen_start": ended.seen_start,
+                            "recognised": None, "reads": 0, "last": None, "loaded": load, "picture_failures": 0,
+                            "keep": ({"folder": keep_dir.name, "pictures": 0} if keep_dir is not None else None),
+-                           "t0": self._clock(), "token": token, "_keep_dir": keep_dir}
++                           "t0": self._clock(), "token": token, "_keep_dir": keep_dir,
++                           "_recognise_s": recognise_s}
+             row = {"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
+                    "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
+-                   "spec_version": spec.get("version"), "recognise_s": self.recognise_s, "bench": bench,
++                   "spec_version": spec.get("version"), "recognise_s": recognise_s, "bench": bench,
+                    "keep": keep_dir.name if keep_dir is not None else None}
+             if begin is not None:
+                 row["begin"] = begin                                 # B127: only under a cheat setup
+@@ -439,7 +473,7 @@ class MiniGame:
+                         w["picture_failures"] += 1
+                         self._row({"step": "picture_failed", "game": game, "why": str(exc)[:200]})
+                         since = round(self._clock() - w["t0"], 1)
+-                        if w["recognised"] is None and w["loaded"] and since >= self.recognise_s:
++                        if w["recognised"] is None and w["loaded"] and since >= w.get("_recognise_s", self.recognise_s):
+                             self._settle(w, False, since, None)
+                     continue
+                 r = reader.read(img)
+@@ -460,7 +494,7 @@ class MiniGame:
+                     if w["recognised"] is None:
+                         if r["class"] == start_class:
+                             self._settle(w, True, since, r)
+-                        elif w["loaded"] and since >= self.recognise_s:
++                        elif w["loaded"] and since >= w.get("_recognise_s", self.recognise_s):
+                             self._settle(w, False, since, r)
+                     if done:
+                         w.update(state="ended", **{"class": done}, ended_after_s=since)
+diff --git a/tests/b129_h7_game_window/test_b129.py b/tests/b129_h7_game_window/test_b129.py
+new file mode 100644
+index 00000000..49454622
+--- /dev/null
++++ b/tests/b129_h7_game_window/test_b129.py
+@@ -0,0 +1,113 @@
++#!/usr/bin/env python3
++"""B129 (host): the watcher reads the game's own window — through the real HTTP server on loopback, behind
++PRIVYHUB_H7=1.
++
++B103's harness (B101's fake RetroArch, the made-up titles, B103's spec and pictures) with the watcher's own
++`WindowPicture` against **a fake window table** (the `xdotool` calls answered from it) and **a fake screen** (Pillow's
++grab returns a 1920 x 1080 desktop picture with the game's picture pasted at its window's place). Checked: a full-screen
++game → (0, 0, 1920, 1080) as today, `recognised` true; **then a windowed game in the same companion (H7-V5's order) →
++its own rectangle (960, 384, 960, 720)**, `recognised` true (today: the first game's rectangle — the desktop — never
++the start); a larger window listed for the process but owned by another → the game's own window; no window owned by
++the process (none, or only another's) → `picture_failed` rows, 0 reads, `recognised` false — never a read of the
++desktop. The flag absent → HEAD's answers through the real routes. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b129_h7_game_window -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import shutil
++import subprocess
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("art_systems", "b99_h7_live_read", "b102_h7_endscreen", "b103_h7_minigame", "b114_party_minigame_hang"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import _tmp_cleanup  # noqa: E402,F401
++import test_b85 as b85  # noqa: E402
++import test_b99 as b99  # noqa: E402
++import test_b103 as b103  # noqa: E402
++import test_b114 as b114  # noqa: E402
++
++HEAD = "1fc0ced0"                      # queue AT's baseline (H7-D1 committed): the companion before B129-B131
++SCENARIO = (HERE / "b129_scenario.py").read_text()
++ON = {**b85.FLAGS, "PRIVYHUB_H7": "1"}
++OFF = dict(b85.FLAGS)
++
++
++def run(root: Path, env: dict, gid: str, mode: str) -> dict:
++    """B103's run with this scenario appended to B103's harness head (`today`: B103's own child)."""
++    child = b103.CHILD if mode == "today" else b103.CHILD.split('out = {"steps": {}}')[0] + SCENARIO
++    child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    child_env.update(env)
++    xdg = root / "xdg"
++    xdg.mkdir(exist_ok=True)
++    child_env.update({"XDG_CONFIG_HOME": str(xdg), "HOME": str(xdg), "PRIVYHUB_H7_RULES": str(root / "h7rules")})
++    (root / "tools").mkdir(exist_ok=True)
++    shutil.copyfile(ROOT / "tools" / "h7_endscreen.py", root / "tools" / "h7_endscreen.py")
++    work = Path(tempfile.mkdtemp(prefix="b129_fx_"))
++    try:
++        frames, spec_dir, js = b103.fixtures(work)
++        js["arrays"] = f"{gid}.endscreen.npz"
++        (spec_dir / "GAME.endscreen.json").write_text(json.dumps(js))
++        r = subprocess.run([sys.executable, "-I", "-B", "-c", child, str(root),
++                            json.dumps({"id": gid, "mode": mode, "p1": b99.P1, "p2": b99.P2, "frames": str(frames),
++                                        "spec_dir": str(spec_dir)})],
++                           cwd=root, env=child_env, capture_output=True, text=True, timeout=900)
++    finally:
++        shutil.rmtree(work, ignore_errors=True)
++    assert r.returncode == 0, r.stderr[-3000:]
++    return json.loads(r.stdout.strip().splitlines()[-1])
++
++
++class GameWindow(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b99.tree()
++        cls.s = run(root, ON, ids[b85.PS1_TITLE], "window")["steps"]
++
++    def test_0_a_full_screen_game_as_today(self):
++        self.assertEqual(self.s["full_grabs"], [[0, 0, 1920, 1080]])
++        self.assertEqual(self.s["full"]["recognised"], True)
++
++    def test_1_then_a_windowed_game_its_own_rectangle(self):
++        self.assertEqual(self.s["windowed_grabs"], [[960, 384, 1920, 1104]])     # (960, 384, 960, 720)
++        self.assertEqual((self.s["windowed"]["recognised"], self.s["windowed"]["picture_failures"]), (True, 0))
++
++    def test_2_a_window_listed_but_owned_by_another_is_not_taken(self):
++        self.assertEqual(self.s["foreign_listed_grabs"], [[300, 200, 1260, 920]])
++        self.assertEqual(self.s["foreign_listed"]["recognised"], True)
++
++    def test_3_no_window_of_the_process_a_picture_failure_never_a_read(self):
++        for tag in ("no_window", "only_foreign"):
++            r = self.s[tag]
++            self.assertEqual(self.s[tag + "_grabs"], [], tag)                  # nothing grabbed at all
++            self.assertEqual((r["reads"], r["recognised"]), (0, False), (tag, r))
++            self.assertGreaterEqual(r["picture_failures"], 3, tag)
++            self.assertIn("picture_failed", self.s[tag + "_rows"], tag)
++            self.assertEqual(self.s[tag + "_failures_why"],
++                             ["the picture was not read: the game's window was not found"], tag)
++
++
++class FlagAbsentIsHeads(unittest.TestCase):
++    def test_flag_absent(self):
++        code = b114.code_of(HEAD)
++        if code is None:
++            self.skipTest("git is absent")
++        root, ids = b99.tree(code)
++        base = run(root, OFF, ids[b85.PS1_TITLE], "today")["steps"]
++        root2, ids2 = b99.tree()
++        mine = run(root2, OFF, ids2[b85.PS1_TITLE], "today")["steps"]
++        for k in ("get_before_launch", "start_before_launch", "get_after", "start_after", "start_after_load0"):
++            self.assertEqual((mine[k]["code"], mine[k]["raw"]), (base[k]["code"], base[k]["raw"]), k)
++        self.assertIn("Unknown Games plugin", base["start_after"]["body"]["error"])
++        shutil.rmtree(code, ignore_errors=True)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/b129_h7_game_window/b129_scenario.py b/tests/b129_h7_game_window/b129_scenario.py
+new file mode 100644
+index 00000000..21fbd599
+--- /dev/null
++++ b/tests/b129_h7_game_window/b129_scenario.py
+@@ -0,0 +1,145 @@
++# B129 / B130's child scenario (appended to B103's harness head; run by test_b129.py / test_b130.py). Not a test module.
++# B129: the watcher's own WindowPicture against a fake window table (the xdotool calls answered from it: which windows
++# a pid's search lists, each window's owner and geometry) and a fake screen (Pillow's X11 grab returns a 1920 x 1080
++# desktop picture with the game's picture pasted at its window's place; every grab's rectangle kept). Large fake pids
++# (no real process has them). B130: B103's scripted pictures, the session under a fake cheat setup or not.
++import PIL.ImageGrab as _IG
++os.environ["DISPLAY"] = ":99"
++out = {"steps": {}}
++S = out["steps"]
++WINDOWS = {}                       # window id -> {"listed": pid, "owner": pid, "geo": (x, y, w, h)}
++SCREEN = {"rect": None, "tok": "start"}
++GRABS = []
++_head_run = subprocess.run
++
++
++def _ns(rc, text):
++    return types.SimpleNamespace(returncode=rc, stdout=text, stderr="")
++
++
++def _xrun(cmd, *a, **k):
++    if cmd and cmd[0] == "xdotool":
++        if cmd[1] == "search":
++            pid = int(cmd[cmd.index("--pid") + 1])
++            listed = "".join(f"{w}\n" for w, v in sorted(WINDOWS.items()) if v["listed"] == pid)
++            return _ns(0 if listed else 1, listed)
++        v = WINDOWS.get(int(cmd[-1]))
++        if v is None:
++            return _ns(1, "")
++        if cmd[1] == "getwindowpid":
++            return _ns(0, f"{v['owner']}\n")
++        if cmd[1] == "getwindowgeometry":
++            x, y, w, h = v["geo"]
++            return _ns(0, f"WINDOW={cmd[-1]}\nX={x}\nY={y}\nWIDTH={w}\nHEIGHT={h}\nSCREEN=0\n")
++        return _ns(1, "")
++    return _head_run(cmd, *a, **k)
++
++
++subprocess.run = _xrun
++with Image.open(frames / "other_0.png") as _d:
++    DESK = _d.convert("L").resize((1920, 1080))
++
++
++def _grab(bbox=None, include_layered_windows=False, all_screens=False, xdisplay=None):
++    GRABS.append(list(bbox))
++    canvas = DESK.copy()
++    if SCREEN["rect"] is not None:
++        x, y, w, h = SCREEN["rect"]
++        with Image.open(frames / f"{SCREEN['tok']}_0.png") as gp:
++            canvas.paste(gp.convert("L").resize((w, h)), (x, y))
++    return canvas.crop(tuple(bbox)).convert("RGB")
++
++
++_IG.grab = _grab
++rules_ = Path(rules)
++rules_.mkdir(parents=True, exist_ok=True)
++for name in os.listdir(args["spec_dir"]):
++    shutil.copyfile(Path(args["spec_dir"], name), rules_ / name.replace("GAME", args["id"]))
++(rules_ / f"{args['id']}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
++mini = g._h7_minigame_runner()
++log = root / "logs/games/h7_results.jsonl"
++
++
++def h7_rows():
++    return [json.loads(l) for l in log.read_text().splitlines()] if log.is_file() else []
++
++
++def settled(bound):
++    end = time.monotonic() + bound
++    while time.monotonic() < end:
++        b = result()
++        if b.get("recognised") is not None:
++            return b
++        time.sleep(0.03)
++    return dict(result(), timeout=True)
++
++
++if args["mode"] == "window":
++    mini.read_every = 0.2
++    mini.recognise_s = 1.6
++
++    def case(tag, pid, windows, rect, tok="start"):
++        call("POST", "/plugins/games/stop")
++        call("POST", f"/plugins/games/launch?id={args['id']}")
++        fake["ra"].paused = False
++        fake["ra"].pid = pid
++        WINDOWS.clear()
++        WINDOWS.update(windows)
++        SCREEN.update(rect=rect, tok=tok)
++        g0, r0 = len(GRABS), len(h7_rows())
++        S[tag + "_start"] = start()["body"]
++        b = settled(6)
++        time.sleep(0.5)
++        S[tag] = {k: b.get(k) for k in ("state", "recognised", "class", "reads", "picture_failures", "timeout")}
++        S[tag + "_grabs"] = sorted({tuple(x) for x in GRABS[g0:]})
++        S[tag + "_rows"] = sorted({r["step"] for r in h7_rows()[r0:]})
++        S[tag + "_failures_why"] = sorted({r.get("why", "")[:60] for r in h7_rows()[r0:]
++                                           if r["step"] == "picture_failed"})
++        call("POST", "/plugins/games/h7-stop")
++
++    case("full", 999999001, {11: {"listed": 999999001, "owner": 999999001, "geo": (0, 0, 1920, 1080)}},
++         (0, 0, 1920, 1080))
++    # the H7-V5 order: a full-screen game, then a windowed one in the same companion
++    case("windowed", 999999002, {21: {"listed": 999999002, "owner": 999999002, "geo": (960, 384, 960, 720)}},
++         (960, 384, 960, 720))
++    # a larger window listed for the process but owned by another (the desktop's size), and the game's own window
++    case("foreign_listed", 999999003, {31: {"listed": 999999003, "owner": 999998999, "geo": (0, 0, 1920, 1080)},
++                                       32: {"listed": 999999003, "owner": 999999003, "geo": (300, 200, 960, 720)}},
++         (300, 200, 960, 720))
++    case("no_window", 999999004, {}, (960, 384, 960, 720))
++    case("only_foreign", 999999005, {51: {"listed": 999999005, "owner": 999998999, "geo": (0, 0, 1920, 1080)}},
++         (960, 384, 960, 720))
++    call("POST", "/plugins/games/stop")
++
++if args["mode"] == "recognise":
++    mini.picture = pic
++    mini.read_every = 0.1
++    mini.recognise_s = 0.8
++    mini.recognise_setup_s = 1.5
++    SETUP = {"session_kind": "cheat", "profile_id": "AB" * 32, "savestate_directory": "data/games/retroarch/states"}
++
++    def case(tag, setup, script):
++        call("POST", "/plugins/games/stop")
++        call("POST", f"/plugins/games/launch?id={args['id']}")
++        fake["ra"].paused = False
++        m._active_cheat_session = dict(SETUP) if setup else None
++        pic.set(script)
++        r0 = len(h7_rows())
++        S[tag + "_start"] = start()["body"]
++        b = settled(5)
++        time.sleep(0.3)
++        rows_ = h7_rows()[r0:]
++        S[tag] = {k: b.get(k) for k in ("recognised", "timeout")}
++        S[tag + "_watching_recognise_s"] = [r.get("recognise_s") for r in rows_ if r["step"] == "watching"]
++        S[tag + "_recognised_rows"] = [[r.get("value"), r.get("after_s")] for r in rows_ if r["step"] == "recognised"]
++        call("POST", "/plugins/games/h7-stop")
++        m._active_cheat_session = None
++
++    case("setup_covered_then_start", True, ["other"] * 10 + ["start"] * 80)
++    case("setup_never", True, ["other"] * 200)
++    case("plain_never", False, ["other"] * 200)
++    case("plain_covered_then_start", False, ["other"] * 10 + ["start"] * 80)
++    call("POST", "/plugins/games/stop")
++
++httpd.shutdown()
++print(json.dumps(out))

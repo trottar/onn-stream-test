@@ -102,3 +102,11 @@ removed with it.
 ## What waits
 
 H7-V5 (A, unattended, with everything unlocked — `SESSION_B_DONE_2026-11-17AS.md` §A); then PP-H4. Nothing adopted.
+
+## Correction (queue AT, 2026-11-17, B131)
+
+**Settled item 6 above is wrong.** The onn's SAVE / LOAD during a hub mini game never reach the title: since B110 the
+manager refuses both whenever the board is the session or set aside (`_party_stash`), which covers every moment of a mini
+game — 503 "Saving and loading are not offered for the board game; nothing was sent.", nothing sent, no slot touched
+(`B131_PARTY_SAVE_LOAD_REFUSED_2026-11-17.md`; HEAD's code in its test: nothing sent, every setup file byte-equal).
+Item 5 (the stop's in-game-save flush into the setup) stands.

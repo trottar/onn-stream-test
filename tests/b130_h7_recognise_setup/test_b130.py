@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""B130 (host): the recognition window under a cheat setup — through the real HTTP server on loopback, behind
+PRIVYHUB_H7=1.
+
+B129's harness (B103's head) with B103's scripted pictures; the windows scaled (`recognise_s` 0.8 s, the setup's 1.5 s,
+one read every 0.1 s — the real ones 8.0 s and 15.0 s, checked as constants). Under a (fake) cheat setup: a covered
+picture for 1.0 s, then the start → `recognised` true (with the plain window it would be false); never the start →
+false at >= 1.5 s, never before and never true; without a setup → false at >= 0.8 s and a covered start false, as
+today; the `watching` row's `recognise_s` the watch's own. The flag absent → HEAD's answers (B129's test). Temp dirs
+removed.
+
+    python3 -m unittest discover -s tests/b130_h7_recognise_setup -v
+"""
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parents[1]
+sys.path.insert(0, str(ROOT / "tests" / "b129_h7_game_window"))
+sys.path.insert(0, str(ROOT / "companion"))
+import test_b129 as b129  # noqa: E402  (its harness; its tests are not collected here)
+
+
+class RecogniseUnderSetup(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        root, ids = b129.b99.tree()
+        cls.s = b129.run(root, b129.ON, ids[b129.b85.PS1_TITLE], "recognise")["steps"]
+
+    def test_0_the_constants(self):
+        src = (ROOT / "companion" / "h7_minigame.py").read_text()
+        self.assertIn("RECOGNISE_S = 8.0 ", src)
+        self.assertIn("RECOGNISE_SETUP_S = 15.0 ", src)
+
+    def test_1_under_a_setup_a_covered_start_is_recognised(self):
+        r = self.s["setup_covered_then_start"]
+        self.assertEqual(r["recognised"], True, self.s["setup_covered_then_start_recognised_rows"])
+        (value, after), = self.s["setup_covered_then_start_recognised_rows"]
+        self.assertTrue(value)
+        self.assertGreater(after, 0.8)                       # past the plain window: only the setup's window allows it
+        self.assertLess(after, 1.5)
+        self.assertEqual(self.s["setup_covered_then_start_watching_recognise_s"], [1.5])
+
+    def test_2_under_a_setup_never_the_start_false_at_the_new_time(self):
+        self.assertEqual(self.s["setup_never"]["recognised"], False)
+        (value, after), = self.s["setup_never_recognised_rows"]
+        self.assertFalse(value)
+        self.assertGreaterEqual(after, 1.5)
+        self.assertLess(after, 1.9)
+
+    def test_3_without_a_setup_as_today(self):
+        self.assertEqual(self.s["plain_never"]["recognised"], False)
+        (value, after), = self.s["plain_never_recognised_rows"]
+        self.assertGreaterEqual(after, 0.8)
+        self.assertLess(after, 1.2)
+        self.assertEqual(self.s["plain_covered_then_start"]["recognised"], False)    # today: the cover outlasts it
+        for tag in ("plain_never", "plain_covered_then_start"):
+            self.assertEqual(self.s[tag + "_watching_recognise_s"], [0.8], tag)
+
+
+if __name__ == "__main__":
+    unittest.main()

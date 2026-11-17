@@ -371,6 +371,15 @@ if args["mode"] == "cheat_today":
                             "launch_plain": ("POST", f"/plugins/games/launch?id={title}"),
                             "stop_plain": ("POST", "/plugins/games/stop")}.items():
         S[k] = call(meth, path)
+    # B131: SAVE / LOAD with the board as the session (no mini game) — today's answers
+    _nodes = call("GET", "/plugins/games/games?system=party")["body"].get("nodes", []) if args.get("board_saveload") else []
+    _bid = next((n["id"] for n in _nodes if n.get("node_type") == "game"), None)
+    if _bid is not None:
+        S["board_launch"] = call("POST", f"/plugins/games/launch?id={_bid}")
+        S["board_launch"] = {"code": S["board_launch"]["code"], "raw": "", "body": {}}
+        S["board_save"] = call("POST", "/plugins/games/save-state?slot=1")
+        S["board_load"] = call("POST", "/plugins/games/load-state?slot=1")
+        S["board_stop"] = {"code": call("POST", "/plugins/games/stop")["code"], "raw": "", "body": {}}
     finish()
 
 rules_ = Path(rules); rules_.mkdir(parents=True, exist_ok=True)
@@ -655,6 +664,16 @@ if args["mode"] == "cheat":
             st = call("GET", "/plugins/games/status")["body"]
             S[tag + "_status_profile"] = (st.get("cheat_session") or {}).get("profile_id") == setups[key]["profile_id"]
             S[tag + "_mem"] = mem()
+            if args.get("saveload"):                  # B131: the onn's SAVE / LOAD during the mini game
+                l0, q0 = len(fake["ra"].log), len(rows())
+                S[tag + "_saveload"] = {k: call("POST", "/plugins/games/" + q) for k, q in
+                                        (("save", "save-state?slot=1"), ("save_replace", "save-state?slot=1&replace=true"),
+                                         ("load", "load-state?slot=1"))}
+                S[tag + "_saveload_sent"] = [c for c in fake["ra"].log[l0:] if c in ("SAVE_STATE_SLOT", "LOAD_STATE_SLOT",
+                                                                                    "SAVE_STATE", "LOAD_STATE")]
+                S[tag + "_saveload_rows"] = [{k: v for k, v in r_.items() if k in ("step", "what", "state")}
+                                             for r_ in rows()[q0:] if r_["step"] == "minigame_state_refused"]
+                S[tag + "_state_after_saveload"] = call("GET", "/plugins/games/party-minigame-result")["body"].get("state")
             if home_resume:
                 time.sleep(0.3)
                 timed("home", "POST", "/plugins/games/native-stream-stop")
@@ -679,6 +698,9 @@ if args["mode"] == "cheat":
         S[tag + "_launch_row"] = [{k: v for k, v in r.items() if k in ("cheat", "profile_matches", "pid_owned")}
                                   for r in rows() if r["step"] == "minigame_launch"][-1]
     S["c_applied"] = [a == setups["ps1"]["profile_id"] or a == setups["n64"]["profile_id"] for a in APPLIED]
+    if args.get("saveload"):                          # B131: after the mini games, on the board's session: today's path
+        S["c_board_saveload"] = {k: call("POST", "/plugins/games/" + q) for k, q in
+                                 (("save", "save-state?slot=1"), ("load", "load-state?slot=1"))}
     S["abr_all"] = [[r.get("event"), r.get("source")] for r in abr_rows()
                     if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
     timed("end_onn", "POST", "/plugins/games/stop")

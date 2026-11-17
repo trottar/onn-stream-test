@@ -31,6 +31,12 @@ or a party mini game launched with its setup) the begin is the setup's own **`<g
 characters>.state`** when the rules folder holds it, else `<game id>.state` as today; it is loaded through scratch slot
 8 of **the setup's own `states/<core>/`** (`_state_root()` is the setup's while its session runs — where RetroArch
 reads). The answer and the `watching` row carry `"begin": "setup" | "normal"` only under a setup; without one, today.
+
+B129 (the same flag): the watcher's picture is the largest visible window **owned by the game's own process**
+(`getwindowpid`, the stream's own rule), found again for every new game process (and after a failed grab, and every
+10 s) — never a rectangle kept from another process; no such window → a picture failure, no read.
+B130 (the same flag): a watch begun with the load under a cheat setup waits RECOGNISE_SETUP_S (15 s) for the start
+before `recognised` is false; every other watch RECOGNISE_S (8 s), as today.
 """
 from __future__ import annotations
 
@@ -58,6 +64,8 @@ BENCH_STREAM_UP = "a client's stream is up: not on the bench"   # B112
 BENCH_LOOPBACK = "the bench is for loopback callers only"          # B112
 LOOPBACK = ("127.0.0.1", "::1", "localhost")
 RECOGNISE_S = 8.0           # B105: s after a start with the load within which a read must name the start class
+RECOGNISE_SETUP_S = 15.0    # B130: the same under a cheat setup (RetroArch's notices: T88's first start 9.00 s)
+REFIND_S = 10.0             # B129: the game's window found again at most this often (and at every new process)
 KEEP_RELATIVE = "runtime/h7_frames"   # B105: keep=1's pictures (git-ignored: runtime/)
 JPEG_QUALITY = 90
 SETUP_PREFIX = 12           # B127: a setup's begin is <game id>.<the profile_id's first 12 characters>.state
@@ -94,12 +102,20 @@ def endscreen():
 
 class WindowPicture:
     """The game's window, read in process: the manager's process → its largest visible window (xdotool, as the
-    stream's capture finds it) → Pillow's X11 grab of that area on the companion's display. Writes nothing."""
+    stream's capture finds it) → Pillow's X11 grab of that area on the companion's display. Writes nothing.
 
-    def __init__(self, emulator: Any, environ=os.environ):
+    B129: the window must be owned by the game's own process (`getwindowpid`, the stream's own check), and it is found
+    again whenever the game's process changes (the cached rectangle belonged to one process: T89's watches had grabbed
+    T88's full-screen rectangle — the desktop), after a failed grab and at most every REFIND_S. No window owned by the
+    process → the grab raises (the watcher's `picture_failed` row), never a read of another rectangle."""
+
+    def __init__(self, emulator: Any, environ=os.environ, clock=time.monotonic):
         self._emu = emulator
         self._environ = environ
+        self._clock = clock
         self._window: tuple[int, tuple[int, int, int, int]] | None = None
+        self._pid: int | None = None                  # B129: the process the cached window belongs to
+        self._found_at: float | None = None
 
     def _find(self, pid: int, display: str) -> tuple[int, tuple[int, int, int, int]]:
         env = dict(os.environ, DISPLAY=display)
@@ -107,6 +123,13 @@ class WindowPicture:
                            text=True, timeout=XDOTOOL_WAIT, env=env, check=False)
         best = None
         for w in r.stdout.split():
+            o = subprocess.run(["xdotool", "getwindowpid", w], capture_output=True, text=True,
+                               timeout=XDOTOOL_WAIT, env=env, check=False)
+            try:
+                if o.returncode != 0 or int(o.stdout.strip()) != pid:      # B129: owned by the game's process
+                    continue
+            except ValueError:
+                continue
             g = subprocess.run(["xdotool", "getwindowgeometry", "--shell", w], capture_output=True, text=True,
                                timeout=XDOTOOL_WAIT, env=env, check=False)
             kv = dict(line.split("=", 1) for line in g.stdout.splitlines() if "=" in line)
@@ -131,12 +154,17 @@ class WindowPicture:
         if proc is None:
             raise RuntimeError("no game process")
         try:
-            if self._window is None:
-                self._window = self._find(int(proc.pid), display)
+            pid = int(proc.pid)
+            now = self._clock()
+            if (self._window is None or self._pid != pid or self._found_at is None
+                    or now - self._found_at >= REFIND_S):                    # B129: found again
+                self._window, self._pid, self._found_at = None, None, None
+                self._window = self._find(pid, display)
+                self._pid, self._found_at = pid, now
             x, y, w, h = self._window[1]
             return ImageGrab.grab(bbox=(x, y, x + w, y + h), xdisplay=display)
         except Exception as exc:
-            self._window = None                                 # found again at the next picture
+            self._window, self._pid, self._found_at = None, None, None     # found again at the next picture
             raise RuntimeError(f"the picture was not read: {exc}") from exc
 
 
@@ -163,6 +191,7 @@ class MiniGame:
         self.picture = WindowPicture(emulator, environ)
         self.read_every = READ_EVERY
         self.recognise_s = RECOGNISE_S
+        self.recognise_setup_s = RECOGNISE_SETUP_S      # B130
         self._watch: dict | None = None
         self._stopped: str | None = None
         self._start_lock = threading.Lock()          # B105: starts one at a time (a replace cannot race a replace)
@@ -234,6 +263,7 @@ class MiniGame:
             self._refused(str(exc))
         loader = _Loader(self)
         begin = None                                        # B127: "setup" / "normal" only under a cheat setup
+        setup = None
         if load:
             if kind in ("pcsx2", "dolphin"):
                 self._refused("not supported yet")
@@ -275,6 +305,9 @@ class MiniGame:
                 line_ms = loader._load(game, state, folder, stem)
             except live.Busy:
                 raise live.Busy("the mini game's state did not load; the game is as it was") from None
+        # B130: a watch begun with the load under a cheat setup waits RECOGNISE_SETUP_S for the start (RetroArch's
+        # notices cover the screen for ~8 s after a setup's launch); every other watch today's RECOGNISE_S
+        recognise_s = self.recognise_setup_s if (load and setup is not None) else self.recognise_s
         reader = endscreen().Reader(spec, arrays, clock=self._clock)
         ended = endscreen().Ended(spec)
         if load:
@@ -291,10 +324,11 @@ class MiniGame:
             self._watch = {"state": "watching", "game": game, "class": None, "seen_start": ended.seen_start,
                            "recognised": None, "reads": 0, "last": None, "loaded": load, "picture_failures": 0,
                            "keep": ({"folder": keep_dir.name, "pictures": 0} if keep_dir is not None else None),
-                           "t0": self._clock(), "token": token, "_keep_dir": keep_dir}
+                           "t0": self._clock(), "token": token, "_keep_dir": keep_dir,
+                           "_recognise_s": recognise_s}
             row = {"step": "watching", "game": game, "loaded": load, "load_line_ms": line_ms,
                    "k": ended.k, "start_class": spec["start_class"], "end_classes": spec["end_classes"],
-                   "spec_version": spec.get("version"), "recognise_s": self.recognise_s, "bench": bench,
+                   "spec_version": spec.get("version"), "recognise_s": recognise_s, "bench": bench,
                    "keep": keep_dir.name if keep_dir is not None else None}
             if begin is not None:
                 row["begin"] = begin                                 # B127: only under a cheat setup
@@ -439,7 +473,7 @@ class MiniGame:
                         w["picture_failures"] += 1
                         self._row({"step": "picture_failed", "game": game, "why": str(exc)[:200]})
                         since = round(self._clock() - w["t0"], 1)
-                        if w["recognised"] is None and w["loaded"] and since >= self.recognise_s:
+                        if w["recognised"] is None and w["loaded"] and since >= w.get("_recognise_s", self.recognise_s):
                             self._settle(w, False, since, None)
                     continue
                 r = reader.read(img)
@@ -460,7 +494,7 @@ class MiniGame:
                     if w["recognised"] is None:
                         if r["class"] == start_class:
                             self._settle(w, True, since, r)
-                        elif w["loaded"] and since >= self.recognise_s:
+                        elif w["loaded"] and since >= w.get("_recognise_s", self.recognise_s):
                             self._settle(w, False, since, r)
                     if done:
                         w.update(state="ended", **{"class": done}, ended_after_s=since)

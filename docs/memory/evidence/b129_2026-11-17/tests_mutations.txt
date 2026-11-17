@@ -1,0 +1,16 @@
+# B129 mutations (each a copy of /tmp/b_q31at; GameWindow run against it)
+== M1
+FAIL: test_1_then_a_windowed_game_its_own_rectangle
+FAIL: test_2_a_window_listed_but_owned_by_another_is_not_taken
+FAIL: test_3_no_window_of_the_process_a_picture_failure_never_a_read
+FAILED (failures=3)
+== M2
+FAIL: test_1_then_a_windowed_game_its_own_rectangle
+FAIL: test_2_a_window_listed_but_owned_by_another_is_not_taken
+FAIL: test_3_no_window_of_the_process_a_picture_failure_never_a_read
+FAILED (failures=3)
+== M3
+FAIL: test_2_a_window_listed_but_owned_by_another_is_not_taken
+FAIL: test_3_no_window_of_the_process_a_picture_failure_never_a_read
+FAILED (failures=2)
+M1 = HEAD's companion/h7_minigame.py (1fc0ced0); M2 = the cache not keyed to the process; M3 = no owner check (getwindowpid).
