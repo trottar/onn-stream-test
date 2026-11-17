@@ -210,9 +210,11 @@ class Client:
 
 client = Client()
 watching = {"on": True}
+QUIET = set()                                 # B133: kinds whose polls are paused (the board no longer asking)
 def watcher(kind, path):
     while watching["on"]:
-        timed(kind, "GET", path)
+        if kind not in QUIET:
+            timed(kind, "GET", path)
         time.sleep(0.1)
 for kind, path in (("status", "/plugins/games/status"), ("result", "/plugins/games/party-minigame-result"),
                    ("ns_status", "/plugins/games/native-stream-status")):
@@ -342,6 +344,7 @@ if args["mode"] == "today":
                             "start": ("POST", "/plugins/games/party-minigame-start?id=x&seats=1,2"),
                             "result": ("GET", "/plugins/games/party-minigame-result"),
                             "end": ("POST", "/plugins/games/party-minigame-end"),
+                            "go": ("POST", "/plugins/games/party-minigame-go"),     # B133
                             "status_idle": ("GET", "/plugins/games/status"),
                             "home_idle": ("POST", "/plugins/games/native-stream-stop"),
                             "stop_idle": ("POST", "/plugins/games/stop")}.items():
@@ -711,6 +714,225 @@ if args["mode"] == "cheat":
     S["c_files_diff"] = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
     S["c_scratch_end"] = scratch_anywhere()
     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
+    finish()
+if args["mode"] in ("hold", "practice"):
+    # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
+    n64 = args["n64_id"]
+    v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+    shutil.copyfile(v3.with_name(js4["arrays"]), rules_ / f"{n64}.endscreen.npz")
+    js4["arrays"] = f"{n64}.endscreen.npz"
+    (rules_ / f"{n64}.endscreen.json").write_text(json.dumps(js4))
+    (rules_ / f"{n64}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
+    (rules_ / f"{n64}.party.json").write_text(json.dumps({"players": 4}))
+    def folder():
+        return m._state_root() / ("Mupen64Plus-Next" if m._n64_core else "Beetle PSX HW")
+    listed = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
+    S["h_list"] = [{"players": e["players"], "title": e.get("title")} for e in listed]
+    tok2 = next(e["id"] for e in listed if e["players"] == 2)
+    tok4 = next(e["id"] for e in listed if e["players"] == 4)
+    layer.poll_gone_s = 120.0
+
+    def res():
+        return call("GET", "/plugins/games/party-minigame-result")["body"]
+
+    def wait_phase(pred, bound=15):
+        end = time.monotonic() + bound
+        b = {}
+        while time.monotonic() < end:
+            b = res()
+            if pred(b):
+                return b
+            time.sleep(0.05)
+        return dict(b, timeout=True)
+
+    def steps_since(r0):
+        return [r["step"] for r in rows()[r0:]]
+
+    def title_alive():
+        return fake["ra"].poll() is None if "ra" in fake else None
+
+    def held_start(tag, tok, seats, script):
+        """Start held; returns rows index. The board up first if it is not."""
+        if call("GET", "/plugins/games/status")["body"].get("launch_kind") != "godot" or board_pid_now() is None:
+            board_up(tag)
+        pic.set(script)
+        r0 = len(rows())
+        S[tag + "_start"] = timed("start", "POST", f"/plugins/games/party-minigame-start?id={tok}&seats={seats}&hold=1")
+        return r0
+
+    def finish_case(tag, r0, k0=None):
+        S[tag + "_end"] = timed("board_end", "POST", "/plugins/games/party-minigame-end")
+        S[tag + "_closed"] = wait_for(lambda b: b.get("closed"), 20).get("closed")
+        S[tag + "_rows"] = steps_since(r0)
+        S[tag + "_title_gone"] = not title_alive()
+        S[tag + "_route_after"] = bridge._party_route
+        S[tag + "_switches"] = [[r.get("window"), r.get("switched")] for r in rows()[r0:] if r["step"] == "minigame_stream"]
+        S[tag + "_board_picture_back"] = wait_until(lambda: stream.flowing() and stream.captured_pid == board_pid_now(), 20)
+
+    def during_ready(tag):
+        S[tag + "_route_ready"] = bridge._party_route
+        S[tag + "_stream_on_board"] = stream.captured_pid == board_pid_now()
+        S[tag + "_title_paused_ready"] = fake["ra"].paused if "ra" in fake else None
+
+    if args["mode"] == "hold":
+        # H1: T88-shaped — notices-like pictures, then the start; held, the board asking; the go; the end
+        r0 = held_start("h1", tok2, "1,2", ["other"] * 5 + ["start"] * 400)
+        S["h1_preparing"] = wait_phase(lambda b: b.get("phase") == "preparing" or b.get("state") != "starting", 5)
+        b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+        S["h1_ready"] = {k: b.get(k) for k in ("state", "phase", "recognised", "practices")}
+        during_ready("h1")
+        S["h1_rows_at_ready"] = steps_since(r0)
+        time.sleep(3.0)                                         # a hold with the board asking
+        S["h1_still"] = {k: res().get(k) for k in ("state", "phase")}
+        S["h1_go"] = timed("go", "POST", "/plugins/games/party-minigame-go")["body"]
+        pic.set(["other"] * 6 + ["end_P1"] * 60)
+        S["h1_go_again"] = call("POST", "/plugins/games/party-minigame-go")
+        p_ = wait_phase(lambda b: b.get("state") != "starting", 20)
+        S["h1_route_playing"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+        S["h1_stream_on_title"] = stream.captured_pid == getattr(fake.get("ra"), "pid", None)
+        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+        S["h1"] = {k: e.get(k) for k in ("state", "class", "scores", "why")}
+        finish_case("h1", r0)
+        S["h1_row_fields"] = {r["step"]: {k: v for k, v in r.items() if k in ("prepare_s", "held_s", "handover_s",
+                                                                             "remembered", "hold")}
+                              for r in rows()[r0:] if r["step"] in ("minigame_start", "minigame_ready", "minigame_go",
+                                                                     "minigame_playing")}
+        # H2: the go before ready (remembered), a second go; T89-shaped (N64: the loads only while paused)
+        r0 = held_start("h2", tok4, "3,1,4,2", ["s4other"] * 6 + ["s4start"] * 400)
+        S["h2_go_early"] = call("POST", "/plugins/games/party-minigame-go")["body"]
+        S["h2_go_second"] = call("POST", "/plugins/games/party-minigame-go")["body"]
+        p_ = wait_phase(lambda b: b.get("state") != "starting", 25)
+        S["h2_playing"] = {k: p_.get(k) for k in ("state", "phase")}
+        pic.set(["s4other"] * 3 + ["s4r2143"] * 60)
+        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+        S["h2"] = {k: e.get(k) for k in ("state", "places", "scores", "seats", "why")}
+        finish_case("h2", r0)
+        S["h2_go_row"] = [{k: v for k, v in r.items() if k in ("remembered",)} for r in rows()[r0:]
+                          if r["step"] == "minigame_go"]
+        # H3: never the start → given up, no route, no switch, the title gone, the board's session back
+        r0 = held_start("h3", tok2, "1,2", ["other"] * 400)
+        e = wait_for(lambda b: b.get("state") in ("given_up", "ended") or b.get("phase") == "ready", 20)
+        S["h3"] = {k: e.get(k) for k in ("state", "why", "phase")}
+        finish_case("h3", r0)
+        S["h3_status_kind"] = call("GET", "/plugins/games/status")["body"].get("launch_kind")
+        # H4: the board stops asking during the hold → given up, the title stopped
+        r0 = held_start("h4", tok2, "1,2", ["start"] * 400)
+        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+        layer.poll_gone_s = 1.5
+        QUIET.add("result")
+        wait_until(lambda: layer.mg.get("closed"), 15)
+        S["h4"] = {k: layer.mg.get(k) for k in ("state", "why", "closed")}
+        S["h4_title_gone"] = not title_alive()
+        S["h4_rows"] = steps_since(r0)
+        QUIET.discard("result")
+        layer.poll_gone_s = 120.0
+        # H5: the board's end during the preparation and during the hold
+        for tag, when in (("h5p", "preparing"), ("h5h", "ready")):
+            r0 = held_start(tag, tok2, "1,2", ["other"] * 6 + ["start"] * 400)
+            wait_phase(lambda b, w=when: b.get("phase") == w or b.get("state") != "starting", 20)
+            S[tag + "_second_start"] = call("POST", f"/plugins/games/party-minigame-start?id={tok2}&seats=1,2&hold=1")
+            finish_case(tag, r0)
+            S[tag + "_state"] = layer.mg.get("state")
+        # H6: the onn's Home during the hold → given up, then Home / RESUME act on the board
+        r0 = held_start("h6", tok2, "1,2", ["start"] * 400)
+        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+        S["h6_home"] = timed("home", "POST", "/plugins/games/native-stream-stop")["body"]
+        client.in_stream = False
+        wait_until(lambda: layer.mg.get("closed"), 15)
+        S["h6"] = {k: layer.mg.get(k) for k in ("state", "why", "closed")}
+        S["h6_title_gone"] = not title_alive()
+        rs = timed("resume_start", "POST", "/plugins/games/native-stream-start?port=48100", timeout=30)
+        client.in_stream = True
+        rr = timed("resume_ready", "POST", "/plugins/games/native-stream-ready", timeout=30)
+        S["h6_resume"] = {"start": rs["code"], "ready": rr["code"],
+                          "kind": call("GET", "/plugins/games/status")["body"].get("launch_kind")}
+        S["h6_rows"] = steps_since(r0)
+        S["h6_route_ever"] = [r for r in steps_since(r0) if r == "minigame_route"]
+        # H7: the onn's END during the preparation (everything ends, as today)
+        r0 = held_start("h7", tok2, "1,2", ["other"] * 8 + ["start"] * 400)
+        wait_phase(lambda b: b.get("phase") == "preparing", 10)
+        S["h7_end"] = timed("end_onn", "POST", "/plugins/games/stop")["body"]
+        wait_until(lambda: layer.mg.get("closed"), 15)
+        S["h7"] = {k: layer.mg.get(k) for k in ("state", "why", "closed")}
+        S["h7_title_gone"] = not title_alive()
+        S["h7_board_gone"] = wait_until(lambda: board_pid_now() is None, 15)
+        S["h7_rows"] = steps_since(r0)
+        # the go with nothing held
+        S["h_go_none"] = call("POST", "/plugins/games/party-minigame-go")
+        S["h_go_bad"] = call("POST", "/plugins/games/party-minigame-go?practice=2")
+        S["h_hold_bad"] = call("POST", f"/plugins/games/party-minigame-start?id={tok2}&seats=1,2&hold=2")
+    if args["mode"] == "practice":
+        r0 = held_start("p", tok2, "1,2", ["start"] * 400)
+        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+        S["p_rows_before"] = rows()[r0:]
+        for n in range(3):
+            tag = f"p{n + 1}"
+            S[tag + "_go"] = timed("go", "POST", "/plugins/games/party-minigame-go?practice=1")["body"]
+            b = wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+            S[tag + "_playing"] = {k: b.get(k) for k in ("state", "practice", "practices")}
+            pic.set(["end_P1"] * 400)                      # an end screen shown in the practice changes nothing
+            time.sleep(1.2)
+            S[tag + "_still"] = {k: res().get(k) for k in ("state", "practice", "scores", "class")}
+            S[tag + "_route_in"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+            S[tag + "_stream_on_title"] = stream.captured_pid == getattr(fake.get("ra"), "pid", None)
+            pic.set(["start"] * 400)
+            if n < 2:
+                bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # the second pad's Start
+                bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+            else:
+                layer.practice_s = 2.0                              # the practice's time alone (scaled)
+            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+            S[tag + "_back"] = {k: b.get(k) for k in ("state", "phase", "practices", "scores")}
+            S[tag + "_route_back"] = bridge._party_route
+            S[tag + "_stream_on_board"] = wait_until(lambda: stream.captured_pid == board_pid_now(), 10)
+            layer.practice_s = 90.0
+        S["p_end_rows"] = [{k: v for k, v in r.items() if k in ("step", "by")} for r in rows()[r0:]
+                           if r["step"] in ("minigame_practice_end", "minigame_ready")]
+        # then a real go: scored as today; Start in it does nothing on the hub
+        S["p_real_go"] = timed("go", "POST", "/plugins/games/party-minigame-go")["body"]
+        b = wait_phase(lambda b: b.get("state") != "starting", 20)
+        bridge._apply_report(0, 0x0010, 0, 0, 0, 0, 0, 0)
+        bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
+        time.sleep(1.0)
+        S["p_real_after_start"] = {k: res().get(k) for k in ("state", "practice")}
+        pic.set(["other"] * 3 + ["end_P2"] * 60)
+        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+        S["p_real"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
+        finish_case("p", r0)
+        S["p_practice_end_rows_total"] = sum(1 for r in rows()[r0:] if r["step"] == "minigame_practice_end")
+        all_rows = (root / "logs/games/party.jsonl").read_text() if (root / "logs/games/party.jsonl").is_file() else ""
+        S["p_names_in_rows"] = [t for t in (e_.get("title") for e_ in listed) if t and t in all_rows]
+        # END from the board, the onn's END / Home during a practice and during its way back
+        for tag, how, when in (("q1", "board", "practice"), ("q2", "home", "practice"), ("q3", "board", "way_back"),
+                               ("q4", "onn_end", "practice")):
+            r0 = held_start(tag, tok2, "1,2", ["start"] * 400)
+            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            call("POST", "/plugins/games/party-minigame-go?practice=1")
+            wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+            if when == "way_back":
+                pic.set(["other"] * 400)                    # the way back's preparation runs on
+                bridge._apply_report(0, 0x0010, 0, 0, 0, 0, 0, 0)
+                bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
+                wait_phase(lambda b: b.get("phase") == "preparing", 10)
+            if how == "board":
+                S[tag + "_end"] = timed("board_end", "POST", "/plugins/games/party-minigame-end")["body"]
+            elif how == "home":
+                S[tag + "_end"] = timed("home", "POST", "/plugins/games/native-stream-stop")["body"]
+                client.in_stream = False
+            else:
+                S[tag + "_end"] = timed("end_onn", "POST", "/plugins/games/stop")["body"]
+            wait_until(lambda: layer.mg.get("closed"), 15)
+            S[tag] = {k: layer.mg.get(k) for k in ("state", "why", "closed", "scores")}
+            S[tag + "_title_gone"] = not title_alive()
+            S[tag + "_hook_cleared"] = getattr(bridge, "_party_buttons", None) is None
+            if how == "home":
+                call("POST", "/plugins/games/native-stream-start?port=48100")
+                client.in_stream = True
+                call("POST", "/plugins/games/native-stream-ready")
+    S["h_running_at_end"] = [title_alive()]
+    timed("end_onn", "POST", "/plugins/games/stop")
+    wait_until(lambda: board_pid_now() is None, 10)
+    S["h_board_at_end"] = board_pid_now()
     finish()
 if args["mode"] == "three":
     def real_stall(tag):

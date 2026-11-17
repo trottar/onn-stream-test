@@ -1,0 +1,923 @@
+diff --git a/companion/h7_minigame.py b/companion/h7_minigame.py
+index f6b69cb8..7f5c39fd 100644
+--- a/companion/h7_minigame.py
++++ b/companion/h7_minigame.py
+@@ -341,6 +341,47 @@ class MiniGame:
+             answer["begin"] = begin
+         return answer
+ 
++    def reload(self) -> float | None:
++        """B133: the begin loaded again into the running game — the setup's when under one (B127), else the normal one;
++        through scratch slot 8 of the session's folder; N64 only into a paused core (B123) — the watch, if one is on,
++        kept as it is (its `recognised`, its start seen). Used by a held party mini game at its go. -> the load line's
++        ms; ValueError with the plain reason, live.Busy when the state did not load."""
++        with self._start_lock:
++            game, system, kind = self._live._running()
++            if game is None:
++                self._refused("no game is running")
++            if kind in ("pcsx2", "dolphin") or system not in SYSTEMS:
++                self._refused("not supported yet")
++            state = live.rules_folder(self._environ) / f"{game}.state"
++            setup = session_profile_id(self._emu)
++            if setup is not None:
++                own = live.rules_folder(self._environ) / setup_begin_name(game, setup)
++                if own.is_file() and own.stat().st_size > 0:
++                    state = own
++            if not state.is_file() or state.stat().st_size <= 0:
++                self._refused("no state for this game's mini game")
++            loader = _Loader(self)
++            core = loader._core_file(system)
++            if system == "n64":
++                core = str(getattr(self._emu, "_n64_core", None) or core)
++            folder_name = contest.CORE_FOLDERS.get(core[:-len(".so")] if core.endswith(".so") else core)
++            if folder_name is None:
++                self._refused("not supported yet with this game's core")
++            if system == "n64":
++                try:
++                    paused = self._emu._retroarch_network_status() == "PAUSED"
++                except Exception:
++                    paused = False
++                if not paused:
++                    self._refused(N64_NOT_PAUSED)
++            try:
++                line_ms = loader._load(game, state, self._emu._state_root() / folder_name,
++                                       self._emu._active_state_stem())
++            except live.Busy:
++                raise live.Busy("the mini game's state did not load; the game is as it was") from None
++            self._row({"step": "reloaded", "game": game, "load_line_ms": line_ms})
++            return line_ms
++
+     def bench_release(self, client_ip: str) -> dict:
+         """B112: the running game's pause released with no stream (loopback, no client's stream up)."""
+         if str(client_ip or "") not in LOOPBACK:
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 04cd4b57..8c5f8177 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -86,6 +86,11 @@ NOT_UNDER_SETUP = "the title did not start under its cheat setup"
+ STATE_REFUSED = {"save-state": "not during a mini game: nothing was saved",
+                  "load-state": "not during a mini game: nothing was loaded"}
+ _HEX64 = re.compile(r"^[0-9A-Fa-f]{64}$")
++# B133 / B134: the title prepared behind the board, handed over on the board's go; practice
++PRACTICE_S = 90.0          # a practice left after this long playing (or by the Start button on any pad)
++XUSB_START = 0x0010        # the pad report's Start bit (native_session_io: XUSB_START)
++NO_GO = "no mini game is waiting for the go"
++NOT_RECOGNISED = "the title's start screen was not recognised"
+ 
+ _local = threading.local()
+ 
+@@ -173,6 +178,7 @@ class PartyMinigames:
+         self.play_limit_s, self.unknown_limit_s = PLAY_LIMIT_S, UNKNOWN_LIMIT_S
+         self.poll_gone_s, self.end_wait_s, self.tick = POLL_GONE_S, END_WAIT_S, TICK
+         self.start_limit_s, self.switch_limit_s, self.step_grace_s = START_LIMIT_S, SWITCH_LIMIT_S, STEP_GRACE_S
++        self.practice_s = PRACTICE_S               # B134
+         self.stream_needed = True               # B112's bench sets False (no stream, no switch)
+         self._reads: dict[str, dict] = {}       # B114: the last good answer of each bounded read, its helper
+ 
+@@ -214,21 +220,23 @@ class PartyMinigames:
+                 more = {"cheat": cheat} if cheat is not None else {}
+                 if spec.get("version") == PLACES_VERSION or "places_to_scores" in side:
+                     entry = self._places_entry(spec, side, n)          # B123: a place for every player
+-                    if entry is None or self.p._find_game_by_id(game) is None:
++                    record = self.p._find_game_by_id(game) if entry is not None else None
++                    if entry is None or record is None:
+                         continue
+-                    out[self._token(game)] = {"game": game, **entry, **more}
++                    out[self._token(game)] = {"game": game, **entry, **more, "title": str(record.get("title") or "")}
+                     continue
+                 scores = {str(k): [int(x) if float(x).is_integer() else float(x) for x in v]
+                           for k, v in dict(side["scores"]).items()}
+                 ends = list(spec["end_classes"])
+                 if n < 1 or n > 4 or sorted(scores) != sorted(ends) or any(len(v) != n for v in scores.values()):
+                     continue
+-                if self.p._find_game_by_id(game) is None:
++                record = self.p._find_game_by_id(game)
++                if record is None:
+                     continue
+             except Exception:
+                 continue
+             out[self._token(game)] = {"game": game, "players": n, "scores": scores, "start_class": spec["start_class"],
+-                                      **more}
++                                      **more, "title": str(record.get("title") or "")}
+         return out
+ 
+     @staticmethod
+@@ -265,10 +273,11 @@ class PartyMinigames:
+         return {"players": n, "scores": None, "places_to_scores": p2s, "start_class": spec["start_class"]}
+ 
+     def listing(self) -> dict:
+-        return {"ok": True, "minigames": [{"id": t, "players": e["players"]} for t, e in sorted(self._entries().items())]}
++        return {"ok": True, "minigames": [{"id": t, "players": e["players"], "title": e["title"]}   # B134: the name
++                                          for t, e in sorted(self._entries().items())]}
+ 
+     # --- start --------------------------------------------------------------------------------------------------------
+-    def start(self, token: str, seats_text: str, bench: bool = False) -> dict:
++    def start(self, token: str, seats_text: str, bench: bool = False, hold: bool = False) -> dict:
+         self.stream_needed = not bench           # B112: with the bench word, the watcher runs with no stream
+         if not party.active(self.emu):
+             self.row({"step": "minigame_refused", "why": "the board game is not the running session"})
+@@ -296,10 +305,14 @@ class PartyMinigames:
+               "stash": None, "launched": False, "routed": False, "ended_by": None, "closed": False,
+               # B114: the actor's step, the taken calls, the end's owner
+               "step": None, "step_since": None, "queue": collections.deque(), "end_req": None, "ending": False,
+-              "title_proc": None, "actor_done": False, "switched_to": None}
++              "title_proc": None, "actor_done": False, "switched_to": None,
++              # B133 / B134: a held start — prepared behind the board, handed over on the board's go
++              "hold": bool(hold), "phase": None, "go": None, "prep_t0": now, "ready_at": None, "play_t0": None,
++              "practice": False, "practice_t0": None, "practices": 0, "practice_end_by": None}
+         with self._lock:
+             self.mg = mg
+-        self.row({"step": "minigame_start", "seats": seats, "players": entry["players"]})
++        self.row({"step": "minigame_start", "seats": seats, "players": entry["players"],
++                  **({"hold": True} if hold else {})})
+         threading.Thread(target=self._actor, args=(mg,), daemon=True, name="party-minigame").start()
+         threading.Thread(target=self._watch, args=(mg,), daemon=True, name="party-minigame-watch").start()
+         return {"ok": True, "state": "starting", "seats": seats}
+@@ -461,7 +474,9 @@ class PartyMinigames:
+     # --- the actor: the start's steps, then every taken call in order -------------------------------------------------
+     def _step(self, mg: dict, name: str, fn: Callable[[], Any]):
+         with self._cond:
+-            if mg["end_req"] is not None or mg["closed"] or mg["state"] != "starting":
++            # B134: a held mini game's steps also run while a practice plays (its way back)
++            if (mg["end_req"] is not None or mg["closed"]
++                    or mg["state"] not in (("starting", "playing") if mg.get("hold") else ("starting",))):
+                 raise _Abort()
+             mg["step"], mg["step_since"] = name, self.clock()
+         try:
+@@ -499,6 +514,9 @@ class PartyMinigames:
+             self.row({"step": "minigame_launch", "pid_owned": True, "cheat": True, "profile_matches": matches})
+             if not matches:
+                 raise RuntimeError(NOT_UNDER_SETUP)
++        if mg["hold"]:                               # B133: prepared behind the board, handed over on the go
++            self._held_steps(mg, proc)
++            return
+         self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
+         bridge = self._bridge()
+         if bridge is not None:
+@@ -517,6 +535,159 @@ class PartyMinigames:
+                 mg["state"] = "playing"
+         self.row({"step": "minigame_playing"})
+ 
++    # --- B133 / B134: the held start ----------------------------------------------------------------------------------
++    def _wait(self, mg: dict, until: Callable[[], bool], allowed: tuple = ("starting",)) -> None:
++        """Wait (the actor) until `until()` holds; an end asked for, the mini game closed or a final state → _Abort."""
++        while True:                                   # B114: `until` runs with no lock held (it may read the watch)
++            with self._cond:
++                if mg["end_req"] is not None or mg["closed"] or mg["state"] not in allowed:
++                    raise _Abort()
++            if until():
++                return
++            with self._cond:
++                self._cond.wait(0.1)
++
++    def _prepare(self, mg: dict, after_practice: bool = False) -> None:
++        """The title made ready behind the board: paused, the begin loaded (a new watch), run until the start is read
++        (the stream untouched, no pad route), then paused again → "ready". Not recognised → RuntimeError."""
++        emu = self.emu
++        runner = self.p._h7_minigame_runner()
++        t0 = self.clock()
++        with self._lock:
++            mg["phase"], mg["prep_t0"], mg["ready_at"] = "preparing", t0, None
++        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
++        self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed))
++        self.row({"step": "minigame_watch", "loaded": True})
++        self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))      # behind the board: nobody routed
++        seen: dict = {}
++
++        def recognised() -> bool:
++            try:
++                r = runner.result()
++            except Exception:
++                return False
++            seen["r"] = r.get("recognised")
++            if r.get("state") in ("no_game", "idle", "no_spec"):
++                seen["r"] = False
++            return seen["r"] is not None
++        self._wait(mg, recognised)
++        if seen.get("r") is not True:
++            raise RuntimeError(NOT_RECOGNISED)
++        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))        # held paused: no input, notices run out
++        now = self.clock()
++        with self._cond:
++            mg["phase"], mg["ready_at"], mg["recognised"] = "ready", now, True
++            self._cond.notify_all()
++        self.row({"step": "minigame_ready", "prepare_s": round(now - t0, 3),
++                  **({"after_practice": True} if after_practice else {})})
++
++    def _handover(self, mg: dict, proc: Any) -> bool:
++        """The go: the begin loaded again (paused; the watch kept), the pads routed, the planned switch, the release.
++        → True for a practice."""
++        emu = self.emu
++        runner = self.p._h7_minigame_runner()
++        go = mg["go"]
++        t0 = self.clock()
++        with self._lock:
++            mg["phase"] = "handing_over"
++        self.row({"step": "minigame_go", "held_s": round(t0 - (mg["ready_at"] or t0), 3),
++                  "remembered": bool(go["remembered"]), **({"practice": True} if go["practice"] else {})})
++        self._step(mg, "reload", lambda: runner.reload())
++        self.row({"step": "minigame_reloaded", "loaded": True})
++        if go["practice"]:
++            self._bounded(lambda: runner.stop(), 2.0)       # B134: nothing read in a practice
++        bridge = self._bridge()
++        if bridge is not None:
++            self._step(mg, "route", lambda: bridge.set_party_route({s - 1: k for k, s in enumerate(mg["seats"])}))
++            mg["routed"] = True
++        self.row({"step": "minigame_route", "ports": {str(k + 1): s for k, s in enumerate(mg["seats"])},
++                  "routed": mg["routed"]})
++        if self._step(mg, "switch", lambda: self._switch_stream("minigame", getattr(proc, "pid", None))):
++            mg["switched_to"] = "minigame"
++        if go["practice"] and bridge is not None:
++            self._start_hook(mg, bridge)
++        self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))
++        now = self.clock()
++        with self._cond:
++            if mg["state"] == "starting":
++                mg["state"], mg["play_t0"], mg["phase"] = "playing", now, None
++                if go["practice"]:
++                    mg["practice"], mg["practice_t0"], mg["practice_end_by"] = True, now, None
++            self._cond.notify_all()
++        self.row({"step": "minigame_playing", "handover_s": round(now - t0, 3),
++                  **({"practice": True, "n": mg["practices"] + 1} if go["practice"] else {})})
++        return bool(go["practice"])
++
++    def _start_hook(self, mg: dict, bridge: Any) -> None:
++        """B134: the Start button on any pad leaves a practice (the bridge's report hook; None again after)."""
++        last: dict = {}
++
++        def hook(player: int, buttons: int) -> None:
++            down = bool(int(buttons) & XUSB_START)
++            if down and not last.get(player, False):
++                with self._cond:
++                    if mg.get("practice") and mg["practice_end_by"] is None:
++                        mg["practice_end_by"] = "start_button"
++                        self._cond.notify_all()
++            last[player] = down
++        bridge._party_buttons = hook
++
++    def _way_back(self, mg: dict) -> None:
++        """B134: a practice over — the route cleared, the planned switch to the board, the title paused; then made
++        ready again behind the board (`_prepare`)."""
++        emu = self.emu
++        bridge = self._bridge()
++        if bridge is not None:
++            bridge._party_buttons = None
++        now = self.clock()
++        self.row({"step": "minigame_practice_end", "by": mg["practice_end_by"] or "time",
++                  "practice_s": round(now - (mg["practice_t0"] or now), 3)})
++        if mg.get("routed") and bridge is not None:
++            self._step(mg, "unroute", lambda: bridge.set_party_route(None))
++            mg["routed"] = False
++        board = (mg.get("stash") or {}).get("process")
++        if self._step(mg, "switch", lambda: self._switch_stream("board", getattr(board, "pid", None))):
++            mg["switched_to"] = "board"
++        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
++        with self._cond:
++            mg.update(state="starting", practice=False, practice_t0=None, practice_end_by=None, go=None,
++                      practices=mg["practices"] + 1, phase="preparing")
++            self._cond.notify_all()
++
++    def _held_steps(self, mg: dict, proc: Any) -> None:
++        after = False
++        while True:
++            self._prepare(mg, after_practice=after)
++            self._wait(mg, lambda: mg["go"] is not None)
++            if not self._handover(mg, proc):
++                return
++            self._wait(mg, lambda: mg["practice_end_by"] is not None
++                       or self.clock() - (mg["practice_t0"] or self.clock()) >= self.practice_s, ("playing",))
++            if mg["practice_end_by"] is None:
++                mg["practice_end_by"] = "time"
++            self._way_back(mg)
++            after = True
++
++    def go(self, practice_text: str = "") -> dict:
++        """B133 / B134: the board's go (`practice=1`: a practice) — taken at once; remembered before "ready"."""
++        word = str(practice_text or "").strip()
++        if word not in ("", "1"):
++            raise ValueError("practice is 1")
++        with self._cond:
++            mg = self.mg
++            if (mg is None or not mg.get("hold") or mg["closed"] or mg["end_req"] is not None
++                    or mg["state"] in FINAL):
++                raise ValueError(NO_GO)
++            if mg["go"] is not None and (mg["state"] == "starting" or not mg["practice"]):
++                return {"ok": True, "go": "already", "phase": mg["phase"] or mg["state"]}
++            if mg["state"] != "starting":                 # a practice playing: its way back comes first
++                raise ValueError(NO_GO)
++            phase = mg["phase"] or "preparing"            # before the preparation's first step: preparing
++            remembered = phase != "ready"
++            mg["go"] = {"practice": word == "1", "remembered": remembered, "at": self.clock()}
++            self._cond.notify_all()
++        return {"ok": True, "go": "remembered" if remembered else "taken", "phase": phase, "practice": word == "1"}
++
+     @staticmethod
+     def _cheat_query(game_id: str, cheat: dict) -> str:
+         """B127: the onn's Extras launch query for a saved setup (`showExistingGameCheatProfileDialog`'s call)."""
+@@ -604,6 +775,11 @@ class PartyMinigames:
+             return None
+         if kind == "end":
+             self._final(mg, "given_up", why="ended from the onn")
++        elif mg.get("hold") and (mg["state"] == "starting" or mg.get("practice")):
++            # B133 / B134: Home / RESUME while the TV shows the board (the preparation, the hold) or a practice: the
++            # mini game is given up first (the title stopped, the board's session back); the call then acts on the board
++            self._final(mg, "given_up", why="the onn's Home during the preparation")
++            self._enqueue(mg, "end_hub", None, by="onn: Home during the preparation")
+         item = self._enqueue(mg, kind, fn, by="onn" if kind == "end" else None)
+         if item is None:
+             return None
+@@ -695,6 +871,14 @@ class PartyMinigames:
+                 if now - (mg["final_at"] or now) >= self.end_wait_s:
+                     self._enqueue(mg, "end_hub", None, by="hub: no end call")
+                 continue
++            if state == "starting" and mg.get("hold"):     # B133: the limit is the preparation's; the hold has none
++                if mg["phase"] in (None, "preparing") and now - mg["prep_t0"] >= self.start_limit_s:
++                    self._final(mg, "given_up", why=f"the mini game was not ready within {self.start_limit_s:.0f} s")
++                    self._enqueue(mg, "end_hub", None, by="hub: the start was stuck")
++                elif mg["phase"] == "ready" and now - mg["last_poll"] >= self.poll_gone_s:
++                    self._final(mg, "given_up", why="the board stopped asking")
++                    self._enqueue(mg, "end_hub", None, by="hub: the board stopped asking")
++                continue
+             if state == "starting":
+                 if now - mg["t0"] >= self.start_limit_s:
+                     self._final(mg, "given_up", why=f"the mini game did not start within {self.start_limit_s:.0f} s")
+@@ -705,9 +889,11 @@ class PartyMinigames:
+             if now - mg["last_poll"] >= self.poll_gone_s:
+                 self._final(mg, "given_up", why="the board stopped asking")
+                 continue
+-            if now - mg["t0"] >= self.play_limit_s:
++            if now - (mg.get("play_t0") or mg["t0"]) >= self.play_limit_s:   # B133: a held start: from the hand-over
+                 self._final(mg, "given_up", why=f"no end within {self.play_limit_s:.0f} s")
+                 continue
++            if mg.get("practice"):                        # B134: nothing read, nothing scored in a practice
++                continue
+             try:
+                 r = runner.result()
+             except Exception:
+@@ -755,6 +941,13 @@ class PartyMinigames:
+             out = {"ok": True, "state": mg["state"], "seats": mg["seats"], "recognised": mg["recognised"],
+                    "class": mg["class"], "scores": mg["scores"], "why": mg["why"], "closed": mg["closed"],
+                    "since_s": round(self.clock() - mg["t0"], 1)}
++            if mg.get("hold"):                            # B133 / B134: a held start's phase, practices
++                if mg["state"] == "starting":
++                    out["phase"] = mg["phase"] or "preparing"
++                if mg["state"] == "playing" and mg["practice"]:
++                    out["practice"] = True
++                    out["practice_s"] = round(self.clock() - (mg["practice_t0"] or self.clock()), 1)
++                out["practices"] = mg["practices"]
+             if mg["entry"].get("places_to_scores") is not None:   # B123: the places read, port by port
+                 out["places"] = mg["places"]
+             return out
+@@ -817,7 +1010,12 @@ class PartyMinigames:
+             if bridge is not None:
+                 bridge.set_party_route(None)
+         board = (mg.get("stash") or {}).get("process")
+-        if by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:
++        bridge = self._bridge()
++        if bridge is not None and getattr(bridge, "_party_buttons", None) is not None:
++            bridge._party_buttons = None                  # B134: a practice's Start hook never outlives it
++        if mg.get("hold") and mg.get("switched_to") != "minigame":
++            pass                                          # B133: the stream never left the board: no switch back
++        elif by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:
+             try:
+                 self._switch_stream("board", getattr(board, "pid", None))
+             except Exception:
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index 831c7959..a976fa41 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4439,7 +4439,18 @@ class GamesPlugin:
+                 if self._native_stream.status().get("active"):
+                     raise ValueError(_h7_minigame.BENCH_STREAM_UP)
+                 bench = True
++            hold = False
++            if "hold" in q:                              # B133: prepared behind the board, handed over on the go
++                if self._first(q, "hold") != "1":
++                    raise ValueError("hold is 1")
++                hold = True
++            if hold:
++                return self._party_minigame_runner().start(self._first(q, "id"), self._first(q, "seats"), bench=bench,
++                                                           hold=True)
+             return self._party_minigame_runner().start(self._first(q, "id"), self._first(q, "seats"), bench=bench)
++        # B133 / B134: the board's go for a held start (practice=1: a practice)
++        if action == "party-minigame-go" and _party_minigame is not None:
++            return self._party_minigame_runner().go(self._first(parse_qs(raw_query), "practice"))
+         if action == "party-minigame-end" and _party_minigame is not None:
+             return self._party_minigame_runner().end(by="board")
+ 
+diff --git a/tests/b111_party_board/test_b111.py b/tests/b111_party_board/test_b111.py
+index b33fb574..0c6b57ab 100644
+--- a/tests/b111_party_board/test_b111.py
++++ b/tests/b111_party_board/test_b111.py
+@@ -38,6 +38,7 @@ class FakeHub:
+     def __init__(self):
+         self.calls: list[str] = []
+         self.polls: dict[str, int] = {}
++        self.held_state: dict[str, dict] = {}     # B135: a held start's state, per scenario
+         hub = self
+ 
+         class Handler(BaseHTTPRequestHandler):
+@@ -51,7 +52,12 @@ class FakeHub:
+                 scenario = parts[2] if len(parts) > 2 else ""
+                 action = path.split("/plugins/games/", 1)[-1].split("?", 1)[0]
+                 code, body = 200, {"ok": True}
+-                if action == "party-minigames":
++                if scenario.startswith("h"):                          # B135: the held starts (choose, load, go)
++                    code, body = hub.held(scenario, action, path)
++                    action = "-"
++                if action == "-":
++                    pass
++                elif action == "party-minigames":
+                     if scenario.startswith("mix"):                    # B124: a two- and a four-player game
+                         body["minigames"] = [{"id": "mg_two", "players": 2}, {"id": "mg_four", "players": 4}]
+                     else:
+@@ -91,6 +97,55 @@ class FakeHub:
+         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+         threading.Thread(target=self.server.serve_forever, daemon=True).start()
+ 
++    def held(self, scenario: str, action: str, path: str) -> tuple[int, dict]:
++        """B135: as the check's own stand-in — preparing for two result calls, ready from the third; the go only when
++        ready; a practice plays two calls and prepares again; a plain go plays two calls and ends [1, 0]."""
++        body: dict = {"ok": True}
++        st = self.held_state.setdefault(scenario, {"mode": "prep", "k": 0, "p": 0, "practices": 0})
++        if action == "party-minigames":
++            body["minigames"] = [{"id": "mg_a", "players": 2, "title": "Made-up A"}]
++            if scenario != "hone":
++                body["minigames"].append({"id": "mg_b", "players": 2, "title": "Made-up B"})
++        elif action == "party-minigame-start":
++            if scenario == "hrefused":
++                return 400, {"ok": False, "error": "a mini game is already on"}
++            st.update(mode="prep", k=0, p=0, practices=0)
++            body["state"] = "starting"
++        elif action == "party-minigame-result":
++            if scenario == "hsilent" and st["k"] >= 2:
++                return 500, {"ok": False, "error": "the hub is busy"}
++            if st["mode"] == "prep":
++                st["k"] += 1
++                if scenario == "hsilent":
++                    body.update(state="starting", phase="preparing")
++                elif scenario == "hgiveup" and st["k"] >= 2:
++                    body.update(state="given_up", why="the title's start screen was not recognised", scores=None)
++                else:
++                    body.update(state="starting", phase="ready" if st["k"] >= 3 else "preparing",
++                                practices=st["practices"])
++            elif st["mode"] == "practice":
++                st["p"] += 1
++                if st["p"] <= 2:
++                    body.update(state="playing", practice=True, practices=st["practices"])
++                else:
++                    st.update(mode="prep", k=0)
++                    st["practices"] += 1
++                    body.update(state="starting", phase="preparing", practices=st["practices"])
++            else:
++                st["p"] += 1
++                body.update({"state": "playing", "recognised": True} if st["p"] <= 2 else
++                            {"state": "ended", "class": "end_P1", "scores": [1, 0]})
++        elif action == "party-minigame-go":
++            if not (st["mode"] == "prep" and st["k"] >= 3):
++                return 400, {"ok": False, "error": "no mini game is waiting for the go"}
++            st.update(mode="practice" if "practice=1" in path else "play", p=0)
++            body.update(go="taken", phase="ready")
++        elif action == "party-minigame-end":
++            body["ended"] = True
++        else:
++            return 404, {"ok": False, "error": "Unknown Games plugin action"}
++        return 200, body
++
+     def close(self):
+         self.server.shutdown()
+         self.server.server_close()
+@@ -124,7 +179,7 @@ class BoardCheck(unittest.TestCase):
+     def test_with_the_checks_own_stand_in_hub(self):
+         r = run_check({})
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+-        self.assertIn("HUB MINIGAME CHECK: PASS (40 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats
++        self.assertIn("HUB MINIGAME CHECK: PASS (81 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats; B135: +41
+ 
+     def test_against_this_tests_fake_hub(self):
+         hub = FakeHub()
+@@ -134,13 +189,21 @@ class BoardCheck(unittest.TestCase):
+             hub.close()
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+         # its eight "asked" ones (B124: +3), "listens" and (B116) the five frame-rate ones are ours here
+-        self.assertIn("HUB MINIGAME CHECK: PASS (26 assertions)", r.stdout)
++        self.assertIn("HUB MINIGAME CHECK: PASS (56 assertions)", r.stdout)   # B135: +30 (its stand-in-only ones ours here)
+         starts = [c for c in hub.calls if "party-minigame-start" in c]
+         self.assertIn("/s/win1/plugins/games/party-minigame-start?id=mg_one&seats=1,2", starts)
+         self.assertIn("/s/mix4/plugins/games/party-minigame-start?id=mg_four&seats=3,1,4,2", starts)   # B124
+         self.assertIn("/s/mix2/plugins/games/party-minigame-start?id=mg_two&seats=1,2", starts)
+         self.assertFalse(any(c.startswith("/s/mix3/") for c in starts))
+-        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 10)   # every started one
++        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 19)   # every started one (B135: +9)
++        # B135: the screens' starts held, the goes only once ready, the practices
++        held = [c for c in starts if c.startswith("/s/h")]
++        self.assertTrue(held and all(c.endswith("&hold=1") for c in held), held)
++        self.assertFalse(any(c.startswith("/s/hrefused/") and c.endswith("party-minigame-end") for c in hub.calls))
++        goes = [c for c in hub.calls if c.startswith("/s/hpractice/") and "party-minigame-go" in c]
++        self.assertEqual([("practice=1" in c) for c in goes], [True, True, True, False])
++        self.assertIn("PrivyParty: hub mini game: a draw: the hub gave it up (the title's start screen was not recognised)",
++                      r.stdout)
+         self.assertIn("PrivyParty: hub mini game: a draw: the hub stopped answering", r.stdout)   # B116's silent hub
+         self.assertFalse(any(c.startswith("/s/refused/") and c.endswith("party-minigame-end") for c in hub.calls))
+         self.assertIn("PrivyParty: hub mini game: a draw: the hub gave it up (no end within 900 s)", r.stdout)
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index d079dab7..2a6ed427 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -210,9 +210,11 @@ class Client:
+ 
+ client = Client()
+ watching = {"on": True}
++QUIET = set()                                 # B133: kinds whose polls are paused (the board no longer asking)
+ def watcher(kind, path):
+     while watching["on"]:
+-        timed(kind, "GET", path)
++        if kind not in QUIET:
++            timed(kind, "GET", path)
+         time.sleep(0.1)
+ for kind, path in (("status", "/plugins/games/status"), ("result", "/plugins/games/party-minigame-result"),
+                    ("ns_status", "/plugins/games/native-stream-status")):
+@@ -342,6 +344,7 @@ if args["mode"] == "today":
+                             "start": ("POST", "/plugins/games/party-minigame-start?id=x&seats=1,2"),
+                             "result": ("GET", "/plugins/games/party-minigame-result"),
+                             "end": ("POST", "/plugins/games/party-minigame-end"),
++                            "go": ("POST", "/plugins/games/party-minigame-go"),     # B133
+                             "status_idle": ("GET", "/plugins/games/status"),
+                             "home_idle": ("POST", "/plugins/games/native-stream-stop"),
+                             "stop_idle": ("POST", "/plugins/games/stop")}.items():
+@@ -712,6 +715,225 @@ if args["mode"] == "cheat":
+     S["c_scratch_end"] = scratch_anywhere()
+     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
+     finish()
++if args["mode"] in ("hold", "practice"):
++    # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
++    n64 = args["n64_id"]
++    v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
++    shutil.copyfile(v3.with_name(js4["arrays"]), rules_ / f"{n64}.endscreen.npz")
++    js4["arrays"] = f"{n64}.endscreen.npz"
++    (rules_ / f"{n64}.endscreen.json").write_text(json.dumps(js4))
++    (rules_ / f"{n64}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
++    (rules_ / f"{n64}.party.json").write_text(json.dumps({"players": 4}))
++    def folder():
++        return m._state_root() / ("Mupen64Plus-Next" if m._n64_core else "Beetle PSX HW")
++    listed = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
++    S["h_list"] = [{"players": e["players"], "title": e.get("title")} for e in listed]
++    tok2 = next(e["id"] for e in listed if e["players"] == 2)
++    tok4 = next(e["id"] for e in listed if e["players"] == 4)
++    layer.poll_gone_s = 120.0
++
++    def res():
++        return call("GET", "/plugins/games/party-minigame-result")["body"]
++
++    def wait_phase(pred, bound=15):
++        end = time.monotonic() + bound
++        b = {}
++        while time.monotonic() < end:
++            b = res()
++            if pred(b):
++                return b
++            time.sleep(0.05)
++        return dict(b, timeout=True)
++
++    def steps_since(r0):
++        return [r["step"] for r in rows()[r0:]]
++
++    def title_alive():
++        return fake["ra"].poll() is None if "ra" in fake else None
++
++    def held_start(tag, tok, seats, script):
++        """Start held; returns rows index. The board up first if it is not."""
++        if call("GET", "/plugins/games/status")["body"].get("launch_kind") != "godot" or board_pid_now() is None:
++            board_up(tag)
++        pic.set(script)
++        r0 = len(rows())
++        S[tag + "_start"] = timed("start", "POST", f"/plugins/games/party-minigame-start?id={tok}&seats={seats}&hold=1")
++        return r0
++
++    def finish_case(tag, r0, k0=None):
++        S[tag + "_end"] = timed("board_end", "POST", "/plugins/games/party-minigame-end")
++        S[tag + "_closed"] = wait_for(lambda b: b.get("closed"), 20).get("closed")
++        S[tag + "_rows"] = steps_since(r0)
++        S[tag + "_title_gone"] = not title_alive()
++        S[tag + "_route_after"] = bridge._party_route
++        S[tag + "_switches"] = [[r.get("window"), r.get("switched")] for r in rows()[r0:] if r["step"] == "minigame_stream"]
++        S[tag + "_board_picture_back"] = wait_until(lambda: stream.flowing() and stream.captured_pid == board_pid_now(), 20)
++
++    def during_ready(tag):
++        S[tag + "_route_ready"] = bridge._party_route
++        S[tag + "_stream_on_board"] = stream.captured_pid == board_pid_now()
++        S[tag + "_title_paused_ready"] = fake["ra"].paused if "ra" in fake else None
++
++    if args["mode"] == "hold":
++        # H1: T88-shaped — notices-like pictures, then the start; held, the board asking; the go; the end
++        r0 = held_start("h1", tok2, "1,2", ["other"] * 5 + ["start"] * 400)
++        S["h1_preparing"] = wait_phase(lambda b: b.get("phase") == "preparing" or b.get("state") != "starting", 5)
++        b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++        S["h1_ready"] = {k: b.get(k) for k in ("state", "phase", "recognised", "practices")}
++        during_ready("h1")
++        S["h1_rows_at_ready"] = steps_since(r0)
++        time.sleep(3.0)                                         # a hold with the board asking
++        S["h1_still"] = {k: res().get(k) for k in ("state", "phase")}
++        S["h1_go"] = timed("go", "POST", "/plugins/games/party-minigame-go")["body"]
++        pic.set(["other"] * 6 + ["end_P1"] * 60)
++        S["h1_go_again"] = call("POST", "/plugins/games/party-minigame-go")
++        p_ = wait_phase(lambda b: b.get("state") != "starting", 20)
++        S["h1_route_playing"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
++        S["h1_stream_on_title"] = stream.captured_pid == getattr(fake.get("ra"), "pid", None)
++        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++        S["h1"] = {k: e.get(k) for k in ("state", "class", "scores", "why")}
++        finish_case("h1", r0)
++        S["h1_row_fields"] = {r["step"]: {k: v for k, v in r.items() if k in ("prepare_s", "held_s", "handover_s",
++                                                                             "remembered", "hold")}
++                              for r in rows()[r0:] if r["step"] in ("minigame_start", "minigame_ready", "minigame_go",
++                                                                     "minigame_playing")}
++        # H2: the go before ready (remembered), a second go; T89-shaped (N64: the loads only while paused)
++        r0 = held_start("h2", tok4, "3,1,4,2", ["s4other"] * 6 + ["s4start"] * 400)
++        S["h2_go_early"] = call("POST", "/plugins/games/party-minigame-go")["body"]
++        S["h2_go_second"] = call("POST", "/plugins/games/party-minigame-go")["body"]
++        p_ = wait_phase(lambda b: b.get("state") != "starting", 25)
++        S["h2_playing"] = {k: p_.get(k) for k in ("state", "phase")}
++        pic.set(["s4other"] * 3 + ["s4r2143"] * 60)
++        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++        S["h2"] = {k: e.get(k) for k in ("state", "places", "scores", "seats", "why")}
++        finish_case("h2", r0)
++        S["h2_go_row"] = [{k: v for k, v in r.items() if k in ("remembered",)} for r in rows()[r0:]
++                          if r["step"] == "minigame_go"]
++        # H3: never the start → given up, no route, no switch, the title gone, the board's session back
++        r0 = held_start("h3", tok2, "1,2", ["other"] * 400)
++        e = wait_for(lambda b: b.get("state") in ("given_up", "ended") or b.get("phase") == "ready", 20)
++        S["h3"] = {k: e.get(k) for k in ("state", "why", "phase")}
++        finish_case("h3", r0)
++        S["h3_status_kind"] = call("GET", "/plugins/games/status")["body"].get("launch_kind")
++        # H4: the board stops asking during the hold → given up, the title stopped
++        r0 = held_start("h4", tok2, "1,2", ["start"] * 400)
++        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++        layer.poll_gone_s = 1.5
++        QUIET.add("result")
++        wait_until(lambda: layer.mg.get("closed"), 15)
++        S["h4"] = {k: layer.mg.get(k) for k in ("state", "why", "closed")}
++        S["h4_title_gone"] = not title_alive()
++        S["h4_rows"] = steps_since(r0)
++        QUIET.discard("result")
++        layer.poll_gone_s = 120.0
++        # H5: the board's end during the preparation and during the hold
++        for tag, when in (("h5p", "preparing"), ("h5h", "ready")):
++            r0 = held_start(tag, tok2, "1,2", ["other"] * 6 + ["start"] * 400)
++            wait_phase(lambda b, w=when: b.get("phase") == w or b.get("state") != "starting", 20)
++            S[tag + "_second_start"] = call("POST", f"/plugins/games/party-minigame-start?id={tok2}&seats=1,2&hold=1")
++            finish_case(tag, r0)
++            S[tag + "_state"] = layer.mg.get("state")
++        # H6: the onn's Home during the hold → given up, then Home / RESUME act on the board
++        r0 = held_start("h6", tok2, "1,2", ["start"] * 400)
++        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++        S["h6_home"] = timed("home", "POST", "/plugins/games/native-stream-stop")["body"]
++        client.in_stream = False
++        wait_until(lambda: layer.mg.get("closed"), 15)
++        S["h6"] = {k: layer.mg.get(k) for k in ("state", "why", "closed")}
++        S["h6_title_gone"] = not title_alive()
++        rs = timed("resume_start", "POST", "/plugins/games/native-stream-start?port=48100", timeout=30)
++        client.in_stream = True
++        rr = timed("resume_ready", "POST", "/plugins/games/native-stream-ready", timeout=30)
++        S["h6_resume"] = {"start": rs["code"], "ready": rr["code"],
++                          "kind": call("GET", "/plugins/games/status")["body"].get("launch_kind")}
++        S["h6_rows"] = steps_since(r0)
++        S["h6_route_ever"] = [r for r in steps_since(r0) if r == "minigame_route"]
++        # H7: the onn's END during the preparation (everything ends, as today)
++        r0 = held_start("h7", tok2, "1,2", ["other"] * 8 + ["start"] * 400)
++        wait_phase(lambda b: b.get("phase") == "preparing", 10)
++        S["h7_end"] = timed("end_onn", "POST", "/plugins/games/stop")["body"]
++        wait_until(lambda: layer.mg.get("closed"), 15)
++        S["h7"] = {k: layer.mg.get(k) for k in ("state", "why", "closed")}
++        S["h7_title_gone"] = not title_alive()
++        S["h7_board_gone"] = wait_until(lambda: board_pid_now() is None, 15)
++        S["h7_rows"] = steps_since(r0)
++        # the go with nothing held
++        S["h_go_none"] = call("POST", "/plugins/games/party-minigame-go")
++        S["h_go_bad"] = call("POST", "/plugins/games/party-minigame-go?practice=2")
++        S["h_hold_bad"] = call("POST", f"/plugins/games/party-minigame-start?id={tok2}&seats=1,2&hold=2")
++    if args["mode"] == "practice":
++        r0 = held_start("p", tok2, "1,2", ["start"] * 400)
++        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++        S["p_rows_before"] = rows()[r0:]
++        for n in range(3):
++            tag = f"p{n + 1}"
++            S[tag + "_go"] = timed("go", "POST", "/plugins/games/party-minigame-go?practice=1")["body"]
++            b = wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
++            S[tag + "_playing"] = {k: b.get(k) for k in ("state", "practice", "practices")}
++            pic.set(["end_P1"] * 400)                      # an end screen shown in the practice changes nothing
++            time.sleep(1.2)
++            S[tag + "_still"] = {k: res().get(k) for k in ("state", "practice", "scores", "class")}
++            S[tag + "_route_in"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
++            S[tag + "_stream_on_title"] = stream.captured_pid == getattr(fake.get("ra"), "pid", None)
++            pic.set(["start"] * 400)
++            if n < 2:
++                bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # the second pad's Start
++                bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
++            else:
++                layer.practice_s = 2.0                              # the practice's time alone (scaled)
++            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++            S[tag + "_back"] = {k: b.get(k) for k in ("state", "phase", "practices", "scores")}
++            S[tag + "_route_back"] = bridge._party_route
++            S[tag + "_stream_on_board"] = wait_until(lambda: stream.captured_pid == board_pid_now(), 10)
++            layer.practice_s = 90.0
++        S["p_end_rows"] = [{k: v for k, v in r.items() if k in ("step", "by")} for r in rows()[r0:]
++                           if r["step"] in ("minigame_practice_end", "minigame_ready")]
++        # then a real go: scored as today; Start in it does nothing on the hub
++        S["p_real_go"] = timed("go", "POST", "/plugins/games/party-minigame-go")["body"]
++        b = wait_phase(lambda b: b.get("state") != "starting", 20)
++        bridge._apply_report(0, 0x0010, 0, 0, 0, 0, 0, 0)
++        bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
++        time.sleep(1.0)
++        S["p_real_after_start"] = {k: res().get(k) for k in ("state", "practice")}
++        pic.set(["other"] * 3 + ["end_P2"] * 60)
++        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++        S["p_real"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
++        finish_case("p", r0)
++        S["p_practice_end_rows_total"] = sum(1 for r in rows()[r0:] if r["step"] == "minigame_practice_end")
++        all_rows = (root / "logs/games/party.jsonl").read_text() if (root / "logs/games/party.jsonl").is_file() else ""
++        S["p_names_in_rows"] = [t for t in (e_.get("title") for e_ in listed) if t and t in all_rows]
++        # END from the board, the onn's END / Home during a practice and during its way back
++        for tag, how, when in (("q1", "board", "practice"), ("q2", "home", "practice"), ("q3", "board", "way_back"),
++                               ("q4", "onn_end", "practice")):
++            r0 = held_start(tag, tok2, "1,2", ["start"] * 400)
++            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++            call("POST", "/plugins/games/party-minigame-go?practice=1")
++            wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
++            if when == "way_back":
++                pic.set(["other"] * 400)                    # the way back's preparation runs on
++                bridge._apply_report(0, 0x0010, 0, 0, 0, 0, 0, 0)
++                bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
++                wait_phase(lambda b: b.get("phase") == "preparing", 10)
++            if how == "board":
++                S[tag + "_end"] = timed("board_end", "POST", "/plugins/games/party-minigame-end")["body"]
++            elif how == "home":
++                S[tag + "_end"] = timed("home", "POST", "/plugins/games/native-stream-stop")["body"]
++                client.in_stream = False
++            else:
++                S[tag + "_end"] = timed("end_onn", "POST", "/plugins/games/stop")["body"]
++            wait_until(lambda: layer.mg.get("closed"), 15)
++            S[tag] = {k: layer.mg.get(k) for k in ("state", "why", "closed", "scores")}
++            S[tag + "_title_gone"] = not title_alive()
++            S[tag + "_hook_cleared"] = getattr(bridge, "_party_buttons", None) is None
++            if how == "home":
++                call("POST", "/plugins/games/native-stream-start?port=48100")
++                client.in_stream = True
++                call("POST", "/plugins/games/native-stream-ready")
++    S["h_running_at_end"] = [title_alive()]
++    timed("end_onn", "POST", "/plugins/games/stop")
++    wait_until(lambda: board_pid_now() is None, 10)
++    S["h_board_at_end"] = board_pid_now()
++    finish()
+ if args["mode"] == "three":
+     def real_stall(tag):
+         """The client's video stops while the title plays, outside the switch windows: handled as today."""
+diff --git a/tests/b133_party_prepare_go/test_b133.py b/tests/b133_party_prepare_go/test_b133.py
+new file mode 100644
+index 00000000..f603b9e8
+--- /dev/null
++++ b/tests/b133_party_prepare_go/test_b133.py
+@@ -0,0 +1,144 @@
++#!/usr/bin/env python3
++"""B133 (host): the hub prepares the title behind the board and hands over on the board's go — through the real HTTP
++server on loopback, behind PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
++
++B114's scenario, its `hold` mode: B108's stand-in board, B101's fake RetroArch, B103's scripted pictures, the stream stub
++following one window, the onn's thread and status / result / native-stream-status every 0.1 s; the PS1 title (two
++players) and the N64 one (four, B122's version-3 spec). Checked: `party-minigame-start?…&hold=1` → `"preparing"` →
++`"ready"` with **no route and no switch** (the stream still on the board, the title paused); a hold with the board
++asking → still `ready`; the go → the begin loaded again, the route, the planned switch, `playing`, ended as today; the
++rows in that order with `prepare_s` / `held_s` / `handover_s`; a go before `ready` remembered (T89-shaped, back to
++back); a second go; never the start → `given_up`, no route, no switch, the title gone, the board's session back; the
++board no longer asking → `given_up`; the board's end and a second start during the preparation and the hold; the onn's
++Home (the mini game given up, then Home / RESUME on the board) and END (everything ends); every route < 2 s; nothing
++left running. The flags absent → HEAD's answers; no `hold` → today (B114 / B124 / B127's suites). Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b133_party_prepare_go -v
++"""
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b114_party_minigame_hang", "b124_party_four_seats", "b127_party_cheat_setups", "b115_party_handovers",
++            "b123_h7_n64_start"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import test_b114 as b114  # noqa: E402  (harnesses; their tests are not collected here)
++import test_b124 as b124  # noqa: E402
++import test_b127 as b127  # noqa: E402
++
++HEAD = "73284310"                       # queue AU's baseline: the companion before B133 / B134
++NO_GO = "no mini game is waiting for the go"
++
++
++class PrepareAndGo(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b114.b99.tree()
++        b124.IDS.clear()
++        b124.IDS.update(ids)
++        cls.out = b114.run(root, b114.BOTH, ids, "hold", extra=b124.extra)
++        cls.s = cls.out["steps"]
++
++    def test_0_prepared_behind_the_board_then_ready_nothing_routed(self):
++        s = self.s
++        self.assertIsNone(self.out["hung"])
++        self.assertEqual(s["h1_preparing"]["phase"], "preparing")
++        self.assertEqual(s["h1_ready"], {"state": "starting", "phase": "ready", "recognised": True, "practices": 0})
++        self.assertEqual(s["h1_rows_at_ready"], ["minigame_start", "minigame_launch", "minigame_watch", "minigame_ready"])
++        self.assertIsNone(s["h1_route_ready"])
++        self.assertTrue(s["h1_stream_on_board"])
++        self.assertTrue(s["h1_title_paused_ready"])
++        self.assertEqual(s["h1_still"], {"state": "starting", "phase": "ready"})      # a hold, the board asking
++
++    def test_1_the_go_hands_over_and_the_match_ends_as_today(self):
++        s = self.s
++        self.assertEqual(s["h1_go"], {"ok": True, "go": "taken", "phase": "ready", "practice": False})
++        self.assertEqual(s["h1_route_playing"], {"0": 0, "1": 1})
++        self.assertTrue(s["h1_stream_on_title"])
++        self.assertEqual(s["h1"], {"state": "ended", "class": "end_P1", "scores": [1, 0], "why": None})
++        self.assertEqual(s["h1_rows"][:9], ["minigame_start", "minigame_launch", "minigame_watch", "minigame_ready",
++                                            "minigame_go", "minigame_reloaded", "minigame_route", "minigame_stream",
++                                            "minigame_playing"])
++        f = s["h1_row_fields"]
++        self.assertEqual(f["minigame_start"], {"hold": True})
++        self.assertGreater(f["minigame_ready"]["prepare_s"], 0.5)
++        self.assertGreaterEqual(f["minigame_go"]["held_s"], 3.0)
++        self.assertFalse(f["minigame_go"]["remembered"])
++        self.assertLess(f["minigame_playing"]["handover_s"], 2.0)
++        self.assertEqual(s["h1_switches"], [["minigame", True], ["board", True]])
++        self.assertTrue(s["h1_title_gone"] and s["h1_closed"] and s["h1_board_picture_back"])
++        self.assertIsNone(s["h1_route_after"])
++
++    def test_2_a_go_before_ready_is_remembered_a_second_go_already_t89_shaped(self):
++        s = self.s
++        self.assertEqual((s["h2_go_early"]["go"], s["h2_go_early"]["phase"]), ("remembered", "preparing"))
++        self.assertEqual(s["h2_go_second"]["go"], "already")
++        self.assertEqual(s["h2"]["state"], "ended")
++        self.assertEqual((s["h2"]["places"], s["h2"]["scores"], s["h2"]["seats"]), ([2, 1, 4, 3], [3, 4, 1, 2], [3, 1, 4, 2]))
++        self.assertEqual(s["h2_go_row"], [{"remembered": True}])
++        self.assertEqual(s["h2_switches"], [["minigame", True], ["board", True]])
++
++    def test_3_never_the_start_nothing_routed_nothing_switched(self):
++        s = self.s
++        self.assertEqual(s["h3"]["state"], "given_up")
++        self.assertIn("start screen was not recognised", s["h3"]["why"])
++        self.assertNotIn("minigame_route", s["h3_rows"])
++        self.assertEqual(s["h3_switches"], [])
++        self.assertTrue(s["h3_title_gone"])
++        self.assertEqual(s["h3_status_kind"], "godot")
++
++    def test_4_the_board_no_longer_asking(self):
++        self.assertEqual(self.s["h4"], {"state": "given_up", "why": "the board stopped asking", "closed": True})
++        self.assertTrue(self.s["h4_title_gone"])
++        self.assertNotIn("minigame_route", self.s["h4_rows"])
++
++    def test_5_the_boards_end_and_a_second_start_during_the_preparation_and_the_hold(self):
++        for tag in ("h5p", "h5h"):
++            self.assertEqual(self.s[tag + "_state"], "given_up", tag)
++            self.assertEqual(self.s[tag + "_second_start"]["code"], 400, tag)
++            self.assertTrue(self.s[tag + "_title_gone"] and self.s[tag + "_closed"], tag)
++            self.assertNotIn("minigame_route", self.s[tag + "_rows"], tag)
++            self.assertEqual(self.s[tag + "_switches"], [], tag)
++
++    def test_6_the_onns_home_and_end_during_the_preparation_and_the_hold(self):
++        s = self.s
++        self.assertEqual(s["h6"], {"state": "given_up", "why": "the onn's Home during the preparation", "closed": True})
++        self.assertTrue(s["h6_title_gone"])
++        self.assertEqual(s["h6_resume"], {"start": 200, "ready": 200, "kind": "godot"})
++        self.assertEqual(s["h6_route_ever"], [])
++        self.assertEqual(s["h7"], {"state": "given_up", "why": "ended from the onn", "closed": True})
++        self.assertTrue(s["h7_title_gone"] and s["h7_board_gone"])
++
++    def test_7_refusals_routes_within_2_s_nothing_left(self):
++        s = self.s
++        self.assertEqual((s["h_go_none"]["code"], s["h_go_none"]["body"]["error"]), (400, NO_GO))
++        self.assertEqual((s["h_go_bad"]["code"], s["h_go_bad"]["body"]["error"]), (400, "practice is 1"))
++        self.assertEqual((s["h_hold_bad"]["code"], s["h_hold_bad"]["body"]["error"]), (400, "hold is 1"))
++        for kind in ("status", "result", "ns_status", "start", "go", "board_end", "home"):
++            self.assertLess(self.out["lat"][kind]["max"], b114.WITHIN_S, kind)
++        self.assertEqual(s["h_running_at_end"], [False])
++        self.assertIsNone(s["h_board_at_end"])
++
++
++class Today(unittest.TestCase):
++    def test_flags_absent_and_no_mini_game_are_heads(self):
++        code = b114.code_of(HEAD)
++        if code is None:
++            self.skipTest("git is absent")
++        for env in ({**b114.b85.FLAGS, **b114.ADOPTED}, {**b114.b85.FLAGS, **b114.ADOPTED, "PRIVYHUB_PARTY": "1"},
++                    {**b114.b85.FLAGS, **b114.ADOPTED, "PRIVYHUB_H7": "1"}):
++            root, ids = b114.b99.tree(code)
++            base = b114.run(root, env, ids, "today")["steps"]
++            root2, ids2 = b114.b99.tree()
++            mine = b114.run(root2, env, ids2, "today")["steps"]
++            for k in ("list", "start", "result", "end", "go", "status_idle", "home_idle", "stop_idle"):
++                self.assertEqual((mine[k]["code"], b114.CLOCK.sub("<ms>", mine[k]["raw"])),
++                                 (base[k]["code"], b114.CLOCK.sub("<ms>", base[k]["raw"])), (sorted(env), k))
++
++
++if __name__ == "__main__":
++    unittest.main()

@@ -341,6 +341,47 @@ class MiniGame:
             answer["begin"] = begin
         return answer
 
+    def reload(self) -> float | None:
+        """B133: the begin loaded again into the running game — the setup's when under one (B127), else the normal one;
+        through scratch slot 8 of the session's folder; N64 only into a paused core (B123) — the watch, if one is on,
+        kept as it is (its `recognised`, its start seen). Used by a held party mini game at its go. -> the load line's
+        ms; ValueError with the plain reason, live.Busy when the state did not load."""
+        with self._start_lock:
+            game, system, kind = self._live._running()
+            if game is None:
+                self._refused("no game is running")
+            if kind in ("pcsx2", "dolphin") or system not in SYSTEMS:
+                self._refused("not supported yet")
+            state = live.rules_folder(self._environ) / f"{game}.state"
+            setup = session_profile_id(self._emu)
+            if setup is not None:
+                own = live.rules_folder(self._environ) / setup_begin_name(game, setup)
+                if own.is_file() and own.stat().st_size > 0:
+                    state = own
+            if not state.is_file() or state.stat().st_size <= 0:
+                self._refused("no state for this game's mini game")
+            loader = _Loader(self)
+            core = loader._core_file(system)
+            if system == "n64":
+                core = str(getattr(self._emu, "_n64_core", None) or core)
+            folder_name = contest.CORE_FOLDERS.get(core[:-len(".so")] if core.endswith(".so") else core)
+            if folder_name is None:
+                self._refused("not supported yet with this game's core")
+            if system == "n64":
+                try:
+                    paused = self._emu._retroarch_network_status() == "PAUSED"
+                except Exception:
+                    paused = False
+                if not paused:
+                    self._refused(N64_NOT_PAUSED)
+            try:
+                line_ms = loader._load(game, state, self._emu._state_root() / folder_name,
+                                       self._emu._active_state_stem())
+            except live.Busy:
+                raise live.Busy("the mini game's state did not load; the game is as it was") from None
+            self._row({"step": "reloaded", "game": game, "load_line_ms": line_ms})
+            return line_ms
+
     def bench_release(self, client_ip: str) -> dict:
         """B112: the running game's pause released with no stream (loopback, no client's stream up)."""
         if str(client_ip or "") not in LOOPBACK:

@@ -1,0 +1,47 @@
+Queue AU tests: B133-B134 3 runs, the others once, 2026-11-17T20:08:00Z, a work copy of /tmp/b_q32au, TMPDIR on the main disk
+run 1 tests/b133_party_prepare_go: Ran 9 tests in 53.001s OK 
+run 1 tests/b134_party_practice: Ran 5 tests in 31.191s OK 
+run 2 tests/b133_party_prepare_go: Ran 9 tests in 53.009s OK 
+run 2 tests/b134_party_practice: Ran 5 tests in 31.440s OK 
+run 3 tests/b133_party_prepare_go: Ran 9 tests in 53.049s OK 
+run 3 tests/b134_party_practice: Ran 5 tests in 31.443s OK 
+temp dirs left by these 6 runs: 0
+tests/b129_h7_game_window: Ran 5 tests in 19.260s OK 
+tests/b130_h7_recognise_setup: Ran 4 tests in 9.980s OK 
+tests/b131_party_save_load: Ran 5 tests in 62.262s OK 
+tests/b127_party_cheat_setups: Ran 9 tests in 146.157s OK 
+tests/b124_party_four_seats: Ran 6 tests in 46.117s OK 
+tests/b114_party_minigame_hang: Ran 8 tests in 87.223s OK 
+tests/b115_party_handovers: Ran 6 tests in 40.661s OK 
+tests/b110_party_minigame: Ran 13 tests in 50.381s OK 
+tests/b112_no_client_bench: Ran 7 tests in 31.730s OK 
+tests/b123_h7_n64_start: Ran 6 tests in 37.572s OK 
+tests/b122_h7_places: Ran 12 tests in 20.614s OK 
+tests/b111_party_board: ERROR: test_against_this_tests_fake_hub (test_b111.BoardCheck.test_against_this_tests_fake_hub) FAIL: test_with_the_checks_own_stand_in_hub (test_b111.BoardCheck.test_with_the_checks_own_stand_in_hub) Ran 2 tests in 458.266s FAILED (failures=1, errors=1) 
+tests/b102_h7_endscreen: Ran 16 tests in 25.730s OK 
+tests/b104_h7_tone: Ran 19 tests in 42.898s OK 
+tests/b103_h7_minigame: Ran 13 tests in 36.337s OK 
+tests/b105_h7_watcher: Ran 12 tests in 36.155s OK 
+tests/b101_h7_contest: Ran 14 tests in 50.697s OK 
+tests/b99_h7_live_read: Ran 15 tests in 19.963s OK 
+tests/b108_party_launch: Ran 16 tests in 17.568s OK 
+tests/art_systems: ERROR: test_cheats_md_names_the_folders (test_b81.Docs.test_cheats_md_names_the_folders) Ran 120 tests in 31.278s FAILED (errors=1) 
+tests/b65_n64_continue: Ran 7 tests in 4.905s OK 
+tests/b61_n64_hold: Ran 14 tests in 0.834s OK 
+tests/player_prompt: Ran 11 tests in 0.206s OK 
+tests/players_session: Ran 19 tests in 0.010s OK 
+tests/relaunch_ports: Ran 19 tests in 0.083s OK 
+tests/pad_slots: Ran 5 tests in 0.147s OK 
+tests/stall_signal: Ran 12 tests in 15.824s OK 
+tests/stall_owner: Ran 10 tests in 2.355s OK 
+tests/link_recovery: Ran 16 tests in 1.308s OK 
+tests/restart_fast: Ran 13 tests in 8.422s OK 
+tests/client_contract: Ran 5 tests in 2.886s OK 
+tests/ps2_session: Ran 93 tests in 1.666s OK 
+tests/gamecube_session: Ran 54 tests in 1.351s OK 
+tests/n64_session: Ran 28 tests in 1.272s OK 
+board stand-ins / Godot / RetroArch left: 0 / 3 / 0
+temp dirs left after the other suites: 54 (     11 b22       3 b34_root       1 b34_root_eb      11 b41_root       1 b41_root_vmv3mo       4 b7_bridge       1 b7_bridge___vp7w       1 b7_bridge_wv       8 b7_rec       1 b7_rec_u       6 b9_rec       5 b9_states       1 b9_states_jw1asf )
+x3 DONE 2026-11-17T20:34:13Z
+tests/b111_party_board rerun after updating it for B135's check (its fake hub's held answers, counts 81 / 56): Ran 2 tests OK (the run above failed on the old counts 40 / 26; its 3 Godot processes at the end were that rerun's, overlapping; none left after)
+art_systems' one error: test_b81.Docs reads docs/CHEATS.md, absent from the work copy by the rule; against the repo itself (read only): Ran 1 test in 0.000s OK 

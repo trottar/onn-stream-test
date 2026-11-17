@@ -1,0 +1,498 @@
+diff --git a/checks/hub_minigame_check.gd b/checks/hub_minigame_check.gd
+index e262ffd..e6502b9 100644
+--- a/checks/hub_minigame_check.gd
++++ b/checks/hub_minigame_check.gd
+@@ -22,6 +22,14 @@ extends SceneTree
+ ##   - four players get a four-player game on the hub, two a two-player one, in
+ ##     the seats their pads give; three: a draw, nothing started
+ ##   - it fits the registry's contract and the picker can offer it for two to four
++##   - with a stage that has the screens (queue AU, made-up names): one card and
++##     two, card 0, card 1, Random (the same seed, the same game); the start
++##     held (hold=1); the load screen shown with the chosen name, told the hub's
++##     readiness; no go while nobody has decided however long, the go only with
++##     the hub ready, the practice go for "practice"; three practices then a real
++##     one scored; the load screen hidden at each playing and on every way out;
++##     the pads reaching the board while its screens are up and swallowed while
++##     the hub's game is on; the frame cap only then; without the screens: as before
+ ## Exit code 0 = PASS, 1 = FAIL.
+ 
+ const HubMinigame = preload("res://minigames/hub_minigame.gd")
+@@ -35,6 +43,12 @@ var _calls: Array[String] = []    # every path the stand-in hub was asked, in or
+ var _polls := {}                  # scenario -> result calls so far
+ var _fps_polls := {}              # scenario -> Engine.max_fps at each result call (the board waiting)
+ var _fps_at_end := {}             # scenario -> Engine.max_fps when the end was asked
++var _hub := {}                    # queue AU: a held scenario's state on the stand-in hub
++var _hfps := {}                   # scenario -> [[mode, Engine.max_fps]] at each result call
++var _go_phase_list := {}          # scenario -> the hub's phase at each go
++var _go_kinds := {}               # scenario -> "practice" / "start" for each go
++var _go_reads := {}               # scenario -> the stage's choice reads when the go came
++var _screens: Node = null
+ 
+ 
+ class Witness extends Node:  # stands where the board's controls stand: sees what reaches them
+@@ -53,6 +67,59 @@ class FakeStage extends Node:
+ 	var controls: Node
+ 
+ 
++class FakeScreens extends Node:  # a made-up presenter with the five methods of the seam
++	var controls: Node
++	var card := 0
++	var cards_seen: Array = []
++	var players_seen := 0
++	var shows: Array = []
++	var hides := 0
++	var readies: Array = []
++	var plan: Array = ["start"]   # the answer for each showing of the load screen (the last repeats)
++	var wait_reads := 4           # reads answered "" each showing before the answer
++	var reads := 0
++	var up := false
++
++	func reset(chosen: int, answers: Array) -> void:
++		card = chosen
++		plan = answers
++		cards_seen = []
++		shows = []
++		hides = 0
++		readies = []
++		wait_reads = 4
++		reads = 0
++		up = false
++
++	func second_id() -> String:
++		return "mg_b" if str(cards_seen[1].get("title")) == "Made-up B" else "mg_a"
++
++	func choose_minigame(cards: Array, players: Array) -> Dictionary:
++		cards_seen = cards.duplicate(true)
++		players_seen = players.size()
++		await get_tree().process_frame
++		return {"card": card}
++
++	func show_minigame_loading(title: String, _players: Array) -> void:
++		shows.append(title)
++		reads = 0
++		up = true
++
++	func set_minigame_loading_ready(ready: bool) -> void:
++		readies.append(ready)
++
++	func minigame_loading_choice() -> String:
++		reads += 1
++		if reads <= wait_reads:
++			return ""
++		return str(plan[mini(shows.size() - 1, plan.size() - 1)])
++
++	func hide_minigame_loading() -> void:
++		if up:
++			hides += 1
++		up = false
++
++
+ func _initialize() -> void:
+ 	_run()
+ 
+@@ -156,6 +223,84 @@ func _run() -> void:
+ 	_same(await _play(stage, base, "mix3", three), [0, 0, 0], "three players: no game fits, a draw")
+ 	_expect_asked(not _asked("mix3", "party-minigame-start"), "three players: nothing started on the hub")
+ 
++	# --- choose, load, ready or practise (queue AU): a stage with the screens -------------------------------
++	var screens := FakeScreens.new()
++	_screens = screens
++	screens.controls = controls
++	root.add_child(screens)
++	controls.players = ["pad0", "pad1"]
++	Engine.max_fps = 0
++	witness.pads = 0
++	var pads_seen := [-1, -1]
++	var poke_prep := func():  # while the hub prepares (the load screen up) and later while the hub's game is on
++		await create_timer(0.6).timeout
++		await _press()
++		pads_seen[0] = witness.pads
++		await create_timer(4.7).timeout
++		await _press()
++		pads_seen[1] = witness.pads
++	screens.card = 0
++	screens.plan = ["start"]
++	poke_prep.call()
++	_same(await _play(screens, base, "hcard0", two), [1, 0], "with the screens: card 0 chosen, the scores come back")
++	var titles_seen := screens.cards_seen.map(func(c): return str(c.get("title")))
++	titles_seen.sort()
++	_same(titles_seen, ["Made-up A", "Made-up B"], "two cards, the hub's names (seeded order)")
++	_same(screens.players_seen, 2, "the cards offered to the players about to play")
++	var first_id := "mg_a" if str(screens.cards_seen[0].get("title")) == "Made-up A" else "mg_b"
++	_expect_asked(_asked("hcard0", "party-minigame-start?id=%s&seats=1,2&hold=1" % first_id), "card 0's game started held (hold=1)")
++	_same(screens.shows, [str(screens.cards_seen[0].get("title"))], "the load screen shown with the chosen game's name")
++	_same(screens.readies, [false, true], "the load screen told the hub's readiness: false, then true")
++	_expect_asked(_go_phases("hcard0") == ["ready"], "the go sent only when the hub was ready")
++	_same(screens.hides, 1, "the load screen hidden at the first playing (and not again)")
++	_same(pads_seen[0], 1, "the pads reach the board while its load screen is up")
++	_same(pads_seen[1], 1, "the pads swallowed while the hub's game is on")
++	_expect_fps(_prep_fps("hcard0").all(func(v): return int(v) == 0), "the board's own frame rate while its screens are up")
++	_expect_fps(_play_fps("hcard0").all(func(v): return int(v) == idle) and not _play_fps("hcard0").is_empty(), "the cap only while the hub's game is on")
++	_same(Engine.max_fps, 0, "the board's own frame rate after")
++	_expect(not root.get_children().any(func(n): return n is HubMinigame.PadGate), "no gate left")
++	screens.reset(1, ["start"])
++	_same(await _play(screens, base, "hcard1", two), [1, 0], "card 1 chosen")
++	_expect_asked(_asked("hcard1", "party-minigame-start?id=" + screens.second_id()), "card 1's game started")
++	_same(screens.shows, [str(screens.cards_seen[1].get("title"))], "card 1's name on the load screen")
++	var played: int = HubMinigame._played
++	screens.reset(-1, ["start"])
++	var predicted := _random_pick(played, ["mg_a", "mg_b"])
++	_same(await _play(screens, base, "hrandom", two), [1, 0], "Random chosen")
++	_expect_asked(_asked("hrandom", "party-minigame-start?id=" + predicted), "Random: the seeded pick between the two (the same seed, the same game)")
++	screens.reset(0, ["start"])
++	_same(await _play(screens, base, "hone", two), [1, 0], "one game fits: one card")
++	_same(screens.cards_seen, [{"title": "Made-up A"}], "one card, no second")
++	# no go while nobody has decided, however long; then the plain go
++	screens.reset(0, ["start"])
++	screens.wait_reads = 16  # four seconds of "" with the hub ready
++	_same(await _play(screens, base, "hwait", two), [1, 0], "a long ready check, then the start")
++	_expect_asked(_go_phases("hwait") == ["ready"], "one go, sent with the hub ready")
++	_expect_asked(int(_go_reads.get("hwait", 0)) > 16, "no go while the choice was \"\" (16 reads)")
++	# the players ready before the hub: the go waits for the hub
++	screens.reset(0, ["start"])
++	screens.wait_reads = 0
++	_same(await _play(screens, base, "hearly", two), [1, 0], "the players ready before the hub")
++	_expect_asked(_go_phases("hearly") == ["ready"], "the go not before the hub was ready")
++	# three practices, then a real one
++	screens.reset(0, ["practice", "practice", "practice", "start"])
++	_same(await _play(screens, base, "hpractice", two), [1, 0], "three practices, then a real one scored")
++	_expect_asked(_go_kinds.get("hpractice", []) == ["practice", "practice", "practice", "start"], "three practice goes, then a plain one")
++	_same(screens.shows.size(), 4, "the load screen shown again after each practice")
++	_same(screens.hides, 4, "and hidden at each playing")
++	_expect_asked(_go_phases("hpractice") == ["ready", "ready", "ready", "ready"], "every go with the hub ready")
++	# every way out takes the load screen down
++	for scenario in ["hgiveup", "hrefused", "hsilent"]:
++		screens.reset(0, ["start"])
++		screens.wait_reads = 400
++		_same(await _play(screens, base, scenario, two), [0, 0], "%s: a draw" % scenario)
++		_expect(not screens.up and screens.hides >= 1, "%s: the load screen taken down" % scenario)
++	screens.reset(0, ["start"])
++	_same(await _play(screens, "http://127.0.0.1:9", "nohub", two), [0, 0], "no hub: a draw")
++	_expect(screens.shows.is_empty() and not screens.up, "no hub: no load screen ever up")
++	_same(Engine.max_fps, 0, "the board's own frame rate after every way out")
++	_expect(not root.get_children().any(func(n): return n is HubMinigame.PadGate), "no gate left after every way out")
++
+ 	var script: Script = load("res://minigames/hub_minigame.gd")
+ 	var constants: Dictionary = script.get_script_constant_map()
+ 	_expect(Registry.register_minigame(script), "it follows the registry's contract")
+@@ -211,6 +356,28 @@ func _expect_fps(condition: bool, what: String) -> void:
+ 		_expect(condition, what)
+ 
+ 
++func _go_phases(scenario: String) -> Array:
++	return _go_phase_list.get(scenario, [])
++
++
++func _prep_fps(scenario: String) -> Array:
++	return _hfps.get(scenario, []).filter(func(r): return r[0] == "prep").map(func(r): return r[1])
++
++
++func _play_fps(scenario: String) -> Array:
++	return _hfps.get(scenario, []).filter(func(r): return r[0] != "prep").map(func(r): return r[1])
++
++
++## Random's game, by the script's own seeded steps: the first card, the second from the rest, then one of the two.
++func _random_pick(played: int, fitting: Array) -> String:
++	var rng := RandomNumberGenerator.new()
++	rng.seed = (0 ^ 0x48554221) + played
++	var first: String = fitting[rng.randi_range(0, fitting.size() - 1)]
++	var others := fitting.filter(func(x): return x != first)
++	var second: String = others[rng.randi_range(0, others.size() - 1)]
++	return [first, second][rng.randi_range(0, 1)]
++
++
+ func _all_are(values: Array, value: int) -> bool:
+ 	return not values.is_empty() and values.all(func(v): return int(v) == value)
+ 
+@@ -242,7 +409,14 @@ func _answer(peer: StreamPeerTCP) -> void:
+ 	var action := path.get_slice("/plugins/games/", 1).get_slice("?", 0)
+ 	var code := 200
+ 	var body := {"ok": true}
++	if scenario.begins_with("h"):
++		var held := _held_answer(scenario, action, path)
++		code = held[0]
++		body = held[1]
++		action = "-"
+ 	match action:
++		"-":
++			pass
+ 		"party-minigames":
+ 			if scenario.begins_with("mix"):
+ 				body["minigames"] = [{"id": "mg_two", "players": 2}, {"id": "mg_four", "players": 4}]
+@@ -285,6 +459,74 @@ func _answer(peer: StreamPeerTCP) -> void:
+ 	peer.disconnect_from_host()
+ 
+ 
++## Queue AU: the stand-in hub for a held start — preparing for two result calls, ready from the third; the go
++## (refused unless ready); a practice plays two calls then prepares again; a plain go plays two calls then ends.
++func _held_answer(scenario: String, action: String, path: String) -> Array:
++	var body := {"ok": true}
++	match action:
++		"party-minigames":
++			body["minigames"] = [{"id": "mg_a", "players": 2, "title": "Made-up A"}]
++			if scenario != "hone":
++				body["minigames"].append({"id": "mg_b", "players": 2, "title": "Made-up B"})
++		"party-minigame-start":
++			if scenario == "hrefused":
++				return [400, {"ok": false, "error": "a mini game is already on"}]
++			_hub[scenario] = {"mode": "prep", "k": 0, "p": 0, "practices": 0}
++			body["state"] = "starting"
++		"party-minigame-result":
++			if scenario == "hsilent" and _hub.get(scenario, {}).get("k", 0) >= 2:
++				return [500, {"ok": false, "error": "the hub is busy"}]
++			var st: Dictionary = _hub.get(scenario, {"mode": "prep", "k": 0, "p": 0, "practices": 0})
++			_hub[scenario] = st
++			if not _hfps.has(scenario):
++				_hfps[scenario] = []
++			_hfps[scenario].append([st["mode"], Engine.max_fps])
++			if st["mode"] == "prep":
++				st["k"] += 1
++				if scenario == "hsilent":
++					body.merge({"state": "starting", "phase": "preparing"})
++				elif scenario == "hgiveup" and st["k"] >= 2:
++					body.merge({"state": "given_up", "why": "the title's start screen was not recognised", "scores": null})
++				else:
++					body.merge({"state": "starting", "phase": "ready" if st["k"] >= 3 else "preparing",
++						"practices": st["practices"]})
++			elif st["mode"] == "practice":
++				st["p"] += 1
++				if st["p"] <= 2:
++					body.merge({"state": "playing", "practice": true, "practices": st["practices"]})
++				else:
++					st["mode"] = "prep"
++					st["k"] = 0
++					st["practices"] += 1
++					body.merge({"state": "starting", "phase": "preparing", "practices": st["practices"]})
++			else:
++				st["p"] += 1
++				if st["p"] <= 2:
++					body.merge({"state": "playing", "recognised": true})
++				else:
++					body.merge({"state": "ended", "class": "end_P1", "scores": [1, 0]})
++		"party-minigame-go":
++			var st: Dictionary = _hub.get(scenario, {"mode": "none", "k": 0})
++			var phase := "ready" if st["mode"] == "prep" and int(st["k"]) >= 3 else str(st["mode"])
++			if not _go_phase_list.has(scenario):
++				_go_phase_list[scenario] = []
++				_go_kinds[scenario] = []
++			_go_phase_list[scenario].append(phase)
++			_go_kinds[scenario].append("practice" if path.contains("practice=1") else "start")
++			_go_reads[scenario] = _screens.reads if _screens != null else -1
++			if phase != "ready":
++				return [400, {"ok": false, "error": "no mini game is waiting for the go"}]
++			st["mode"] = "practice" if path.contains("practice=1") else "play"
++			st["p"] = 0
++			body.merge({"go": "taken", "phase": "ready"})
++		"party-minigame-end":
++			_fps_at_end[scenario] = Engine.max_fps
++			body["ended"] = true
++		_:
++			return [404, {"ok": false, "error": "Unknown Games plugin action"}]
++	return [200, body]
++
++
+ # --- the assertions ------------------------------------------------------------
+ 
+ func _expect(condition: bool, what: String) -> bool:
+diff --git a/minigames/hub_minigame.gd b/minigames/hub_minigame.gd
+index 5c7a07d..12b4780 100644
+--- a/minigames/hub_minigame.gd
++++ b/minigames/hub_minigame.gd
+@@ -14,6 +14,19 @@ extends "res://rules/minigame.gd"
+ ## It only awaits; it never holds the board's frame. While it waits the board
+ ## draws at most IDLE_FPS frames a second (nobody sees it: the TV shows the
+ ## hub's game), and its own frame rate is back as soon as the wait ends.
++##
++## Choose, load, ready or practise (the hub's queue AU): when the stage (the
++## presenter) has the screens, the players choose one of up to two of the hub's
++## games (or Random) on stage.choose_minigame; the load screen comes up
++## (stage.show_minigame_loading) while the hub gets the game ready behind the
++## board (the start with hold=1); the hub's readiness goes to the screen
++## (set_minigame_loading_ready); the go is sent once the players' choice
++## (minigame_loading_choice: "start" or "practice") is made and the hub is
++## ready, however long that takes; the screen goes at the first "playing"
++## (hide_minigame_loading) and on every way out. A practice gives the rules
++## nothing: when the hub is back at "starting" the load screen comes up again.
++## The pads are swallowed, and the frame rate capped, only while the TV is on
++## the hub's game. A stage without the screens: everything as before.
+ 
+ const ID := "hub"
+ const TITLE := "On the hub"
+@@ -35,9 +48,16 @@ const LIST := "/plugins/games/party-minigames"
+ const START := "/plugins/games/party-minigame-start"
+ const RESULT := "/plugins/games/party-minigame-result"
+ const END := "/plugins/games/party-minigame-end"
++const GO := "/plugins/games/party-minigame-go"
+ const POLL_SECONDS := 1.0
++## The players' choice on the load screen is read this often while the hub prepares.
++const CHOICE_SECONDS := 0.25
++## The seam with the presenter's screens (each called only if the stage has it).
++const LOADING_METHODS: Array[String] = ["show_minigame_loading", "set_minigame_loading_ready",
++		"minigame_loading_choice", "hide_minigame_loading"]
+ const REQUEST_SECONDS := 10.0
+-## The hub gives a mini game up after 15 minutes; this is the board's own bound.
++## The hub gives a mini game up after 15 minutes; this is the board's own bound
++## (counted only while the TV is on the hub's game: never during the ready check).
+ const LIMIT_SECONDS := 1200.0
+ const MISSED_POLLS := 10
+ ## The board's frame cap while the hub's game is on the TV (Engine.max_fps).
+@@ -89,9 +109,11 @@ func play(players: Array) -> Array:
+ 	if not listed.get("ok", false):
+ 		return _draw(players, "no hub (%s)" % listed.get("error", "no answer"))
+ 	var fitting: Array = []
++	var titles := {}
+ 	for entry in listed.get("minigames", []):
+ 		if int(entry.get("players", 0)) == players.size():
+ 			fitting.append(str(entry.get("id", "")))
++			titles[str(entry.get("id", ""))] = str(entry.get("title", ""))
+ 	if fitting.is_empty():
+ 		return _draw(players, "no mini game on the hub for %d players" % players.size())
+ 	fitting.sort()
+@@ -99,22 +121,53 @@ func play(players: Array) -> Array:
+ 	random.seed = (_game_seed(tree) ^ 0x48554221) + _played
+ 	_played += 1
+ 	var id: String = fitting[random.randi_range(0, fitting.size() - 1)]
++	if stage != null and stage.has_method("choose_minigame"):
++		id = await _choose(random, fitting, id, titles, players)
+ 	var seats: Array[String] = []
+ 	for player in players:
+ 		seats.append(str(_seat_of(player)))
+-	var started: Dictionary = await _call(tree, "POST", "%s%s?id=%s&seats=%s" % [hub, START, id, ",".join(seats)])
++	var screens := _has_screens()
++	if screens:
++		stage.show_minigame_loading(str(titles.get(id, "")), players)
++	var started: Dictionary = await _call(tree, "POST", "%s%s?id=%s&seats=%s%s" % [hub, START, id, ",".join(seats),
++			"&hold=1" if screens else ""])
+ 	if not started.get("ok", false):
++		_hide()
+ 		return _draw(players, "the hub refused (%s)" % started.get("error", "no answer"))
+ 
+-	var gate := PadGate.new()
+-	tree.root.add_child(gate)
++	# Without the screens the gate is up from the start (as before); with them only from the go until the
++	# board has the TV again (a practice's end), so the players choose and ready up with their pads.
++	var gate: PadGate = null
++	if not screens:
++		gate = PadGate.new()
++		tree.root.add_child(gate)
+ 	var scores: Array = []
+ 	var why := ""
+-	var waited := 0.0
++	var waited := 0.0        # seconds with the TV on the hub's game: the board's own bound
+ 	var missed := 0
++	var phase := ""
++	var said_ready := -1     # what the load screen was last told (-1: nothing yet)
++	var went := false        # the go sent for this showing of the load screen
++	var shown := screens
++	var since_poll := POLL_SECONDS
+ 	while true:
+-		await tree.create_timer(POLL_SECONDS).timeout
+-		waited += POLL_SECONDS
++		var step := CHOICE_SECONDS if screens else POLL_SECONDS
++		await tree.create_timer(step).timeout
++		since_poll += step
++		if gate != null:
++			waited += step
++		if screens and shown and not went and phase == "ready":
++			var choice := str(stage.minigame_loading_choice())
++			if choice == "start" or choice == "practice":
++				var answer: Dictionary = await _call(tree, "POST", hub + GO + ("?practice=1" if choice == "practice" else ""))
++				if answer.get("ok", false):
++					went = true
++					if gate == null:
++						gate = PadGate.new()
++						tree.root.add_child(gate)
++		if since_poll + 0.0001 < POLL_SECONDS:
++			continue
++		since_poll = 0.0
+ 		var result: Dictionary = await _call(tree, "GET", hub + RESULT)
+ 		if not result.get("ok", false):
+ 			missed += 1
+@@ -134,20 +187,83 @@ func play(players: Array) -> Array:
+ 		if state != "starting" and state != "playing":
+ 			why = "the hub has no mini game on (%s)" % state
+ 			break
++		if screens:
++			if state == "starting":
++				if not shown:  # a practice is over: the load screen again, the wait starts over
++					if gate != null:
++						gate.restore()
++						if gate.get_parent() != null:
++							gate.get_parent().remove_child(gate)
++						gate.free()
++						gate = null
++					stage.show_minigame_loading(str(titles.get(id, "")), players)
++					shown = true
++					went = false
++					said_ready = -1
++				phase = str(result.get("phase", ""))
++				var ready := 1 if phase == "ready" else 0
++				if ready != said_ready:
++					stage.set_minigame_loading_ready(ready == 1)
++					said_ready = ready
++			elif state == "playing" and shown:
++				stage.hide_minigame_loading()
++				shown = false
++				phase = ""
+ 		if waited >= LIMIT_SECONDS:
+ 			why = "no result within %d s" % int(LIMIT_SECONDS)
+ 			break
+-	gate.restore()  # the board's own frame rate before the hub hands the TV back
++	if gate != null:
++		gate.restore()  # the board's own frame rate before the hub hands the TV back
+ 	await _call(tree, "POST", hub + END)
+-	if gate.get_parent() != null:
+-		gate.get_parent().remove_child(gate)
+-	gate.free()
++	if gate != null:
++		if gate.get_parent() != null:
++			gate.get_parent().remove_child(gate)
++		gate.free()
++	_hide()
+ 	if why != "" or scores.size() != players.size():
+ 		return _draw(players, why if why != "" else "the hub's scores do not fit the players")
+ 	print("PrivyParty: hub mini game: scores %s for seats %s" % [str(scores), ",".join(seats)])
+ 	return scores
+ 
+ 
++## The players' choice on the stage's selection screen: one or two cards (the first today's seeded pick, the second
++## another seeded from the rest), {"card": 0 | 1 | -1}; -1 (Random) a seeded pick between the two. Anything else:
++## today's pick.
++func _choose(random: RandomNumberGenerator, fitting: Array, first: String, titles: Dictionary, players: Array) -> String:
++	var ids: Array = [first]
++	if fitting.size() >= 2:
++		var others := fitting.filter(func(x): return x != first)
++		ids.append(others[random.randi_range(0, others.size() - 1)])
++	var cards: Array = []
++	for one in ids:
++		cards.append({"title": str(titles.get(one, ""))})
++	var answer = await stage.choose_minigame(cards, players)
++	var card := -2
++	if typeof(answer) == TYPE_DICTIONARY:
++		card = int(answer.get("card", -2))
++	if card == -1 and ids.size() == 2:
++		return ids[random.randi_range(0, 1)]
++	if card >= 0 and card < ids.size():
++		return ids[card]
++	return first
++
++
++## Whether the stage has the load screen (all four of its methods): else the mini game plays as before.
++func _has_screens() -> bool:
++	if stage == null:
++		return false
++	for method in LOADING_METHODS:
++		if not stage.has_method(method):
++			return false
++	return true
++
++
++## The load screen taken down on every way out (with nothing shown the stage does nothing).
++func _hide() -> void:
++	if stage != null and stage.has_method("hide_minigame_loading"):
++		stage.hide_minigame_loading()
++
++
+ ## The pad a player plays with (1-4: the hub's seat), from the board's own
+ ## record of who joined with what; a player on the keyboard keeps their place.
+ func _seat_of(player: Dictionary) -> int:

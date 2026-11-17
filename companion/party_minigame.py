@@ -86,6 +86,11 @@ NOT_UNDER_SETUP = "the title did not start under its cheat setup"
 STATE_REFUSED = {"save-state": "not during a mini game: nothing was saved",
                  "load-state": "not during a mini game: nothing was loaded"}
 _HEX64 = re.compile(r"^[0-9A-Fa-f]{64}$")
+# B133 / B134: the title prepared behind the board, handed over on the board's go; practice
+PRACTICE_S = 90.0          # a practice left after this long playing (or by the Start button on any pad)
+XUSB_START = 0x0010        # the pad report's Start bit (native_session_io: XUSB_START)
+NO_GO = "no mini game is waiting for the go"
+NOT_RECOGNISED = "the title's start screen was not recognised"
 
 _local = threading.local()
 
@@ -173,6 +178,7 @@ class PartyMinigames:
         self.play_limit_s, self.unknown_limit_s = PLAY_LIMIT_S, UNKNOWN_LIMIT_S
         self.poll_gone_s, self.end_wait_s, self.tick = POLL_GONE_S, END_WAIT_S, TICK
         self.start_limit_s, self.switch_limit_s, self.step_grace_s = START_LIMIT_S, SWITCH_LIMIT_S, STEP_GRACE_S
+        self.practice_s = PRACTICE_S               # B134
         self.stream_needed = True               # B112's bench sets False (no stream, no switch)
         self._reads: dict[str, dict] = {}       # B114: the last good answer of each bounded read, its helper
 
@@ -214,21 +220,23 @@ class PartyMinigames:
                 more = {"cheat": cheat} if cheat is not None else {}
                 if spec.get("version") == PLACES_VERSION or "places_to_scores" in side:
                     entry = self._places_entry(spec, side, n)          # B123: a place for every player
-                    if entry is None or self.p._find_game_by_id(game) is None:
+                    record = self.p._find_game_by_id(game) if entry is not None else None
+                    if entry is None or record is None:
                         continue
-                    out[self._token(game)] = {"game": game, **entry, **more}
+                    out[self._token(game)] = {"game": game, **entry, **more, "title": str(record.get("title") or "")}
                     continue
                 scores = {str(k): [int(x) if float(x).is_integer() else float(x) for x in v]
                           for k, v in dict(side["scores"]).items()}
                 ends = list(spec["end_classes"])
                 if n < 1 or n > 4 or sorted(scores) != sorted(ends) or any(len(v) != n for v in scores.values()):
                     continue
-                if self.p._find_game_by_id(game) is None:
+                record = self.p._find_game_by_id(game)
+                if record is None:
                     continue
             except Exception:
                 continue
             out[self._token(game)] = {"game": game, "players": n, "scores": scores, "start_class": spec["start_class"],
-                                      **more}
+                                      **more, "title": str(record.get("title") or "")}
         return out
 
     @staticmethod
@@ -265,10 +273,11 @@ class PartyMinigames:
         return {"players": n, "scores": None, "places_to_scores": p2s, "start_class": spec["start_class"]}
 
     def listing(self) -> dict:
-        return {"ok": True, "minigames": [{"id": t, "players": e["players"]} for t, e in sorted(self._entries().items())]}
+        return {"ok": True, "minigames": [{"id": t, "players": e["players"], "title": e["title"]}   # B134: the name
+                                          for t, e in sorted(self._entries().items())]}
 
     # --- start --------------------------------------------------------------------------------------------------------
-    def start(self, token: str, seats_text: str, bench: bool = False) -> dict:
+    def start(self, token: str, seats_text: str, bench: bool = False, hold: bool = False) -> dict:
         self.stream_needed = not bench           # B112: with the bench word, the watcher runs with no stream
         if not party.active(self.emu):
             self.row({"step": "minigame_refused", "why": "the board game is not the running session"})
@@ -296,10 +305,14 @@ class PartyMinigames:
               "stash": None, "launched": False, "routed": False, "ended_by": None, "closed": False,
               # B114: the actor's step, the taken calls, the end's owner
               "step": None, "step_since": None, "queue": collections.deque(), "end_req": None, "ending": False,
-              "title_proc": None, "actor_done": False, "switched_to": None}
+              "title_proc": None, "actor_done": False, "switched_to": None,
+              # B133 / B134: a held start — prepared behind the board, handed over on the board's go
+              "hold": bool(hold), "phase": None, "go": None, "prep_t0": now, "ready_at": None, "play_t0": None,
+              "practice": False, "practice_t0": None, "practices": 0, "practice_end_by": None}
         with self._lock:
             self.mg = mg
-        self.row({"step": "minigame_start", "seats": seats, "players": entry["players"]})
+        self.row({"step": "minigame_start", "seats": seats, "players": entry["players"],
+                  **({"hold": True} if hold else {})})
         threading.Thread(target=self._actor, args=(mg,), daemon=True, name="party-minigame").start()
         threading.Thread(target=self._watch, args=(mg,), daemon=True, name="party-minigame-watch").start()
         return {"ok": True, "state": "starting", "seats": seats}
@@ -461,7 +474,9 @@ class PartyMinigames:
     # --- the actor: the start's steps, then every taken call in order -------------------------------------------------
     def _step(self, mg: dict, name: str, fn: Callable[[], Any]):
         with self._cond:
-            if mg["end_req"] is not None or mg["closed"] or mg["state"] != "starting":
+            # B134: a held mini game's steps also run while a practice plays (its way back)
+            if (mg["end_req"] is not None or mg["closed"]
+                    or mg["state"] not in (("starting", "playing") if mg.get("hold") else ("starting",))):
                 raise _Abort()
             mg["step"], mg["step_since"] = name, self.clock()
         try:
@@ -499,6 +514,9 @@ class PartyMinigames:
             self.row({"step": "minigame_launch", "pid_owned": True, "cheat": True, "profile_matches": matches})
             if not matches:
                 raise RuntimeError(NOT_UNDER_SETUP)
+        if mg["hold"]:                               # B133: prepared behind the board, handed over on the go
+            self._held_steps(mg, proc)
+            return
         self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
         bridge = self._bridge()
         if bridge is not None:
@@ -516,6 +534,159 @@ class PartyMinigames:
             if mg["state"] == "starting":
                 mg["state"] = "playing"
         self.row({"step": "minigame_playing"})
+
+    # --- B133 / B134: the held start ----------------------------------------------------------------------------------
+    def _wait(self, mg: dict, until: Callable[[], bool], allowed: tuple = ("starting",)) -> None:
+        """Wait (the actor) until `until()` holds; an end asked for, the mini game closed or a final state → _Abort."""
+        while True:                                   # B114: `until` runs with no lock held (it may read the watch)
+            with self._cond:
+                if mg["end_req"] is not None or mg["closed"] or mg["state"] not in allowed:
+                    raise _Abort()
+            if until():
+                return
+            with self._cond:
+                self._cond.wait(0.1)
+
+    def _prepare(self, mg: dict, after_practice: bool = False) -> None:
+        """The title made ready behind the board: paused, the begin loaded (a new watch), run until the start is read
+        (the stream untouched, no pad route), then paused again → "ready". Not recognised → RuntimeError."""
+        emu = self.emu
+        runner = self.p._h7_minigame_runner()
+        t0 = self.clock()
+        with self._lock:
+            mg["phase"], mg["prep_t0"], mg["ready_at"] = "preparing", t0, None
+        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
+        self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed))
+        self.row({"step": "minigame_watch", "loaded": True})
+        self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))      # behind the board: nobody routed
+        seen: dict = {}
+
+        def recognised() -> bool:
+            try:
+                r = runner.result()
+            except Exception:
+                return False
+            seen["r"] = r.get("recognised")
+            if r.get("state") in ("no_game", "idle", "no_spec"):
+                seen["r"] = False
+            return seen["r"] is not None
+        self._wait(mg, recognised)
+        if seen.get("r") is not True:
+            raise RuntimeError(NOT_RECOGNISED)
+        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))        # held paused: no input, notices run out
+        now = self.clock()
+        with self._cond:
+            mg["phase"], mg["ready_at"], mg["recognised"] = "ready", now, True
+            self._cond.notify_all()
+        self.row({"step": "minigame_ready", "prepare_s": round(now - t0, 3),
+                  **({"after_practice": True} if after_practice else {})})
+
+    def _handover(self, mg: dict, proc: Any) -> bool:
+        """The go: the begin loaded again (paused; the watch kept), the pads routed, the planned switch, the release.
+        → True for a practice."""
+        emu = self.emu
+        runner = self.p._h7_minigame_runner()
+        go = mg["go"]
+        t0 = self.clock()
+        with self._lock:
+            mg["phase"] = "handing_over"
+        self.row({"step": "minigame_go", "held_s": round(t0 - (mg["ready_at"] or t0), 3),
+                  "remembered": bool(go["remembered"]), **({"practice": True} if go["practice"] else {})})
+        self._step(mg, "reload", lambda: runner.reload())
+        self.row({"step": "minigame_reloaded", "loaded": True})
+        if go["practice"]:
+            self._bounded(lambda: runner.stop(), 2.0)       # B134: nothing read in a practice
+        bridge = self._bridge()
+        if bridge is not None:
+            self._step(mg, "route", lambda: bridge.set_party_route({s - 1: k for k, s in enumerate(mg["seats"])}))
+            mg["routed"] = True
+        self.row({"step": "minigame_route", "ports": {str(k + 1): s for k, s in enumerate(mg["seats"])},
+                  "routed": mg["routed"]})
+        if self._step(mg, "switch", lambda: self._switch_stream("minigame", getattr(proc, "pid", None))):
+            mg["switched_to"] = "minigame"
+        if go["practice"] and bridge is not None:
+            self._start_hook(mg, bridge)
+        self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))
+        now = self.clock()
+        with self._cond:
+            if mg["state"] == "starting":
+                mg["state"], mg["play_t0"], mg["phase"] = "playing", now, None
+                if go["practice"]:
+                    mg["practice"], mg["practice_t0"], mg["practice_end_by"] = True, now, None
+            self._cond.notify_all()
+        self.row({"step": "minigame_playing", "handover_s": round(now - t0, 3),
+                  **({"practice": True, "n": mg["practices"] + 1} if go["practice"] else {})})
+        return bool(go["practice"])
+
+    def _start_hook(self, mg: dict, bridge: Any) -> None:
+        """B134: the Start button on any pad leaves a practice (the bridge's report hook; None again after)."""
+        last: dict = {}
+
+        def hook(player: int, buttons: int) -> None:
+            down = bool(int(buttons) & XUSB_START)
+            if down and not last.get(player, False):
+                with self._cond:
+                    if mg.get("practice") and mg["practice_end_by"] is None:
+                        mg["practice_end_by"] = "start_button"
+                        self._cond.notify_all()
+            last[player] = down
+        bridge._party_buttons = hook
+
+    def _way_back(self, mg: dict) -> None:
+        """B134: a practice over — the route cleared, the planned switch to the board, the title paused; then made
+        ready again behind the board (`_prepare`)."""
+        emu = self.emu
+        bridge = self._bridge()
+        if bridge is not None:
+            bridge._party_buttons = None
+        now = self.clock()
+        self.row({"step": "minigame_practice_end", "by": mg["practice_end_by"] or "time",
+                  "practice_s": round(now - (mg["practice_t0"] or now), 3)})
+        if mg.get("routed") and bridge is not None:
+            self._step(mg, "unroute", lambda: bridge.set_party_route(None))
+            mg["routed"] = False
+        board = (mg.get("stash") or {}).get("process")
+        if self._step(mg, "switch", lambda: self._switch_stream("board", getattr(board, "pid", None))):
+            mg["switched_to"] = "board"
+        self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
+        with self._cond:
+            mg.update(state="starting", practice=False, practice_t0=None, practice_end_by=None, go=None,
+                      practices=mg["practices"] + 1, phase="preparing")
+            self._cond.notify_all()
+
+    def _held_steps(self, mg: dict, proc: Any) -> None:
+        after = False
+        while True:
+            self._prepare(mg, after_practice=after)
+            self._wait(mg, lambda: mg["go"] is not None)
+            if not self._handover(mg, proc):
+                return
+            self._wait(mg, lambda: mg["practice_end_by"] is not None
+                       or self.clock() - (mg["practice_t0"] or self.clock()) >= self.practice_s, ("playing",))
+            if mg["practice_end_by"] is None:
+                mg["practice_end_by"] = "time"
+            self._way_back(mg)
+            after = True
+
+    def go(self, practice_text: str = "") -> dict:
+        """B133 / B134: the board's go (`practice=1`: a practice) — taken at once; remembered before "ready"."""
+        word = str(practice_text or "").strip()
+        if word not in ("", "1"):
+            raise ValueError("practice is 1")
+        with self._cond:
+            mg = self.mg
+            if (mg is None or not mg.get("hold") or mg["closed"] or mg["end_req"] is not None
+                    or mg["state"] in FINAL):
+                raise ValueError(NO_GO)
+            if mg["go"] is not None and (mg["state"] == "starting" or not mg["practice"]):
+                return {"ok": True, "go": "already", "phase": mg["phase"] or mg["state"]}
+            if mg["state"] != "starting":                 # a practice playing: its way back comes first
+                raise ValueError(NO_GO)
+            phase = mg["phase"] or "preparing"            # before the preparation's first step: preparing
+            remembered = phase != "ready"
+            mg["go"] = {"practice": word == "1", "remembered": remembered, "at": self.clock()}
+            self._cond.notify_all()
+        return {"ok": True, "go": "remembered" if remembered else "taken", "phase": phase, "practice": word == "1"}
 
     @staticmethod
     def _cheat_query(game_id: str, cheat: dict) -> str:
@@ -604,6 +775,11 @@ class PartyMinigames:
             return None
         if kind == "end":
             self._final(mg, "given_up", why="ended from the onn")
+        elif mg.get("hold") and (mg["state"] == "starting" or mg.get("practice")):
+            # B133 / B134: Home / RESUME while the TV shows the board (the preparation, the hold) or a practice: the
+            # mini game is given up first (the title stopped, the board's session back); the call then acts on the board
+            self._final(mg, "given_up", why="the onn's Home during the preparation")
+            self._enqueue(mg, "end_hub", None, by="onn: Home during the preparation")
         item = self._enqueue(mg, kind, fn, by="onn" if kind == "end" else None)
         if item is None:
             return None
@@ -695,6 +871,14 @@ class PartyMinigames:
                 if now - (mg["final_at"] or now) >= self.end_wait_s:
                     self._enqueue(mg, "end_hub", None, by="hub: no end call")
                 continue
+            if state == "starting" and mg.get("hold"):     # B133: the limit is the preparation's; the hold has none
+                if mg["phase"] in (None, "preparing") and now - mg["prep_t0"] >= self.start_limit_s:
+                    self._final(mg, "given_up", why=f"the mini game was not ready within {self.start_limit_s:.0f} s")
+                    self._enqueue(mg, "end_hub", None, by="hub: the start was stuck")
+                elif mg["phase"] == "ready" and now - mg["last_poll"] >= self.poll_gone_s:
+                    self._final(mg, "given_up", why="the board stopped asking")
+                    self._enqueue(mg, "end_hub", None, by="hub: the board stopped asking")
+                continue
             if state == "starting":
                 if now - mg["t0"] >= self.start_limit_s:
                     self._final(mg, "given_up", why=f"the mini game did not start within {self.start_limit_s:.0f} s")
@@ -705,8 +889,10 @@ class PartyMinigames:
             if now - mg["last_poll"] >= self.poll_gone_s:
                 self._final(mg, "given_up", why="the board stopped asking")
                 continue
-            if now - mg["t0"] >= self.play_limit_s:
+            if now - (mg.get("play_t0") or mg["t0"]) >= self.play_limit_s:   # B133: a held start: from the hand-over
                 self._final(mg, "given_up", why=f"no end within {self.play_limit_s:.0f} s")
+                continue
+            if mg.get("practice"):                        # B134: nothing read, nothing scored in a practice
                 continue
             try:
                 r = runner.result()
@@ -755,6 +941,13 @@ class PartyMinigames:
             out = {"ok": True, "state": mg["state"], "seats": mg["seats"], "recognised": mg["recognised"],
                    "class": mg["class"], "scores": mg["scores"], "why": mg["why"], "closed": mg["closed"],
                    "since_s": round(self.clock() - mg["t0"], 1)}
+            if mg.get("hold"):                            # B133 / B134: a held start's phase, practices
+                if mg["state"] == "starting":
+                    out["phase"] = mg["phase"] or "preparing"
+                if mg["state"] == "playing" and mg["practice"]:
+                    out["practice"] = True
+                    out["practice_s"] = round(self.clock() - (mg["practice_t0"] or self.clock()), 1)
+                out["practices"] = mg["practices"]
             if mg["entry"].get("places_to_scores") is not None:   # B123: the places read, port by port
                 out["places"] = mg["places"]
             return out
@@ -817,7 +1010,12 @@ class PartyMinigames:
             if bridge is not None:
                 bridge.set_party_route(None)
         board = (mg.get("stash") or {}).get("process")
-        if by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:
+        bridge = self._bridge()
+        if bridge is not None and getattr(bridge, "_party_buttons", None) is not None:
+            bridge._party_buttons = None                  # B134: a practice's Start hook never outlives it
+        if mg.get("hold") and mg.get("switched_to") != "minigame":
+            pass                                          # B133: the stream never left the board: no switch back
+        elif by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:
             try:
                 self._switch_stream("board", getattr(board, "pid", None))
             except Exception:

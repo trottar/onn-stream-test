@@ -38,6 +38,7 @@ class FakeHub:
     def __init__(self):
         self.calls: list[str] = []
         self.polls: dict[str, int] = {}
+        self.held_state: dict[str, dict] = {}     # B135: a held start's state, per scenario
         hub = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -51,7 +52,12 @@ class FakeHub:
                 scenario = parts[2] if len(parts) > 2 else ""
                 action = path.split("/plugins/games/", 1)[-1].split("?", 1)[0]
                 code, body = 200, {"ok": True}
-                if action == "party-minigames":
+                if scenario.startswith("h"):                          # B135: the held starts (choose, load, go)
+                    code, body = hub.held(scenario, action, path)
+                    action = "-"
+                if action == "-":
+                    pass
+                elif action == "party-minigames":
                     if scenario.startswith("mix"):                    # B124: a two- and a four-player game
                         body["minigames"] = [{"id": "mg_two", "players": 2}, {"id": "mg_four", "players": 4}]
                     else:
@@ -91,6 +97,55 @@ class FakeHub:
         self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
+    def held(self, scenario: str, action: str, path: str) -> tuple[int, dict]:
+        """B135: as the check's own stand-in — preparing for two result calls, ready from the third; the go only when
+        ready; a practice plays two calls and prepares again; a plain go plays two calls and ends [1, 0]."""
+        body: dict = {"ok": True}
+        st = self.held_state.setdefault(scenario, {"mode": "prep", "k": 0, "p": 0, "practices": 0})
+        if action == "party-minigames":
+            body["minigames"] = [{"id": "mg_a", "players": 2, "title": "Made-up A"}]
+            if scenario != "hone":
+                body["minigames"].append({"id": "mg_b", "players": 2, "title": "Made-up B"})
+        elif action == "party-minigame-start":
+            if scenario == "hrefused":
+                return 400, {"ok": False, "error": "a mini game is already on"}
+            st.update(mode="prep", k=0, p=0, practices=0)
+            body["state"] = "starting"
+        elif action == "party-minigame-result":
+            if scenario == "hsilent" and st["k"] >= 2:
+                return 500, {"ok": False, "error": "the hub is busy"}
+            if st["mode"] == "prep":
+                st["k"] += 1
+                if scenario == "hsilent":
+                    body.update(state="starting", phase="preparing")
+                elif scenario == "hgiveup" and st["k"] >= 2:
+                    body.update(state="given_up", why="the title's start screen was not recognised", scores=None)
+                else:
+                    body.update(state="starting", phase="ready" if st["k"] >= 3 else "preparing",
+                                practices=st["practices"])
+            elif st["mode"] == "practice":
+                st["p"] += 1
+                if st["p"] <= 2:
+                    body.update(state="playing", practice=True, practices=st["practices"])
+                else:
+                    st.update(mode="prep", k=0)
+                    st["practices"] += 1
+                    body.update(state="starting", phase="preparing", practices=st["practices"])
+            else:
+                st["p"] += 1
+                body.update({"state": "playing", "recognised": True} if st["p"] <= 2 else
+                            {"state": "ended", "class": "end_P1", "scores": [1, 0]})
+        elif action == "party-minigame-go":
+            if not (st["mode"] == "prep" and st["k"] >= 3):
+                return 400, {"ok": False, "error": "no mini game is waiting for the go"}
+            st.update(mode="practice" if "practice=1" in path else "play", p=0)
+            body.update(go="taken", phase="ready")
+        elif action == "party-minigame-end":
+            body["ended"] = True
+        else:
+            return 404, {"ok": False, "error": "Unknown Games plugin action"}
+        return 200, body
+
     def close(self):
         self.server.shutdown()
         self.server.server_close()
@@ -124,7 +179,7 @@ class BoardCheck(unittest.TestCase):
     def test_with_the_checks_own_stand_in_hub(self):
         r = run_check({})
         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
-        self.assertIn("HUB MINIGAME CHECK: PASS (40 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats
+        self.assertIn("HUB MINIGAME CHECK: PASS (81 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats; B135: +41
 
     def test_against_this_tests_fake_hub(self):
         hub = FakeHub()
@@ -134,13 +189,21 @@ class BoardCheck(unittest.TestCase):
             hub.close()
         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
         # its eight "asked" ones (B124: +3), "listens" and (B116) the five frame-rate ones are ours here
-        self.assertIn("HUB MINIGAME CHECK: PASS (26 assertions)", r.stdout)
+        self.assertIn("HUB MINIGAME CHECK: PASS (56 assertions)", r.stdout)   # B135: +30 (its stand-in-only ones ours here)
         starts = [c for c in hub.calls if "party-minigame-start" in c]
         self.assertIn("/s/win1/plugins/games/party-minigame-start?id=mg_one&seats=1,2", starts)
         self.assertIn("/s/mix4/plugins/games/party-minigame-start?id=mg_four&seats=3,1,4,2", starts)   # B124
         self.assertIn("/s/mix2/plugins/games/party-minigame-start?id=mg_two&seats=1,2", starts)
         self.assertFalse(any(c.startswith("/s/mix3/") for c in starts))
-        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 10)   # every started one
+        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 19)   # every started one (B135: +9)
+        # B135: the screens' starts held, the goes only once ready, the practices
+        held = [c for c in starts if c.startswith("/s/h")]
+        self.assertTrue(held and all(c.endswith("&hold=1") for c in held), held)
+        self.assertFalse(any(c.startswith("/s/hrefused/") and c.endswith("party-minigame-end") for c in hub.calls))
+        goes = [c for c in hub.calls if c.startswith("/s/hpractice/") and "party-minigame-go" in c]
+        self.assertEqual([("practice=1" in c) for c in goes], [True, True, True, False])
+        self.assertIn("PrivyParty: hub mini game: a draw: the hub gave it up (the title's start screen was not recognised)",
+                      r.stdout)
         self.assertIn("PrivyParty: hub mini game: a draw: the hub stopped answering", r.stdout)   # B116's silent hub
         self.assertFalse(any(c.startswith("/s/refused/") and c.endswith("party-minigame-end") for c in hub.calls))
         self.assertIn("PrivyParty: hub mini game: a draw: the hub gave it up (no end within 900 s)", r.stdout)

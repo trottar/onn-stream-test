@@ -4439,7 +4439,18 @@ class GamesPlugin:
                 if self._native_stream.status().get("active"):
                     raise ValueError(_h7_minigame.BENCH_STREAM_UP)
                 bench = True
+            hold = False
+            if "hold" in q:                              # B133: prepared behind the board, handed over on the go
+                if self._first(q, "hold") != "1":
+                    raise ValueError("hold is 1")
+                hold = True
+            if hold:
+                return self._party_minigame_runner().start(self._first(q, "id"), self._first(q, "seats"), bench=bench,
+                                                           hold=True)
             return self._party_minigame_runner().start(self._first(q, "id"), self._first(q, "seats"), bench=bench)
+        # B133 / B134: the board's go for a held start (practice=1: a practice)
+        if action == "party-minigame-go" and _party_minigame is not None:
+            return self._party_minigame_runner().go(self._first(parse_qs(raw_query), "practice"))
         if action == "party-minigame-end" and _party_minigame is not None:
             return self._party_minigame_runner().end(by="board")
 

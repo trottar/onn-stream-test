@@ -1643,6 +1643,7 @@ class NativeControllerBridge:
     # B110: a party mini game's seats → ports ({the onn's player byte: the pad it drives}); others dropped. Set only by
     # the mini-game layer (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1) for a mini game's length. None = today.
     _party_route: dict[int, int] | None = None
+    _party_buttons = None      # B134: a party practice's report hook (player, buttons); None = today
 
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
@@ -2341,6 +2342,13 @@ class NativeControllerBridge:
         lt: int,
         rt: int,
     ) -> None:
+        # B134: a party practice watches the pads' reports (the Start button); None = today
+        hook = self._party_buttons
+        if hook is not None:
+            try:
+                hook(player, buttons)
+            except Exception:
+                pass
         # B110: a party mini game's route (None = today)
         route = self._party_route
         if route is not None:
