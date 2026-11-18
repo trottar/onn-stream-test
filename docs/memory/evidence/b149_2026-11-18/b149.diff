@@ -1,0 +1,53 @@
+diff --git a/tests/b111_party_board/test_b111.py b/tests/b111_party_board/test_b111.py
+index 95239394..94fb001d 100644
+--- a/tests/b111_party_board/test_b111.py
++++ b/tests/b111_party_board/test_b111.py
+@@ -123,6 +123,10 @@ class FakeHub:
+                 else:
+                     body.update(state="starting", phase="ready" if st["k"] >= 3 else "preparing",
+                                 practices=st["practices"])
++            elif st["mode"] == "practice" and scenario == "hunseen":   # B149: a practice never seen playing
++                st.update(mode="prep", k=0)
++                st["practices"] += 1
++                body.update(state="starting", phase="preparing", practices=st["practices"])
+             elif st["mode"] == "practice":
+                 st["p"] += 1
+                 if st["p"] <= 2:
+@@ -179,7 +183,7 @@ class BoardCheck(unittest.TestCase):
+     def test_with_the_checks_own_stand_in_hub(self):
+         r = run_check({})
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+-        self.assertIn("HUB MINIGAME CHECK: PASS (89 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats; B135: +41; B145: +8
++        self.assertIn("HUB MINIGAME CHECK: PASS (97 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats; B135: +41; B145: +8; B149: +8
+ 
+     def test_against_this_tests_fake_hub(self):
+         hub = FakeHub()
+@@ -189,13 +193,13 @@ class BoardCheck(unittest.TestCase):
+             hub.close()
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+         # its eight "asked" ones (B124: +3), "listens" and (B116) the five frame-rate ones are ours here
+-        self.assertIn("HUB MINIGAME CHECK: PASS (63 assertions)", r.stdout)   # B135: +30 (its stand-in-only ones ours here); B145: +7
++        self.assertIn("HUB MINIGAME CHECK: PASS (68 assertions)", r.stdout)   # B135: +30 (its stand-in-only ones ours here); B145: +7; B149: +5
+         starts = [c for c in hub.calls if "party-minigame-start" in c]
+         self.assertIn("/s/win1/plugins/games/party-minigame-start?id=mg_one&seats=1,2", starts)
+         self.assertIn("/s/mix4/plugins/games/party-minigame-start?id=mg_four&seats=3,1,4,2", starts)   # B124
+         self.assertIn("/s/mix2/plugins/games/party-minigame-start?id=mg_two&seats=1,2", starts)
+         self.assertFalse(any(c.startswith("/s/mix3/") for c in starts))
+-        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 19)   # every started one (B135: +9)
++        self.assertEqual(sum(1 for c in hub.calls if c.endswith("party-minigame-end")), 20)   # every started one (B135: +9; B149: +1)
+         # B135: the screens' starts held, the goes only once ready, the practices
+         held = [c for c in starts if c.startswith("/s/h")]
+         self.assertTrue(held and all(c.endswith("&hold=1") for c in held), held)
+@@ -210,9 +214,11 @@ class BoardCheck(unittest.TestCase):
+         self.assertIn("PrivyParty: hub mini game: a draw: no hub (no hub)", r.stdout)
+         # B145: one line for each choice and each decision, never a game's name
+         for line in ("cards 2, chose 0", "cards 2, chose 1", "cards 2, chose random", "cards 1, chose 0", "practice",
+-                     "start"):
++                     "start", "load screen again"):
+             self.assertIn("PrivyParty: hub mini game: " + line + "\n", r.stdout)
+         self.assertNotIn("Made-up", "".join(x for x in r.stdout.splitlines(True) if "hub mini game:" in x))
++        goes = [c for c in hub.calls if c.startswith("/s/hunseen/") and "party-minigame-go" in c]   # B149
++        self.assertEqual([("practice=1" in c) for c in goes], [True, False])
+ 
+ 
+ if __name__ == "__main__":

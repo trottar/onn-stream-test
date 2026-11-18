@@ -7982,6 +7982,10 @@ class EmulatorManager:
                                                                                          buffering=1)
         log_handle.write(f"PrivyHub game session (the board game) renderer={cfg['renderer']}\n")
         try:
+            _party.prepare(cfg, self._party_row, log_handle, os.environ)   # B148: the board's resources imported first
+        except Exception as exc:
+            self._party_row({"step": "board_import", "error": type(exc).__name__})   # launched as today all the same
+        try:
             process = _party.start(cfg, log_handle, os.environ)
         except Exception as exc:
             log_handle.close()

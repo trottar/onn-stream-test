@@ -106,6 +106,111 @@ def command(cfg: dict[str, str]) -> list[str]:
             "--rendering-driver", RENDERERS[cfg["renderer"]], "--fullscreen", "--", "--content=" + cfg["pictures"]]
 
 
+# --- B148: the board prepared before its launch ---------------------------------------------------------------------
+IMPORT_LIMIT_S = 20.0                 # the import's bound (the onn waits 60 s for a launch's answer)
+IMPORTABLE = {".png", ".jpg", ".jpeg", ".webp", ".svg", ".bmp", ".tga", ".wav", ".ogg", ".mp3", ".glb", ".gltf",
+              ".fbx", ".obj", ".ttf", ".otf", ".woff", ".woff2"}
+_DEST = re.compile(r'"res://(\.godot/imported/[^"]+)"')
+
+
+def import_needed(project: Any) -> int:
+    """B148: how many of the project's resources are not prepared in its `.godot/imported` cache (0: none). Walks the
+    project, skipping `.godot/` and any folder holding a `.gdignore`: every `<file>.import` sidecar's `dest_files`
+    present, each with its `.md5` whose `source_md5` is the source's md5; every importable file with its sidecar."""
+    import hashlib
+    root = Path(project)
+    count = 0
+    for folder, dirs, files in os.walk(root):
+        here = Path(folder)
+        if ".gdignore" in files and here != root:
+            dirs[:] = []
+            continue
+        dirs[:] = [d for d in dirs if not (here == root and d == ".godot")]
+        names = set(files)
+        for name in files:
+            if name.endswith(".import"):
+                source = here / name[: -len(".import")]
+                try:
+                    text = (here / name).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    count += 1
+                    continue
+                deps = text.split("[deps]", 1)[1] if "[deps]" in text else ""
+                dests = _DEST.findall(deps.split("\n[", 1)[0])
+                ok = bool(dests) and source.is_file()
+                for dest in dests:
+                    d = root / dest
+                    md5 = d.with_name(d.name.rsplit(".", 1)[0] + ".md5")
+                    if not ok or not d.is_file() or not md5.is_file():
+                        ok = False
+                        break
+                    m = re.search(r'source_md5="([0-9a-f]+)"', md5.read_text(encoding="utf-8", errors="replace"))
+                    if m is None or m.group(1) != hashlib.md5(source.read_bytes()).hexdigest():
+                        ok = False
+                        break
+                count += 0 if ok else 1
+            elif Path(name).suffix.lower() in IMPORTABLE and name + ".import" not in names:
+                count += 1
+    return count
+
+
+def _board_running(cfg: dict[str, str]) -> bool:
+    """B148: a process whose command line names the config's godot (first, or after its interpreter) and its project
+    (the board, or Godot open on its folder)."""
+    want_godot, want_project = str(cfg["godot"]), str(cfg["project"])
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            argv = [a.decode("utf-8", "replace") for a in (entry / "cmdline").read_bytes().split(b"\0") if a]
+        except OSError:
+            continue
+        if want_godot in argv[:2] and any(a == want_project or a.startswith(want_project + "/") for a in argv):
+            return True
+    return False
+
+
+def prepare(cfg: dict[str, str], row_fn: Callable[[dict], None], log_handle: Any = None, environ=os.environ,
+            limit_s: float | None = None, running: Callable[[dict], bool] | None = None) -> dict | None:
+    """B148: before the board's launch — nothing to prepare: None (no row, the launch as today); else Godot's own
+    `--headless --import` on the project, bounded, one `board_import` row; never while the board runs. Whatever its end,
+    the caller launches as today."""
+    needed = import_needed(cfg["project"])
+    if not needed:
+        return None
+    fields: dict[str, Any] = {"step": "board_import", "needed": True, "files": needed}
+    if (running or _board_running)(cfg):
+        fields["skipped"] = "the board is running"
+        row_fn(fields)
+        return fields
+    bound = IMPORT_LIMIT_S if limit_s is None else float(limit_s)
+    t0 = time.monotonic()
+    out = log_handle if log_handle is not None else subprocess.DEVNULL
+    try:
+        proc = _POPEN([cfg["godot"], "--headless", "--path", cfg["project"], "--import"], cwd=cfg["project"],
+                      stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, env=launch_env(environ),
+                      start_new_session=True)
+    except Exception as exc:
+        fields.update(rc=None, error=type(exc).__name__)
+        row_fn(fields)
+        return fields
+    try:
+        fields["rc"] = proc.wait(timeout=bound)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError, OSError):
+            proc.kill()
+        try:
+            proc.wait(timeout=KILL_WAIT_S)
+        except subprocess.TimeoutExpired:
+            pass
+        fields.update(rc=None, timeout=True)
+    fields["seconds"] = round(time.monotonic() - t0, 2)
+    row_fn(fields)
+    return fields
+
+
 ON_HUB = "PRIVYPARTY_ON_HUB"          # B124: the board knows it runs on the hub (its picker may prefer the hub's games)
 
 

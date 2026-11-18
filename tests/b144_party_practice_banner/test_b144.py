@@ -14,7 +14,7 @@ title's window is never drawn on (the watcher reads the window, not the stream).
 - **The title's window untouched / the band in the output frame** (needs the hub's display, `DISPLAY=:0` or the
   environment's; skipped without X): a made-up 960 × 720 window showing a known picture, grabbed by its id with the
   stream's own x11grab arguments: the window's own picture (no band); the practice command's own `-vf` (its
-  `hwupload` swapped for an RGB frame out) on that grab: the band's rows (0-58 of 720) differ from the same chain
+  `hwupload` swapped for an RGB frame out) on that grab: the band's rows (B147: 36-85 of 720) differ from the same chain
   without the band, every other row equal within 2 grey levels, the text's white pixels inside the band.
 - The flags absent: B114's flag test (run with the suites). Temp dirs removed.
 
@@ -136,11 +136,13 @@ class WindowAndFrame(unittest.TestCase):
             b = np.asarray(Image.open(tmp / "plain.png").convert("L")).astype(int)
             self.assertEqual(a.shape, (720, 1280))
             diff_rows = [y for y in range(720) if np.abs(a[y] - b[y]).max() > 2]
-            self.assertTrue(diff_rows and min(diff_rows) == 0 and max(diff_rows) <= 58, (diff_rows[:3], diff_rows[-3:]))
-            self.assertLessEqual(int(np.abs(a[59:] - b[59:]).max()), 2)           # the rest equal
-            band = a[:58, 160:1120]
+            # B147: the band inside the inner 90 % — rows 36-85 of 720 (B144's was 0-58)
+            self.assertTrue(diff_rows and min(diff_rows) >= 36 and max(diff_rows) <= 90, (diff_rows[:3], diff_rows[-3:]))
+            self.assertLessEqual(int(np.abs(a[:36] - b[:36]).max()), 2)           # above it equal
+            self.assertLessEqual(int(np.abs(a[91:] - b[91:]).max()), 2)           # below it equal
+            band = a[36:86, 160:1120]
             self.assertGreater(int((band > 200).sum()), 500)                      # the text's white pixels
-            self.assertLess(float(band[band <= 200].mean()), float(b[:58, 160:1120].mean()))   # the band darker
+            self.assertLess(float(band[band <= 200].mean()), float(b[36:86, 160:1120].mean()))   # the box darker
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

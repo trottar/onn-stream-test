@@ -1,0 +1,8 @@
+# Queue AY: the mutations (scripts/run_mutations.sh), each one change in a copy, the suite or check that must catch it run once — FAIL expected. board_no_unseen_branch: "no verdict" = the check never finished within its 300-s bound (the board waits on its 20-minute bound: the fault B149 removes).
+b147_old_band (companion/native_stream.py): Ran 1 test in 40.951s FAILED (failures=1, errors=1) 
+b148_no_prepare (companion/party_session.py): Ran 6 tests in 9.924s FAILED (failures=2, errors=1, skipped=1) 
+b148_no_bound (companion/party_session.py): Ran 6 tests in 15.067s FAILED (failures=1, skipped=1) 
+b148_import_while_running (companion/party_session.py): Ran 6 tests in 11.058s FAILED (failures=1, skipped=1) 
+board_no_unseen_branch: run 1: no verdict 
+board_no_again_line: run 1:   FAIL: an unseen practice: the board's log, the line once (got ["cards 2, chose 0", "practice", "start", "scores [1, 0] for seats 1,2"], wanted ["cards 2, chose 0", "practice", "load screen again", "start", "scores [1, 0] for seats 1,2"]) HUB MINIGAME CHECK: FAIL (1 of 97 assertions) 
+b147_old_band, run again alone (the first run above also showed one error in the scenario's first class, not reproduced): FAILED (failures=2) — the filter's y=h*5/100+10 absent; a changed pixel at row 0 (< 36), (1280, 720)

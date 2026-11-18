@@ -1,0 +1,481 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index c6ea5156..314b3037 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -7981,6 +7981,10 @@ class EmulatorManager:
+         log_handle = (logs_dir / (time.strftime("%Y%m%d-%H%M%S") + "-party.log")).open("a", encoding="utf-8",
+                                                                                          buffering=1)
+         log_handle.write(f"PrivyHub game session (the board game) renderer={cfg['renderer']}\n")
++        try:
++            _party.prepare(cfg, self._party_row, log_handle, os.environ)   # B148: the board's resources imported first
++        except Exception as exc:
++            self._party_row({"step": "board_import", "error": type(exc).__name__})   # launched as today all the same
+         try:
+             process = _party.start(cfg, log_handle, os.environ)
+         except Exception as exc:
+diff --git a/companion/party_session.py b/companion/party_session.py
+index 6201bd83..9db4a47b 100644
+--- a/companion/party_session.py
++++ b/companion/party_session.py
+@@ -106,6 +106,111 @@ def command(cfg: dict[str, str]) -> list[str]:
+             "--rendering-driver", RENDERERS[cfg["renderer"]], "--fullscreen", "--", "--content=" + cfg["pictures"]]
+ 
+ 
++# --- B148: the board prepared before its launch ---------------------------------------------------------------------
++IMPORT_LIMIT_S = 20.0                 # the import's bound (the onn waits 60 s for a launch's answer)
++IMPORTABLE = {".png", ".jpg", ".jpeg", ".webp", ".svg", ".bmp", ".tga", ".wav", ".ogg", ".mp3", ".glb", ".gltf",
++              ".fbx", ".obj", ".ttf", ".otf", ".woff", ".woff2"}
++_DEST = re.compile(r'"res://(\.godot/imported/[^"]+)"')
++
++
++def import_needed(project: Any) -> int:
++    """B148: how many of the project's resources are not prepared in its `.godot/imported` cache (0: none). Walks the
++    project, skipping `.godot/` and any folder holding a `.gdignore`: every `<file>.import` sidecar's `dest_files`
++    present, each with its `.md5` whose `source_md5` is the source's md5; every importable file with its sidecar."""
++    import hashlib
++    root = Path(project)
++    count = 0
++    for folder, dirs, files in os.walk(root):
++        here = Path(folder)
++        if ".gdignore" in files and here != root:
++            dirs[:] = []
++            continue
++        dirs[:] = [d for d in dirs if not (here == root and d == ".godot")]
++        names = set(files)
++        for name in files:
++            if name.endswith(".import"):
++                source = here / name[: -len(".import")]
++                try:
++                    text = (here / name).read_text(encoding="utf-8", errors="replace")
++                except OSError:
++                    count += 1
++                    continue
++                deps = text.split("[deps]", 1)[1] if "[deps]" in text else ""
++                dests = _DEST.findall(deps.split("\n[", 1)[0])
++                ok = bool(dests) and source.is_file()
++                for dest in dests:
++                    d = root / dest
++                    md5 = d.with_name(d.name.rsplit(".", 1)[0] + ".md5")
++                    if not ok or not d.is_file() or not md5.is_file():
++                        ok = False
++                        break
++                    m = re.search(r'source_md5="([0-9a-f]+)"', md5.read_text(encoding="utf-8", errors="replace"))
++                    if m is None or m.group(1) != hashlib.md5(source.read_bytes()).hexdigest():
++                        ok = False
++                        break
++                count += 0 if ok else 1
++            elif Path(name).suffix.lower() in IMPORTABLE and name + ".import" not in names:
++                count += 1
++    return count
++
++
++def _board_running(cfg: dict[str, str]) -> bool:
++    """B148: a process whose command line names the config's godot (first, or after its interpreter) and its project
++    (the board, or Godot open on its folder)."""
++    want_godot, want_project = str(cfg["godot"]), str(cfg["project"])
++    for entry in Path("/proc").iterdir():
++        if not entry.name.isdigit():
++            continue
++        try:
++            argv = [a.decode("utf-8", "replace") for a in (entry / "cmdline").read_bytes().split(b"\0") if a]
++        except OSError:
++            continue
++        if want_godot in argv[:2] and any(a == want_project or a.startswith(want_project + "/") for a in argv):
++            return True
++    return False
++
++
++def prepare(cfg: dict[str, str], row_fn: Callable[[dict], None], log_handle: Any = None, environ=os.environ,
++            limit_s: float | None = None, running: Callable[[dict], bool] | None = None) -> dict | None:
++    """B148: before the board's launch — nothing to prepare: None (no row, the launch as today); else Godot's own
++    `--headless --import` on the project, bounded, one `board_import` row; never while the board runs. Whatever its end,
++    the caller launches as today."""
++    needed = import_needed(cfg["project"])
++    if not needed:
++        return None
++    fields: dict[str, Any] = {"step": "board_import", "needed": True, "files": needed}
++    if (running or _board_running)(cfg):
++        fields["skipped"] = "the board is running"
++        row_fn(fields)
++        return fields
++    bound = IMPORT_LIMIT_S if limit_s is None else float(limit_s)
++    t0 = time.monotonic()
++    out = log_handle if log_handle is not None else subprocess.DEVNULL
++    try:
++        proc = _POPEN([cfg["godot"], "--headless", "--path", cfg["project"], "--import"], cwd=cfg["project"],
++                      stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, env=launch_env(environ),
++                      start_new_session=True)
++    except Exception as exc:
++        fields.update(rc=None, error=type(exc).__name__)
++        row_fn(fields)
++        return fields
++    try:
++        fields["rc"] = proc.wait(timeout=bound)
++    except subprocess.TimeoutExpired:
++        try:
++            os.killpg(proc.pid, signal.SIGKILL)
++        except (ProcessLookupError, PermissionError, OSError):
++            proc.kill()
++        try:
++            proc.wait(timeout=KILL_WAIT_S)
++        except subprocess.TimeoutExpired:
++            pass
++        fields.update(rc=None, timeout=True)
++    fields["seconds"] = round(time.monotonic() - t0, 2)
++    row_fn(fields)
++    return fields
++
++
+ ON_HUB = "PRIVYPARTY_ON_HUB"          # B124: the board knows it runs on the hub (its picker may prefer the hub's games)
+ 
+ 
+diff --git a/tests/b148_party_board_prepared/test_b148.py b/tests/b148_party_board_prepared/test_b148.py
+new file mode 100644
+index 00000000..272cdd96
+--- /dev/null
++++ b/tests/b148_party_board_prepared/test_b148.py
+@@ -0,0 +1,344 @@
++#!/usr/bin/env python3
++"""B148 (host): the board prepared before its launch — through the real HTTP server on loopback.
++
++PP-H3d: the board was silent on the hub because the PC side's new sounds had never been imported there (Godot's
++`.godot/` cache is git-ignored: a pull brings the sources and their `.import` sidecars, not the imported files). B148:
++at the board's launch the hub tests the project (every sidecar's dests and their `source_md5`, every importable file's
++sidecar) and, when something is not prepared, runs Godot's own `--headless --import` first, bounded, with a
++`board_import` row; whatever its end, the board is launched as today.
++
++B108's harness (the companion's real routes in a child on B83's fixture tree; the stand-in board as the config's
++`godot`), its stand-in taught `--import` (it writes each sidecar's dests and `.md5`s, or fails / runs long when told).
++Cases: **not needed** → no import, no row, the launch's argv equal to HEAD's (the same scenario on the baseline's
++companion); **needed** (a dest missing) → the import, then the launch, in that order, the row `needed` / `seconds` /
++`rc` 0, nothing needed after; **a changed source** → needed again; **the import failing** → launched, rc 1; **past a
++shortened bound** → killed, launched, `timeout`; **the board already running on that project** → no import, `skipped`.
++The test itself on its own: a missing dest, a changed source, a source without its sidecar, a `.gdignore`d folder.
++**Once (`RealBoard`, needs Godot and the board's repo named, as B111): a scratch clone of the board's real tree with a
++cold cache** — needed; `prepare` with the real Godot; nothing needed after; `checks/step26_sound_and_ready.gd` PASS; the
++clone's `git status --short` 0 lines; the scratch removed. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b148_party_board_prepared -v
++"""
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import shutil
++import subprocess
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "b108_party_launch"))
++sys.path.insert(0, str(ROOT / "tests" / "b114_party_minigame_hang"))
++import test_b108 as b108  # noqa: E402  (its harness; its tests are not collected here)
++import test_b114 as b114  # noqa: E402
++
++BASELINE = "1052fe82"            # queue AY's baseline: the companion before B147-B149
++GODOT = os.environ.get("PRIVYPARTY_GODOT", "")
++REPO = os.environ.get("PRIVYPARTY_REPO", "")
++
++IMPORTER = r'''#!/usr/bin/env python3
++import hashlib, json, os, re, sys, time
++from pathlib import Path
++here = Path(os.environ["B108_BOARD_DIR"])
++project = Path(sys.argv[sys.argv.index("--path") + 1])
++with (here / "calls.jsonl").open("a") as fh:
++    fh.write(json.dumps({"t": time.time(), "import": "--import" in sys.argv, "argv": sys.argv[1:]}) + "\n")
++if "--import" in sys.argv:
++    if (project / "SLOW_IMPORT").exists():
++        time.sleep(float((project / "SLOW_IMPORT").read_text()))
++    rc = int((project / "IMPORT_RC").read_text()) if (project / "IMPORT_RC").exists() else 0
++    if rc == 0:
++        for imp in project.rglob("*.import"):
++            if ".godot" in imp.parts:
++                continue
++            src = imp.with_name(imp.name[:-len(".import")])
++            for dest in re.findall(r'"res://(\.godot/imported/[^"]+)"', imp.read_text()):
++                d = project / dest
++                d.parent.mkdir(parents=True, exist_ok=True)
++                d.write_bytes(b"imported")
++                d.with_name(d.name.rsplit(".", 1)[0] + ".md5").write_text(
++                    'source_md5="%s"\ndest_md5="0"\n' % hashlib.md5(src.read_bytes()).hexdigest())
++    sys.exit(rc)
++'''
++
++SIDE = '''[remap]
++
++importer="wav"
++type="AudioStreamWAV"
++path="res://.godot/imported/{name}-0123456789abcdef0123456789abcdef.sample"
++
++[deps]
++
++source_file="res://sound/{name}"
++dest_files=["res://.godot/imported/{name}-0123456789abcdef0123456789abcdef.sample"]
++
++[params]
++
++edit/trim=false
++'''
++
++SCENARIO = r'''
++import party_session as party
++party.QUIT_WAIT_S = 1.0
++import importlib.util as ilu_
++spec_ = ilu_.find_spec("subprocess")            # the harness replaced subprocess.Popen (its fake RetroArch)
++sp_ = ilu_.module_from_spec(spec_); spec_.loader.exec_module(sp_)
++S_popen_real = party._POPEN is not subprocess.Popen   # the board's starter taken at import: the real one
++board_dir = Path(args["board_dir"])
++project = Path(args["project"])
++cmds = []
++def fake_run(cmd, timeout=3.0):
++    cmds.append(list(cmd))
++    pid = (board_dir / "pid").read_text() if (board_dir / "pid").exists() else ""
++    out, rc = "", 0
++    if cmd[:4] == ["xdotool", "search", "--onlyvisible", "--class"]:
++        out = "4242\n" if pid else ""
++    elif cmd[:2] == ["xdotool", "getwindowpid"]:
++        out = pid + "\n"
++    elif cmd[:2] == ["xdotool", "windowactivate"]:
++        with (board_dir / "keys").open("a") as fh:
++            fh.write(cmd[-1] + "\n")
++    elif cmd[:2] == ["pactl", "list"]:
++        out = f'application.process.id = "{pid}"\n' if pid else ""
++    else:
++        rc = 1
++    return types.SimpleNamespace(returncode=rc, stdout=out, stderr="")
++m._party_session_kwargs = {"run": fake_run, "devices": Path(args["devices"])}
++stream.start = lambda **kw: {"active": True}
++stream.stop = lambda *a, **k: {"active": False}
++def rows():
++    p = root / "logs/games/party.jsonl"
++    return [json.loads(l) for l in p.read_text().splitlines()] if p.is_file() else []
++def calls():
++    p = board_dir / "calls.jsonl"
++    return [json.loads(l) for l in p.read_text().splitlines()] if p.is_file() else []
++Path(os.environ["PRIVYHUB_PARTY_CONFIG"]).write_text(json.dumps(
++    {"godot": args["board"], "project": args["project"], "pictures": args["pictures"]}))
++gid = [n for n in call("GET", "/plugins/games/games?system=party")["body"].get("nodes", [])
++       if n.get("node_type") == "game"][0]["id"]
++out = {"steps": {}}
++S = out["steps"]
++S["popen_real"] = S_popen_real
++def case(tag, before=None):
++    r0, c0 = len(rows()), len(calls())
++    (board_dir / "keys").unlink(missing_ok=True)
++    if before:
++        before()
++    t = time.monotonic()
++    S[tag + "_launch"] = call("POST", f"/plugins/games/launch?id={gid}", timeout=60)["code"]
++    S[tag + "_launch_s"] = round(time.monotonic() - t, 2)
++    S[tag + "_rows"] = [{k: v for k, v in r.items() if k != "time_unix"} for r in rows()[r0:]]
++    S[tag + "_calls"] = [{"import": c["import"], "argv": c["argv"]} for c in calls()[c0:]]
++    S[tag + "_cmd"] = json.loads((board_dir / "cmd.json").read_text()) if (board_dir / "cmd.json").exists() else None
++    S[tag + "_needed_after"] = party.import_needed(project) if hasattr(party, "import_needed") else None
++    S[tag + "_stop"] = call("POST", "/plugins/games/stop", timeout=30)["code"]
++    (board_dir / "cmd.json").unlink(missing_ok=True)
++    (board_dir / "pid").unlink(missing_ok=True)
++sound = project / "sound"
++dest = project / ".godot/imported/beep.wav-0123456789abcdef0123456789abcdef.sample"
++def unprepare():
++    dest.unlink(missing_ok=True)
++case("ready")                                              # prepared: nothing to do
++if args["mode"] == "on":
++    case("missing", unprepare)                             # a pull's new sound: its dest missing
++    case("changed", lambda: (sound / "beep.wav").write_bytes(b"RIFF changed"))
++    def failing():
++        unprepare(); (project / "IMPORT_RC").write_text("1")
++    case("failing", failing)
++    (project / "IMPORT_RC").unlink()
++    def slow():
++        unprepare(); (project / "SLOW_IMPORT").write_text("5"); party.IMPORT_LIMIT_S = 1.0
++    case("slow", slow)
++    (project / "SLOW_IMPORT").unlink(); party.IMPORT_LIMIT_S = 20.0
++    other_dir = board_dir.parent / "other_board"
++    other_dir.mkdir(exist_ok=True)
++    other = sp_.Popen([sys.executable, args["board"], "--path", str(project), "--", "--x"],
++                      env={**os.environ, "B108_BOARD_DIR": str(other_dir)})
++    time.sleep(0.5)
++    case("running", unprepare)
++    other.kill(); other.wait()
++httpd.shutdown()
++print(json.dumps(out))
++'''
++
++
++def fixtures(work: Path, prepared: bool = True) -> dict:
++    fx = b108.fixtures(work)
++    board = Path(fx["board"])
++    board.write_text(IMPORTER + b108.BOARD.split("project = Path(sys.argv[sys.argv.index(\"--path\") + 1])\n", 1)[1]
++                     .replace("#!/usr/bin/env python3\n", ""))
++    project = Path(fx["project"])
++    (project / "sound").mkdir()
++    (project / "sound" / "beep.wav").write_bytes(b"RIFF a made-up sound")
++    (project / "sound" / "beep.wav.import").write_text(SIDE.format(name="beep.wav"))
++    (project / "blender").mkdir()
++    (project / "blender" / ".gdignore").write_text("")
++    (project / "blender" / "not_for_godot.png").write_bytes(b"x")           # ignored: a .gdignore'd folder
++    if prepared:
++        d = project / ".godot/imported/beep.wav-0123456789abcdef0123456789abcdef.sample"
++        d.parent.mkdir(parents=True)
++        d.write_bytes(b"imported")
++        d.with_name(d.name.rsplit(".", 1)[0] + ".md5").write_text(
++            'source_md5="%s"\n' % hashlib.md5((project / "sound" / "beep.wav").read_bytes()).hexdigest())
++    return fx
++
++
++def run(code_rev: str | None, mode: str) -> dict:
++    code = b114.code_of(code_rev) if code_rev else None
++    if code_rev and code is None:
++        raise unittest.SkipTest("git is absent")
++    root, ids = b108.b99.tree(code)
++    child_env = {k: v for k, v in os.environ.items() if not k.startswith("PRIVYHUB_")}
++    child_env.update(b108.ON)
++    xdg = root / "xdg"
++    xdg.mkdir(exist_ok=True)
++    work = Path(tempfile.mkdtemp(prefix="b148_fx_"))
++    fx = fixtures(work)
++    child_env.update({"XDG_CONFIG_HOME": str(xdg), "HOME": str(xdg), "PRIVYHUB_H7_RULES": str(root / "h7rules"),
++                      "PRIVYHUB_PARTY_CONFIG": str(work / "party.json"), "B108_BOARD_DIR": fx["board_dir"]})
++    (root / "tools").mkdir(exist_ok=True)
++    shutil.copyfile(ROOT / "tools" / "h7_endscreen.py", root / "tools" / "h7_endscreen.py")
++    frames, spec_dir, _js = b108.b103.fixtures(work)
++    child = b108.b103.CHILD.split('out = {"steps": {}}')[0] + "import types\n" + SCENARIO
++    try:
++        r = subprocess.run([sys.executable, "-I", "-B", "-c", child, str(root),
++                            json.dumps({"id": ids[b108.b85.PS1_TITLE], "mode": mode, "p1": b108.b99.P1,
++                                        "p2": b108.b99.P2, "frames": str(frames), "spec_dir": str(spec_dir), **fx})],
++                           cwd=root, env=child_env, capture_output=True, text=True, timeout=600)
++    finally:
++        shutil.rmtree(work, ignore_errors=True)
++    assert r.returncode == 0, r.stderr[-3000:]
++    text = r.stdout.strip().splitlines()[-1]
++    for form in {str(root), str(root.resolve()), str(work)}:
++        text = text.replace(form, "<root>")
++    return json.loads(text)["steps"]
++
++
++def imports(rows):
++    return [r for r in rows if r.get("step") == "board_import"]
++
++
++class Prepared(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.s = run(None, "on")
++        cls.head = run(BASELINE, "today")
++
++    def test_0_nothing_needed_is_today(self):
++        s = self.s
++        self.assertTrue(s["popen_real"])                                              # the board's real starter
++        self.assertEqual(s["ready_launch"], 200)
++        self.assertEqual([c["import"] for c in s["ready_calls"]], [False])          # the launch alone
++        self.assertEqual(imports(s["ready_rows"]), [])                                # no row
++        self.assertEqual(s["ready_cmd"]["argv"], self.head["ready_cmd"]["argv"])      # HEAD's argv
++        self.assertEqual([r["step"] for r in s["ready_rows"]], [r["step"] for r in self.head["ready_rows"]])
++
++    def test_1_needed_the_import_then_the_launch(self):
++        s = self.s
++        self.assertEqual(s["missing_launch"], 200)
++        self.assertEqual([c["import"] for c in s["missing_calls"]], [True, False])  # in that order
++        self.assertIn("--headless", s["missing_calls"][0]["argv"])
++        self.assertEqual(s["missing_calls"][0]["argv"][-1], "--import")
++        row = imports(s["missing_rows"])
++        self.assertEqual(len(row), 1)
++        self.assertEqual((row[0]["needed"], row[0]["rc"], row[0]["files"]), (True, 0, 1))
++        self.assertLess(row[0]["seconds"], 5)
++        steps = [r["step"] for r in s["missing_rows"]]
++        self.assertLess(steps.index("board_import"), steps.index("launch"))
++        self.assertEqual(s["missing_needed_after"], 0)
++        self.assertEqual(s["missing_cmd"]["argv"], self.head["ready_cmd"]["argv"])   # the launch itself as today
++        self.assertEqual([c["import"] for c in s["changed_calls"]], [True, False])   # a changed source: again
++        self.assertEqual(s["changed_needed_after"], 0)
++
++    def test_2_a_failing_or_slow_import_still_launches(self):
++        s = self.s
++        self.assertEqual(s["failing_launch"], 200)
++        self.assertEqual(imports(s["failing_rows"])[0]["rc"], 1)
++        self.assertEqual([c["import"] for c in s["failing_calls"]], [True, False])
++        self.assertEqual(s["slow_launch"], 200)
++        row = imports(s["slow_rows"])[0]
++        self.assertTrue(row.get("timeout"))
++        self.assertIsNone(row["rc"])
++        self.assertLess(row["seconds"], 3.0)                                          # the 1-s bound, then the kill
++        self.assertEqual([c["import"] for c in s["slow_calls"]], [True, False])
++
++    def test_3_never_while_the_board_runs(self):
++        s = self.s
++        row = imports(s["running_rows"])
++        self.assertEqual(len(row), 1)
++        self.assertEqual(row[0].get("skipped"), "the board is running")
++        self.assertNotIn(True, [c["import"] for c in s["running_calls"]])
++        self.assertEqual(s["running_launch"], 200)
++
++
++class TheTest(unittest.TestCase):
++    def test_import_needed(self):
++        sys.path.insert(0, str(ROOT / "companion"))
++        import party_session as party
++        work = Path(tempfile.mkdtemp(prefix="b148_t_"))
++        try:
++            project = Path(fixtures(work)["project"])
++            self.assertEqual(party.import_needed(project), 0)                         # prepared (.gdignore'd png skipped)
++            dest = project / ".godot/imported/beep.wav-0123456789abcdef0123456789abcdef.sample"
++            dest.unlink()
++            self.assertEqual(party.import_needed(project), 1)                         # a missing dest
++            dest.write_bytes(b"imported")
++            self.assertEqual(party.import_needed(project), 0)
++            (project / "sound" / "beep.wav").write_bytes(b"RIFF other")
++            self.assertEqual(party.import_needed(project), 1)                         # a changed source
++            (project / "sound" / "beep.wav.import").unlink()
++            self.assertEqual(party.import_needed(project), 1)                         # a source without its sidecar
++            (project / "sound" / "new.ogg").write_bytes(b"x")
++            self.assertEqual(party.import_needed(project), 2)
++        finally:
++            shutil.rmtree(work, ignore_errors=True)
++
++
++@unittest.skipUnless(GODOT and REPO and Path(GODOT).is_file() and (Path(REPO) / "project.godot").is_file(),
++                     "Godot or the board's repo not given")
++class RealBoard(unittest.TestCase):
++    """Once, disclosed: a scratch clone of the board's real tree (its repo only read), Godot's own folders in the
++    scratch, a cold cache: needed → prepare with the real Godot → nothing needed → step26 PASS → 0 status lines."""
++
++    def test_a_cold_clone_prepared_then_its_check(self):
++        sys.path.insert(0, str(ROOT / "companion"))
++        import party_session as party
++        scratch = Path(tempfile.mkdtemp(prefix="b148_board_"))
++        try:
++            repo = scratch / "repo"
++            subprocess.run(["git", "clone", "-q", "--no-hardlinks", REPO, str(repo)], check=True, timeout=300)
++            xdg = scratch / "x"
++            xdg.mkdir()
++            env = {**{k: v for k, v in os.environ.items() if not k.startswith("PRIVYPARTY_")},
++                   "XDG_DATA_HOME": str(xdg), "XDG_CONFIG_HOME": str(xdg), "XDG_CACHE_HOME": str(xdg)}
++            before = party.import_needed(repo)
++            self.assertGreater(before, 0)
++            rows = []
++            res = party.prepare({"godot": GODOT, "project": str(repo)}, rows.append, None, env)
++            self.assertEqual((res["needed"], res["rc"]), (True, 0), res)
++            self.assertEqual(party.import_needed(repo), 0)
++            r = subprocess.run([GODOT, "--headless", "--path", str(repo), "--script",
++                                "res://checks/step26_sound_and_ready.gd"], env=env, capture_output=True, text=True,
++                               timeout=300)
++            self.assertIn("CHECK: PASS", r.stdout, r.stdout[-1500:])
++            status = subprocess.run(["git", "-C", str(repo), "status", "--short"], capture_output=True, text=True,
++                                    check=True).stdout
++            self.assertEqual(status.splitlines(), [])
++            if os.environ.get("B148_OUT"):
++                Path(os.environ["B148_OUT"]).write_text(json.dumps({
++                    "needed_before": before, "seconds": res["seconds"], "rc": res["rc"], "needed_after": 0,
++                    "step26": [x for x in r.stdout.splitlines() if "CHECK:" in x], "status_lines": 0}))
++        finally:
++            shutil.rmtree(scratch, ignore_errors=True)
++
++
++if __name__ == "__main__":
++    unittest.main()

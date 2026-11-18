@@ -1,0 +1,162 @@
+diff --git a/checks/hub_minigame_check.gd b/checks/hub_minigame_check.gd
+index 23e596a..f814cd1 100644
+--- a/checks/hub_minigame_check.gd
++++ b/checks/hub_minigame_check.gd
+@@ -36,6 +36,10 @@ extends SceneTree
+ ##     load screen, and no go comes from it; the board's log has one line for the
+ ##     choice ("cards <n>, chose <0 | 1 | random>") and one for each go ("start" /
+ ##     "practice"), never a game's name
++##   - (queue AY) a practice that comes and goes without the board ever seeing it
++##     playing (the hub's practices count rising): the load screen shown again at
++##     once and the next choice taken within a second of the hub being ready, not
++##     after the long bound; "load screen again" logged once a practice
+ ## Exit code 0 = PASS, 1 = FAIL.
+ 
+ const HubMinigame = preload("res://minigames/hub_minigame.gd")
+@@ -54,6 +58,8 @@ var _hfps := {}                   # scenario -> [[mode, Engine.max_fps]] at each
+ var _go_phase_list := {}          # scenario -> the hub's phase at each go
+ var _go_kinds := {}               # scenario -> "practice" / "start" for each go
+ var _go_reads := {}               # scenario -> the stage's choice reads when the go came
++var _ready_at := {}               # queue AY: scenario -> when the stand-in first answered ready for this showing (ms)
++var _go_delays := {}              # queue AY: scenario -> ms from that ready to each go
+ var _screens: Node = null
+ var _now := ""                    # the scenario being played (the made-up presenter reads the stand-in hub's mode)
+ var _lines := LineCatcher.new()   # queue AX: the board's own log lines, as printed
+@@ -344,9 +350,24 @@ func _run() -> void:
+ 	# shown before the hand-over: the re-show at the hand-over clears every mark, so it makes no go)
+ 	_same(screens.pads_in_practice, 0, "no press made during a practice reaches the load screen shown behind it")
+ 	_expect_asked(_go_phases("hpractice") == ["ready", "ready", "ready", "ready"], "every go with the hub ready (none from a press in a practice)")
+-	_same(_lines.lines.slice(mark), ["cards 2, chose 0", "practice", "practice", "practice", "start", "scores [1, 0] for seats 1,2"],
++	_same(_lines.lines.slice(mark), ["cards 2, chose 0", "practice", "load screen again", "practice", "load screen again",
++		"practice", "load screen again", "start", "scores [1, 0] for seats 1,2"],
+ 		"the board's log: the choice, then each decision in order")
+ 	_expect(_lines.lines.all(func(l): return not l.contains("Made-up")), "no game's name in the board's log lines")
++	# a practice that came and went unseen: the hub never answers "playing", its practices count rises
++	screens.reset(0, ["practice", "start"])
++	mark = _lines.lines.size()
++	var t_unseen := Time.get_ticks_msec()
++	_same(await _play(screens, base, "hunseen", two), [1, 0], "an unseen practice, then a real one scored")
++	_expect(Time.get_ticks_msec() - t_unseen < 30000, "an unseen practice: the case ends in seconds, not the long bound")
++	_same(screens.shows.size(), 2, "an unseen practice: the load screen shown again")
++	_expect_asked(screens.show_modes.slice(1) == ["prep"], "an unseen practice: shown again once the hub was back (never playing)")
++	_same(screens.hides, 1, "an unseen practice: hidden only at the real playing")
++	_expect_asked(_go_kinds.get("hunseen", []) == ["practice", "start"], "an unseen practice: the practice go, then a plain one")
++	_expect_asked(_go_delays.get("hunseen", []).size() == 2 and int(_go_delays["hunseen"][1]) < 1500,
++		"an unseen practice: the next go within a second or so of the hub being ready (%s ms)" % str(_go_delays.get("hunseen", [])))
++	_same(_lines.lines.slice(mark), ["cards 2, chose 0", "practice", "load screen again", "start", "scores [1, 0] for seats 1,2"],
++		"an unseen practice: the board's log, the line once")
+ 	# every way out takes the load screen down
+ 	for scenario in ["hgiveup", "hrefused", "hsilent"]:
+ 		screens.reset(0, ["start"])
+@@ -549,6 +570,14 @@ func _held_answer(scenario: String, action: String, path: String) -> Array:
+ 				else:
+ 					body.merge({"state": "starting", "phase": "ready" if st["k"] >= 3 else "preparing",
+ 						"practices": st["practices"]})
++					if st["k"] >= 3 and not _ready_at.has(scenario):
++						_ready_at[scenario] = Time.get_ticks_msec()
++			elif st["mode"] == "practice" and scenario == "hunseen":
++				st["mode"] = "prep"
++				st["k"] = 0
++				st["practices"] += 1
++				_ready_at.erase(scenario)
++				body.merge({"state": "starting", "phase": "preparing", "practices": st["practices"]})
+ 			elif st["mode"] == "practice":
+ 				st["p"] += 1
+ 				if st["p"] <= 2:
+@@ -573,10 +602,14 @@ func _held_answer(scenario: String, action: String, path: String) -> Array:
+ 			_go_phase_list[scenario].append(phase)
+ 			_go_kinds[scenario].append("practice" if path.contains("practice=1") else "start")
+ 			_go_reads[scenario] = _screens.reads if _screens != null else -1
++			if not _go_delays.has(scenario):
++				_go_delays[scenario] = []
++			_go_delays[scenario].append(Time.get_ticks_msec() - int(_ready_at.get(scenario, Time.get_ticks_msec())))
+ 			if phase != "ready":
+ 				return [400, {"ok": false, "error": "no mini game is waiting for the go"}]
+ 			st["mode"] = "practice" if path.contains("practice=1") else "play"
+ 			st["p"] = 0
++			_ready_at.erase(scenario)
+ 			body.merge({"go": "taken", "phase": "ready"})
+ 		"party-minigame-end":
+ 			_fps_at_end[scenario] = Engine.max_fps
+diff --git a/minigames/hub_minigame.gd b/minigames/hub_minigame.gd
+index e2fc945..a73f42c 100644
+--- a/minigames/hub_minigame.gd
++++ b/minigames/hub_minigame.gd
+@@ -27,9 +27,13 @@ extends "res://rules/minigame.gd"
+ ## nothing: once the hub has handed a practice over ("playing"), the load
+ ## screen is shown again behind it (every mark clear), so when the practice
+ ## ends the TV comes back to the load screen, not the board.
++## A practice the board never saw playing (its Start pressed within a poll of
++## the hand-over) is known by the hub's practices count rising: the load screen
++## is shown again then, every mark clear, and the next choice taken at once.
+ ## The board's log gets one line for the players' choice ("cards <n>, chose
+-## <0 | 1 | random>") and one for each go the hub takes ("start" / "practice"):
+-## numbers and words only, never a game's name.
++## <0 | 1 | random>"), one for each go the hub takes ("start" / "practice") and
++## one at every re-show after a practice ("load screen again"): numbers and
++## words only, never a game's name.
+ ## The pads are swallowed, and the frame rate capped, only while the TV is on
+ ## the hub's game. A stage without the screens: everything as before.
+ 
+@@ -155,6 +159,8 @@ func play(players: Array) -> Array:
+ 	var went := false        # the go sent for this showing of the load screen
+ 	var practising := false  # the go sent was a practice
+ 	var behind := false      # the load screen shown again behind a practice the hub has handed over
++	var practices_seen := 0  # the hub's practices count in its last answer
++	var practices_at_go := 0 # ... when the go now waited on was sent
+ 	var shown := screens
+ 	var since_poll := POLL_SECONDS
+ 	while true:
+@@ -170,6 +176,7 @@ func play(players: Array) -> Array:
+ 				if answer.get("ok", false):
+ 					went = true
+ 					practising = choice == "practice"
++					practices_at_go = practices_seen
+ 					print("PrivyParty: hub mini game: %s" % choice)
+ 					if gate == null:
+ 						gate = PadGate.new()
+@@ -186,6 +193,7 @@ func play(players: Array) -> Array:
+ 			continue
+ 		missed = 0
+ 		var state := str(result.get("state", ""))
++		var practices := int(result.get("practices", practices_seen))
+ 		if state == "ended":
+ 			for number in result.get("scores", []):  # JSON numbers come as floats: whole ones back to ints
+ 				scores.append(int(number) if float(number) == floorf(float(number)) else float(number))
+@@ -209,6 +217,21 @@ func play(players: Array) -> Array:
+ 					practising = false
+ 					went = false
+ 					said_ready = -1
++				elif went and practices > practices_at_go:
++					# a practice came and went unseen (never "playing" here): the load screen again, every mark
++					# clear (the gate kept the pads from it), the pads the board's again, the next choice at once
++					if gate != null:
++						gate.restore()
++						if gate.get_parent() != null:
++							gate.get_parent().remove_child(gate)
++						gate.free()
++						gate = null
++					stage.show_minigame_loading(str(titles.get(id, "")), players)
++					print("PrivyParty: hub mini game: load screen again")
++					shown = true
++					practising = false
++					went = false
++					said_ready = -1
+ 				if not shown:  # a practice is over: the load screen again, the wait starts over
+ 					if gate != null:
+ 						gate.restore()
+@@ -229,12 +252,14 @@ func play(players: Array) -> Array:
+ 				# a practice handed over: the load screen again behind it, every mark clear (the gate keeps the
+ 				# pads from it while the hub's game is on), so the way back lands on it
+ 				stage.show_minigame_loading(str(titles.get(id, "")), players)
++				print("PrivyParty: hub mini game: load screen again")
+ 				behind = true
+ 				phase = ""
+ 			elif state == "playing" and shown and not practising:
+ 				stage.hide_minigame_loading()
+ 				shown = false
+ 				phase = ""
++		practices_seen = practices
+ 		if waited >= LIMIT_SECONDS:
+ 			why = "no result within %d s" % int(LIMIT_SECONDS)
+ 			break

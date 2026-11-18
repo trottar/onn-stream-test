@@ -35,9 +35,11 @@ ENC_BUFSIZE_K_ENV = "PRIVYHUB_ENC_BUFSIZE_K"
 # before hwupload: the title's window is never drawn on). Only when the party layer arms a start for the practice's
 # process (`party_banner_next`); every other start's command is byte for byte today's.
 PARTY_BANNER_TEXT = "PRACTICE \u2014 press Start to go back"
+# B147: inside the frame's inner 90 % (the TV's overscan cut B144's band at the top edge): the box's top at h*5/100,
+# as wide as the words (10 px above and below, 16 px to each side), centred — rows 36-85 of 720.
 PARTY_BANNER_FILTER = (
     "drawtext=font=Sans:text='" + PARTY_BANNER_TEXT + "':fontcolor=white:fontsize=h*30/720:"
-    "x=(w-text_w)/2:y=(h*56/720-text_h)/2:box=1:boxcolor=black@0.72:boxborderw=14|4096|14|4096"
+    "x=(w-text_w)/2:y=h*5/100+10:box=1:boxcolor=black@0.72:boxborderw=10|16|10|16"
 )
 # B70: the hub's X pointer is not drawn into the capture (x11grab -draw_mouse 0); =1 keeps today's argv
 CAPTURE_POINTER_ENV = "PRIVYHUB_CAPTURE_POINTER"
