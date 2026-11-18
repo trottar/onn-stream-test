@@ -48,6 +48,13 @@ paused core only after a frame; the N64 core's load runs a frame itself, reading
 `minigame_frame_advance`) → the watcher reads the redrawn, paused window (RetroArch's "Paused." corner masked) → ready.
 The go: the route, the planned switch, the resume — no second load when the title has not run since its begin was
 loaded. A practice's way back pauses first, then clears the route and switches, then prepares again the same way.
+
+B139 — a party mini game's own launch writes PARTY_SESSION_SETTINGS into its session config (RetroArch's on-screen
+text off: no notices, no "Paused.", no content banner); the users' launches are untouched; the watch reads unmasked.
+B140 — after the paused load, frames in ADVANCE_STEPS with a grab after each, until the window moved >= BEGIN_MOVED
+from its pre-load picture (or the start is read); never → given up at once ("the title did not show its starting
+point"). B141 — from a held title's launch to the go, and on every way back, the pads' Select is not passed (RetroArch's
+hotkeys are pairs with Select); from the go on, as today.
 """
 from __future__ import annotations
 
@@ -99,9 +106,19 @@ PRACTICE_S = 90.0          # a practice left after this long playing (or by the 
 XUSB_START = 0x0010        # the pad report's Start bit (native_session_io: XUSB_START)
 NO_GO = "no mini game is waiting for the go"
 NOT_RECOGNISED = "the title's start screen was not recognised"
+# B139: a party mini game's own launch writes these into its session config (RetroArch's on-screen text off: the
+# notices, "Paused." and the content banner — nothing of RetroArch's on the title's window, paused or running)
+PARTY_SESSION_SETTINGS = {"video_font_enable": "false", "menu_show_load_content_animation": "false"}
+PARTY_LABEL_MASK = False    # B139: no text left on the window, so the watch reads it unmasked
 # B137
-ADVANCE_FRAMES = 2          # FRAMEADVANCE sent after the paused load (PS1 needs 1, N64 0: one frame of margin)
-ADVANCE_GAP_S = 0.06        # between them, and after the last (>= 50 ms: each one counts; 2 ms apart they merge)
+ADVANCE_FRAMES = 2          # B137's fixed count (B140: replaced by ADVANCE_STEPS; kept for the row's history)
+ADVANCE_GAP_S = 0.05        # between FRAMEADVANCEs (>= 50 ms: each one counts; 2 ms apart they merge)
+# B140: after the paused load, frames in steps until the window has moved from its pre-load picture (or the start read)
+ADVANCE_STEPS = (0, 2, 4, 8, 16, 30)   # frames per step: cumulative 0, 2, 6, 14, 30, 60 (the cap)
+ADVANCE_SETTLE_S = 0.08     # after a step's last frame, before its grab
+BEGIN_MOVED = 0.20          # the share of 64 x 48 cells moved > 16 grey levels: the begin is on the window (H7-D2:
+                            # a paused window 0.0, RetroArch's notices <= 0.10, the boot frame -> the begin >= 0.51)
+NO_BEGIN = "the title did not show its starting point"
 
 _local = threading.local()
 
@@ -191,6 +208,7 @@ class PartyMinigames:
         self.start_limit_s, self.switch_limit_s, self.step_grace_s = START_LIMIT_S, SWITCH_LIMIT_S, STEP_GRACE_S
         self.practice_s = PRACTICE_S               # B134
         self.advance_frames, self.advance_gap_s = ADVANCE_FRAMES, ADVANCE_GAP_S     # B137
+        self.advance_steps, self.advance_settle_s, self.begin_moved = ADVANCE_STEPS, ADVANCE_SETTLE_S, BEGIN_MOVED  # B140
         self.stream_needed = True               # B112's bench sets False (no stream, no switch)
         self._reads: dict[str, dict] = {}       # B114: the last good answer of each bounded read, its helper
 
@@ -506,12 +524,18 @@ class PartyMinigames:
         emu._party_mg_stop_hook = lambda: self._end_by_stop(mg)
         game = self.p._find_game_by_id(mg["entry"]["game"])
         cheat = mg["entry"].get("cheat")
+        if mg["hold"]:
+            self._hold_select(mg, True)              # B141: from the launch to the go
 
         def launch():
-            if cheat is None:
-                emu.launch(game)
-            else:                                    # B127: the onn's Extras launch, through the plugin's own path
-                self.p.handle_post("launch", self._cheat_query(mg["entry"]["game"], cheat))
+            emu._party_session_settings = dict(PARTY_SESSION_SETTINGS)    # B139: this one launch only
+            try:
+                if cheat is None:
+                    emu.launch(game)
+                else:                                # B127: the onn's Extras launch, through the plugin's own path
+                    self.p.handle_post("launch", self._cheat_query(mg["entry"]["game"], cheat))
+            finally:
+                emu._party_session_settings = None
             return emu.process
         proc = self._step(mg, "launch", lambda: self._emu_call(mg, launch))
         with self._lock:
@@ -561,6 +585,14 @@ class PartyMinigames:
             with self._cond:
                 self._cond.wait(0.1)
 
+    def _hold_select(self, mg: dict, on: bool) -> None:
+        """B141: the pads' Select kept from a held title (RetroArch's hotkey pairs) — on / off (no bridge: nothing)."""
+        bridge = self._bridge()
+        if bridge is None or not hasattr(bridge, "party_hold_select"):
+            return
+        bridge.party_hold_select(on)
+        mg["select_held"] = bool(on)
+
     def _mute(self, mg: dict, on: bool) -> None:
         """B137: the bridge's mute on / off (no bridge: nothing to mute)."""
         bridge = self._bridge()
@@ -569,17 +601,54 @@ class PartyMinigames:
         bridge.party_mute(on)
         mg["muted"] = bool(on)
 
-    def _advance(self, mg: dict) -> bool:
-        """B137: ADVANCE_FRAMES × FRAMEADVANCE into the paused title, each its own manager call, ADVANCE_GAP_S apart and
-        after the last; then GET_STATUS → True when still PAUSED (else paused again: False)."""
+    def _grab(self):
+        """B140: the title's window as the watcher sees it (None when it cannot be read)."""
+        try:
+            return self.p._h7_minigame_runner().picture.grab()
+        except Exception:
+            return None
+
+    @staticmethod
+    def _moved(a, b) -> float:
+        """B140: the share of 64 x 48 cells (grey, BOX) moved by more than 16 grey levels between two pictures."""
+        import numpy as np
+        from PIL import Image
+        x = np.asarray(a.convert("L").resize((64, 48), Image.BOX), dtype=np.float32)
+        y = np.asarray(b.convert("L").resize((64, 48), Image.BOX), dtype=np.float32)
+        return float((np.abs(x - y) > 16).mean())
+
+    def _advance(self, mg: dict, pre) -> dict:
+        """B140: into the paused title, ADVANCE_STEPS' frames (each FRAMEADVANCE its own manager call, ADVANCE_GAP_S
+        apart), ADVANCE_SETTLE_S, a grab — until the grab moved >= BEGIN_MOVED from the pre-load one or the watch has read
+        the start; the cap the steps' sum. Then GET_STATUS (PAUSED, else paused again)."""
         emu = self.emu
-        for _ in range(int(self.advance_frames)):
-            self._emu_call(mg, lambda: emu._retroarch_network_request("FRAMEADVANCE", expect_response=False))
-            time.sleep(self.advance_gap_s)
+        runner = self.p._h7_minigame_runner()
+        frames = steps = 0
+        moved, changed = None, False
+        for n in self.advance_steps:
+            for _ in range(int(n)):
+                self._emu_call(mg, lambda: emu._retroarch_network_request("FRAMEADVANCE", expect_response=False))
+                time.sleep(self.advance_gap_s)
+            frames += int(n)
+            steps += 1
+            time.sleep(self.advance_settle_s)
+            now = self._grab()
+            if pre is not None and now is not None:
+                moved = self._moved(pre, now)
+                if moved >= self.begin_moved:
+                    changed = True
+                    break
+            try:
+                if runner.result().get("recognised") is True:          # the watch has read the start already
+                    changed = True
+                    break
+            except Exception:
+                pass
         paused = self._emu_call(mg, emu._retroarch_network_status) == "PAUSED"
         if not paused:
             self._emu_call(mg, emu.pause)
-        return paused
+        return {"frames": frames, "batches": steps, "changed": changed,
+                "moved": round(moved, 4) if moved is not None else None, "paused": paused}
 
     def _prepare(self, mg: dict, after_practice: bool = False) -> None:
         """The title made ready behind the board, never resumed (B137): paused, the mute on, the begin loaded (a new
@@ -591,17 +660,22 @@ class PartyMinigames:
         with self._lock:
             mg["phase"], mg["prep_t0"], mg["ready_at"] = "preparing", t0, None
         self._step(mg, "pause", lambda: self._emu_call(mg, emu.pause))
+        pre = self._step(mg, "grab", self._grab)                                # B140: the window before the load
         m0 = self.clock()
         self._mute(mg, True)                                                    # B137: no press reaches a frame
         try:
-            self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed, mask_label=True))
+            self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed,
+                                                          mask_label=PARTY_LABEL_MASK))
             self.row({"step": "minigame_watch", "loaded": True})
-            paused = self._step(mg, "advance", lambda: self._advance(mg))
+            adv = self._step(mg, "advance", lambda: self._advance(mg, pre))
         finally:
             self._mute(mg, False)
         mg["ran_since_begin"] = False
-        self.row({"step": "minigame_frame_advance", "frames": int(self.advance_frames),
-                  "mute_ms": round((self.clock() - m0) * 1000.0, 1), "paused": paused})
+        self.row({"step": "minigame_frame_advance", "frames": adv["frames"], "batches": adv["batches"],
+                  "mute_ms": round((self.clock() - m0) * 1000.0, 1), "changed": adv["changed"],
+                  "moved": adv["moved"], "paused": adv["paused"]})
+        if not adv["changed"]:
+            raise RuntimeError(NO_BEGIN)                                        # B140: plainly, at once
         seen: dict = {}
 
         def recognised() -> bool:
@@ -634,6 +708,7 @@ class PartyMinigames:
             mg["phase"] = "handing_over"
         self.row({"step": "minigame_go", "held_s": round(t0 - (mg["ready_at"] or t0), 3),
                   "remembered": bool(go["remembered"]), **({"practice": True} if go["practice"] else {})})
+        self._hold_select(mg, False)                        # B141: from the go on, Select passes as today
         if mg.get("ran_since_begin"):                       # B137: only when the title ran since its begin was loaded
             self._mute(mg, True)
             try:
@@ -688,6 +763,7 @@ class PartyMinigames:
         bridge = self._bridge()
         if bridge is not None:
             bridge._party_buttons = None
+        self._hold_select(mg, True)                         # B141: the way back holds Select again
         now = self.clock()
         self.row({"step": "minigame_practice_end", "by": mg["practice_end_by"] or "time",
                   "practice_s": round(now - (mg["practice_t0"] or now), 3)})
@@ -1064,6 +1140,8 @@ class PartyMinigames:
             bridge._party_buttons = None                  # B134: a practice's Start hook never outlives it
         if bridge is not None and getattr(bridge, "_party_mute", False):
             bridge.party_mute(False)                      # B137: the mute never outlives the mini game
+        if bridge is not None and getattr(bridge, "_party_hold_select", False):
+            bridge.party_hold_select(False)               # B141: nor does the Select hold
         if mg.get("hold") and mg.get("switched_to") != "minigame":
             pass                                          # B133: the stream never left the board: no switch back
         elif by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:

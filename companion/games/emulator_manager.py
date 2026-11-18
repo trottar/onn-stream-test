@@ -2229,6 +2229,9 @@ class EmulatorManager:
     # stop hook (else None)
     _party_stash: Any = None
     _party_mg_stop_hook: Any = None
+    # B139: {key: value} written into the next session config by a party mini game's own launch (set and cleared by the
+    # mini-game layer around that one launch, the manager's lock held); None = today (every other launch)
+    _party_session_settings: dict[str, str] | None = None
     # B71: {"discs": n, "disc": i | None} on a multi-disc PS1 session, else None (= today)
     _disc_session: dict[str, Any] | None = None
     _disc_tail: Any = None
@@ -5635,6 +5638,15 @@ class EmulatorManager:
                         "Generated cheat-profile session config has an "
                         f"ambiguous {key} assignment"
                     )
+
+        # B139: a party mini game's title launch only — its settings replace any assignment of theirs (RetroArch does
+        # not honour an appended duplicate); every other launch: today
+        party_settings = getattr(self, "_party_session_settings", None)
+        if party_settings:
+            for key in party_settings:
+                session_text = re.sub(rf"(?m)^[ \t]*{re.escape(key)}[ \t]*=.*\n?", "", session_text)
+            session_text = (session_text.rstrip("\n") + "\n\n# PrivyHub B139 party mini game: RetroArch's on-screen text off\n"
+                            + "".join(f'{k} = "{v}"\n' for k, v in party_settings.items()))
 
         # B4: the rewind keys for the hold's release (flag on only; a base that sets one is left alone)
         if _hold_rewind is not None:

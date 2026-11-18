@@ -38,6 +38,21 @@ bridge._gamepads = ["P1", "P2", "P3", "P4"]
 bridge._controller_backend = "linux_uinput"
 bridge._write_linux_report_locked = lambda index, report, *a, **k: None
 T0 = time.monotonic()
+B139_KEYS = ("video_font_enable", "menu_show_load_content_animation")
+def b139_config(cmd):
+    """B139: the session config RetroArch was started with — its B139 keys (every assignment) and the text normalised
+    (the temp root and the per-launch command port), for byte-for-byte comparisons across runs."""
+    cmd = [str(c) for c in cmd]
+    if "--config" not in cmd:
+        return {"keys": {}, "text": None}
+    cfg = Path(cmd[cmd.index("--config") + 1]); cfg = cfg if cfg.is_absolute() else root / cfg
+    text = cfg.read_text()
+    keys = {k: re.findall(rf'(?m)^[ \t]*{k}[ \t]*=[ \t]*"([^"]*)"', text) for k in B139_KEYS}
+    norm = text
+    for form in {str(root.resolve()), str(root)}:
+        norm = norm.replace(form, "<root>")
+    norm = re.sub(r'(?m)^(network_cmd_port = )"\d+"', r'\1"<port>"', norm)
+    return {"keys": {k: v for k, v in keys.items() if v}, "text": norm}
 def now_s():
     return round(time.monotonic() - T0, 3)
 
@@ -350,7 +365,15 @@ if args["mode"] == "today":
                             "stop_idle": ("POST", "/plugins/games/stop")}.items():
         S[k] = call(meth, path)
     # B124: a title's start with the prompt answers its players and ports as today (no board without the flag)
+    _cfg_cmds = []
+    _P0 = em.subprocess.Popen
+    def _pk(cmd, **kw):                                # B139: the users' launch's session config, kept
+        _cfg_cmds.append(b139_config(cmd))
+        return _P0(cmd, **kw)
+    em.subprocess.Popen = _pk
     call("POST", f"/plugins/games/launch?id={title}")
+    em.subprocess.Popen = _P0
+    S["b139_users_cfg"] = _cfg_cmds[0] if _cfg_cmds else None
     pr = call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")["body"]
     S["ports_today"] = {"players": pr.get("players"), "players_source": pr.get("players_source"),
                         "ports_set": pr.get("ports_set")}
@@ -512,9 +535,13 @@ if args["mode"] == "cheat":
     n64 = args["n64_id"]
     LAST, LOADS, POPENS, APPLIED, LQ = {}, [], [], [], []
     _FR = em.subprocess.Popen
+    B139_CFG = []
     def _popen(cmd, **kw):                            # RetroArch's command line kept (its session config)
         LAST["cmd"] = [str(c) for c in cmd]
         POPENS.append(1)
+        _lay = getattr(g, "_party_minigame_obj", None); _mg = getattr(_lay, "mg", None)
+        B139_CFG.append({"party": bool(_mg is not None and not _mg.get("launched") and not _mg.get("closed")),
+                         "keys": b139_config(cmd)["keys"]})
         return _FR(cmd, **kw)
     em.subprocess.Popen = _popen
     def _apply(self):                                 # RetroArch's network side of the cheat toggles (B83's stub)
@@ -714,6 +741,7 @@ if args["mode"] == "cheat":
     S["c_files_diff"] = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
     S["c_scratch_end"] = scratch_anywhere()
     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
+    S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
     finish()
 if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
@@ -949,12 +977,19 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
             VP["log"].append([time.monotonic(), index, b_])
         bridge._write_linux_report_locked = _rec
         EV = []                                             # the fake title's own log: [t, what, detail]
-        TITLE = {"begin": "start"}
+        TITLE = {"begin": "start", "show_after": None}     # B140: frames after a load before the begin shows (None:
+                                                            # the core's own — PS1-shaped 1, N64-shaped 0); "never"
 
         class TitleRA(FakeRetroArch):
             def __init__(self, cmd, **kw):
                 self.screen, self.shown, self.notice_until = "boot", "boot", 0.0
                 self.loads = self.advances = self.frames = 0
+                self.since_load, self.show_after = None, None       # B140
+                c_ = b139_config(cmd)                       # B139: RetroArch reads its session config
+                self.notices_on = c_["keys"].get("video_font_enable", ["true"])[-1] != "false"
+                _lay = getattr(g, "_party_minigame_obj", None); _mg = getattr(_lay, "mg", None)
+                LAUNCH_CFG.append({"party": bool(_mg is not None and not _mg.get("launched") and not _mg.get("closed")),
+                                   "keys": c_["keys"], "text": c_["text"]})
                 super().__init__(cmd, **kw)
                 EV.append([time.monotonic(), "launch", None])
                 threading.Thread(target=self.run_frames, daemon=True).start()
@@ -964,6 +999,13 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
                 if self.screen == "start" and any(b_ != 0 for b_ in pads):
                     self.screen = "fight"
                     EV.append([time.monotonic(), "left_start", why])
+                if self.since_load is not None:                     # B140: the begin shows after show_after frames
+                    self.since_load += 1
+                    if self.show_after == "never" or self.since_load < self.show_after:
+                        self.frames += 1
+                        EV.append([time.monotonic(), "frame", [why, pads]])
+                        return
+                    self.since_load = None
                 self.shown = self.screen
                 self.frames += 1
                 EV.append([time.monotonic(), "frame", [why, pads]])
@@ -972,6 +1014,9 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
                 while not self.stop:
                     if not self.paused:
                         self.frame("run")
+                    for i_, b_ in enumerate(VP["cur"]):     # B141: RetroArch's hotkeys, polled paused or running
+                        if b_ & 0x0020 and b_ & (0x0100 | 0x0200 | 0x0010 | 0x0080):
+                            HOTKEYS.append([time.monotonic(), i_, b_])
                     time.sleep(1 / 60)
 
             def serve(self):
@@ -1001,7 +1046,13 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
                         else:
                             self.screen = TITLE["begin"]
                             self.loads += 1
-                            self.notice_until = time.monotonic() + NOTICE_S
+                            sa = TITLE["show_after"]
+                            self.show_after = sa if sa is not None else (0 if m._n64_core else 1)
+                            self.since_load = 0
+                            if self.show_after == 0:                # shown with the load itself
+                                self.since_load = None
+                                self.shown = self.screen
+                            self.notice_until = time.monotonic() + (NOTICE_S if self.notices_on else 0.0)
                             EV.append([time.monotonic(), "load", self.loads])
                             if m._n64_core:                 # the N64 core's load runs a frame (B137's settle)
                                 self.frame("load")
@@ -1010,6 +1061,8 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
                     elif w and w[0] in ("READ_CORE_RAM", "READ_CORE_MEMORY") and len(w) == 3:
                         self.sock.sendto(f"{w[0]} {w[1]} -1".encode(), addr)
         em.subprocess.Popen = TitleRA
+        LAUNCH_CFG = []                                     # B139: every launch's session config keys (party or not)
+        HOTKEYS = []                                        # B141: every poll that saw Select with a paired button
         P_UNROUTE = []                                      # each route cleared while a title runs: was it paused
         _set_route = bridge.set_party_route
 
@@ -1039,9 +1092,11 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
                 else:
                     tok = shown
                 i = self.n[tok] = (self.n.get(tok, -1) + 1) % 6
+                if tok in ("other", "s4other"):             # B140: the same picture while nothing changes; a fight
+                    i = 3 if (shown == "fight" and time.monotonic() >= ra_.notice_until) else 0   # is not the boot frame
                 with Image.open(frames / f"{tok}_{i}.png") as im:
                     img = im.convert("L")
-                if ra_.paused:                              # RetroArch's "Paused." in the corner
+                if ra_.paused and ra_.notices_on:          # RetroArch's "Paused." in the corner (B139: only with text on)
                     img.paste(255, (img.size[0] - LBL[0], 0, img.size[0], LBL[1]))
                 return img
         follow = FollowPicture()
@@ -1053,7 +1108,8 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
             ra_ = fake.get("ra")
             W_ = img.size[0]
             corner = max(img.crop((W_ - LBL[0], 0, W_, LBL[1])).getdata())
-            READS.append([time.monotonic(), bool(ra_ is not None and ra_.paused), corner])
+            READS.append([time.monotonic(), bool(ra_ is not None and ra_.paused), corner,
+                          bool(ra_ is not None and ra_.paused and ra_.notices_on)])
             return _read(self_, img)
         es_.Reader.read = _spy
         PRESS = {"on": False, "players": [0, 1], "sent": []}
@@ -1071,6 +1127,12 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
                 PRESS["sent"].append([time.monotonic(), "up"])
                 time.sleep(0.1)
         threading.Thread(target=presser, daemon=True, name="b137-presses").start()
+
+        W0 = [time.time()]
+
+        def h7_rows():
+            p_ = root / "logs/games/h7_results.jsonl"
+            return [json.loads(l) for l in p_.read_text().splitlines()] if p_.is_file() else []
 
         def ev_since(t0_):
             return [e for e in EV if e[0] >= t0_]
@@ -1148,6 +1210,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
             S[tag + "_mute"] = mute_windows(t0_, t_go)
             S[tag + "_on_the_begin"] = screen_at_resume_after(t_go)
             S[tag + "_reads_paused_unmasked"] = len(reads_paused_unmasked(t0_, t_go))
+            S[tag + "_reads_paused_label"] = sum(1 for r_ in READS if t0_ <= r_[0] <= t_go and r_[3])   # B139
             S[tag + "_reads_paused"] = sum(1 for r_ in READS if t0_ <= r_[0] <= t_go and r_[1])
             S[tag + "_reads_running_masked"] = sum(1 for r_ in READS if r_[0] > t_go + 0.5 and not r_[1] and r_[2] == 0)
             S[tag + "_route_playing"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
@@ -1156,10 +1219,13 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
             S[tag] = {k: e.get(k) for k in ("state", "class", "scores", "places", "why")}
             finish_case(tag, r0)
             S[tag + "_row_fields"] = [{k: v for k, v in r.items() if k in ("step", "frames", "mute_ms", "paused",
-                                                                         "remembered", "label_mask")}
+                                                                         "remembered", "label_mask", "batches",
+                                                                         "changed", "moved")}
                                       for r in rows()[r0:] if r["step"] in ("minigame_frame_advance", "minigame_go",
                                                                              "minigame_reloaded")]
             S[tag + "_mute_after"] = bool(getattr(bridge, "_party_mute", False))
+            S[tag + "_watching_label_mask"] = [r.get("label_mask") for r in h7_rows() if r.get("step") == "watching"
+                                               and r.get("time_unix", 0) >= W0[0]][-1:]
             return r0, t0_, t_go
 
         if args["mode"] == "nopress_head":
@@ -1229,8 +1295,109 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
             S["n4_resumes"] = sum(1 for e_ in ev_since(t0_) if e_[1] == "resume")
             finish_case("n4", r0)
             TITLE["begin"] = "start"
+            # B140: the begin shown after 0, 2, 12 and never frames following the load; presses from every pad
+            layer.advance_gap_s = 0.05
+            for tag, sa in (("v0", 0), ("v2", 2), ("v12", 12)):
+                TITLE["show_after"] = sa
+                press_case(tag, tok2, "1,2", [0, 1, 2, 3])
+            TITLE["show_after"] = "never"
+            PRESS["players"] = [0, 1, 2, 3]; PRESS["on"] = True
+            t0_ = time.monotonic()
+            r0 = held_start("vn", tok2, "1,2", ["other"])
+            e = wait_for(lambda b: b.get("state") in ("given_up", "ended") or b.get("phase") == "ready", 20)
+            PRESS["on"] = False
+            S["vn"] = {k: e.get(k) for k in ("state", "why", "phase")}
+            S["vn_s"] = round(time.monotonic() - t0_, 2)
+            S["vn_resumes"] = sum(1 for e_ in ev_since(t0_) if e_[1] == "resume")
+            S["vn_frames_with_a_button"] = sum(1 for e_ in ev_since(t0_) if e_[1] == "frame" and e_[2][0] != "run" and any(e_[2][1]))
+            finish_case("vn", r0)
+            S["vn_row"] = [{k: v for k, v in r.items() if k in ("frames", "batches", "changed", "moved", "mute_ms")}
+                           for r in rows()[r0:] if r["step"] == "minigame_frame_advance"]
+            # the practices' ways back with a title that needs 12 frames
+            TITLE["show_after"] = 12
+            PRESS["players"] = [0, 1]; PRESS["on"] = True
+            t0_ = time.monotonic()
+            r0 = held_start("vp", tok2, "1,2", ["other"])
+            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            gos_, ends_ = [], []
+            for n in range(2):
+                gos_.append(time.monotonic())
+                call("POST", "/plugins/games/party-minigame-go?practice=1")
+                wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+                time.sleep(0.5)
+                ends_.append(time.monotonic())
+                bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)
+                bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+                b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+                S[f"vp_back{n + 1}"] = {k: b.get(k) for k in ("state", "phase", "practices")}
+            t_go = time.monotonic()
+            call("POST", "/plugins/games/party-minigame-go")
+            PRESS["on"] = False
+            wait_phase(lambda b: b.get("state") != "starting", 20)
+            time.sleep(0.3)
+            S["vp_way_back_segments"] = [segment(ends_[k], (gos_ + [t_go])[k + 1]) for k in range(2)]
+            S["vp_on_the_begin"] = screen_at_resume_after(t_go)
+            S["vp_fa_rows"] = [{k: v for k, v in r.items() if k in ("frames", "batches", "changed")}
+                            for r in rows()[r0:] if r["step"] == "minigame_frame_advance"]
+            finish_case("vp", r0)
+            TITLE["show_after"] = None
+            # B141: Select with each paired button (L1, R1, Start, R3) from every pad during the preparation, the hold
+            # and a practice's way back; Select alone after the go
+            SEL = {"on": False}
+            PAIRS = (0x0100, 0x0200, 0x0010, 0x0080)
+
+            def selector():
+                k = 0
+                while watching["on"] and SEL["on"]:
+                    pair = PAIRS[k % 4]; k += 1
+                    for pl in range(4):
+                        bridge._apply_report(pl, 0x0020 | pair, 0, 0, 0, 0, 0, 0)
+                    time.sleep(0.1)
+                    for pl in range(4):
+                        bridge._apply_report(pl, 0, 0, 0, 0, 0, 0, 0)
+                    time.sleep(0.1)
+            st_dir = folder()
+            st_before = {p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}
+            r0 = held_start("sl", tok2, "1,2", ["other"])
+            S["sl_hold_seen"] = wait_until(lambda: bool(getattr(bridge, "_party_hold_select", False)), 10)
+            h0, v0_ = len(HOTKEYS), len(VP["log"])           # from the hold on: before the title's launch
+            SEL["on"] = True
+            threading.Thread(target=selector, daemon=True).start()
+            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            S["sl_ready"] = b.get("phase")
+            time.sleep(1.0)                                 # held, the pairs go on
+            SEL["on"] = False; time.sleep(0.3)
+            S["sl_select_written_before_practice"] = sum(1 for x in VP["log"][v0_:] if x[2] & 0x0020)
+            S["sl_hotkeys_before_practice"] = len(HOTKEYS) - h0
+            call("POST", "/plugins/games/party-minigame-go?practice=1")
+            wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+            bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # Start leaves the practice
+            bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+            wait_until(lambda: bool(getattr(bridge, "_party_hold_select", False)), 10)   # the way back under way
+            h1, v1_ = len(HOTKEYS), len(VP["log"])
+            SEL["on"] = True
+            threading.Thread(target=selector, daemon=True).start()
+            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+            S["sl_back"] = b.get("phase")
+            time.sleep(0.6)
+            SEL["on"] = False; time.sleep(0.3)
+            S["sl_select_written_way_back"] = sum(1 for x in VP["log"][v1_:] if x[2] & 0x0020)
+            S["sl_hotkeys_way_back"] = len(HOTKEYS) - h1
+            S["sl_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+            wait_phase(lambda b: b.get("state") != "starting", 20)
+            v2_ = len(VP["log"])
+            bridge._apply_report(0, 0x0020, 0, 0, 0, 0, 0, 0)    # Select alone after the go: passes
+            bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
+            S["sl_select_written_after_go"] = sum(1 for x in VP["log"][v2_:] if x[2] & 0x0020)
+            S["sl_held_flag_after_go"] = bool(getattr(bridge, "_party_hold_select", False))
+            S["sl_states_same"] = ({p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}) == st_before
+            fake["ra"].screen = "end_P1"
+            wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+            finish_case("sl", r0)
+            S["sl_held_flag_after_end"] = bool(getattr(bridge, "_party_hold_select", False))
             # N5: during the mute — the board's end, the onn's Home, a second start, the onn's END
             layer.advance_gap_s = 0.7
+            TITLE["show_after"] = 2
             for tag, how in (("n5b", "board"), ("n5h", "home"), ("n5s", "second"), ("n5e", "onn_end")):
                 PRESS["players"] = [0, 1]; PRESS["on"] = True
                 r0 = held_start(tag, tok2, "1,2", ["other"])
@@ -1263,7 +1430,14 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
                 if how == "onn_end":
                     S[tag + "_board_gone"] = wait_until(lambda: board_pid_now() is None, 15)
             layer.advance_gap_s = 0.06
+            TITLE["show_after"] = None
             S["n_lat"] = {k: max(v) if v else None for k, v in out["lat"].items()}
+            # B139: the users' own launch of the same game in the same companion (no mini game on)
+            wait_until(lambda: board_pid_now() is None, 10)
+            call("POST", f"/plugins/games/launch?id={title}")
+            call("POST", "/plugins/games/stop")
+        S["b139_launches"] = [{"party": c["party"], "keys": c["keys"]} for c in LAUNCH_CFG]
+        S["b139_users_cfg"] = next((c for c in reversed(LAUNCH_CFG) if not c["party"]), None)
         es_.Reader.read = _read
     S["h_running_at_end"] = [title_alive()]
     timed("end_onn", "POST", "/plugins/games/stop")

@@ -52,13 +52,13 @@ class NoPressBeforeTheGo(unittest.TestCase):
         cls.out = _run()
         cls.s = cls.out["steps"]
 
-    def _no_press_reached(self, seg, tag):
+    def _no_press_reached(self, seg, tag, advances=2):
         self.assertTrue(seg.get("paused_from"), (tag, seg))
         self.assertEqual(seg["resumes"], 0, (tag, seg))                     # never resumed before the go
         self.assertEqual(seg["frames_with_a_button"], 0, (tag, seg))        # every frame it ran saw neutral pads
         self.assertEqual(seg["left_start"], 0, (tag, seg))
         self.assertEqual(seg["loads"], 1, (tag, seg))
-        self.assertEqual(seg["advances"], 2, (tag, seg))
+        self.assertEqual(seg["advances"], advances, (tag, seg))      # B140: as many as the window needed
 
     def test_0_t88_shaped_ready_with_presses_never_resumed(self):
         s = self.s
@@ -89,12 +89,13 @@ class NoPressBeforeTheGo(unittest.TestCase):
         self.assertEqual(s["n1"], {"state": "ended", "class": "end_P1", "scores": [1, 0], "places": None, "why": None})
         self.assertTrue(s["n1_title_gone"] and s["n1_closed"] and s["n1_board_picture_back"])
 
-    def test_2_the_label_masked_on_every_paused_read_and_never_after_the_go(self):
+    def test_2_the_paused_window_read_as_it_is(self):
+        """B139: the party's launch turns RetroArch's text off — no "Paused." on the paused window, so no mask."""
         s = self.s
-        self.assertGreater(s["n1_reads_paused"], 3)
-        self.assertEqual(s["n1_reads_paused_unmasked"], 0)
+        self.assertGreater(s["n1_reads_paused"], 0)
+        self.assertEqual(s["n1_reads_paused_label"], 0)
+        self.assertEqual(s["n1_watching_label_mask"], [None])
         self.assertEqual(s["n1_reads_running_masked"], 0)
-        self.assertEqual(s["n2_reads_paused_unmasked"], 0)
 
     def test_3_three_practices_presses_throughout_the_ways_back(self):
         s = self.s
@@ -117,8 +118,8 @@ class NoPressBeforeTheGo(unittest.TestCase):
         s = self.s
         self.assertEqual(s["n3_go_early"]["go"], "remembered")
         self.assertEqual(s["n3_ready"]["state"], "playing")
-        self._no_press_reached(s["n3_segment"], "n3")
-        self.assertGreaterEqual(s["n3_segment"]["frames"], 3)              # the load's own frame + 2 advanced
+        self._no_press_reached(s["n3_segment"], "n3", advances=0)     # B140: the N64-shaped load shows the begin
+        self.assertGreaterEqual(s["n3_segment"]["frames"], 1)              # the load's own frame
         for w in s["n3_mute"]:
             self.assertEqual(w["buttons_written"], 0, w)
         self.assertEqual(s["n3_on_the_begin"], {"left_start_at_first_frame": False, "loads_after_go": 0})

@@ -1647,6 +1647,9 @@ class NativeControllerBridge:
     # B137: a party mini game's mute — while set, every report is dropped (the pads stay neutral). Set only by the
     # mini-game layer around a held title's load and frame advance. False = today.
     _party_mute = False
+    # B141: while a party title is prepared or held behind the board, the pads' Select (RetroArch's hotkey button) is
+    # cleared from every report. Set only by the mini-game layer. False = today.
+    _party_hold_select = False
 
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
@@ -2343,6 +2346,27 @@ class NativeControllerBridge:
             if on:
                 self._neutralize()
 
+    def party_hold_select(self, on: bool) -> None:
+        """B141: on — every report's Select bit cleared until off (a pad holding Select is written once without it)."""
+        with self._meta_lock:
+            self._party_hold_select = bool(on)
+            if not on:
+                return
+            for index in range(len(self._gamepads)):
+                last = self._last_reports[index] if index < len(self._last_reports) else None
+                if last and int(last.get("buttons", 0)) & self.XUSB_BACK:
+                    report = dict(last, buttons=int(last["buttons"]) & ~self.XUSB_BACK & 0xFFFF)
+                    try:
+                        if self._controller_backend == "windows_vigem":
+                            gamepad = self._gamepads[index]
+                            gamepad.report.wButtons = (report["buttons"] | self._forced_buttons[index]) & 0xFFFF
+                            gamepad.update()
+                        else:
+                            self._write_linux_report_locked(index, report, forced_buttons=self._forced_buttons[index])
+                        self._last_reports[index] = report
+                    except Exception:
+                        pass
+
     def _apply_report(
         self,
         player: int,
@@ -2361,6 +2385,9 @@ class NativeControllerBridge:
                 hook(player, buttons)
             except Exception:
                 pass
+        # B141: a party title prepared or held: Select (RetroArch's hotkey button) never reaches it
+        if self._party_hold_select:
+            buttons = int(buttons) & ~self.XUSB_BACK & 0xFFFF
         # B110: a party mini game's route (None = today)
         route = self._party_route
         if route is not None:

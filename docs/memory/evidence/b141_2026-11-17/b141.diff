@@ -1,0 +1,287 @@
+diff -ruN after_b140/companion/native_session_io.py after_b141/companion/native_session_io.py
+--- a/companion/native_session_io.py	2026-11-17 16:42:38.379553839 -0500
++++ b/companion/native_session_io.py	2026-11-17 19:50:04.788197319 -0500
+@@ -1647,6 +1647,9 @@
+     # B137: a party mini game's mute — while set, every report is dropped (the pads stay neutral). Set only by the
+     # mini-game layer around a held title's load and frame advance. False = today.
+     _party_mute = False
++    # B141: while a party title is prepared or held behind the board, the pads' Select (RetroArch's hotkey button) is
++    # cleared from every report. Set only by the mini-game layer. False = today.
++    _party_hold_select = False
+ 
+     LINUX_VENDOR_ID = 0x1209
+     LINUX_PRODUCT_ID = 0x5048
+@@ -2343,6 +2346,27 @@
+             if on:
+                 self._neutralize()
+ 
++    def party_hold_select(self, on: bool) -> None:
++        """B141: on — every report's Select bit cleared until off (a pad holding Select is written once without it)."""
++        with self._meta_lock:
++            self._party_hold_select = bool(on)
++            if not on:
++                return
++            for index in range(len(self._gamepads)):
++                last = self._last_reports[index] if index < len(self._last_reports) else None
++                if last and int(last.get("buttons", 0)) & self.XUSB_BACK:
++                    report = dict(last, buttons=int(last["buttons"]) & ~self.XUSB_BACK & 0xFFFF)
++                    try:
++                        if self._controller_backend == "windows_vigem":
++                            gamepad = self._gamepads[index]
++                            gamepad.report.wButtons = (report["buttons"] | self._forced_buttons[index]) & 0xFFFF
++                            gamepad.update()
++                        else:
++                            self._write_linux_report_locked(index, report, forced_buttons=self._forced_buttons[index])
++                        self._last_reports[index] = report
++                    except Exception:
++                        pass
++
+     def _apply_report(
+         self,
+         player: int,
+@@ -2361,6 +2385,9 @@
+                 hook(player, buttons)
+             except Exception:
+                 pass
++        # B141: a party title prepared or held: Select (RetroArch's hotkey button) never reaches it
++        if self._party_hold_select:
++            buttons = int(buttons) & ~self.XUSB_BACK & 0xFFFF
+         # B110: a party mini game's route (None = today)
+         route = self._party_route
+         if route is not None:
+diff -ruN after_b140/companion/party_minigame.py after_b141/companion/party_minigame.py
+--- a/companion/party_minigame.py	2026-11-17 19:41:03.152020205 -0500
++++ b/companion/party_minigame.py	2026-11-17 19:56:52.629306631 -0500
+@@ -48,6 +48,13 @@
+ `minigame_frame_advance`) → the watcher reads the redrawn, paused window (RetroArch's "Paused." corner masked) → ready.
+ The go: the route, the planned switch, the resume — no second load when the title has not run since its begin was
+ loaded. A practice's way back pauses first, then clears the route and switches, then prepares again the same way.
++
++B139 — a party mini game's own launch writes PARTY_SESSION_SETTINGS into its session config (RetroArch's on-screen
++text off: no notices, no "Paused.", no content banner); the users' launches are untouched; the watch reads unmasked.
++B140 — after the paused load, frames in ADVANCE_STEPS with a grab after each, until the window moved >= BEGIN_MOVED
++from its pre-load picture (or the start is read); never → given up at once ("the title did not show its starting
++point"). B141 — from a held title's launch to the go, and on every way back, the pads' Select is not passed (RetroArch's
++hotkeys are pairs with Select); from the go on, as today.
+ """
+ from __future__ import annotations
+ 
+@@ -517,6 +524,8 @@
+         emu._party_mg_stop_hook = lambda: self._end_by_stop(mg)
+         game = self.p._find_game_by_id(mg["entry"]["game"])
+         cheat = mg["entry"].get("cheat")
++        if mg["hold"]:
++            self._hold_select(mg, True)              # B141: from the launch to the go
+ 
+         def launch():
+             emu._party_session_settings = dict(PARTY_SESSION_SETTINGS)    # B139: this one launch only
+@@ -576,6 +585,14 @@
+             with self._cond:
+                 self._cond.wait(0.1)
+ 
++    def _hold_select(self, mg: dict, on: bool) -> None:
++        """B141: the pads' Select kept from a held title (RetroArch's hotkey pairs) — on / off (no bridge: nothing)."""
++        bridge = self._bridge()
++        if bridge is None or not hasattr(bridge, "party_hold_select"):
++            return
++        bridge.party_hold_select(on)
++        mg["select_held"] = bool(on)
++
+     def _mute(self, mg: dict, on: bool) -> None:
+         """B137: the bridge's mute on / off (no bridge: nothing to mute)."""
+         bridge = self._bridge()
+@@ -691,6 +708,7 @@
+             mg["phase"] = "handing_over"
+         self.row({"step": "minigame_go", "held_s": round(t0 - (mg["ready_at"] or t0), 3),
+                   "remembered": bool(go["remembered"]), **({"practice": True} if go["practice"] else {})})
++        self._hold_select(mg, False)                        # B141: from the go on, Select passes as today
+         if mg.get("ran_since_begin"):                       # B137: only when the title ran since its begin was loaded
+             self._mute(mg, True)
+             try:
+@@ -745,6 +763,7 @@
+         bridge = self._bridge()
+         if bridge is not None:
+             bridge._party_buttons = None
++        self._hold_select(mg, True)                         # B141: the way back holds Select again
+         now = self.clock()
+         self.row({"step": "minigame_practice_end", "by": mg["practice_end_by"] or "time",
+                   "practice_s": round(now - (mg["practice_t0"] or now), 3)})
+@@ -1121,6 +1140,8 @@
+             bridge._party_buttons = None                  # B134: a practice's Start hook never outlives it
+         if bridge is not None and getattr(bridge, "_party_mute", False):
+             bridge.party_mute(False)                      # B137: the mute never outlives the mini game
++        if bridge is not None and getattr(bridge, "_party_hold_select", False):
++            bridge.party_hold_select(False)               # B141: nor does the Select hold
+         if mg.get("hold") and mg.get("switched_to") != "minigame":
+             pass                                          # B133: the stream never left the board: no switch back
+         elif by not in ("stop", "onn") and not inline and board is not None and board.poll() is None:
+diff -ruN after_b140/tests/b114_party_minigame_hang/b114_scenario.py after_b141/tests/b114_party_minigame_hang/b114_scenario.py
+--- a/tests/b114_party_minigame_hang/b114_scenario.py	2026-11-17 19:44:08.844210995 -0500
++++ b/tests/b114_party_minigame_hang/b114_scenario.py	2026-11-17 19:55:37.431629122 -0500
+@@ -1014,6 +1014,9 @@
+                 while not self.stop:
+                     if not self.paused:
+                         self.frame("run")
++                    for i_, b_ in enumerate(VP["cur"]):     # B141: RetroArch's hotkeys, polled paused or running
++                        if b_ & 0x0020 and b_ & (0x0100 | 0x0200 | 0x0010 | 0x0080):
++                            HOTKEYS.append([time.monotonic(), i_, b_])
+                     time.sleep(1 / 60)
+ 
+             def serve(self):
+@@ -1059,6 +1062,7 @@
+                         self.sock.sendto(f"{w[0]} {w[1]} -1".encode(), addr)
+         em.subprocess.Popen = TitleRA
+         LAUNCH_CFG = []                                     # B139: every launch's session config keys (party or not)
++        HOTKEYS = []                                        # B141: every poll that saw Select with a paired button
+         P_UNROUTE = []                                      # each route cleared while a title runs: was it paused
+         _set_route = bridge.set_party_route
+ 
+@@ -1337,6 +1341,60 @@
+                             for r in rows()[r0:] if r["step"] == "minigame_frame_advance"]
+             finish_case("vp", r0)
+             TITLE["show_after"] = None
++            # B141: Select with each paired button (L1, R1, Start, R3) from every pad during the preparation, the hold
++            # and a practice's way back; Select alone after the go
++            SEL = {"on": False}
++            PAIRS = (0x0100, 0x0200, 0x0010, 0x0080)
++
++            def selector():
++                k = 0
++                while watching["on"] and SEL["on"]:
++                    pair = PAIRS[k % 4]; k += 1
++                    for pl in range(4):
++                        bridge._apply_report(pl, 0x0020 | pair, 0, 0, 0, 0, 0, 0)
++                    time.sleep(0.1)
++                    for pl in range(4):
++                        bridge._apply_report(pl, 0, 0, 0, 0, 0, 0, 0)
++                    time.sleep(0.1)
++            st_dir = folder()
++            st_before = {p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}
++            r0 = held_start("sl", tok2, "1,2", ["other"])
++            S["sl_hold_seen"] = wait_until(lambda: bool(getattr(bridge, "_party_hold_select", False)), 10)
++            h0, v0_ = len(HOTKEYS), len(VP["log"])           # from the hold on: before the title's launch
++            SEL["on"] = True
++            threading.Thread(target=selector, daemon=True).start()
++            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++            S["sl_ready"] = b.get("phase")
++            time.sleep(1.0)                                 # held, the pairs go on
++            SEL["on"] = False; time.sleep(0.3)
++            S["sl_select_written_before_practice"] = sum(1 for x in VP["log"][v0_:] if x[2] & 0x0020)
++            S["sl_hotkeys_before_practice"] = len(HOTKEYS) - h0
++            call("POST", "/plugins/games/party-minigame-go?practice=1")
++            wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
++            bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # Start leaves the practice
++            bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
++            wait_until(lambda: bool(getattr(bridge, "_party_hold_select", False)), 10)   # the way back under way
++            h1, v1_ = len(HOTKEYS), len(VP["log"])
++            SEL["on"] = True
++            threading.Thread(target=selector, daemon=True).start()
++            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++            S["sl_back"] = b.get("phase")
++            time.sleep(0.6)
++            SEL["on"] = False; time.sleep(0.3)
++            S["sl_select_written_way_back"] = sum(1 for x in VP["log"][v1_:] if x[2] & 0x0020)
++            S["sl_hotkeys_way_back"] = len(HOTKEYS) - h1
++            S["sl_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
++            wait_phase(lambda b: b.get("state") != "starting", 20)
++            v2_ = len(VP["log"])
++            bridge._apply_report(0, 0x0020, 0, 0, 0, 0, 0, 0)    # Select alone after the go: passes
++            bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
++            S["sl_select_written_after_go"] = sum(1 for x in VP["log"][v2_:] if x[2] & 0x0020)
++            S["sl_held_flag_after_go"] = bool(getattr(bridge, "_party_hold_select", False))
++            S["sl_states_same"] = ({p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}) == st_before
++            fake["ra"].screen = "end_P1"
++            wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++            finish_case("sl", r0)
++            S["sl_held_flag_after_end"] = bool(getattr(bridge, "_party_hold_select", False))
+             # N5: during the mute — the board's end, the onn's Home, a second start, the onn's END
+             layer.advance_gap_s = 0.7
+             TITLE["show_after"] = 2
+diff -ruN after_b140/tests/b141_party_select_held/test_b141.py after_b141/tests/b141_party_select_held/test_b141.py
+--- a/tests/b141_party_select_held/test_b141.py	1969-12-31 19:00:00.000000000 -0500
++++ b/tests/b141_party_select_held/test_b141.py	2026-11-17 19:55:37.431629122 -0500
+@@ -0,0 +1,84 @@
++#!/usr/bin/env python3
++"""B141 (host): Select is not passed to a held title — through the real HTTP server on loopback, behind
++PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
++
++RetroArch's hotkeys on the hub are pairs with Select (`input_enable_hotkey_btn` 6): + L1 load state, + R1 save state,
+++ Start quit, + R3 pause toggle — and a paused core still takes them. B114's scenario, its `nopress` mode: the fake
++RetroArch logs a hotkey whenever a virtual pad shows Select with one of those (paused or running). Select with each
++paired button from every pad through the bridge, every 0.2 s, during the preparation and the hold, and on a practice's
++way back.
++
++Checked: no virtual pad's Select written down and the fake's hotkey log empty in both; the fake's state folder
++byte-equal; after the go Select passes (written) and the hold is off; after the end the hold is off; the flags absent →
++today (B137's `Today`, and the bridge's own default).
++
++    python3 -m unittest discover -s tests/b141_party_select_held -v
++"""
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b114_party_minigame_hang", "b124_party_four_seats", "b127_party_cheat_setups", "b115_party_handovers",
++            "b123_h7_n64_start"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++sys.path.insert(0, str(ROOT / "companion"))
++import test_b114 as b114  # noqa: E402
++import test_b124 as b124  # noqa: E402
++
++
++class SelectHeld(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b114.b99.tree()
++        b124.IDS.clear()
++        b124.IDS.update(ids)
++        cls.s = b114.run(root, b114.BOTH, ids, "nopress", extra=b124.extra)["steps"]
++
++    def test_0_no_select_and_no_hotkey_during_the_preparation_and_the_hold(self):
++        s = self.s
++        self.assertTrue(s["sl_hold_seen"])
++        self.assertEqual(s["sl_ready"], "ready")
++        self.assertEqual(s["sl_select_written_before_practice"], 0)
++        self.assertEqual(s["sl_hotkeys_before_practice"], 0)
++
++    def test_1_nor_on_a_practices_way_back(self):
++        s = self.s
++        self.assertEqual(s["sl_back"], "ready")
++        self.assertEqual(s["sl_select_written_way_back"], 0)
++        self.assertEqual(s["sl_hotkeys_way_back"], 0)
++        self.assertTrue(s["sl_states_same"])
++
++    def test_2_after_the_go_select_passes_and_the_hold_is_off_after_the_end(self):
++        s = self.s
++        self.assertEqual(s["sl_go"], "taken")
++        self.assertGreaterEqual(s["sl_select_written_after_go"], 1)
++        self.assertFalse(s["sl_held_flag_after_go"])
++        self.assertFalse(s["sl_held_flag_after_end"])
++
++
++class BridgeDefault(unittest.TestCase):
++    def test_the_bridge_passes_select_unless_held(self):
++        import native_session_io as nsio
++        b = nsio.NativeControllerBridge(Path(HERE / "_unused"))
++        b._gamepads = ["P1", "P2", "P3", "P4"]
++        b._controller_backend = "linux_uinput"
++        seen = []
++        b._write_linux_report_locked = lambda index, report, *a, **k: seen.append((index, report["buttons"]))
++        self.assertFalse(b._party_hold_select)                       # today
++        b._apply_report(0, 0x0020 | 0x0100, 0, 0, 0, 0, 0, 0)
++        self.assertEqual(seen[-1], (0, 0x0120))
++        b.party_hold_select(True)                                    # the pad holding Select is written without it
++        self.assertEqual(seen[-1], (0, 0x0100))
++        b._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)
++        self.assertEqual(seen[-1], (1, 0x0010))
++        b.party_hold_select(False)
++        b._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)
++        self.assertEqual(seen[-1], (1, 0x0020))
++
++
++if __name__ == "__main__":
++    unittest.main()

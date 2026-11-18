@@ -1,0 +1,426 @@
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index cb220073..c6ea5156 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -2229,6 +2229,9 @@ class EmulatorManager:
+     # stop hook (else None)
+     _party_stash: Any = None
+     _party_mg_stop_hook: Any = None
++    # B139: {key: value} written into the next session config by a party mini game's own launch (set and cleared by the
++    # mini-game layer around that one launch, the manager's lock held); None = today (every other launch)
++    _party_session_settings: dict[str, str] | None = None
+     # B71: {"discs": n, "disc": i | None} on a multi-disc PS1 session, else None (= today)
+     _disc_session: dict[str, Any] | None = None
+     _disc_tail: Any = None
+@@ -5636,6 +5639,15 @@ class EmulatorManager:
+                         f"ambiguous {key} assignment"
+                     )
+ 
++        # B139: a party mini game's title launch only — its settings replace any assignment of theirs (RetroArch does
++        # not honour an appended duplicate); every other launch: today
++        party_settings = getattr(self, "_party_session_settings", None)
++        if party_settings:
++            for key in party_settings:
++                session_text = re.sub(rf"(?m)^[ \t]*{re.escape(key)}[ \t]*=.*\n?", "", session_text)
++            session_text = (session_text.rstrip("\n") + "\n\n# PrivyHub B139 party mini game: RetroArch's on-screen text off\n"
++                            + "".join(f'{k} = "{v}"\n' for k, v in party_settings.items()))
++
+         # B4: the rewind keys for the hold's release (flag on only; a base that sets one is left alone)
+         if _hold_rewind is not None:
+             session_text = _hold_rewind.apply_session_config(
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index dd72ebf9..bf01ff8a 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -99,6 +99,10 @@ PRACTICE_S = 90.0          # a practice left after this long playing (or by the
+ XUSB_START = 0x0010        # the pad report's Start bit (native_session_io: XUSB_START)
+ NO_GO = "no mini game is waiting for the go"
+ NOT_RECOGNISED = "the title's start screen was not recognised"
++# B139: a party mini game's own launch writes these into its session config (RetroArch's on-screen text off: the
++# notices, "Paused." and the content banner — nothing of RetroArch's on the title's window, paused or running)
++PARTY_SESSION_SETTINGS = {"video_font_enable": "false", "menu_show_load_content_animation": "false"}
++PARTY_LABEL_MASK = False    # B139: no text left on the window, so the watch reads it unmasked
+ # B137
+ ADVANCE_FRAMES = 2          # FRAMEADVANCE sent after the paused load (PS1 needs 1, N64 0: one frame of margin)
+ ADVANCE_GAP_S = 0.06        # between them, and after the last (>= 50 ms: each one counts; 2 ms apart they merge)
+@@ -508,10 +512,14 @@ class PartyMinigames:
+         cheat = mg["entry"].get("cheat")
+ 
+         def launch():
+-            if cheat is None:
+-                emu.launch(game)
+-            else:                                    # B127: the onn's Extras launch, through the plugin's own path
+-                self.p.handle_post("launch", self._cheat_query(mg["entry"]["game"], cheat))
++            emu._party_session_settings = dict(PARTY_SESSION_SETTINGS)    # B139: this one launch only
++            try:
++                if cheat is None:
++                    emu.launch(game)
++                else:                                # B127: the onn's Extras launch, through the plugin's own path
++                    self.p.handle_post("launch", self._cheat_query(mg["entry"]["game"], cheat))
++            finally:
++                emu._party_session_settings = None
+             return emu.process
+         proc = self._step(mg, "launch", lambda: self._emu_call(mg, launch))
+         with self._lock:
+@@ -594,7 +602,8 @@ class PartyMinigames:
+         m0 = self.clock()
+         self._mute(mg, True)                                                    # B137: no press reaches a frame
+         try:
+-            self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed, mask_label=True))
++            self._step(mg, "watch", lambda: runner.start("1", "", bench=not self.stream_needed,
++                                                          mask_label=PARTY_LABEL_MASK))
+             self.row({"step": "minigame_watch", "loaded": True})
+             paused = self._step(mg, "advance", lambda: self._advance(mg))
+         finally:
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index 3935c921..5af7baf9 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -38,6 +38,21 @@ bridge._gamepads = ["P1", "P2", "P3", "P4"]
+ bridge._controller_backend = "linux_uinput"
+ bridge._write_linux_report_locked = lambda index, report, *a, **k: None
+ T0 = time.monotonic()
++B139_KEYS = ("video_font_enable", "menu_show_load_content_animation")
++def b139_config(cmd):
++    """B139: the session config RetroArch was started with — its B139 keys (every assignment) and the text normalised
++    (the temp root and the per-launch command port), for byte-for-byte comparisons across runs."""
++    cmd = [str(c) for c in cmd]
++    if "--config" not in cmd:
++        return {"keys": {}, "text": None}
++    cfg = Path(cmd[cmd.index("--config") + 1]); cfg = cfg if cfg.is_absolute() else root / cfg
++    text = cfg.read_text()
++    keys = {k: re.findall(rf'(?m)^[ \t]*{k}[ \t]*=[ \t]*"([^"]*)"', text) for k in B139_KEYS}
++    norm = text
++    for form in {str(root.resolve()), str(root)}:
++        norm = norm.replace(form, "<root>")
++    norm = re.sub(r'(?m)^(network_cmd_port = )"\d+"', r'\1"<port>"', norm)
++    return {"keys": {k: v for k, v in keys.items() if v}, "text": norm}
+ def now_s():
+     return round(time.monotonic() - T0, 3)
+ 
+@@ -350,7 +365,15 @@ if args["mode"] == "today":
+                             "stop_idle": ("POST", "/plugins/games/stop")}.items():
+         S[k] = call(meth, path)
+     # B124: a title's start with the prompt answers its players and ports as today (no board without the flag)
++    _cfg_cmds = []
++    _P0 = em.subprocess.Popen
++    def _pk(cmd, **kw):                                # B139: the users' launch's session config, kept
++        _cfg_cmds.append(b139_config(cmd))
++        return _P0(cmd, **kw)
++    em.subprocess.Popen = _pk
+     call("POST", f"/plugins/games/launch?id={title}")
++    em.subprocess.Popen = _P0
++    S["b139_users_cfg"] = _cfg_cmds[0] if _cfg_cmds else None
+     pr = call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")["body"]
+     S["ports_today"] = {"players": pr.get("players"), "players_source": pr.get("players_source"),
+                         "ports_set": pr.get("ports_set")}
+@@ -512,9 +535,13 @@ if args["mode"] == "cheat":
+     n64 = args["n64_id"]
+     LAST, LOADS, POPENS, APPLIED, LQ = {}, [], [], [], []
+     _FR = em.subprocess.Popen
++    B139_CFG = []
+     def _popen(cmd, **kw):                            # RetroArch's command line kept (its session config)
+         LAST["cmd"] = [str(c) for c in cmd]
+         POPENS.append(1)
++        _lay = getattr(g, "_party_minigame_obj", None); _mg = getattr(_lay, "mg", None)
++        B139_CFG.append({"party": bool(_mg is not None and not _mg.get("launched") and not _mg.get("closed")),
++                         "keys": b139_config(cmd)["keys"]})
+         return _FR(cmd, **kw)
+     em.subprocess.Popen = _popen
+     def _apply(self):                                 # RetroArch's network side of the cheat toggles (B83's stub)
+@@ -714,6 +741,7 @@ if args["mode"] == "cheat":
+     S["c_files_diff"] = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+     S["c_scratch_end"] = scratch_anywhere()
+     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
++    S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
+     finish()
+ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
+@@ -955,6 +983,11 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+             def __init__(self, cmd, **kw):
+                 self.screen, self.shown, self.notice_until = "boot", "boot", 0.0
+                 self.loads = self.advances = self.frames = 0
++                c_ = b139_config(cmd)                       # B139: RetroArch reads its session config
++                self.notices_on = c_["keys"].get("video_font_enable", ["true"])[-1] != "false"
++                _lay = getattr(g, "_party_minigame_obj", None); _mg = getattr(_lay, "mg", None)
++                LAUNCH_CFG.append({"party": bool(_mg is not None and not _mg.get("launched") and not _mg.get("closed")),
++                                   "keys": c_["keys"], "text": c_["text"]})
+                 super().__init__(cmd, **kw)
+                 EV.append([time.monotonic(), "launch", None])
+                 threading.Thread(target=self.run_frames, daemon=True).start()
+@@ -1001,7 +1034,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+                         else:
+                             self.screen = TITLE["begin"]
+                             self.loads += 1
+-                            self.notice_until = time.monotonic() + NOTICE_S
++                            self.notice_until = time.monotonic() + (NOTICE_S if self.notices_on else 0.0)
+                             EV.append([time.monotonic(), "load", self.loads])
+                             if m._n64_core:                 # the N64 core's load runs a frame (B137's settle)
+                                 self.frame("load")
+@@ -1010,6 +1043,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+                     elif w and w[0] in ("READ_CORE_RAM", "READ_CORE_MEMORY") and len(w) == 3:
+                         self.sock.sendto(f"{w[0]} {w[1]} -1".encode(), addr)
+         em.subprocess.Popen = TitleRA
++        LAUNCH_CFG = []                                     # B139: every launch's session config keys (party or not)
+         P_UNROUTE = []                                      # each route cleared while a title runs: was it paused
+         _set_route = bridge.set_party_route
+ 
+@@ -1041,7 +1075,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+                 i = self.n[tok] = (self.n.get(tok, -1) + 1) % 6
+                 with Image.open(frames / f"{tok}_{i}.png") as im:
+                     img = im.convert("L")
+-                if ra_.paused:                              # RetroArch's "Paused." in the corner
++                if ra_.paused and ra_.notices_on:          # RetroArch's "Paused." in the corner (B139: only with text on)
+                     img.paste(255, (img.size[0] - LBL[0], 0, img.size[0], LBL[1]))
+                 return img
+         follow = FollowPicture()
+@@ -1053,7 +1087,8 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+             ra_ = fake.get("ra")
+             W_ = img.size[0]
+             corner = max(img.crop((W_ - LBL[0], 0, W_, LBL[1])).getdata())
+-            READS.append([time.monotonic(), bool(ra_ is not None and ra_.paused), corner])
++            READS.append([time.monotonic(), bool(ra_ is not None and ra_.paused), corner,
++                          bool(ra_ is not None and ra_.paused and ra_.notices_on)])
+             return _read(self_, img)
+         es_.Reader.read = _spy
+         PRESS = {"on": False, "players": [0, 1], "sent": []}
+@@ -1072,6 +1107,12 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+                 time.sleep(0.1)
+         threading.Thread(target=presser, daemon=True, name="b137-presses").start()
+ 
++        W0 = [time.time()]
++
++        def h7_rows():
++            p_ = root / "logs/games/h7_results.jsonl"
++            return [json.loads(l) for l in p_.read_text().splitlines()] if p_.is_file() else []
++
+         def ev_since(t0_):
+             return [e for e in EV if e[0] >= t0_]
+ 
+@@ -1148,6 +1189,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+             S[tag + "_mute"] = mute_windows(t0_, t_go)
+             S[tag + "_on_the_begin"] = screen_at_resume_after(t_go)
+             S[tag + "_reads_paused_unmasked"] = len(reads_paused_unmasked(t0_, t_go))
++            S[tag + "_reads_paused_label"] = sum(1 for r_ in READS if t0_ <= r_[0] <= t_go and r_[3])   # B139
+             S[tag + "_reads_paused"] = sum(1 for r_ in READS if t0_ <= r_[0] <= t_go and r_[1])
+             S[tag + "_reads_running_masked"] = sum(1 for r_ in READS if r_[0] > t_go + 0.5 and not r_[1] and r_[2] == 0)
+             S[tag + "_route_playing"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+@@ -1160,6 +1202,8 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+                                       for r in rows()[r0:] if r["step"] in ("minigame_frame_advance", "minigame_go",
+                                                                              "minigame_reloaded")]
+             S[tag + "_mute_after"] = bool(getattr(bridge, "_party_mute", False))
++            S[tag + "_watching_label_mask"] = [r.get("label_mask") for r in h7_rows() if r.get("step") == "watching"
++                                               and r.get("time_unix", 0) >= W0[0]][-1:]
+             return r0, t0_, t_go
+ 
+         if args["mode"] == "nopress_head":
+@@ -1264,6 +1308,12 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+                     S[tag + "_board_gone"] = wait_until(lambda: board_pid_now() is None, 15)
+             layer.advance_gap_s = 0.06
+             S["n_lat"] = {k: max(v) if v else None for k, v in out["lat"].items()}
++            # B139: the users' own launch of the same game in the same companion (no mini game on)
++            wait_until(lambda: board_pid_now() is None, 10)
++            call("POST", f"/plugins/games/launch?id={title}")
++            call("POST", "/plugins/games/stop")
++        S["b139_launches"] = [{"party": c["party"], "keys": c["keys"]} for c in LAUNCH_CFG]
++        S["b139_users_cfg"] = next((c for c in reversed(LAUNCH_CFG) if not c["party"]), None)
+         es_.Reader.read = _read
+     S["h_running_at_end"] = [title_alive()]
+     timed("end_onn", "POST", "/plugins/games/stop")
+diff --git a/tests/b137_party_no_press/test_b137.py b/tests/b137_party_no_press/test_b137.py
+index 6dcd9bef..6206a730 100644
+--- a/tests/b137_party_no_press/test_b137.py
++++ b/tests/b137_party_no_press/test_b137.py
+@@ -89,12 +89,13 @@ class NoPressBeforeTheGo(unittest.TestCase):
+         self.assertEqual(s["n1"], {"state": "ended", "class": "end_P1", "scores": [1, 0], "places": None, "why": None})
+         self.assertTrue(s["n1_title_gone"] and s["n1_closed"] and s["n1_board_picture_back"])
+ 
+-    def test_2_the_label_masked_on_every_paused_read_and_never_after_the_go(self):
++    def test_2_the_paused_window_read_as_it_is(self):
++        """B139: the party's launch turns RetroArch's text off — no "Paused." on the paused window, so no mask."""
+         s = self.s
+-        self.assertGreater(s["n1_reads_paused"], 3)
+-        self.assertEqual(s["n1_reads_paused_unmasked"], 0)
++        self.assertGreater(s["n1_reads_paused"], 0)
++        self.assertEqual(s["n1_reads_paused_label"], 0)
++        self.assertEqual(s["n1_watching_label_mask"], [None])
+         self.assertEqual(s["n1_reads_running_masked"], 0)
+-        self.assertEqual(s["n2_reads_paused_unmasked"], 0)
+ 
+     def test_3_three_practices_presses_throughout_the_ways_back(self):
+         s = self.s
+diff --git a/tests/b139_party_clean_window/test_b139.py b/tests/b139_party_clean_window/test_b139.py
+new file mode 100644
+index 00000000..7df93135
+--- /dev/null
++++ b/tests/b139_party_clean_window/test_b139.py
+@@ -0,0 +1,169 @@
++#!/usr/bin/env python3
++"""B139 (host): a party mini game's title launched with RetroArch's on-screen text off — through the real HTTP server
++on loopback, behind PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
++
++B114's scenario: B101's fake RetroArch reads the session config it is started with (each launch's B139 keys kept, and
++whether a party mini game launched it); it draws notices and "Paused." only when that config leaves them on.
++
++Checked: **every launch a party mini game makes carries `video_font_enable = "false"` and
++`menu_show_load_content_animation = "false"` once each; the users' own launch of the same game in the same companion
++carries neither** — plain (`nopress`) and under a cheat setup (B127's `cheat` mode: the users' Extras launches beside
++the party's); the party's watch reads unmasked (`watching` has no `label_mask`) and still reads the start; **the users'
++launch's session config byte for byte HEAD's** (normalised for the temp root and the per-launch port) with the flags
++absent, and with the flags set; offline (the hub's own kept pictures, read only; skipped elsewhere): T88's paused
++pictures with the label's pixels removed as the settings remove them → `start`, `other` read as the screen 0 on every
++kept run. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b139_party_clean_window -v
++"""
++from __future__ import annotations
++
++import csv
++import json
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b114_party_minigame_hang", "b124_party_four_seats", "b127_party_cheat_setups", "b115_party_handovers",
++            "b123_h7_n64_start"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import test_b114 as b114  # noqa: E402  (harnesses; their tests are not collected here)
++import test_b124 as b124  # noqa: E402
++import test_b127 as b127  # noqa: E402
++
++HEAD = "c1a66bc9"                       # queue AW's baseline: the companion before B139
++SETTINGS = {"video_font_enable": ["false"], "menu_show_load_content_animation": ["false"]}
++
++
++def _run(mode, code=None, env=None, extra=b124.extra):
++    root, ids = b114.b99.tree(code)
++    b124.IDS.clear()
++    b124.IDS.update(ids)
++    return b114.run(root, env or b114.BOTH, ids, mode, extra=extra)
++
++
++class PartyLaunchesOnly(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.s = _run("nopress")["steps"]
++
++    def test_0_every_party_launch_carries_the_settings_the_users_does_not(self):
++        launches = self.s["b139_launches"]
++        party = [c for c in launches if c["party"]]
++        users = [c for c in launches if not c["party"]]
++        self.assertGreaterEqual(len(party), 8)
++        self.assertGreaterEqual(len(users), 1)
++        for c in party:
++            self.assertEqual(c["keys"], SETTINGS, c)
++        for c in users:
++            self.assertEqual(c["keys"], {}, c)
++
++    def test_1_the_watch_unmasked_no_label_and_the_start_read(self):
++        s = self.s
++        self.assertEqual(s["n1_ready"]["phase"], "ready")
++        self.assertEqual(s["n1_reads_paused_label"], 0)            # the fake drew no "Paused." (the config's text off)
++        self.assertEqual(s["n1_watching_label_mask"], [None])        # the watch did not mask
++        self.assertEqual(s["n1"]["state"], "ended")
++
++
++class UnderSetups(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b114.b99.tree()
++        b124.IDS.clear()
++        b124.IDS.update(ids)
++        cls.s = b114.run(root, b114.BOTH, ids, "cheat", extra=b127.extra)["steps"]
++
++    def test_party_launches_under_a_setup_carry_them_the_users_extras_launches_do_not(self):
++        cfg = self.s["c_b139_cfg"]
++        party = [c for c in cfg if c["party"]]
++        users = [c for c in cfg if not c["party"]]
++        self.assertGreaterEqual(len(party), 2)
++        self.assertGreaterEqual(len(users), 2)                       # the onn's Extras launches of both titles
++        for c in party:
++            self.assertEqual(c["keys"], SETTINGS, c)
++        for c in users:
++            self.assertEqual(c["keys"], {}, c)
++
++
++class Today(unittest.TestCase):
++    def test_the_users_launch_config_is_heads_flags_absent_and_set(self):
++        code = b114.code_of(HEAD)
++        if code is None:
++            self.skipTest("git is absent")
++        texts = {}
++        for name, env in (("absent", {**b114.b85.FLAGS, **b114.ADOPTED}),
++                          ("party_only", {**b114.b85.FLAGS, **b114.ADOPTED, "PRIVYHUB_PARTY": "1"}),
++                          ("both", b114.BOTH)):
++            root, ids = b114.b99.tree(code)
++            base = b114.run(root, env, ids, "today")["steps"]["b139_users_cfg"]["text"]
++            root2, ids2 = b114.b99.tree()
++            mine = b114.run(root2, env, ids2, "today")["steps"]["b139_users_cfg"]["text"]
++            self.assertEqual(mine, base, name)
++            self.assertNotIn("B139", mine)
++            texts[name] = mine
++        # the flags set, inside a party companion that has run mini games: the users' launch is the same text
++        s = _run("nopress")["steps"]
++        self.assertEqual(s["b139_users_cfg"]["text"], texts["both"])
++
++
++def _remove_label(img):
++    """The window as the settings leave it: the label's bright pixels in the right bar's top replaced by the bar's tone."""
++    import numpy as np
++    from PIL import Image
++    a = np.asarray(img.convert("RGB")).copy()
++    h, w, _ = a.shape
++    x0 = w - 301
++    below = np.median(a[200:, x0:].reshape(-1, 3), axis=0).astype(np.uint8)
++    reg = a[:140, x0:]
++    reg[reg.max(axis=2) > int(below.max()) + 16] = below
++    return Image.fromarray(a)
++
++
++class OfflineT88(unittest.TestCase):
++    """The hub's own kept pictures (read only). Elsewhere: skipped."""
++
++    def test_t88_paused_pictures_with_the_text_off_read_start_and_no_other_as_the_screen(self):
++        rules = Path.home() / "privyhub_h7" / "rules"
++        frames = ROOT / "runtime" / "h7_frames"
++        if not rules.is_dir() or not frames.is_dir():
++            self.skipTest("the hub's rules folder and kept pictures are not here")
++        sys.path.insert(0, str(ROOT / "tools"))
++        import h7_endscreen as es
++        from PIL import Image
++        side = [p for p in rules.glob("*.party.json") if json.loads(p.read_text())["players"] == 2]
++        if not side:
++            self.skipTest("no two-player party title")
++        gid = side[0].name.split(".")[0]
++        spec, arr = es.load_spec(rules / f"{gid}.endscreen.json")
++        d2 = frames / f"{gid}_20261117T234139Z"                 # H7-D2 pass P
++        if not d2.is_dir():
++            self.skipTest("H7-D2's pictures are not here")
++        rows = {int(r["file"][1:7]): r for r in csv.DictReader(open(d2 / "index.csv"))}
++        starts, margins = 0, []
++        for k in range(13, 67):                                  # paused, 2 to 210 frames
++            r = es.Reader(spec, arr).read(_remove_label(Image.open(d2 / rows[k]["file"])))
++            starts += r["class"] == "start"
++            margins.append(r["margin"] or 0.0)
++        self.assertEqual(starts, 54)
++        self.assertGreater(min(margins), 0.05)
++        boot = [es.Reader(spec, arr).read(_remove_label(Image.open(d2 / rows[k]["file"])))["screen"] for k in range(1, 13)]
++        self.assertEqual(sum(boot), 0)                           # the boot frame never read as the screen
++        as_screen, runs = 0, 0
++        for d in sorted(frames.iterdir()):                       # every kept T88 run: its `other` pictures
++            if not d.name.startswith(gid + "_") or not (d / "index.csv").is_file() or d == d2:
++                continue
++            runs += 1
++            for row in csv.DictReader(open(d / "index.csv")):
++                if row.get("class") == "other":
++                    as_screen += es.Reader(spec, arr).read(_remove_label(Image.open(d / row["file"])))["screen"]
++        self.assertGreaterEqual(runs, 1)
++        self.assertEqual(as_screen, 0)
++        print(f"\nB139 offline: T88 paused 54/54 start (least margin {min(margins):.4f}); boot 0/12 as the screen; "
++              f"{runs} kept runs, `other` read as the screen 0", file=sys.stderr)
++
++
++if __name__ == "__main__":
++    unittest.main()
