@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **H7-V6: T88 NOT MET, T89 NOT MET** (`evidence/H7_V6_2026-11-17.md`): prepared paused behind the board (B137),
-  paused throughout, but neither paused start recognised in 15 s. Flags off; eighteen lines. H7-V5b MET.
+- **H7-D2 MET** (`evidence/H7_D2_2026-11-17.md`): the paused window — T88's start shown after 2 frames, the mask of
+  "Paused." makes its read worse; T89 read paused. Flags off; eighteen lines. H7-V6 NOT MET.
 
 ## Verified State
 
@@ -87,7 +87,7 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — B: the paused read** (see the paused window; fix the start read for both titles), then H7-V6 again;
+1. **H7 — Cowork reads H7-D2's pictures**, then B: T88's masked paused read, T89's frames; then H7-V6 again;
    PP-H3c and PP-H4 wait. The onn's adb answers "unauthorized": trust it again before PP-H3c.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.

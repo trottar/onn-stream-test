@@ -3231,6 +3231,8 @@ start and result; **the PrivyParty probe on the hub**.
 
 **H7-V6 (2026-11-17): T88 and T89 NOT MET — neither title's start was recognised in the paused window.** On the bench, each title was prepared behind the board in the new order — paused at every second, its starting point loaded, two frames advanced, no route before a go — but the hub's reader did not see either start screen within 15 s (both reads far from it, where the running window read it at once). What the paused window showed is not known yet (no pictures in that order). **What waits:** B looks at the paused window and fixes the read for both titles; then H7-V6 again; PP-H3c and PP-H4 wait (`docs/memory/evidence/H7_V6_2026-11-17.md`).
 
+**H7-D2 (2026-11-17): MET — what the paused window shows.** The duel title's starting screen is on the window after two frames; the only difference from a running window is RetroArch's "Paused." in a corner, and the reader's masking of that corner makes the read worse, not better. The four-player title's paused start reads with no frame at all, and the board's own start read it with more frames. Next: B's fix for both, then H7-V6 again (`docs/memory/evidence/H7_D2_2026-11-17.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 
