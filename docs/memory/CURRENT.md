@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **PP-H3c MET (second try)** (`evidence/PP_H3C2_2026-11-18.md`): the user alone, two pads — paused to every go, no
-  reload, practices, both matches scored, Home / RESUME, END. adb back; flags off; eighteen lines.
+- **PP-H3d NOT MET on one read** (`evidence/PP_H3D_2026-11-18.md`): sound after every switch the user played through,
+  the band, the log, the match met; S's self-proof switch (ended 1.5 s later) not. Flags off; eighteen lines.
 
 ## Verified State
 
@@ -87,7 +87,7 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — PP-H4 may be offered** (four people). For B: audio dropping in a mini game; a practice banner.
+1. **H7 — Cowork: PP-H3d's S read on the self-proof's switch**, then PP-H4. For B: the band a little high, cut off.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
