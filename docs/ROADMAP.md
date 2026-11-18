@@ -3235,6 +3235,8 @@ start and result; **the PrivyParty probe on the hub**.
 
 **H7-D2 (2026-11-17): MET — what the paused window shows.** The duel title's starting screen is on the window after two frames; the only difference from a running window is RetroArch's "Paused." in a corner, and the reader's masking of that corner makes the read worse, not better. The four-player title's paused start reads with no frame at all, and the board's own start read it with more frames. Next: B's fix for both, then H7-V6 again (`docs/memory/evidence/H7_D2_2026-11-17.md`).
 
+**H7-V6b (2026-11-18): T88 and T89 MET — a clean paused window, the hub's half.** On the bench, with RetroArch's own text off the mini game's window (queue AW), each title was prepared behind the board, paused at every second, and its starting screen read at once — about a second after its starting point was loaded, both titles, every time. The duel title held its ready for three minutes, took a go given before it was ready, came back from two practices by time and scored both ends; the four-player title came back from a practice and scored its results. No go loaded the game again; the users' files were unchanged. **What waits:** PP-H3c, the user alone with two pads at the TV (the onn must trust the hub's adb key again first); then PP-H4 (`docs/memory/evidence/H7_V6B_2026-11-18.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

@@ -9,6 +9,7 @@ Sections below keep their text unchanged and their order.
 One line per open item: date — item — status — where it lives.
 
 **Sections below (file order):**
+- 2026-11-18 — H7-V6b (queue AW's clean window on the bench, unattended, PRIVYHUB_H7=1 and PRIVYHUB_PARTY=1 for the task only): **T88 MET, T89 MET** — every party launch wrote both keys "false"; each preparation one frame-advance row ("changed", "paused"); the start read at the first read (1.0 s) with no mask in all seven preparations; PAUSED at every proof second; no reload at any go; T88's ends [1, 0] / [0, 1], two practices by time; T89's places / scores / seats as H7-V5b; the users' files unchanged; step 5's pictures not taken (A's grabber had no DISPLAY); a practice's way back mutes ~1.15 s (14 frames); the onn's adb "unauthorized" — PP-H3c may be offered — `docs/memory/evidence/H7_V6B_2026-11-18.md`
 - 2026-11-18 — Queue AW (a clean window for a party mini game — after H7-V6 not met for both titles: B137's order held, but neither start was read in the paused window; H7-D2's pictures showed RetroArch's own text on it — "Paused.", the launch's notices, a content banner — and, for T89, a begin not yet on the window after two frames; B139 RetroArch's text off, B140 the begin made sure of, B141 Select held, B142 A's bench re-sketched): **built behind the bench flags** — a party mini game's own launch now writes `video_font_enable = "false"` (and `menu_show_load_content_animation = "false"`) into its session config: nothing of RetroArch's on the window, paused or running, while the users' own launches stay as they are; after the paused load the hub advances frames in growing steps until the window has visibly changed (or gives up at once, "the title did not show its starting point"); the pads' Select (RetroArch's hotkey button: with L1 / R1 / Start / R3 it loads, saves, quits, unpauses) no longer reaches a held title; the mask did not make T88 worse on its own pictures (it read the start 54 / 54) — the hub's masked reads came before the begin was on the window — OPEN (H7-V6 again with these; then PP-H3c, then PP-H4; T89's frame count, and so its mute, only the bench shows) — `docs/memory/evidence/B139_PARTY_CLEAN_WINDOW_2026-11-17.md`, `B140_PARTY_BEGIN_SHOWN_2026-11-17.md`, `B141_PARTY_SELECT_HELD_2026-11-17.md`, `docs/memory/handoffs/SESSION_B_DONE_2026-11-17AW.md`
 - 2026-11-17 — H7-D2 (why H7-V6's paused starts were missed: pictures and reads frame by frame, and the board's held start with 30 more frames, unattended, PRIVYHUB_H7=1 and PRIVYHUB_PARTY=1 for the task only): **MET** — T88: the begin is on the window from 2 frames with only RetroArch's "Paused." in a corner; unmasked it reads just out (0.088-0.092 against 0.082) at every frame count, start only running; the party's mask of the corner makes it worse (0.1212) — given up; T89: start unmasked from the 2nd read with 0 frames, and masked with 32 frames ready at 2 s (0.034); the users' files unchanged — OPEN (B): T88's masked paused read; T89's frames — `docs/memory/evidence/H7_D2_2026-11-17.md`
 - 2026-11-17 — H7-V6 (B137's order on the bench: each title prepared paused behind the board, unattended, PRIVYHUB_H7=1 and PRIVYHUB_PARTY=1 for the task only): **T88 NOT MET, T89 NOT MET** — each title held under its cheat setup with its begin loaded, one frame advance (2 frames, paused, mute ~0.2 s) and PAUSED at every second, no route before a go — but neither paused start screen was recognised in 15 s (T88's last read 0.1641 against 0.082; T89's 0.2367 against 0.0932; running, H7-V5b read 0.0117 / 0.0257); no picture kept, so what the paused window showed is not known; the users' files unchanged; the onn's adb "unauthorized" — OPEN (B): see the paused window, then the fix for both; H7-V6 again; PP-H3c waits — `docs/memory/evidence/H7_V6_2026-11-17.md`
@@ -112,6 +113,22 @@ One line per open item: date — item — status — where it lives.
 - 2026-10-19 — G5-S2-L, the first live LAN smoke of the WAN adaptation rules (`PRIVYHUB_WAN_ADAPTATION=1`) — QUEUED, NEVER RUN — `docs/memory/handoffs/QUEUE_2026-10-19N.md` §2
 - 2026-10-23 — LINK-N1, the nightly watch (unit `privyhub-link-n1`, ended 2026-10-31): its nights NOT WRITTEN UP — only `docs/memory/evidence/LINK_N1_LAUNCH_2026-10-23.md` and `docs/memory/evidence/link_n1_2026-10-23/` exist — OPEN ("read LINK-N1's nights")
 - 2026-10-16 — `docs/memory/handoffs/G4_RUNBOOK_HOTSPOT.md` step 18, the "local behaviour unchanged when the overlay is absent" check — NEVER SCORED — that runbook
+
+## 2026-11-18 H7-V6b: a clean paused window on the bench — T88 MET, T89 MET; the flags off
+
+(`docs/memory/evidence/H7_V6B_2026-11-18.md`, `docs/memory/evidence/h7v6b_2026-11-18/`)
+
+- **Seen:** the list `[(2, True), (4, True)]`; each party launch's config `video_font_enable` /
+  `menu_show_load_content_animation` `"false"`; each preparation one `minigame_frame_advance` (`changed` / `paused`
+  true; T88 2 frames, mute 332 ms; T89 0 frames, 178 ms), `watching` with no `label_mask`, **`start` at the first read
+  (1.0 s)**, `prepare_s` 1.19-1.31 s; **GET_STATUS PAUSED at every second** from each watch row to its go; no route
+  before a go; no `minigame_reloaded`. T88 held 180 s, `remembered` / `already`, two practices by time, `end_P1` [1, 0],
+  `end_P2` [0, 1]; T89 one practice by time, places [1, 2, 3, 4], scores [4, 3, 2, 1], seats [3, 1, 4, 2]. The board
+  quit (exit 0); 228 files before = after; no SIGKILL.
+- **Noted:** step 5's window pictures not taken (A's grabber had no `DISPLAY`); a practice's way back runs 14 frames and
+  mutes the pads ~1.15 s (B140 compares against the practice's own last picture).
+- **OPEN:** PP-H3c (the user alone, two pads) may be offered; **the onn answers adb "unauthorized"** — to be trusted
+  again before PP-H3c.
 
 ## 2026-11-17 H7-D2: what the paused window shows — MET; T88 the mask, T89 the frames; the flags off
 
