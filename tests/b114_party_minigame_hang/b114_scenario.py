@@ -743,7 +743,7 @@ if args["mode"] == "cheat":
     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
     S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
     finish()
-if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "select151"):
     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
     n64 = args["n64_id"]
     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
@@ -904,8 +904,12 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
             S[tag + "_route_in"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
             S[tag + "_stream_on_title"] = stream.captured_pid == getattr(fake.get("ra"), "pid", None)
             pic.set(["start"] * 400)
+            bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)        # B151: Start reaches the title, the practice goes on
+            bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+            time.sleep(0.6)
+            S[tag + "_after_start"] = {k: res().get(k) for k in ("state", "practice")}
             if n < 2:
-                bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # the second pad's Start
+                bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: the second pad's Select
                 bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
             else:
                 layer.practice_s = 2.0                              # the practice's time alone (scaled)
@@ -921,6 +925,8 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
         b = wait_phase(lambda b: b.get("state") != "starting", 20)
         bridge._apply_report(0, 0x0010, 0, 0, 0, 0, 0, 0)
         bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
+        bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)            # B151: Select in a real one: nothing on the hub
+        bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
         time.sleep(1.0)
         S["p_real_after_start"] = {k: res().get(k) for k in ("state", "practice")}
         pic.set(["other"] * 3 + ["end_P2"] * 60)
@@ -939,7 +945,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
             wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
             if when == "way_back":
                 pic.set(["other"] * 400)                    # the way back's preparation runs on
-                bridge._apply_report(0, 0x0010, 0, 0, 0, 0, 0, 0)
+                bridge._apply_report(0, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: Select
                 bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
                 wait_phase(lambda b: b.get("phase") == "preparing", 10)
             if how == "board":
@@ -1081,7 +1087,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
         time.sleep(1.2)
         S["a2_switch_rows"] = switches_since(r0)
         S["a2_starts"] = [s0, len(STARTS)]
-        # five planned switches (and the end's way back): practice by Start, practice by time, a real go
+        # five planned switches (and the end's way back): practice by Select (B151), practice by time, a real go
         s0 = len(STARTS)
         r0 = held_start("a5", tok2, "1,2", ["start"] * 400)
         wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
@@ -1089,7 +1095,8 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
         call("POST", "/plugins/games/party-minigame-go?practice=1")
         wait_phase(lambda b: b.get("state") == "playing", 20)
         time.sleep(1.0)
-        bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)            # Start leaves the practice
+        bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)   # B151: Select leaves it (Start passes); the
+                                                                       # HEAD runs of this mode: Start, as before
         bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
         wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
         time.sleep(0.7)
@@ -1114,7 +1121,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
         S["b143_redundancy"] = [audio._redundancy_copies, audio._redundancy_offset_packets]
         S["b143_ffmpeg_fixture"] = "/fixture/ffmpeg"
         audio.stop()
-    if args["mode"] in ("nopress", "nopress_head"):
+    if args["mode"] in ("nopress", "nopress_head", "select151"):
         # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
         # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but
         # neutral reaches it (a pick on the select screen -> a fight); a frame advance runs one frame; its load puts the
@@ -1392,6 +1399,105 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
             press_case("x1", tok2, "1,2", [0, 1])
             PRESS["players"] = []
             press_case("x0", tok2, "1,2", [])
+        elif args["mode"] == "select151":
+            # B151: T89-shaped (four seats 3,1,4,2; its start screen left only by a press): a practice is left by a
+            # Select press on any pad; Start reaches the title; Select never does before a real go
+            layer.advance_gap_s = 0.06
+            SELB, STARTB = 0x0020, 0x0010
+
+            def tap(pl, bits, down_s=0.08):
+                bridge._apply_report(pl, bits, 0, 0, 0, 0, 0, 0)
+                time.sleep(down_s)
+                bridge._apply_report(pl, 0, 0, 0, 0, 0, 0, 0)
+
+            def practice_go():
+                g_ = call("POST", "/plugins/games/party-minigame-go?practice=1")["body"].get("go")
+                b_ = wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+                return g_, {k: b_.get(k) for k in ("state", "practice")}
+
+            def back_ready():
+                b_ = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+                return {k: b_.get(k) for k in ("state", "phase", "practices")}
+
+            def now_playing():
+                return {k: res().get(k) for k in ("state", "practice")}
+            st_dir = folder()
+            st_before = {p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}
+            r0 = held_start("s1", tok4, "3,1,4,2", ["s4other"])
+            S["s1_hold_seen"] = wait_until(lambda: bool(getattr(bridge, "_party_hold_select", False)), 10)
+            h0, v0_ = len(HOTKEYS), len(VP["log"])           # from the hold on: before the title's launch
+            S["s1_ready"] = back_ready()
+            # practice 1: Start from each pad -> the title's pads get it, the practice goes on; then pad 1's Select
+            t_go = time.monotonic()
+            S["s1_p1_go"] = practice_go()
+            vs_ = len(VP["log"])
+            for pl in range(4):
+                tap(pl, STARTB)
+                time.sleep(0.15)
+            time.sleep(0.6)
+            S["s1_after_starts"] = now_playing()
+            S["s1_start_written_to"] = sorted({x[1] for x in VP["log"][vs_:] if x[2] & STARTB})
+            S["s1_title_left_start_in_practice"] = any(e_[1] == "left_start" for e_ in EV if e_[0] >= t_go)
+            S["s1_route_in"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+            tap(0, SELB)
+            S["s1_p1_back"] = back_ready()
+            # practices 2-4: left by the Select of pads 2, 3, 4
+            for n, pl in ((2, 1), (3, 2), (4, 3)):
+                S[f"s1_p{n}_go"] = practice_go()
+                time.sleep(0.4)
+                S[f"s1_p{n}_before"] = now_playing()
+                tap(pl, SELB)
+                S[f"s1_p{n}_back"] = back_ready()
+            # practice 5: pad 3's Select already down at the hand-over (repeated reports) -> the practice goes on;
+            # let go -> still on; pressed again -> it ends
+            bridge._apply_report(2, SELB, 0, 0, 0, 0, 0, 0)
+            time.sleep(0.2)
+            S["s1_p5_go"] = practice_go()
+            for _ in range(4):
+                bridge._apply_report(2, SELB, 0, 0, 0, 0, 0, 0)
+                time.sleep(0.2)
+            S["s1_p5_held"] = now_playing()
+            bridge._apply_report(2, 0, 0, 0, 0, 0, 0, 0)
+            time.sleep(0.4)
+            S["s1_p5_let_go"] = now_playing()
+            tap(2, SELB)
+            S["s1_p5_back"] = back_ready()
+            # practice 6: Select + Start together on pad 4 -> left by Select; Start written alone; no hotkey
+            S["s1_p6_go"] = practice_go()
+            time.sleep(0.3)
+            v6_ = len(VP["log"])
+            tap(3, SELB | STARTB)
+            S["s1_p6_back"] = back_ready()
+            S["s1_p6_start_written"] = any(x[2] & STARTB for x in VP["log"][v6_:])
+            S["s1_title_alive"] = title_alive()
+            # practice 7: the time bound (scaled)
+            S["s1_p7_go"] = practice_go()
+            layer.practice_s = 1.0
+            S["s1_p7_back"] = back_ready()
+            layer.practice_s = 90.0
+            S["s1_end_by"] = [r.get("by") for r in rows()[r0:] if r["step"] == "minigame_practice_end"]
+            S["s1_select_written_before_real_go"] = sum(1 for x in VP["log"][v0_:] if x[2] & SELB)
+            S["s1_writes_before_real_go"] = len(VP["log"]) - v0_
+            S["s1_hotkeys_before_real_go"] = len(HOTKEYS) - h0
+            S["s1_states_same"] = ({p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}) == st_before
+            # a real go: Select and Start pass; nothing on the hub
+            S["s1_real_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+            wait_phase(lambda b: b.get("state") != "starting", 20)
+            v2_ = len(VP["log"])
+            tap(0, SELB)
+            tap(1, STARTB)
+            time.sleep(0.6)
+            S["s1_real_after"] = now_playing()
+            S["s1_real_select_written"] = sum(1 for x in VP["log"][v2_:] if x[2] & SELB)
+            S["s1_real_start_written"] = sum(1 for x in VP["log"][v2_:] if x[2] & STARTB)
+            S["s1_hook_in_real"] = getattr(bridge, "_party_buttons", None) is not None
+            fake["ra"].screen = "s4r2143"
+            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+            S["s1_real"] = {k: e.get(k) for k in ("state", "class", "places", "scores", "seats", "practices")}
+            finish_case("s1", r0)
+            S["s1_hook_after_end"] = getattr(bridge, "_party_buttons", None) is None
+            S["s1_held_after_end"] = bool(getattr(bridge, "_party_hold_select", False))
+            S["s1_seen_after_end"] = getattr(bridge, "_party_select_down", None)
         else:
             layer.advance_gap_s = 0.15                       # the mute long enough to see presses dropped in it
             # N1: T88-shaped, a confirm press from both players every 0.2 s from the start call to the go
@@ -1410,7 +1516,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
                 time.sleep(0.8)                              # practising: routed presses reach the title
                 ends.append(time.monotonic())
                 if n < 2:
-                    bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # Start on the second pad
+                    bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: Select on the second pad
                     bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
                 else:
                     layer.practice_s = 0.5
@@ -1483,7 +1589,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
                 wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
                 time.sleep(0.5)
                 ends_.append(time.monotonic())
-                bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)
+                bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: Select
                 bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
                 b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
                 S[f"vp_back{n + 1}"] = {k: b.get(k) for k in ("state", "phase", "practices")}
@@ -1528,7 +1634,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
             S["sl_hotkeys_before_practice"] = len(HOTKEYS) - h0
             call("POST", "/plugins/games/party-minigame-go?practice=1")
             wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
-            bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # Start leaves the practice
+            bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: Select leaves the practice
             bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
             wait_until(lambda: bool(getattr(bridge, "_party_hold_select", False)), 10)   # the way back under way
             h1, v1_ = len(HOTKEYS), len(VP["log"])
@@ -1584,7 +1690,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
             S["sp_writes_in_practice"] = len(VP["log"]) - v0_
             S["sp_select_written_in_practice"] = sum(1 for x in VP["log"][v0_:] if x[2] & 0x0020)
             S["sp_hotkeys_in_practice"] = len(HOTKEYS) - h0
-            bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)     # Select + Start: Start leaves the practice
+            bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)     # B151: Select leaves the practice (was Select + Start)
             bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
             b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
             S["sp_back"] = b.get("phase")

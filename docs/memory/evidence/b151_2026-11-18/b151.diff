@@ -1,0 +1,643 @@
+diff --git a/companion/native_session_io.py b/companion/native_session_io.py
+index cdaf6a8a..84e5d290 100644
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -1678,6 +1678,9 @@ class NativeControllerBridge:
+     # B141: while a party title is prepared or held behind the board, the pads' Select (RetroArch's hotkey button) is
+     # cleared from every report. Set only by the mini-game layer. False = today.
+     _party_hold_select = False
++    # B151: while Select is held, each onn player's raw Select (before the hold clears it): a practice is left by a
++    # Select press, and one already down at its hand-over does not count. Written only while the hold is on.
++    _party_select_down: dict[int, bool] | None = None
+ 
+     LINUX_VENDOR_ID = 0x1209
+     LINUX_PRODUCT_ID = 0x5048
+@@ -2358,11 +2361,15 @@ class NativeControllerBridge:
+         """B110: set (or clear, None) a party mini game's route; every pad written neutral first, so none is left
+         holding a button across the change."""
+         self._party_route = None
++        seen = self._party_select_down                        # B151: the neutral writes are not the players'
++        kept = dict(seen) if seen is not None else None
+         for index in range(len(self._gamepads)):
+             try:
+                 self._apply_report(index, 0, 0, 0, 0, 0, 0, 0)
+             except Exception:
+                 pass
++        if kept is not None and self._party_select_down is seen:
++            seen.update(kept)
+         self._party_route = dict(route) if route is not None else None
+ 
+     def party_mute(self, on: bool) -> None:
+@@ -2377,9 +2384,15 @@ class NativeControllerBridge:
+     def party_hold_select(self, on: bool) -> None:
+         """B141: on — every report's Select bit cleared until off (a pad holding Select is written once without it)."""
+         with self._meta_lock:
++            was = self._party_hold_select
+             self._party_hold_select = bool(on)
+             if not on:
++                self._party_select_down = None                # B151
+                 return
++            if not was:                                       # B151: off -> on (no route yet): the pads' Select now
++                self._party_select_down = {
++                    index: bool(last and int(last.get("buttons", 0)) & self.XUSB_BACK)
++                    for index, last in enumerate(self._last_reports[:len(self._gamepads)])}
+             for index in range(len(self._gamepads)):
+                 last = self._last_reports[index] if index < len(self._last_reports) else None
+                 if last and int(last.get("buttons", 0)) & self.XUSB_BACK:
+@@ -2395,6 +2408,11 @@ class NativeControllerBridge:
+                     except Exception:
+                         pass
+ 
++    def party_select_down(self, player: int) -> bool:
++        """B151: the onn player's Select as last seen while held (False: up, or not seen)."""
++        seen = self._party_select_down
++        return bool(seen is not None and seen.get(player, False))
++
+     def _apply_report(
+         self,
+         player: int,
+@@ -2415,6 +2433,9 @@ class NativeControllerBridge:
+                 pass
+         # B141: a party title prepared or held: Select (RetroArch's hotkey button) never reaches it
+         if self._party_hold_select:
++            seen = self._party_select_down                    # B151: the raw Select, kept for a practice's hook
++            if seen is not None:
++                seen[player] = bool(int(buttons) & self.XUSB_BACK)
+             buttons = int(buttons) & ~self.XUSB_BACK & 0xFFFF
+         # B110: a party mini game's route (None = today)
+         route = self._party_route
+diff --git a/companion/native_stream.py b/companion/native_stream.py
+index a088b074..e57a1d02 100644
+--- a/companion/native_stream.py
++++ b/companion/native_stream.py
+@@ -34,7 +34,7 @@ ENC_BUFSIZE_K_ENV = "PRIVYHUB_ENC_BUFSIZE_K"
+ # B144: a party practice's band across the top of the onn's picture (the encoder's own filter, after format=nv12 and
+ # before hwupload: the title's window is never drawn on). Only when the party layer arms a start for the practice's
+ # process (`party_banner_next`); every other start's command is byte for byte today's.
+-PARTY_BANNER_TEXT = "PRACTICE \u2014 press Start to go back"
++PARTY_BANNER_TEXT = "PRACTICE \u2014 press Select (Share) to go back"   # B151: Select leaves a practice
+ # B147: inside the frame's inner 90 % (the TV's overscan cut B144's band at the top edge): the box's top at h*5/100,
+ # as wide as the words (10 px above and below, 16 px to each side), centred — rows 36-85 of 720.
+ PARTY_BANNER_FILTER = (
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index ec765e9a..12c27595 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -57,9 +57,10 @@ point"). B141 — from a held title's launch to the go, and on every way back, t
+ hotkeys are pairs with Select); from the go on, as today.
+ B143 — every planned switch arms the audio sender: the new process's sound continues the last run's sequence and
+ timestamp (the app drops a frame behind what it has played: a new stream at sequence 0 was silent until it passed it).
+-B144 — a practice's switch arms the stream: the encoder draws "PRACTICE — press Start to go back" across the top of the
+-onn's picture (the title's window untouched); the way back's start takes it off. B145 — Select stays held through a
+-practice too, until a real go.
++B144 — a practice's switch arms the stream: the encoder draws the practice's band (B151: "PRACTICE — press Select (Share)
++to go back") on the onn's picture (the title's window untouched); the way back's start takes it off. B145 — Select stays
++held through a practice too, until a real go. B151 — a practice is left by a Select press on any pad (one already down
++at its hand-over counts only once let go and pressed again), or by its time; Start reaches the title as in a real one.
+ """
+ from __future__ import annotations
+ 
+@@ -107,8 +108,8 @@ STATE_REFUSED = {"save-state": "not during a mini game: nothing was saved",
+                  "load-state": "not during a mini game: nothing was loaded"}
+ _HEX64 = re.compile(r"^[0-9A-Fa-f]{64}$")
+ # B133 / B134: the title prepared behind the board, handed over on the board's go; practice
+-PRACTICE_S = 90.0          # a practice left after this long playing (or by the Start button on any pad)
+-XUSB_START = 0x0010        # the pad report's Start bit (native_session_io: XUSB_START)
++PRACTICE_S = 90.0          # a practice left after this long playing (or by the Select button on any pad, B151)
++XUSB_BACK = 0x0020         # the pad report's Select (Back / Share) bit (native_session_io: XUSB_BACK)
+ NO_GO = "no mini game is waiting for the go"
+ NOT_RECOGNISED = "the title's start screen was not recognised"
+ # B139: a party mini game's own launch writes these into its session config (RetroArch's on-screen text off: the
+@@ -757,7 +758,7 @@ class PartyMinigames:
+                                                                banner=bool(go["practice"]))):   # B144
+             mg["switched_to"] = "minigame"
+         if go["practice"] and bridge is not None:
+-            self._start_hook(mg, bridge)
++            self._select_hook(mg, bridge)
+         runner.label_mask(False)                            # B137: the title runs: no "Paused." to mask
+         self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))
+         mg["ran_since_begin"] = True
+@@ -772,16 +773,21 @@ class PartyMinigames:
+                   **({"practice": True, "n": mg["practices"] + 1} if go["practice"] else {})})
+         return bool(go["practice"])
+ 
+-    def _start_hook(self, mg: dict, bridge: Any) -> None:
+-        """B134: the Start button on any pad leaves a practice (the bridge's report hook; None again after)."""
++    def _select_hook(self, mg: dict, bridge: Any) -> None:
++        """B134 / B151: a Select press on any pad leaves a practice (the bridge's report hook; None again after). A
++        player's first state is its Select as the bridge last saw it, so one already down at the hand-over counts only
++        once let go and pressed again. Start is not looked at: it reaches the title."""
+         last: dict = {}
++        seen = getattr(bridge, "party_select_down", None)
+ 
+         def hook(player: int, buttons: int) -> None:
+-            down = bool(int(buttons) & XUSB_START)
+-            if down and not last.get(player, False):
++            down = bool(int(buttons) & XUSB_BACK)
++            if player not in last:
++                last[player] = bool(seen(player)) if callable(seen) else False
++            if down and not last[player]:
+                 with self._cond:
+                     if mg.get("practice") and mg["practice_end_by"] is None:
+-                        mg["practice_end_by"] = "start_button"
++                        mg["practice_end_by"] = "select_button"
+                         self._cond.notify_all()
+             last[player] = down
+         bridge._party_buttons = hook
+@@ -1167,7 +1173,7 @@ class PartyMinigames:
+         board = (mg.get("stash") or {}).get("process")
+         bridge = self._bridge()
+         if bridge is not None and getattr(bridge, "_party_buttons", None) is not None:
+-            bridge._party_buttons = None                  # B134: a practice's Start hook never outlives it
++            bridge._party_buttons = None                  # B134: a practice's Select hook (B151) never outlives it
+         if bridge is not None and getattr(bridge, "_party_mute", False):
+             bridge.party_mute(False)                      # B137: the mute never outlives the mini game
+         if bridge is not None and getattr(bridge, "_party_hold_select", False):
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index a3232195..922561fa 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -743,7 +743,7 @@ if args["mode"] == "cheat":
+     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
+     S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
+     finish()
+-if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
++if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "select151"):
+     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
+     n64 = args["n64_id"]
+     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+@@ -904,8 +904,12 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+             S[tag + "_route_in"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
+             S[tag + "_stream_on_title"] = stream.captured_pid == getattr(fake.get("ra"), "pid", None)
+             pic.set(["start"] * 400)
++            bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)        # B151: Start reaches the title, the practice goes on
++            bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
++            time.sleep(0.6)
++            S[tag + "_after_start"] = {k: res().get(k) for k in ("state", "practice")}
+             if n < 2:
+-                bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # the second pad's Start
++                bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: the second pad's Select
+                 bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+             else:
+                 layer.practice_s = 2.0                              # the practice's time alone (scaled)
+@@ -921,6 +925,8 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+         b = wait_phase(lambda b: b.get("state") != "starting", 20)
+         bridge._apply_report(0, 0x0010, 0, 0, 0, 0, 0, 0)
+         bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
++        bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)            # B151: Select in a real one: nothing on the hub
++        bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+         time.sleep(1.0)
+         S["p_real_after_start"] = {k: res().get(k) for k in ("state", "practice")}
+         pic.set(["other"] * 3 + ["end_P2"] * 60)
+@@ -939,7 +945,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+             wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+             if when == "way_back":
+                 pic.set(["other"] * 400)                    # the way back's preparation runs on
+-                bridge._apply_report(0, 0x0010, 0, 0, 0, 0, 0, 0)
++                bridge._apply_report(0, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: Select
+                 bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
+                 wait_phase(lambda b: b.get("phase") == "preparing", 10)
+             if how == "board":
+@@ -1081,7 +1087,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+         time.sleep(1.2)
+         S["a2_switch_rows"] = switches_since(r0)
+         S["a2_starts"] = [s0, len(STARTS)]
+-        # five planned switches (and the end's way back): practice by Start, practice by time, a real go
++        # five planned switches (and the end's way back): practice by Select (B151), practice by time, a real go
+         s0 = len(STARTS)
+         r0 = held_start("a5", tok2, "1,2", ["start"] * 400)
+         wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+@@ -1089,7 +1095,8 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+         call("POST", "/plugins/games/party-minigame-go?practice=1")
+         wait_phase(lambda b: b.get("state") == "playing", 20)
+         time.sleep(1.0)
+-        bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)            # Start leaves the practice
++        bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)   # B151: Select leaves it (Start passes); the
++                                                                       # HEAD runs of this mode: Start, as before
+         bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+         wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+         time.sleep(0.7)
+@@ -1114,7 +1121,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+         S["b143_redundancy"] = [audio._redundancy_copies, audio._redundancy_offset_packets]
+         S["b143_ffmpeg_fixture"] = "/fixture/ffmpeg"
+         audio.stop()
+-    if args["mode"] in ("nopress", "nopress_head"):
++    if args["mode"] in ("nopress", "nopress_head", "select151"):
+         # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
+         # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but
+         # neutral reaches it (a pick on the select screen -> a fight); a frame advance runs one frame; its load puts the
+@@ -1392,6 +1399,105 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+             press_case("x1", tok2, "1,2", [0, 1])
+             PRESS["players"] = []
+             press_case("x0", tok2, "1,2", [])
++        elif args["mode"] == "select151":
++            # B151: T89-shaped (four seats 3,1,4,2; its start screen left only by a press): a practice is left by a
++            # Select press on any pad; Start reaches the title; Select never does before a real go
++            layer.advance_gap_s = 0.06
++            SELB, STARTB = 0x0020, 0x0010
++
++            def tap(pl, bits, down_s=0.08):
++                bridge._apply_report(pl, bits, 0, 0, 0, 0, 0, 0)
++                time.sleep(down_s)
++                bridge._apply_report(pl, 0, 0, 0, 0, 0, 0, 0)
++
++            def practice_go():
++                g_ = call("POST", "/plugins/games/party-minigame-go?practice=1")["body"].get("go")
++                b_ = wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
++                return g_, {k: b_.get(k) for k in ("state", "practice")}
++
++            def back_ready():
++                b_ = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++                return {k: b_.get(k) for k in ("state", "phase", "practices")}
++
++            def now_playing():
++                return {k: res().get(k) for k in ("state", "practice")}
++            st_dir = folder()
++            st_before = {p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}
++            r0 = held_start("s1", tok4, "3,1,4,2", ["s4other"])
++            S["s1_hold_seen"] = wait_until(lambda: bool(getattr(bridge, "_party_hold_select", False)), 10)
++            h0, v0_ = len(HOTKEYS), len(VP["log"])           # from the hold on: before the title's launch
++            S["s1_ready"] = back_ready()
++            # practice 1: Start from each pad -> the title's pads get it, the practice goes on; then pad 1's Select
++            t_go = time.monotonic()
++            S["s1_p1_go"] = practice_go()
++            vs_ = len(VP["log"])
++            for pl in range(4):
++                tap(pl, STARTB)
++                time.sleep(0.15)
++            time.sleep(0.6)
++            S["s1_after_starts"] = now_playing()
++            S["s1_start_written_to"] = sorted({x[1] for x in VP["log"][vs_:] if x[2] & STARTB})
++            S["s1_title_left_start_in_practice"] = any(e_[1] == "left_start" for e_ in EV if e_[0] >= t_go)
++            S["s1_route_in"] = {str(k): v for k, v in (bridge._party_route or {}).items()}
++            tap(0, SELB)
++            S["s1_p1_back"] = back_ready()
++            # practices 2-4: left by the Select of pads 2, 3, 4
++            for n, pl in ((2, 1), (3, 2), (4, 3)):
++                S[f"s1_p{n}_go"] = practice_go()
++                time.sleep(0.4)
++                S[f"s1_p{n}_before"] = now_playing()
++                tap(pl, SELB)
++                S[f"s1_p{n}_back"] = back_ready()
++            # practice 5: pad 3's Select already down at the hand-over (repeated reports) -> the practice goes on;
++            # let go -> still on; pressed again -> it ends
++            bridge._apply_report(2, SELB, 0, 0, 0, 0, 0, 0)
++            time.sleep(0.2)
++            S["s1_p5_go"] = practice_go()
++            for _ in range(4):
++                bridge._apply_report(2, SELB, 0, 0, 0, 0, 0, 0)
++                time.sleep(0.2)
++            S["s1_p5_held"] = now_playing()
++            bridge._apply_report(2, 0, 0, 0, 0, 0, 0, 0)
++            time.sleep(0.4)
++            S["s1_p5_let_go"] = now_playing()
++            tap(2, SELB)
++            S["s1_p5_back"] = back_ready()
++            # practice 6: Select + Start together on pad 4 -> left by Select; Start written alone; no hotkey
++            S["s1_p6_go"] = practice_go()
++            time.sleep(0.3)
++            v6_ = len(VP["log"])
++            tap(3, SELB | STARTB)
++            S["s1_p6_back"] = back_ready()
++            S["s1_p6_start_written"] = any(x[2] & STARTB for x in VP["log"][v6_:])
++            S["s1_title_alive"] = title_alive()
++            # practice 7: the time bound (scaled)
++            S["s1_p7_go"] = practice_go()
++            layer.practice_s = 1.0
++            S["s1_p7_back"] = back_ready()
++            layer.practice_s = 90.0
++            S["s1_end_by"] = [r.get("by") for r in rows()[r0:] if r["step"] == "minigame_practice_end"]
++            S["s1_select_written_before_real_go"] = sum(1 for x in VP["log"][v0_:] if x[2] & SELB)
++            S["s1_writes_before_real_go"] = len(VP["log"]) - v0_
++            S["s1_hotkeys_before_real_go"] = len(HOTKEYS) - h0
++            S["s1_states_same"] = ({p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}) == st_before
++            # a real go: Select and Start pass; nothing on the hub
++            S["s1_real_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
++            wait_phase(lambda b: b.get("state") != "starting", 20)
++            v2_ = len(VP["log"])
++            tap(0, SELB)
++            tap(1, STARTB)
++            time.sleep(0.6)
++            S["s1_real_after"] = now_playing()
++            S["s1_real_select_written"] = sum(1 for x in VP["log"][v2_:] if x[2] & SELB)
++            S["s1_real_start_written"] = sum(1 for x in VP["log"][v2_:] if x[2] & STARTB)
++            S["s1_hook_in_real"] = getattr(bridge, "_party_buttons", None) is not None
++            fake["ra"].screen = "s4r2143"
++            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++            S["s1_real"] = {k: e.get(k) for k in ("state", "class", "places", "scores", "seats", "practices")}
++            finish_case("s1", r0)
++            S["s1_hook_after_end"] = getattr(bridge, "_party_buttons", None) is None
++            S["s1_held_after_end"] = bool(getattr(bridge, "_party_hold_select", False))
++            S["s1_seen_after_end"] = getattr(bridge, "_party_select_down", None)
+         else:
+             layer.advance_gap_s = 0.15                       # the mute long enough to see presses dropped in it
+             # N1: T88-shaped, a confirm press from both players every 0.2 s from the start call to the go
+@@ -1410,7 +1516,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+                 time.sleep(0.8)                              # practising: routed presses reach the title
+                 ends.append(time.monotonic())
+                 if n < 2:
+-                    bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # Start on the second pad
++                    bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: Select on the second pad
+                     bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+                 else:
+                     layer.practice_s = 0.5
+@@ -1483,7 +1589,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+                 wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+                 time.sleep(0.5)
+                 ends_.append(time.monotonic())
+-                bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)
++                bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: Select
+                 bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+                 b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+                 S[f"vp_back{n + 1}"] = {k: b.get(k) for k in ("state", "phase", "practices")}
+@@ -1528,7 +1634,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+             S["sl_hotkeys_before_practice"] = len(HOTKEYS) - h0
+             call("POST", "/plugins/games/party-minigame-go?practice=1")
+             wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+-            bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)    # Start leaves the practice
++            bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)    # B151: Select leaves the practice
+             bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+             wait_until(lambda: bool(getattr(bridge, "_party_hold_select", False)), 10)   # the way back under way
+             h1, v1_ = len(HOTKEYS), len(VP["log"])
+@@ -1584,7 +1690,7 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+             S["sp_writes_in_practice"] = len(VP["log"]) - v0_
+             S["sp_select_written_in_practice"] = sum(1 for x in VP["log"][v0_:] if x[2] & 0x0020)
+             S["sp_hotkeys_in_practice"] = len(HOTKEYS) - h0
+-            bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)     # Select + Start: Start leaves the practice
++            bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)     # B151: Select leaves the practice (was Select + Start)
+             bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+             b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+             S["sp_back"] = b.get("phase")
+diff --git a/tests/b134_party_practice/test_b134.py b/tests/b134_party_practice/test_b134.py
+index 05f531ee..b4061674 100644
+--- a/tests/b134_party_practice/test_b134.py
++++ b/tests/b134_party_practice/test_b134.py
+@@ -4,10 +4,11 @@ behind PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
+ 
+ B114's scenario, its `practice` mode (B133's harness): the list with the fixture's made-up names; a held start, then
+ **three practices** — `party-minigame-go?practice=1` → `playing` with `"practice": true`, an end screen shown in it
+-changing nothing, the pads routed and the stream on the title; **the second pad's Start** (a controller report through
+-the bridge) leaves the first two, **the practice time** (scaled) the third → back to `"starting"`, `"ready"`,
+-`"practices": n`, the route cleared, the stream on the board, no scores — then **a real go**, Start in it doing nothing
+-on the hub, scored as today; **no name in any row**; the board's end and the onn's Home / END during a practice and
++changing nothing, the pads routed and the stream on the title; **a Start press in each changing nothing** (B151: it
++reaches the title); **the second pad's Select** (B151; was Start — a controller report through the bridge) leaves the
++first two, **the practice time** (scaled) the third → back to `"starting"`, `"ready"`,
++`"practices": n`, the route cleared, the stream on the board, no scores — then **a real go**, Start and Select in it
++doing nothing on the hub, scored as today; **no name in any row**; the board's end and the onn's Home / END during a practice and
+ during its way back → given up, nothing scored, the title gone, the Start hook cleared. The flags absent → HEAD's
+ answers (B133's test). Temp dirs removed.
+ 
+@@ -52,12 +53,13 @@ class Practice(unittest.TestCase):
+                              {"state": "playing", "practice": True, "scores": None, "class": None}, tag)
+             self.assertEqual(self.s[tag + "_route_in"], {"0": 0, "1": 1}, tag)
+             self.assertTrue(self.s[tag + "_stream_on_title"], tag)
++            self.assertEqual(self.s[tag + "_after_start"], {"state": "playing", "practice": True}, tag)   # B151
+             self.assertEqual(self.s[tag + "_back"], {"state": "starting", "phase": "ready", "practices": n,
+                                                     "scores": None}, tag)
+             self.assertIsNone(self.s[tag + "_route_back"], tag)
+             self.assertTrue(self.s[tag + "_stream_on_board"], tag)
+         ends = [r.get("by") for r in self.s["p_end_rows"] if r["step"] == "minigame_practice_end"]
+-        self.assertEqual(ends, ["start_button", "start_button", "time"])
++        self.assertEqual(ends, ["select_button", "select_button", "time"])                              # B151
+ 
+     def test_2_then_a_real_go_start_does_nothing_scored_as_today(self):
+         self.assertEqual(self.s["p_real_go"]["practice"], False)
+diff --git a/tests/b144_party_practice_banner/test_b144.py b/tests/b144_party_practice_banner/test_b144.py
+index d357dcfc..d2999166 100644
+--- a/tests/b144_party_practice_banner/test_b144.py
++++ b/tests/b144_party_practice_banner/test_b144.py
+@@ -3,7 +3,7 @@
+ 
+ The user at PP-H3c: "it's hard to tell if we're in practice since they have the same screen so maybe a hub side banner
+ at the top (unless that messes with the vision model)". B144: while a practice plays, the encoder's own filter draws
+-"PRACTICE — press Start to go back" across the top of the stream's picture (after format=nv12, before hwupload); the
++"PRACTICE — press Select (Share) to go back" (B151; was "… press Start …") across the top of the stream's picture (after format=nv12, before hwupload); the
+ title's window is never drawn on (the watcher reads the window, not the stream).
+ 
+ - **The encoder's commands** (B143's `b143` mode of B114's scenario: the real routes, the real
+@@ -37,7 +37,7 @@ sys.path.insert(0, str(ROOT / "tests" / "b143_party_audio_switch"))
+ sys.path.insert(0, str(ROOT / "companion"))
+ import test_b143 as b143  # noqa: E402  (its scenario runner; its tests are not collected here)
+ 
+-BANNER_TEXT = "PRACTICE — press Start to go back"
++BANNER_TEXT = "PRACTICE — press Select (Share) to go back"   # B151
+ 
+ 
+ def vf_of(argv: list) -> str:
+diff --git a/tests/b145_party_small_things/test_b145.py b/tests/b145_party_small_things/test_b145.py
+index d457866d..6d0f8777 100644
+--- a/tests/b145_party_small_things/test_b145.py
++++ b/tests/b145_party_small_things/test_b145.py
+@@ -8,8 +8,9 @@ still loaded / saved over a slot of the users' cheat setup. B145: Select is held
+ B114's scenario, its `nopress` mode (B137's fake title reads the virtual pads and logs every poll that sees Select with
+ a paired button; B141's cases first): a held start, a practice; **while it plays, Select + L1 / R1 / R3 from all four
+ pads every 0.2 s → the virtual pads written, none with Select; the fake's hotkey log empty; its state folder
+-byte-equal**; the practice left by Select + Start (Start passes: `start_button`, the title not quit); a real go → Select
+-alone written; the hold off after it and after the end. HEAD's code (the mutation, run by the record): the same
++byte-equal** — B151: the first of those pairs leaves the practice (`select_button`: Select is the way out now), the
++pairs going on through its way back; a Select press after it changes nothing (was: Select + Start left it,
++`start_button`); the title not quit; a real go → Select alone written; the hold off after it and after the end. HEAD's code (the mutation, run by the record): the same
+ presses in a practice reach the fake. Temp dirs removed.
+ 
+     python3 -m unittest discover -s tests/b145_party_small_things -v
+@@ -54,7 +55,7 @@ class SelectThroughPractice(unittest.TestCase):
+     def test_2_select_start_leaves_the_practice_without_quitting(self):
+         s = self.s
+         self.assertEqual(s["sp_back"], "ready")
+-        self.assertEqual(s["sp_end_by"], ["start_button"])
++        self.assertEqual(s["sp_end_by"], ["select_button"])          # B151
+         self.assertTrue(s["sp_title_alive"])
+         self.assertEqual(s["sp_hotkeys_total"], 0)
+ 
+diff --git a/tests/b147_party_band_inside/test_b147.py b/tests/b147_party_band_inside/test_b147.py
+index 5bee4589..92d88019 100644
+--- a/tests/b147_party_band_inside/test_b147.py
++++ b/tests/b147_party_band_inside/test_b147.py
+@@ -3,7 +3,8 @@
+ 
+ PP-H3d, the user: "The practice band was there (maybe a little too high, it was partially cut off)". The app fits the
+ whole 16:9 frame to its full-screen surface (no crop, no zoom): the cut is the TV's overscan. B147: the same words, the
+-box's top at h*5/100, as wide as the words — rows 36-85 of 720, columns 379-899 on the 720p profile.
++box's top at h*5/100, as wide as the words — rows 36-85 of 720, columns 379-899 on the 720p profile (B151's longer
++words "PRACTICE — press Select (Share) to go back": columns 318-960).
+ 
+ - **The commands** (B143's `b143` scenario of B114's harness, mine and HEAD's): the two practices' commands carry the
+   new band (its `y=h*5/100+10`, `boxborderw=10|16|10|16`); the real goes', the ways back' and the onn's own start's
+@@ -11,7 +12,8 @@ box's top at h*5/100, as wide as the words — rows 36-85 of 720, columns 379-89
+ - **The output frame** (no display needed): a made-up 4:3 picture as the source of the practice command's own `-vf`
+   (`hwupload` swapped for an RGB frame out) against the same chain without the band: the rows above h*5/100 and the
+   columns within w*5/100 of either side equal within 2 grey levels (B144's bound); the changed rows inside 36-90;
+-  every changed pixel inside the inner 90 %; the box only as wide as the words (< half the frame); the text's white
++  every changed pixel inside the inner 90 %; the box only as wide as the words (B151: inside a centred 4:3 picture's
++  columns; was < half the frame, which the longer words pass by 3 px); the text's white
+   pixels in it. The same at the 1080 rung's size.
+ - The flags absent: B114's flag test (run with the suites). Temp dirs removed.
+ 
+@@ -95,7 +97,9 @@ class OutputFrame(unittest.TestCase):
+                 self.assertLessEqual(int(np.abs(a[:top] - b[:top]).max()), 2)  # above: the source's own, within 2
+                 self.assertLessEqual(int(np.abs(a[:, :side] - b[:, :side]).max()), 2)
+                 self.assertLessEqual(int(np.abs(a[:, w - side:] - b[:, w - side:]).max()), 2)
+-                self.assertLess(int(xs.max() - xs.min() + 1), w // 2, (w, h))  # as wide as the words, not the frame
++                pic = (w - h * 4 // 3) // 2                                     # B151: as wide as the words, inside
++                self.assertGreaterEqual(int(xs.min()), pic, (w, h))             # a centred 4:3 picture's columns
++                self.assertLessEqual(int(xs.max()), w - pic - 1, (w, h))
+                 box = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+                 self.assertGreater(int((box > 200).sum()), 300)                 # the text's white pixels
+                 if (w, h) == (1280, 720):
+diff --git a/tests/b151_party_select_leaves/test_b151.py b/tests/b151_party_select_leaves/test_b151.py
+new file mode 100644
+index 00000000..cbbaf421
+--- /dev/null
++++ b/tests/b151_party_select_leaves/test_b151.py
+@@ -0,0 +1,150 @@
++#!/usr/bin/env python3
++"""B151 (host): a practice is left by Select, not Start — through the real HTTP server on loopback, behind
++PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
++
++T89 goes on from its character screen only with Start, which B134 took as "leave the practice": a T89 practice would
++end the moment anyone tried to start the fight. The user's choice: the pad's Select (Share) leaves a practice in every
++game; Start goes to the game as in a real one.
++
++B114's scenario, its `select151` mode (B137's fake title and virtual pads; T89-shaped: four seats 3,1,4,2, its start
++screen left only by a press): a held start; **practice 1: Start from each of the four pads → still playing, the
++title's four pads written with Start, the title off its start screen; then pad 1's Select → back, ready**; practices
++2-4 left by the Select of pads 2, 3, 4; **practice 5: pad 3's Select already down at the hand-over (its reports
++repeated) → the practice goes on; let go → on; pressed again → it ends**; practice 6: Select + Start together → left
++by Select, Start written alone, no hotkey; practice 7: the time (scaled) → `"by": "time"`; **from the hold to the real
++go no virtual pad written with Select, the hotkey log empty, the state folder byte-equal**; a real go: Select and Start
++pass, nothing on the hub, scored as today; every end clears the hook, the hold and the bridge's record.
++The bridge's own record (`_party_select_down`): untouched with the hold off; seeded at off → on; not re-seeded on → on.
++The band's words. The flags absent: B114's / B133's tests (run with the suites). Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b151_party_select_leaves -v
++"""
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b114_party_minigame_hang", "b124_party_four_seats"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++sys.path.insert(0, str(ROOT / "companion"))
++import test_b114 as b114  # noqa: E402  (its harness; its tests are not collected here)
++import test_b124 as b124  # noqa: E402
++
++PLAYING = {"state": "playing", "practice": True}
++
++
++class SelectLeaves(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b114.b99.tree()
++        b124.IDS.clear()
++        b124.IDS.update(ids)
++        cls.s = b114.run(root, b114.BOTH, ids, "select151", extra=b124.extra)["steps"]
++
++    def test_0_held_and_ready(self):
++        self.assertTrue(self.s["s1_hold_seen"])
++        self.assertEqual(self.s["s1_ready"]["phase"], "ready")
++
++    def test_1_start_in_a_practice_reaches_the_title_and_the_practice_goes_on(self):
++        s = self.s
++        self.assertEqual(s["s1_p1_go"], ["taken", PLAYING])
++        self.assertEqual(s["s1_after_starts"], PLAYING)
++        self.assertEqual(s["s1_start_written_to"], [0, 1, 2, 3])          # every seated pad's Start, routed
++        self.assertTrue(s["s1_title_left_start_in_practice"])             # T89-shaped: Start begins the fight
++        self.assertEqual(s["s1_route_in"], {"2": 0, "0": 1, "3": 2, "1": 3})
++
++    def test_2_a_select_press_on_each_pad_leaves_a_practice(self):
++        s = self.s
++        for n in (1, 2, 3, 4):
++            self.assertEqual(s[f"s1_p{n}_back"], {"state": "starting", "phase": "ready", "practices": n}, n)
++        for n in (2, 3, 4):
++            self.assertEqual(s[f"s1_p{n}_before"], PLAYING, n)
++        self.assertEqual(s["s1_end_by"][:4], ["select_button"] * 4)
++
++    def test_3_a_select_held_across_the_hand_over_counts_only_when_pressed_again(self):
++        s = self.s
++        self.assertEqual(s["s1_p5_go"], ["taken", PLAYING])
++        self.assertEqual(s["s1_p5_held"], PLAYING)
++        self.assertEqual(s["s1_p5_let_go"], PLAYING)
++        self.assertEqual(s["s1_p5_back"]["practices"], 5)
++        self.assertEqual(s["s1_end_by"][4], "select_button")
++
++    def test_4_select_with_start_leaves_by_select_start_passes_alone(self):
++        s = self.s
++        self.assertEqual(s["s1_p6_back"]["practices"], 6)
++        self.assertEqual(s["s1_end_by"][5], "select_button")
++        self.assertTrue(s["s1_p6_start_written"])
++        self.assertTrue(s["s1_title_alive"])
++
++    def test_5_the_time_bound_still_ends_one(self):
++        self.assertEqual(self.s["s1_p7_back"]["practices"], 7)
++        self.assertEqual(self.s["s1_end_by"], ["select_button"] * 6 + ["time"])
++
++    def test_6_select_in_no_report_the_title_gets_before_a_real_go(self):
++        s = self.s
++        self.assertGreater(s["s1_writes_before_real_go"], 20)
++        self.assertEqual(s["s1_select_written_before_real_go"], 0)
++        self.assertEqual(s["s1_hotkeys_before_real_go"], 0)
++        self.assertTrue(s["s1_states_same"])
++
++    def test_7_a_real_go_as_today(self):
++        s = self.s
++        self.assertEqual(s["s1_real_go"], "taken")
++        self.assertEqual(s["s1_real_after"], {"state": "playing", "practice": None})
++        self.assertGreaterEqual(s["s1_real_select_written"], 1)            # Select passes from the real go on
++        self.assertGreaterEqual(s["s1_real_start_written"], 1)
++        self.assertFalse(s["s1_hook_in_real"])
++        self.assertEqual(s["s1_real"], {"state": "ended", "class": "end", "places": [2, 1, 4, 3],
++                                        "scores": [3, 4, 1, 2], "seats": [3, 1, 4, 2], "practices": 7})
++
++    def test_8_every_end_clears_the_hook_the_hold_and_the_record(self):
++        self.assertTrue(self.s["s1_hook_after_end"])
++        self.assertFalse(self.s["s1_held_after_end"])
++        self.assertIsNone(self.s["s1_seen_after_end"])
++
++
++class BridgeRecord(unittest.TestCase):
++    def test_the_raw_select_kept_only_while_held(self):
++        import native_session_io as nsio
++        b = nsio.NativeControllerBridge(Path(HERE / "_unused"))
++        b._gamepads = ["P1", "P2", "P3", "P4"]
++        b._controller_backend = "linux_uinput"
++        seen = []
++        b._write_linux_report_locked = lambda index, report, *a, **k: seen.append((index, report["buttons"]))
++        self.assertIsNone(b._party_select_down)                           # today
++        b._apply_report(2, 0x0020, 0, 0, 0, 0, 0, 0)
++        self.assertIsNone(b._party_select_down)                           # the hold off: nothing kept
++        self.assertEqual(seen[-1], (2, 0x0020))
++        b.party_hold_select(True)                                         # off -> on: seeded from the last reports
++        self.assertEqual(b._party_select_down, {0: False, 1: False, 2: True, 3: False})
++        self.assertTrue(b.party_select_down(2))
++        self.assertEqual(seen[-1], (2, 0))                                # B141: written once without it
++        b._apply_report(2, 0, 0, 0, 0, 0, 0, 0)
++        self.assertFalse(b.party_select_down(2))
++        b._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)
++        self.assertTrue(b.party_select_down(1))
++        self.assertEqual(seen[-1], (1, 0x0010))                           # Select cleared, Start written
++        b.set_party_route({0: 3})
++        b.party_hold_select(True)                                         # on -> on: not seeded again
++        self.assertTrue(b.party_select_down(1))
++        b.set_party_route(None)
++        b.party_hold_select(False)
++        self.assertIsNone(b._party_select_down)
++        self.assertFalse(b.party_select_down(1))
++        b._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)
++        self.assertEqual(seen[-1], (1, 0x0020))                           # today again
++
++
++class Band(unittest.TestCase):
++    def test_the_words(self):
++        import native_stream as ns
++        self.assertEqual(ns.PARTY_BANNER_TEXT, "PRACTICE — press Select (Share) to go back")
++        self.assertIn("text='PRACTICE — press Select (Share) to go back'", ns.PARTY_BANNER_FILTER)
++        self.assertIn("y=h*5/100+10:box=1:boxcolor=black@0.72:boxborderw=10|16|10|16", ns.PARTY_BANNER_FILTER)
++
++
++if __name__ == "__main__":
++    unittest.main()

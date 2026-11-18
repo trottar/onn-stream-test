@@ -8,8 +8,9 @@ still loaded / saved over a slot of the users' cheat setup. B145: Select is held
 B114's scenario, its `nopress` mode (B137's fake title reads the virtual pads and logs every poll that sees Select with
 a paired button; B141's cases first): a held start, a practice; **while it plays, Select + L1 / R1 / R3 from all four
 pads every 0.2 s → the virtual pads written, none with Select; the fake's hotkey log empty; its state folder
-byte-equal**; the practice left by Select + Start (Start passes: `start_button`, the title not quit); a real go → Select
-alone written; the hold off after it and after the end. HEAD's code (the mutation, run by the record): the same
+byte-equal** — B151: the first of those pairs leaves the practice (`select_button`: Select is the way out now), the
+pairs going on through its way back; a Select press after it changes nothing (was: Select + Start left it,
+`start_button`); the title not quit; a real go → Select alone written; the hold off after it and after the end. HEAD's code (the mutation, run by the record): the same
 presses in a practice reach the fake. Temp dirs removed.
 
     python3 -m unittest discover -s tests/b145_party_small_things -v
@@ -54,7 +55,7 @@ class SelectThroughPractice(unittest.TestCase):
     def test_2_select_start_leaves_the_practice_without_quitting(self):
         s = self.s
         self.assertEqual(s["sp_back"], "ready")
-        self.assertEqual(s["sp_end_by"], ["start_button"])
+        self.assertEqual(s["sp_end_by"], ["select_button"])          # B151
         self.assertTrue(s["sp_title_alive"])
         self.assertEqual(s["sp_hotkeys_total"], 0)
 

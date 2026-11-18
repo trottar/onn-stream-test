@@ -1678,6 +1678,9 @@ class NativeControllerBridge:
     # B141: while a party title is prepared or held behind the board, the pads' Select (RetroArch's hotkey button) is
     # cleared from every report. Set only by the mini-game layer. False = today.
     _party_hold_select = False
+    # B151: while Select is held, each onn player's raw Select (before the hold clears it): a practice is left by a
+    # Select press, and one already down at its hand-over does not count. Written only while the hold is on.
+    _party_select_down: dict[int, bool] | None = None
 
     LINUX_VENDOR_ID = 0x1209
     LINUX_PRODUCT_ID = 0x5048
@@ -2358,11 +2361,15 @@ class NativeControllerBridge:
         """B110: set (or clear, None) a party mini game's route; every pad written neutral first, so none is left
         holding a button across the change."""
         self._party_route = None
+        seen = self._party_select_down                        # B151: the neutral writes are not the players'
+        kept = dict(seen) if seen is not None else None
         for index in range(len(self._gamepads)):
             try:
                 self._apply_report(index, 0, 0, 0, 0, 0, 0, 0)
             except Exception:
                 pass
+        if kept is not None and self._party_select_down is seen:
+            seen.update(kept)
         self._party_route = dict(route) if route is not None else None
 
     def party_mute(self, on: bool) -> None:
@@ -2377,9 +2384,15 @@ class NativeControllerBridge:
     def party_hold_select(self, on: bool) -> None:
         """B141: on — every report's Select bit cleared until off (a pad holding Select is written once without it)."""
         with self._meta_lock:
+            was = self._party_hold_select
             self._party_hold_select = bool(on)
             if not on:
+                self._party_select_down = None                # B151
                 return
+            if not was:                                       # B151: off -> on (no route yet): the pads' Select now
+                self._party_select_down = {
+                    index: bool(last and int(last.get("buttons", 0)) & self.XUSB_BACK)
+                    for index, last in enumerate(self._last_reports[:len(self._gamepads)])}
             for index in range(len(self._gamepads)):
                 last = self._last_reports[index] if index < len(self._last_reports) else None
                 if last and int(last.get("buttons", 0)) & self.XUSB_BACK:
@@ -2394,6 +2407,11 @@ class NativeControllerBridge:
                         self._last_reports[index] = report
                     except Exception:
                         pass
+
+    def party_select_down(self, player: int) -> bool:
+        """B151: the onn player's Select as last seen while held (False: up, or not seen)."""
+        seen = self._party_select_down
+        return bool(seen is not None and seen.get(player, False))
 
     def _apply_report(
         self,
@@ -2415,6 +2433,9 @@ class NativeControllerBridge:
                 pass
         # B141: a party title prepared or held: Select (RetroArch's hotkey button) never reaches it
         if self._party_hold_select:
+            seen = self._party_select_down                    # B151: the raw Select, kept for a practice's hook
+            if seen is not None:
+                seen[player] = bool(int(buttons) & self.XUSB_BACK)
             buttons = int(buttons) & ~self.XUSB_BACK & 0xFFFF
         # B110: a party mini game's route (None = today)
         route = self._party_route

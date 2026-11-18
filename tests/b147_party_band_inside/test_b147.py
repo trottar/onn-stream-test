@@ -3,7 +3,8 @@
 
 PP-H3d, the user: "The practice band was there (maybe a little too high, it was partially cut off)". The app fits the
 whole 16:9 frame to its full-screen surface (no crop, no zoom): the cut is the TV's overscan. B147: the same words, the
-box's top at h*5/100, as wide as the words — rows 36-85 of 720, columns 379-899 on the 720p profile.
+box's top at h*5/100, as wide as the words — rows 36-85 of 720, columns 379-899 on the 720p profile (B151's longer
+words "PRACTICE — press Select (Share) to go back": columns 318-960).
 
 - **The commands** (B143's `b143` scenario of B114's harness, mine and HEAD's): the two practices' commands carry the
   new band (its `y=h*5/100+10`, `boxborderw=10|16|10|16`); the real goes', the ways back' and the onn's own start's
@@ -11,7 +12,8 @@ box's top at h*5/100, as wide as the words — rows 36-85 of 720, columns 379-89
 - **The output frame** (no display needed): a made-up 4:3 picture as the source of the practice command's own `-vf`
   (`hwupload` swapped for an RGB frame out) against the same chain without the band: the rows above h*5/100 and the
   columns within w*5/100 of either side equal within 2 grey levels (B144's bound); the changed rows inside 36-90;
-  every changed pixel inside the inner 90 %; the box only as wide as the words (< half the frame); the text's white
+  every changed pixel inside the inner 90 %; the box only as wide as the words (B151: inside a centred 4:3 picture's
+  columns; was < half the frame, which the longer words pass by 3 px); the text's white
   pixels in it. The same at the 1080 rung's size.
 - The flags absent: B114's flag test (run with the suites). Temp dirs removed.
 
@@ -95,7 +97,9 @@ class OutputFrame(unittest.TestCase):
                 self.assertLessEqual(int(np.abs(a[:top] - b[:top]).max()), 2)  # above: the source's own, within 2
                 self.assertLessEqual(int(np.abs(a[:, :side] - b[:, :side]).max()), 2)
                 self.assertLessEqual(int(np.abs(a[:, w - side:] - b[:, w - side:]).max()), 2)
-                self.assertLess(int(xs.max() - xs.min() + 1), w // 2, (w, h))  # as wide as the words, not the frame
+                pic = (w - h * 4 // 3) // 2                                     # B151: as wide as the words, inside
+                self.assertGreaterEqual(int(xs.min()), pic, (w, h))             # a centred 4:3 picture's columns
+                self.assertLessEqual(int(xs.max()), w - pic - 1, (w, h))
                 box = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
                 self.assertGreater(int((box > 200).sum()), 300)                 # the text's white pixels
                 if (w, h) == (1280, 720):

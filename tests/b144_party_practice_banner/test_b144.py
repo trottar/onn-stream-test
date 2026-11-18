@@ -3,7 +3,7 @@
 
 The user at PP-H3c: "it's hard to tell if we're in practice since they have the same screen so maybe a hub side banner
 at the top (unless that messes with the vision model)". B144: while a practice plays, the encoder's own filter draws
-"PRACTICE — press Start to go back" across the top of the stream's picture (after format=nv12, before hwupload); the
+"PRACTICE — press Select (Share) to go back" (B151; was "… press Start …") across the top of the stream's picture (after format=nv12, before hwupload); the
 title's window is never drawn on (the watcher reads the window, not the stream).
 
 - **The encoder's commands** (B143's `b143` mode of B114's scenario: the real routes, the real
@@ -37,7 +37,7 @@ sys.path.insert(0, str(ROOT / "tests" / "b143_party_audio_switch"))
 sys.path.insert(0, str(ROOT / "companion"))
 import test_b143 as b143  # noqa: E402  (its scenario runner; its tests are not collected here)
 
-BANNER_TEXT = "PRACTICE — press Start to go back"
+BANNER_TEXT = "PRACTICE — press Select (Share) to go back"   # B151
 
 
 def vf_of(argv: list) -> str:

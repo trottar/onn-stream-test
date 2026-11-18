@@ -34,7 +34,7 @@ ENC_BUFSIZE_K_ENV = "PRIVYHUB_ENC_BUFSIZE_K"
 # B144: a party practice's band across the top of the onn's picture (the encoder's own filter, after format=nv12 and
 # before hwupload: the title's window is never drawn on). Only when the party layer arms a start for the practice's
 # process (`party_banner_next`); every other start's command is byte for byte today's.
-PARTY_BANNER_TEXT = "PRACTICE \u2014 press Start to go back"
+PARTY_BANNER_TEXT = "PRACTICE \u2014 press Select (Share) to go back"   # B151: Select leaves a practice
 # B147: inside the frame's inner 90 % (the TV's overscan cut B144's band at the top edge): the box's top at h*5/100,
 # as wide as the words (10 px above and below, 16 px to each side), centred — rows 36-85 of 720.
 PARTY_BANNER_FILTER = (

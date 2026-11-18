@@ -4,10 +4,11 @@ behind PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
 
 B114's scenario, its `practice` mode (B133's harness): the list with the fixture's made-up names; a held start, then
 **three practices** — `party-minigame-go?practice=1` → `playing` with `"practice": true`, an end screen shown in it
-changing nothing, the pads routed and the stream on the title; **the second pad's Start** (a controller report through
-the bridge) leaves the first two, **the practice time** (scaled) the third → back to `"starting"`, `"ready"`,
-`"practices": n`, the route cleared, the stream on the board, no scores — then **a real go**, Start in it doing nothing
-on the hub, scored as today; **no name in any row**; the board's end and the onn's Home / END during a practice and
+changing nothing, the pads routed and the stream on the title; **a Start press in each changing nothing** (B151: it
+reaches the title); **the second pad's Select** (B151; was Start — a controller report through the bridge) leaves the
+first two, **the practice time** (scaled) the third → back to `"starting"`, `"ready"`,
+`"practices": n`, the route cleared, the stream on the board, no scores — then **a real go**, Start and Select in it
+doing nothing on the hub, scored as today; **no name in any row**; the board's end and the onn's Home / END during a practice and
 during its way back → given up, nothing scored, the title gone, the Start hook cleared. The flags absent → HEAD's
 answers (B133's test). Temp dirs removed.
 
@@ -52,12 +53,13 @@ class Practice(unittest.TestCase):
                              {"state": "playing", "practice": True, "scores": None, "class": None}, tag)
             self.assertEqual(self.s[tag + "_route_in"], {"0": 0, "1": 1}, tag)
             self.assertTrue(self.s[tag + "_stream_on_title"], tag)
+            self.assertEqual(self.s[tag + "_after_start"], {"state": "playing", "practice": True}, tag)   # B151
             self.assertEqual(self.s[tag + "_back"], {"state": "starting", "phase": "ready", "practices": n,
                                                     "scores": None}, tag)
             self.assertIsNone(self.s[tag + "_route_back"], tag)
             self.assertTrue(self.s[tag + "_stream_on_board"], tag)
         ends = [r.get("by") for r in self.s["p_end_rows"] if r["step"] == "minigame_practice_end"]
-        self.assertEqual(ends, ["start_button", "start_button", "time"])
+        self.assertEqual(ends, ["select_button", "select_button", "time"])                              # B151
 
     def test_2_then_a_real_go_start_does_nothing_scored_as_today(self):
         self.assertEqual(self.s["p_real_go"]["practice"], False)

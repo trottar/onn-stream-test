@@ -57,9 +57,10 @@ point"). B141 — from a held title's launch to the go, and on every way back, t
 hotkeys are pairs with Select); from the go on, as today.
 B143 — every planned switch arms the audio sender: the new process's sound continues the last run's sequence and
 timestamp (the app drops a frame behind what it has played: a new stream at sequence 0 was silent until it passed it).
-B144 — a practice's switch arms the stream: the encoder draws "PRACTICE — press Start to go back" across the top of the
-onn's picture (the title's window untouched); the way back's start takes it off. B145 — Select stays held through a
-practice too, until a real go.
+B144 — a practice's switch arms the stream: the encoder draws the practice's band (B151: "PRACTICE — press Select (Share)
+to go back") on the onn's picture (the title's window untouched); the way back's start takes it off. B145 — Select stays
+held through a practice too, until a real go. B151 — a practice is left by a Select press on any pad (one already down
+at its hand-over counts only once let go and pressed again), or by its time; Start reaches the title as in a real one.
 """
 from __future__ import annotations
 
@@ -107,8 +108,8 @@ STATE_REFUSED = {"save-state": "not during a mini game: nothing was saved",
                  "load-state": "not during a mini game: nothing was loaded"}
 _HEX64 = re.compile(r"^[0-9A-Fa-f]{64}$")
 # B133 / B134: the title prepared behind the board, handed over on the board's go; practice
-PRACTICE_S = 90.0          # a practice left after this long playing (or by the Start button on any pad)
-XUSB_START = 0x0010        # the pad report's Start bit (native_session_io: XUSB_START)
+PRACTICE_S = 90.0          # a practice left after this long playing (or by the Select button on any pad, B151)
+XUSB_BACK = 0x0020         # the pad report's Select (Back / Share) bit (native_session_io: XUSB_BACK)
 NO_GO = "no mini game is waiting for the go"
 NOT_RECOGNISED = "the title's start screen was not recognised"
 # B139: a party mini game's own launch writes these into its session config (RetroArch's on-screen text off: the
@@ -757,7 +758,7 @@ class PartyMinigames:
                                                                banner=bool(go["practice"]))):   # B144
             mg["switched_to"] = "minigame"
         if go["practice"] and bridge is not None:
-            self._start_hook(mg, bridge)
+            self._select_hook(mg, bridge)
         runner.label_mask(False)                            # B137: the title runs: no "Paused." to mask
         self._step(mg, "resume", lambda: self._emu_call(mg, emu.resume))
         mg["ran_since_begin"] = True
@@ -772,16 +773,21 @@ class PartyMinigames:
                   **({"practice": True, "n": mg["practices"] + 1} if go["practice"] else {})})
         return bool(go["practice"])
 
-    def _start_hook(self, mg: dict, bridge: Any) -> None:
-        """B134: the Start button on any pad leaves a practice (the bridge's report hook; None again after)."""
+    def _select_hook(self, mg: dict, bridge: Any) -> None:
+        """B134 / B151: a Select press on any pad leaves a practice (the bridge's report hook; None again after). A
+        player's first state is its Select as the bridge last saw it, so one already down at the hand-over counts only
+        once let go and pressed again. Start is not looked at: it reaches the title."""
         last: dict = {}
+        seen = getattr(bridge, "party_select_down", None)
 
         def hook(player: int, buttons: int) -> None:
-            down = bool(int(buttons) & XUSB_START)
-            if down and not last.get(player, False):
+            down = bool(int(buttons) & XUSB_BACK)
+            if player not in last:
+                last[player] = bool(seen(player)) if callable(seen) else False
+            if down and not last[player]:
                 with self._cond:
                     if mg.get("practice") and mg["practice_end_by"] is None:
-                        mg["practice_end_by"] = "start_button"
+                        mg["practice_end_by"] = "select_button"
                         self._cond.notify_all()
             last[player] = down
         bridge._party_buttons = hook
@@ -1167,7 +1173,7 @@ class PartyMinigames:
         board = (mg.get("stash") or {}).get("process")
         bridge = self._bridge()
         if bridge is not None and getattr(bridge, "_party_buttons", None) is not None:
-            bridge._party_buttons = None                  # B134: a practice's Start hook never outlives it
+            bridge._party_buttons = None                  # B134: a practice's Select hook (B151) never outlives it
         if bridge is not None and getattr(bridge, "_party_mute", False):
             bridge.party_mute(False)                      # B137: the mute never outlives the mini game
         if bridge is not None and getattr(bridge, "_party_hold_select", False):
