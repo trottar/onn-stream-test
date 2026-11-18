@@ -1,0 +1,727 @@
+diff --git a/companion/audio_codec.py b/companion/audio_codec.py
+index 8244990..a625074 100644
+--- a/companion/audio_codec.py
++++ b/companion/audio_codec.py
+@@ -230,12 +230,13 @@ def run_opus_sender(streamer: Any, session: OpusSession, client_ip: str, client_
+     streamer._linux_pacing_frame = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame"
+     streamer._linux_pacing_frame_spin = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame_spin"
+     sock = sock_factory() if sock_factory is not None else socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
++    # B143: this run's token and its start ((0, 0) = today; a party's planned switch continues the last run's)
++    run = streamer._audio_run = object()
++    sequence, sample_timestamp = getattr(streamer, "_audio_start", (0, 0))
+     try:
+         if sock_factory is None:
+             sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 64 * 1024)
+             sock.setblocking(False)
+-        sequence = 0
+-        sample_timestamp = 0
+         copies = streamer._redundancy_copies
+         offset = copy_offset_packets(streamer._redundancy_offset_packets, session.frame_ms)
+         history: deque[bytes] = deque(maxlen=offset + 1)
+@@ -279,6 +280,9 @@ def run_opus_sender(streamer: Any, session: OpusSession, client_ip: str, client_
+             sequence = (sequence + 1) & 0xFFFF
+             sample_timestamp = (sample_timestamp + frame_samples) & 0xFFFFFFFF
+     finally:
++        note = getattr(streamer, "_audio_note_sent", None)   # B143: where this run stopped
++        if note is not None:
++            note(run, sequence, sample_timestamp)
+         encoder.close()
+         try:
+             sock.close()
+diff --git a/companion/native_session_io.py b/companion/native_session_io.py
+index 79faa6b..cdaf6a8 100644
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -145,6 +145,12 @@ class NativeAudioStreamer:
+         self._linux_sender_scheduler_priority = 0
+         self._linux_sender_scheduler_error = ""
+         self._linux_log_path = self.log_dir / "native_pulseaudio.log"
++        # B143: where the last sender run stopped ((next sequence, next timestamp), written by that run at its end),
++        # the next run's start (0, 0 = today) and the party layer's arm (the pid of the next start that continues).
++        self._audio_sent_next: tuple[int, int] | None = None
++        self._audio_start: tuple[int, int] = (0, 0)
++        self._audio_run: object | None = None
++        self._party_continue_pid: int | None = None
+ 
+     @staticmethod
+     def _kill_process(
+@@ -350,6 +356,26 @@ class NativeAudioStreamer:
+ 
+         return False
+ 
++    def party_continue_next(self, pid: int | None) -> None:
++        """B143: a party mini game's planned switch — the next audio start for process `pid` continues the last sender
++        run's sequence and timestamp (the app plays in sequence order and drops what is behind what it has played);
++        None disarms. Nothing else arms it: every other start begins at 0 as today."""
++        self._party_continue_pid = None if pid is None else int(pid)
++
++    def _audio_start_counters(self, process_id: int) -> tuple[int, int]:
++        """B143: once per start, after the old run is stopped — the recorded (sequence, timestamp) when armed for this
++        process and one is recorded, else (0, 0); the arm and the record cleared either way."""
++        armed, self._party_continue_pid = self._party_continue_pid, None
++        last, self._audio_sent_next = self._audio_sent_next, None
++        if armed is not None and armed == int(process_id) and last is not None:
++            return (int(last[0]) & 0xFFFF, int(last[1]) & 0xFFFFFFFF)
++        return (0, 0)
++
++    def _audio_note_sent(self, run: object, sequence: int, sample_timestamp: int) -> None:
++        """B143: a sender run's end — where it stopped, only if it is still the current run."""
++        if self._audio_run is run:
++            self._audio_sent_next = (int(sequence) & 0xFFFF, int(sample_timestamp) & 0xFFFFFFFF)
++
+     def set_redundancy(self, copies: int, offset_packets: int) -> None:
+         """D-BASE-P10: send each audio datagram `copies` times, the copy
+         `offset_packets` ticks after the original. Read by the Linux sender
+@@ -475,6 +501,8 @@ class NativeAudioStreamer:
+             socket.AF_INET,
+             socket.SOCK_DGRAM,
+         )
++        run = self._audio_run = object()   # B143: this run's token
++        sequence, sample_timestamp = getattr(self, "_audio_start", (0, 0))
+ 
+         try:
+             sock.setsockopt(
+@@ -484,8 +512,6 @@ class NativeAudioStreamer:
+             )
+             sock.setblocking(False)
+ 
+-            sequence = 0
+-            sample_timestamp = 0
+             # D-BASE-P10: the last `offset` + 1 datagrams, so tick n can send
+             # the copy of packet n - offset right after packet n. The pacer's
+             # deadline is untouched; a copy is a second sendto in the tick.
+@@ -574,6 +600,7 @@ class NativeAudioStreamer:
+                     + self.LINUX_FRAMES_PER_PACKET
+                 ) & 0xFFFFFFFF
+         finally:
++            self._audio_note_sent(run, sequence, sample_timestamp)   # B143
+             try:
+                 sock.close()
+             except OSError:
+@@ -933,6 +960,7 @@ class NativeAudioStreamer:
+ 
+         self._linux_pactl = pactl
+         self._target_pid = process_id
++        self._audio_start = self._audio_start_counters(process_id)   # B143: (0, 0) unless a planned switch armed it
+         self._client_ip = client_ip
+         self._client_port = int(client_port)
+         self._linux_stop_event.clear()
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 30419ef..71b6784 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -55,6 +55,11 @@ B140 — after the paused load, frames in ADVANCE_STEPS with a grab after each,
+ from its pre-load picture (or the start is read); never → given up at once ("the title did not show its starting
+ point"). B141 — from a held title's launch to the go, and on every way back, the pads' Select is not passed (RetroArch's
+ hotkeys are pairs with Select); from the go on, as today.
++B143 — every planned switch arms the audio sender: the new process's sound continues the last run's sequence and
++timestamp (the app drops a frame behind what it has played: a new stream at sequence 0 was silent until it passed it).
++B144 — a practice's switch arms the stream: the encoder draws "PRACTICE — press Start to go back" across the top of the
++onn's picture (the title's window untouched); the way back's start takes it off. B145 — Select stays held through a
++practice too, until a real go.
+ """
+ from __future__ import annotations
+ 
+@@ -474,12 +479,14 @@ class PartyMinigames:
+         seq = ps.open(which, self.switch_limit_s + PLANNED_GRACE_S)
+         t0 = self.clock()
+         ns = self.p._native_stream
++        self._arm_switch(ns, int(pid))                       # B143: the new process's sound continues the old's
+ 
+         def go():
+             return ns.start(client_ip=str(args["client_ip"]), port=int(args["port"]), managed_process_id=int(pid))
+         try:
+             done, res = self._bounded(go, self.switch_limit_s)
+         finally:
++            self._arm_switch(ns, None)
+             until = ps.close_after(seq, PLANNED_GRACE_S)
+             threading.Thread(target=self._window_row, args=(ps, seq, until), daemon=True,
+                              name="party-minigame-window").start()
+@@ -496,6 +503,15 @@ class PartyMinigames:
+                   "seconds": round(self.clock() - t0, 3)})
+         return True
+ 
++    @staticmethod
++    def _arm_switch(ns: Any, pid: int | None) -> None:
++        """B143: the audio sender's next start for `pid` continues the last run's sequence and timestamp (None: disarmed).
++        A stream without the arm (a stub, an old object): nothing."""
++        audio = getattr(getattr(ns, "_session_io", None), "audio", None)
++        arm = getattr(audio, "party_continue_next", None)
++        if callable(arm):
++            arm(pid)
++
+     def _window_row(self, ps: PlannedSwitch, seq: int, until: float | None) -> None:
+         if until is not None:
+             time.sleep(max(0.0, until - self.clock()) + 0.05)
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index 6066d0a..32599e3 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -743,7 +743,7 @@ if args["mode"] == "cheat":
+     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
+     S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
+     finish()
+-if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
++if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
+     n64 = args["n64_id"]
+     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+@@ -957,6 +957,163 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+                 call("POST", "/plugins/games/native-stream-start?port=48100")
+                 client.in_stream = True
+                 call("POST", "/plugins/games/native-stream-ready")
++    if args["mode"] == "b143":
++        # B143 / B144: behind the stub's own start, the real stream start (`_start_linux_locked` on G8-S2's stubbed
++        # manager: nothing spawned, the encoder's command recorded) and the real audio streamer (Opus, as the hub runs
++        # it; pactl answered by stubs, the capture a made-up process writing silence at the real rate) sending to a
++        # socket on loopback — the onn's audio as it arrives: [t, sequence, version, timestamp] per datagram.
++        import socket as socket_, struct as struct_, importlib.util as ilu_
++        import native_stream as nsm, native_session_io as nsio_, audio_codec as ac_
++        spec_ = ilu_.find_spec("subprocess")                # the harness replaced subprocess.Popen (its fake title):
++        sp_ = ilu_.module_from_spec(spec_); spec_.loader.exec_module(sp_)   # a fresh copy for the made-up capture
++
++        class _Alive:
++            def is_dir(self):
++                return True
++
++        def _alias_path(*a_):                               # the fake title's pid has no /proc entry: alive for the
++            if len(a_) == 1 and str(a_[0]) == "/proc/999999999":   # stream's and the audio's own checks
++                return _Alive()
++            return Path(*a_)
++        nsm.Path = _alias_path
++        nsio_.Path = _alias_path
++        sys.path.insert(0, args["start_rung"])
++        import stub_manager as stubm
++        rx = socket_.socket(socket_.AF_INET, socket_.SOCK_DGRAM)
++        rx.bind(("127.0.0.1", 0)); rx.settimeout(0.2)
++        AP = rx.getsockname()[1]
++        DG = []
++
++        def rx_loop():
++            while watching["on"]:
++                try:
++                    d_ = rx.recv(2048)
++                except OSError:
++                    continue
++                if len(d_) >= 16 and d_[:4] == b"PHA1":
++                    _m, v_, _c, sq_, ts_, _f = struct_.unpack_from("<4sBBHII", d_)
++                    DG.append([round(time.monotonic() - T0, 4), sq_, v_, ts_])
++        threading.Thread(target=rx_loop, daemon=True).start()
++        PCM = ("import sys,time\nb=bytes(1920)\nt=time.monotonic()\nwhile True:\n t+=0.01\n"
++               " time.sleep(max(0,t-time.monotonic()))\n sys.stdout.buffer.write(b); sys.stdout.buffer.flush()\n")
++
++        class _SP:
++            PIPE, DEVNULL, STDOUT = sp_.PIPE, sp_.DEVNULL, sp_.STDOUT
++
++            def __getattr__(self, n):
++                return getattr(sp_, n)
++
++            @staticmethod
++            def Popen(cmd, **kw):
++                return sp_.Popen([sys.executable, "-c", PCM], stdout=sp_.PIPE, stdin=sp_.DEVNULL, stderr=sp_.DEVNULL,
++                                 bufsize=0)
++        nsio_.subprocess = _SP()
++        nsio_.AUDIO_CODEC = ac_.from_environ_fresh({"PRIVYHUB_AUDIO_CODEC": "opus"}, log=lambda *a_: None)
++        _fake_popen, subprocess.Popen = subprocess.Popen, sp_.Popen     # libopus found (ctypes asks ldconfig) with
++        try:                                                          # the real Popen, once
++            ac_.libopus()
++        finally:
++            subprocess.Popen = _fake_popen
++        audio = nsio_.NativeAudioStreamer(root / "b143_audio")
++        audio._linux_run_pactl = lambda *a_, **k_: types.SimpleNamespace(returncode=0, stdout="7\n", stderr="")
++        audio._linux_pactl_json = lambda *a_: ([{"name": audio._linux_sink_name, "index": 3,
++                                                 "monitor_source_name": "fixture.monitor"}] if a_[-1] == "sinks"
++                                               else [{"index": 5, "sink": 3}])
++        audio._linux_find_owned_sink_inputs = lambda pid_: [{"index": 5, "sink": 0}]
++        threading.excepthook = lambda a_: S.setdefault("b143_thread_exc", []).append(   # a worker's death, kept
++            f"{a_.exc_type.__name__}: {a_.exc_value}"[:300])
++        real = stubm.stub_manager(nsm, [])
++        shutil.rmtree(real.project_root, ignore_errors=True)
++        real.project_root = root / "b143_stream"; real.data_dir = real.project_root / "data"
++        real.log_dir = real.project_root / "logs"; real.log_path = real.log_dir / "native_video_alpha.log"
++
++        def sio_start(ffmpeg, client_ip, audio_port, input_port, process_id):
++            audio._audio_codec_opus = ac_.OpusSession(128, 10)        # as the codec's prepare (the onn declared opus)
++            return audio.start(ffmpeg=Path(sys.executable), client_ip="127.0.0.1", client_port=AP,
++                               process_id=process_id)
++        real._session_io = types.SimpleNamespace(stop_stream=audio.stop, start=sio_start, audio=audio)
++        nsm.subprocess = types.SimpleNamespace(Popen=lambda argv, **k_: stubm.FakeProc(argv), DEVNULL=-3, STDOUT=-2)
++        stream._session_io.audio = audio
++        if hasattr(nsm.NativeStreamManager, "party_banner_next"):
++            type(stream).party_banner_next = lambda self_, pid_: real.party_banner_next(pid_)
++        STARTS = []
++        stub_start = stream.start
++
++        def start_real(client_ip=None, port=None, managed_process_id=None):
++            r_ = stub_start(client_ip, port, managed_process_id)
++            with stream._lock:
++                t_stop = round(time.monotonic() - T0, 4)
++                try:
++                    real._start_linux_locked(client_ip="127.0.0.1", port=48100,
++                                             managed_process_id=int(managed_process_id))
++                except Exception as exc_:
++                    c_ = exc_.__cause__ or exc_.__context__
++                    S.setdefault("b143_errors", []).append(f"{type(exc_).__name__}: {exc_}"[:300]
++                                                           + (f" ({type(c_).__name__}: {c_})"[:300] if c_ else ""))
++                    raise
++                STARTS.append({"pid": int(managed_process_id), "board": int(managed_process_id) == board_pid_now(),
++                               "t_stop": t_stop, "t_up": round(time.monotonic() - T0, 4),
++                               "argv": list(real._encoder_command or []),
++                               "audio_start": list(getattr(audio, "_audio_start", (0, 0)))})
++            return r_
++        stream.start = start_real
++
++        def switches_since(r0):
++            return [{k: v for k, v in r.items() if k in ("window", "switched", "planned", "why")} for r in rows()[r0:]
++                    if r["step"] == "minigame_stream"]
++        n_ = len(STARTS)
++        board_up("b143")                                    # a fresh board: its stream a users' start (the onn's)
++        S["b143_board_up"] = [n_, len(STARTS), S.get("b143_board_launch")]
++        S["b143_users_start"] = list(STARTS[-1]["audio_start"]) if STARTS else None
++        time.sleep(1.0)
++        # two planned switches: a real go and its end
++        s0 = len(STARTS)
++        r0 = held_start("a2", tok2, "1,2", ["start"] * 400)
++        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++        time.sleep(0.8)
++        S["a2_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
++        wait_phase(lambda b: b.get("state") != "starting", 20)
++        time.sleep(1.4)
++        pic.set(["end_P1"] * 400)
++        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++        S["a2"] = {k: e.get(k) for k in ("state", "class", "scores")}
++        finish_case("a2", r0)
++        time.sleep(1.2)
++        S["a2_switch_rows"] = switches_since(r0)
++        S["a2_starts"] = [s0, len(STARTS)]
++        # five planned switches (and the end's way back): practice by Start, practice by time, a real go
++        s0 = len(STARTS)
++        r0 = held_start("a5", tok2, "1,2", ["start"] * 400)
++        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++        time.sleep(0.6)
++        call("POST", "/plugins/games/party-minigame-go?practice=1")
++        wait_phase(lambda b: b.get("state") == "playing", 20)
++        time.sleep(1.0)
++        bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)            # Start leaves the practice
++        bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
++        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++        time.sleep(0.7)
++        call("POST", "/plugins/games/party-minigame-go?practice=1")
++        wait_phase(lambda b: b.get("state") == "playing", 20)
++        layer.practice_s = 1.6                                         # the practice's time alone (scaled)
++        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++        layer.practice_s = 90.0
++        time.sleep(0.9)
++        S["a5_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
++        wait_phase(lambda b: b.get("state") != "starting", 20)
++        time.sleep(1.2)
++        pic.set(["end_P1"] * 400)
++        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++        S["a5"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
++        finish_case("a5", r0)
++        time.sleep(1.2)
++        S["a5_switch_rows"] = switches_since(r0)
++        S["a5_starts"] = [s0, len(STARTS)]
++        S["b143_starts"] = STARTS
++        S["b143_dg"] = DG
++        S["b143_redundancy"] = [audio._redundancy_copies, audio._redundancy_offset_packets]
++        S["b143_ffmpeg_fixture"] = "/fixture/ffmpeg"
++        audio.stop()
+     if args["mode"] in ("nopress", "nopress_head"):
+         # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
+         # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but
+diff --git a/tests/b143_party_audio_switch/receiver_model.py b/tests/b143_party_audio_switch/receiver_model.py
+new file mode 100644
+index 0000000..213ae3a
+--- /dev/null
++++ b/tests/b143_party_audio_switch/receiver_model.py
+@@ -0,0 +1,126 @@
++"""B143: the onn's audio receive rule, modelled from the app's source (the app is not changed; nothing here runs on it).
++
++Ported line for line (PrivyHub/app/src/main/java/streaming/):
++- `NativeAudioReceiver.receiveLoop` (lines 1101-1225): the PHA1 magic, then version, channels, the 16-bit sequence;
++  the sample timestamp is read and skipped (`header.int // sample timestamp`, line 1204); version 2 → `receiveOpus`.
++- `NativeAudioReceiver.receiveOpus` (lines 1418-1549): the de-duplication by `seenSequences[sequence & 63]`
++  (lines 1434-1444, SEEN_WINDOW 64, line 167), then `OpusReorder.offer` with k = `OpusFraming.copyOffsetFrames`.
++- `OpusReorder` (OpusFraming.kt lines 76-170): `offer` (101-135) — the first frame starts the run (102-107); a frame
++  more than half the 16-bit space behind `next` is LATE (110); 64 or more ahead a JUMP (111-119); a duplicate in the
++  window (122); else in order / recovered (123-134); `drain` (145-163) releases `next` when held, gives it up as lost
++  once a frame more than k ahead has arrived; `flush` (166-169).
++- `OpusFraming.copyOffsetFrames` (46-50).
++
++`Receiver.feed(t, seq)` returns the frames released by that datagram: [(seq, played)] — played False for a frame given
++up as lost. A released frame goes to the decoder and the PCM queue at once; the playback loop takes it within one 5-ms
++poll (`STARVATION_POLL_MS`, line 185).
++"""
++from __future__ import annotations
++
++SEEN_WINDOW = 64
++SEEN_WINDOW_MASK = SEEN_WINDOW - 1
++
++
++def copy_offset_frames(copies: int, offset_pcm_packets: int, frame_samples: int) -> int:
++    if copies < 2:
++        return 0
++    frame_ms = frame_samples * 1000 // 48_000
++    return max(1, int(round(offset_pcm_packets * 5.0 / frame_ms)))
++
++
++class OpusReorder:
++    IN_ORDER, RECOVERED, LATE, DUPLICATE, JUMP = "in_order", "recovered", "late", "duplicate", "jump"
++
++    def __init__(self, window: int = 64):
++        self.window = window
++        self.slots: list = [None] * window
++        self.slot_seq = [-1] * window
++        self.next = -1
++        self.highest = -1
++        self.held = 0
++
++    @staticmethod
++    def ahead(a: int, b: int) -> int:
++        return (a - b) & 0xFFFF
++
++    def offer(self, seq: int, payload, k: int, emit, on_jump=lambda n: None):
++        if self.next < 0:
++            self.next = seq
++            self.highest = seq
++            self._store(seq, payload)
++            self._drain(k, emit)
++            return self.IN_ORDER, 0
++        behind_next = self.ahead(seq, self.next)
++        if behind_next > 32767:
++            return self.LATE, 0
++        if behind_next >= self.window:
++            self.flush(emit)
++            skipped = self.ahead(seq, self.highest) - 1
++            on_jump(max(0, skipped))
++            self.next = seq
++            self.highest = seq
++            self._store(seq, payload)
++            self._drain(k, emit)
++            return self.JUMP, max(0, skipped)
++        idx = seq % self.window
++        if self.slot_seq[idx] == seq:
++            return self.DUPLICATE, 0
++        past_highest = self.ahead(seq, self.highest)
++        if 1 <= past_highest <= 32767:
++            kind, gap = self.IN_ORDER, past_highest - 1
++            self.highest = seq
++        else:
++            kind, gap = self.RECOVERED, 0
++        self._store(seq, payload)
++        self._drain(k, emit)
++        return kind, gap
++
++    def _store(self, seq, payload):
++        idx = seq % self.window
++        self.slots[idx] = payload
++        self.slot_seq[idx] = seq
++        self.held += 1
++
++    def _drain(self, k, emit):
++        while True:
++            distance = self.ahead(self.highest, self.next)
++            if distance > 32767:
++                return
++            idx = self.next % self.window
++            if self.slot_seq[idx] == self.next:
++                p = self.slots[idx]
++                self.slots[idx] = None
++                self.slot_seq[idx] = -1
++                self.held -= 1
++                emit(self.next, p)
++            elif distance > k:
++                emit(self.next, None)
++            else:
++                return
++            self.next = (self.next + 1) & 0xFFFF
++
++    def flush(self, emit):
++        if self.next < 0:
++            return
++        self._drain(-1, emit)
++
++
++class Receiver:
++    """One client session's receiver (a new one per client session, as the app builds one per session)."""
++
++    def __init__(self, copies: int = 2, offset_pcm_packets: int = 4, frame_samples: int = 480):
++        self.seen = [-1] * SEEN_WINDOW
++        self.reorder = OpusReorder(SEEN_WINDOW)
++        self.k = copy_offset_frames(copies, offset_pcm_packets, frame_samples)
++        self.counts = {"late": 0, "duplicate": 0, "jump": 0, "in_order": 0, "recovered": 0, "dedup": 0}
++
++    def feed(self, seq: int) -> list[tuple[int, bool]]:
++        slot = seq & SEEN_WINDOW_MASK
++        if self.seen[slot] == seq:
++            self.counts["dedup"] += 1
++            return []
++        self.seen[slot] = seq
++        out: list[tuple[int, bool]] = []
++        kind, _gap = self.reorder.offer(seq, b"x", self.k, lambda s, p: out.append((s, p is not None)))
++        self.counts[kind] += 1
++        return out
+diff --git a/tests/b143_party_audio_switch/test_b143.py b/tests/b143_party_audio_switch/test_b143.py
+new file mode 100644
+index 0000000..558eefd
+--- /dev/null
++++ b/tests/b143_party_audio_switch/test_b143.py
+@@ -0,0 +1,257 @@
++#!/usr/bin/env python3
++"""B143 (host): the sound across a party's planned switch — through the real HTTP server on loopback.
++
++PP-H3c's second sitting: after every planned switch the onn's audio queue stayed empty for as long as the longest
++stretch already played in that client session. The hub's sender began every stream at sequence 0 and the app drops a
++frame behind what it has played (`OpusReorder.offer`, LATE), so the new process's sound was not played until its own
++count passed the old one's. B143: a planned switch continues the audio's sequence and timestamp.
++
++B114's harness, its `b143` mode: the real routes (a held start, the go, practices by Start and by time, the board's
++end) drive the real `PartyMinigames._switch_stream`; behind the stream stub's own start, the real
++`NativeStreamManager._start_linux_locked` (G8-S2's stubbed manager, nothing spawned) and the real
++`NativeAudioStreamer` (Opus, as the hub runs it; pactl answered by stubs; the capture a made-up process writing silence
++at the real rate) send to a UDP socket on loopback. The datagrams are fed to `receiver_model.Receiver` (the app's rule,
++ported line for line). **Two planned switches, then five (and the end's way back): after every one, the first frame
++the modelled app releases comes ≤ BOUND_MS after the new stream's first datagram; every new frame released; the
++sequence continuous.** HEAD's code (its companion from git, the same scenario): the silent stretches (each new stream
++silent until its count passes the furthest played). A users' start: sequence 0, timestamp 0, its datagrams byte for
++byte HEAD's (`UsersStart`). Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b143_party_audio_switch -v
++"""
++from __future__ import annotations
++
++import os
++import subprocess
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "b114_party_minigame_hang"))
++sys.path.insert(0, str(ROOT / "tests" / "b124_party_four_seats"))
++sys.path.insert(0, str(HERE))
++import test_b114 as b114  # noqa: E402  (its harness; its tests are not collected here)
++import test_b124 as b124  # noqa: E402
++import receiver_model as rm  # noqa: E402
++
++BASELINE = "246c67da"            # queue AX's baseline: the companion before B143-B145
++BOUND_MS = 50.0                  # the design's bound: the new stream's first datagram → the first frame released
++
++
++def extra(work, frames):
++    return {**b124.extra(work, frames), "start_rung": str(ROOT / "tests" / "start_rung")}
++
++
++def run_mode(code_rev: str | None) -> dict:
++    code = b114.code_of(code_rev) if code_rev else None
++    if code_rev and code is None:
++        raise unittest.SkipTest("git is absent")
++    root, ids = b114.b99.tree(code)
++    b124.IDS.clear()
++    b124.IDS.update(ids)
++    return b114.run(root, b114.BOTH, ids, "b143", extra=extra)["steps"]
++
++
++def analyse(s: dict) -> dict:
++    """The datagrams through the modelled receiver (one client session: the board's stream started it); for every
++    planned switch (a start that is not the session's first): the new stream's first datagram, the first frame the
++    model released after it, the silent stretch in ms, and whether the sequence went on."""
++    starts = s["b143_starts"]
++    copies, offset = s["b143_redundancy"]
++    rec = rm.Receiver(copies=copies, offset_pcm_packets=offset, frame_samples=480)
++    dg = sorted(s["b143_dg"], key=lambda d: d[0])
++    released: list[tuple[float, int]] = []
++    for t, seq, _v, _ts in dg:
++        for sq, played in rec.feed(seq):
++            if played:
++                released.append((t, sq))
++    def begin_of(k):
++        """Where start k's stream begins: the first datagram after the switch's own gap (> 100 ms) — the old sender
++        sends on for a few ms after the start is stamped, until the start stops it."""
++        t = starts[k]["t_stop"]
++        times = [d[0] for d in dg]
++        j = next((j for j in range(1, len(dg)) if times[j] > t and times[j] - times[j - 1] > 0.1), None)
++        return times[j] if j is not None else float("inf")
++    out = []
++    for i, st in enumerate(starts[1:], start=1):
++        b0 = begin_of(i)
++        nxt = begin_of(i + 1) if i + 1 < len(starts) else float("inf")
++        new = [d for d in dg if b0 <= d[0] < nxt]
++        if not new:
++            out.append({"i": i, "no_datagrams": True})
++            continue
++        first_t, first_seq = new[0][0], new[0][1]
++        rel = [r for r in released if b0 <= r[0] < nxt]
++        old = [d for d in dg if d[0] < b0]
++        last_old = max(d[1] for d in old[-8:]) if old else None      # the last original (its copies trail by k)
++        span_frames = len({d[1] for d in new})
++        gap_ms = round((first_t - old[-1][0]) * 1000.0, 1) if old else None   # no datagram: the switch's own gap
++        out.append({"i": i, "board": st["board"], "first_seq": first_seq, "last_old_seq": last_old, "gap_ms": gap_ms,
++                    "continued": last_old is not None and first_seq == (last_old + 1) & 0xFFFF,
++                    "silent_ms": round((rel[0][0] - first_t) * 1000.0, 1) if rel else None,
++                    "stream_ms": round((new[-1][0] - first_t) * 1000.0, 1),
++                    "frames_new": span_frames, "frames_released": len({r[1] for r in rel}),
++                    "audio_start": st["audio_start"]})
++    return {"switches": out, "counts": rec.counts}
++
++
++class AcrossSwitches(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.s = run_mode(None)
++        cls.a = analyse(cls.s)
++        if os.environ.get("B143_OUT"):
++            import json
++            Path(os.environ["B143_OUT"]).write_text(json.dumps({"mine": cls.a, "rows": {
++                k: cls.s.get(k) for k in ("b143_thread_exc", "b143_errors", "b143_board_up", "b143_users_start", "a2", "a5", "a2_switch_rows", "a5_switch_rows", "a2_starts", "a5_starts")}},
++                indent=1))
++
++    def test_0_the_scenario_played(self):
++        s = self.s
++        self.assertIsNone(s.get("b143_errors"), s.get("b143_errors"))      # every real start went through
++        self.assertIsNone(s.get("b143_thread_exc"), s.get("b143_thread_exc"))
++        self.assertEqual(s["a2"]["state"], "ended", s["a2"])
++        self.assertEqual(s["a5"]["state"], "ended", s["a5"])
++        self.assertEqual(s["a5"].get("practices"), 2, s["a5"])
++        two = [r["window"] for r in s["a2_switch_rows"] if r.get("switched")]
++        five = [r["window"] for r in s["a5_switch_rows"] if r.get("switched")]
++        self.assertEqual(two, ["minigame", "board"])
++        self.assertEqual(five, ["minigame", "board", "minigame", "board", "minigame", "board"])
++        self.assertEqual(s["b143_users_start"], [0, 0])                  # the board's own (users') start: 0, 0
++        self.assertTrue(s["b143_starts"][0]["board"])
++
++    def test_1_every_planned_switch_heard_at_once(self):
++        sw = self.a["switches"]
++        planned = [x for x in sw if not x.get("no_datagrams")]
++        self.assertEqual(len(planned), 8, sw)                          # 2 + 6 starts after the board's own
++        for x in planned:
++            self.assertTrue(x["continued"], x)                          # the sequence goes on across the switch
++            self.assertIsNotNone(x["silent_ms"], x)
++            self.assertLessEqual(x["silent_ms"], BOUND_MS, x)
++            self.assertGreaterEqual(x["frames_released"], x["frames_new"] - 3, x)   # every frame (the last k held)
++        self.assertEqual(self.a["counts"]["late"], 0, self.a["counts"])
++
++
++class HeadGivesTheSilence(unittest.TestCase):
++    """The mutation that shows the fault: HEAD's companion, the same scenario."""
++
++    @classmethod
++    def setUpClass(cls):
++        cls.s = run_mode(BASELINE)
++        cls.a = analyse(cls.s)
++        if os.environ.get("B143_OUT_HEAD"):
++            import json
++            Path(os.environ["B143_OUT_HEAD"]).write_text(json.dumps({"head": cls.a}, indent=1))
++
++    def test_head_restarts_at_zero_and_the_new_streams_are_silent(self):
++        planned = [x for x in self.a["switches"] if not x.get("no_datagrams")]
++        self.assertEqual(len(planned), 8, self.a["switches"])
++        self.assertTrue(all(x["first_seq"] == 0 for x in planned), planned)
++        silent = [x for x in planned if x["silent_ms"] is None or x["silent_ms"] > BOUND_MS]
++        self.assertGreaterEqual(len(silent), 6, planned)                 # most switches silent past the bound
++        self.assertGreater(self.a["counts"]["late"], 500, self.a["counts"])
++
++
++class ModelChecks(unittest.TestCase):
++    """The modelled receiver against the app's own cases (OpusFraming.kt's OpusReorder, k = 2 at 10-ms frames)."""
++
++    def test_the_rule(self):
++        r = rm.Receiver(copies=2, offset_pcm_packets=4, frame_samples=480)
++        self.assertEqual(r.k, 2)
++        self.assertEqual(r.feed(100), [(100, True)])                   # the first frame starts the run
++        self.assertEqual(r.feed(101), [(101, True)])                   # in order: released at once
++        self.assertEqual(r.feed(101), [])                              # a duplicate (the receive path's window)
++        self.assertEqual(r.feed(103), [])                              # 102 missing: held for its copy (k = 2)
++        self.assertEqual(r.feed(104), [])
++        self.assertEqual(r.feed(105), [(102, False), (103, True), (104, True), (105, True)])   # given up after k
++        self.assertEqual(r.feed(0), [])                                # far behind: LATE, dropped
++        self.assertEqual(r.counts["late"], 1)
++        self.assertEqual(r.feed(106 + 64), [(106 + 64, True)])         # 64 ahead: a JUMP, taken at once
++        self.assertEqual(r.counts["jump"], 1)
++        fresh = rm.Receiver()
++        played = [x for sq in range(300) for x in fresh.feed(sq)]      # a stream of 300 frames
++        played += [x for sq in range(250) for x in fresh.feed(sq)]     # a new one at 0: 250 frames, all LATE
++        played += [x for sq in range(250, 320) for x in fresh.feed(sq)]
++        self.assertEqual(len(played), 300 + 20)                        # only what passed 300 is played
++
++
++SENDER = r'''
++import json, os, sys, threading, time, types
++from pathlib import Path
++sys.path.insert(0, sys.argv[1])
++import native_session_io as nsio, audio_codec as ac
++codec = sys.argv[2]
++class Sock:
++    def __init__(s): s.log = []
++    def setsockopt(s, *a): pass
++    def setblocking(s, *a): pass
++    def sendto(s, d, a): s.log.append(bytes(d).hex())
++    def close(s): pass
++out = []
++a = nsio.NativeAudioStreamer(Path(sys.argv[3]))
++a._redundancy_copies, a._redundancy_offset_packets = 2, 4
++if hasattr(a, "party_continue_next"):
++    a.party_continue_next(424242)                     # an arm for another process: must not touch this start
++for run in range(2):
++    sock = Sock()
++    if hasattr(a, "_audio_start_counters"):
++        a._audio_start = a._audio_start_counters(os.getpid())    # as `_start_linux_locked` does, for this process
++    a._linux_stop_event = threading.Event()
++    n = {"k": 0}
++    def wait_until(deadline):
++        n["k"] += 1
++        if n["k"] > 60:
++            a._linux_stop_event.set()
++            return False
++        return True
++    a._linux_wait_until = wait_until
++    a._client_ip, a._client_port = "127.0.0.1", 9
++    if codec == "opus":
++        a._audio_codec_opus = ac.OpusSession(128, 10)
++        ac.run_opus_sender(a, a._audio_codec_opus, "127.0.0.1", 9, sock_factory=lambda: sock)
++    else:
++        import socket as real
++        nsio.socket = types.SimpleNamespace(socket=lambda *x: sock, AF_INET=real.AF_INET, SOCK_DGRAM=real.SOCK_DGRAM,
++                                            SOL_SOCKET=real.SOL_SOCKET, SO_SNDBUF=real.SO_SNDBUF)
++        a._linux_prepare_sender_scheduler = lambda: True
++        nsio.AUDIO_CODEC = None
++        a._linux_sender_loop()
++    out.append(sock.log)
++print(json.dumps(out))
++'''
++
++
++class UsersStart(unittest.TestCase):
++    """A users' start (no arm for its process; an arm for another): sequence and timestamp 0, byte for byte HEAD's —
++    the Opus sender (as the hub runs) and the PCM one, two starts each, 60 ticks each."""
++
++    def datagrams(self, companion: Path, codec: str, tmp: Path) -> list:
++        import json
++        r = subprocess.run([sys.executable, "-I", "-B", "-c", SENDER, str(companion), codec, str(tmp)],
++                           capture_output=True, text=True, timeout=120, env={k: v for k, v in os.environ.items()
++                                                                             if not k.startswith("PRIVYHUB_")})
++        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
++        return json.loads(r.stdout.strip().splitlines()[-1])
++
++    def test_users_start_byte_for_byte(self):
++        import tempfile
++        head = b114.code_of(BASELINE)
++        if head is None:
++            self.skipTest("git is absent")
++        tmp = Path(tempfile.mkdtemp(prefix="b143_users_"))
++        for codec in ("opus", "pcm"):
++            mine = self.datagrams(ROOT / "companion", codec, tmp)
++            theirs = self.datagrams(head / "companion", codec, tmp)
++            self.assertEqual(len(mine), 2)
++            self.assertTrue(all(len(x) >= 60 for x in mine), [len(x) for x in mine])
++            self.assertEqual(mine, theirs, codec)
++            for run in mine:                                       # each start at sequence 0, timestamp 0
++                first = bytes.fromhex(run[0])
++                self.assertEqual(first[6:8], b"\x00\x00")
++                self.assertEqual(first[8:12], b"\x00\x00\x00\x00")
++
++
++if __name__ == "__main__":
++    unittest.main()

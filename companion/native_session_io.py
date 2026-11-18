@@ -145,6 +145,12 @@ class NativeAudioStreamer:
         self._linux_sender_scheduler_priority = 0
         self._linux_sender_scheduler_error = ""
         self._linux_log_path = self.log_dir / "native_pulseaudio.log"
+        # B143: where the last sender run stopped ((next sequence, next timestamp), written by that run at its end),
+        # the next run's start (0, 0 = today) and the party layer's arm (the pid of the next start that continues).
+        self._audio_sent_next: tuple[int, int] | None = None
+        self._audio_start: tuple[int, int] = (0, 0)
+        self._audio_run: object | None = None
+        self._party_continue_pid: int | None = None
 
     @staticmethod
     def _kill_process(
@@ -350,6 +356,26 @@ class NativeAudioStreamer:
 
         return False
 
+    def party_continue_next(self, pid: int | None) -> None:
+        """B143: a party mini game's planned switch — the next audio start for process `pid` continues the last sender
+        run's sequence and timestamp (the app plays in sequence order and drops what is behind what it has played);
+        None disarms. Nothing else arms it: every other start begins at 0 as today."""
+        self._party_continue_pid = None if pid is None else int(pid)
+
+    def _audio_start_counters(self, process_id: int) -> tuple[int, int]:
+        """B143: once per start, after the old run is stopped — the recorded (sequence, timestamp) when armed for this
+        process and one is recorded, else (0, 0); the arm and the record cleared either way."""
+        armed, self._party_continue_pid = self._party_continue_pid, None
+        last, self._audio_sent_next = self._audio_sent_next, None
+        if armed is not None and armed == int(process_id) and last is not None:
+            return (int(last[0]) & 0xFFFF, int(last[1]) & 0xFFFFFFFF)
+        return (0, 0)
+
+    def _audio_note_sent(self, run: object, sequence: int, sample_timestamp: int) -> None:
+        """B143: a sender run's end — where it stopped, only if it is still the current run."""
+        if self._audio_run is run:
+            self._audio_sent_next = (int(sequence) & 0xFFFF, int(sample_timestamp) & 0xFFFFFFFF)
+
     def set_redundancy(self, copies: int, offset_packets: int) -> None:
         """D-BASE-P10: send each audio datagram `copies` times, the copy
         `offset_packets` ticks after the original. Read by the Linux sender
@@ -475,6 +501,8 @@ class NativeAudioStreamer:
             socket.AF_INET,
             socket.SOCK_DGRAM,
         )
+        run = self._audio_run = object()   # B143: this run's token
+        sequence, sample_timestamp = getattr(self, "_audio_start", (0, 0))
 
         try:
             sock.setsockopt(
@@ -484,8 +512,6 @@ class NativeAudioStreamer:
             )
             sock.setblocking(False)
 
-            sequence = 0
-            sample_timestamp = 0
             # D-BASE-P10: the last `offset` + 1 datagrams, so tick n can send
             # the copy of packet n - offset right after packet n. The pacer's
             # deadline is untouched; a copy is a second sendto in the tick.
@@ -574,6 +600,7 @@ class NativeAudioStreamer:
                     + self.LINUX_FRAMES_PER_PACKET
                 ) & 0xFFFFFFFF
         finally:
+            self._audio_note_sent(run, sequence, sample_timestamp)   # B143
             try:
                 sock.close()
             except OSError:
@@ -933,6 +960,7 @@ class NativeAudioStreamer:
 
         self._linux_pactl = pactl
         self._target_pid = process_id
+        self._audio_start = self._audio_start_counters(process_id)   # B143: (0, 0) unless a planned switch armed it
         self._client_ip = client_ip
         self._client_port = int(client_port)
         self._linux_stop_event.clear()

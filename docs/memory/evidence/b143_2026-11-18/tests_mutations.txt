@@ -1,0 +1,9 @@
+# Queue AX: the mutations (scripts/run_mutations.sh), each one change in a copy, the suite that must catch it run once — FAIL expected. The board's gate mutation run again on the final check (after the counting fix).
+b143_no_arm (companion/party_minigame.py): Ran 2 tests in 40.575s FAILED (failures=1) 
+b143_any_pid (companion/native_session_io.py): Ran 1 test in 1.725s FAILED (failures=1) 
+b144_no_arm (companion/party_minigame.py): Ran 4 tests in 81.296s FAILED (failures=1) 
+b144_always (companion/native_stream.py): Ran 4 tests in 81.130s FAILED (failures=2) 
+b145_hold_off_in_practice (companion/party_minigame.py): Ran 4 tests in 69.944s FAILED (failures=2) 
+board_no_show_at_handover: run 1:   FAIL: each shown again while the hub still answered playing (a practice), before its answer left playing   FAIL: hidden only at the real playing (a practice keeps it up behind the hub's game) (got 4, wanted 1) HUB MINIGAME CHECK: FAIL (2 of 89 assertions) 
+board_no_go_line: run 1:   FAIL: the board's log: two cards, card 0, then the go, then the scores (got ["cards 2, chose 0", "scores [1, 0] for seats 1,2"], wanted ["cards 2, chose 0", "start", "scores [1, 0] for seats 1,2"])   FAIL: the board's log: card 1 (got ["cards 2, chose 1", "scores [1, 0] for seats 1,2"], wanted ["cards 2, chose 1", "start", "scores [1, 0] for seats 1,2"])   FAIL: the board's log: Random (g
+board_no_gate_in_practice (on the final check): run 1:   FAIL: no press made during a practice reaches the load screen shown behind it (got 26, wanted 0) HUB MINIGAME CHECK: FAIL (1 of 89 assertions) 

@@ -179,7 +179,7 @@ class BoardCheck(unittest.TestCase):
     def test_with_the_checks_own_stand_in_hub(self):
         r = run_check({})
         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
-        self.assertIn("HUB MINIGAME CHECK: PASS (81 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats; B135: +41
+        self.assertIn("HUB MINIGAME CHECK: PASS (89 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats; B135: +41; B145: +8
 
     def test_against_this_tests_fake_hub(self):
         hub = FakeHub()
@@ -189,7 +189,7 @@ class BoardCheck(unittest.TestCase):
             hub.close()
         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
         # its eight "asked" ones (B124: +3), "listens" and (B116) the five frame-rate ones are ours here
-        self.assertIn("HUB MINIGAME CHECK: PASS (56 assertions)", r.stdout)   # B135: +30 (its stand-in-only ones ours here)
+        self.assertIn("HUB MINIGAME CHECK: PASS (63 assertions)", r.stdout)   # B135: +30 (its stand-in-only ones ours here); B145: +7
         starts = [c for c in hub.calls if "party-minigame-start" in c]
         self.assertIn("/s/win1/plugins/games/party-minigame-start?id=mg_one&seats=1,2", starts)
         self.assertIn("/s/mix4/plugins/games/party-minigame-start?id=mg_four&seats=3,1,4,2", starts)   # B124
@@ -208,6 +208,11 @@ class BoardCheck(unittest.TestCase):
         self.assertFalse(any(c.startswith("/s/refused/") and c.endswith("party-minigame-end") for c in hub.calls))
         self.assertIn("PrivyParty: hub mini game: a draw: the hub gave it up (no end within 900 s)", r.stdout)
         self.assertIn("PrivyParty: hub mini game: a draw: no hub (no hub)", r.stdout)
+        # B145: one line for each choice and each decision, never a game's name
+        for line in ("cards 2, chose 0", "cards 2, chose 1", "cards 2, chose random", "cards 1, chose 0", "practice",
+                     "start"):
+            self.assertIn("PrivyParty: hub mini game: " + line + "\n", r.stdout)
+        self.assertNotIn("Made-up", "".join(x for x in r.stdout.splitlines(True) if "hub mini game:" in x))
 
 
 if __name__ == "__main__":

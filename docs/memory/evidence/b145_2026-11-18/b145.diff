@@ -1,0 +1,186 @@
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 2e0d810..ec765e9 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -736,7 +736,8 @@ class PartyMinigames:
+             mg["phase"] = "handing_over"
+         self.row({"step": "minigame_go", "held_s": round(t0 - (mg["ready_at"] or t0), 3),
+                   "remembered": bool(go["remembered"]), **({"practice": True} if go["practice"] else {})})
+-        self._hold_select(mg, False)                        # B141: from the go on, Select passes as today
++        if not go["practice"]:                              # B145: held through a practice too, until a real go
++            self._hold_select(mg, False)                    # B141: from the go on, Select passes as today
+         if mg.get("ran_since_begin"):                       # B137: only when the title ran since its begin was loaded
+             self._mute(mg, True)
+             try:
+diff --git a/tests/b111_party_board/test_b111.py b/tests/b111_party_board/test_b111.py
+index 0c6b57a..9523939 100644
+--- a/tests/b111_party_board/test_b111.py
++++ b/tests/b111_party_board/test_b111.py
+@@ -179,7 +179,7 @@ class BoardCheck(unittest.TestCase):
+     def test_with_the_checks_own_stand_in_hub(self):
+         r = run_check({})
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+-        self.assertIn("HUB MINIGAME CHECK: PASS (81 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats; B135: +41
++        self.assertIn("HUB MINIGAME CHECK: PASS (89 assertions)", r.stdout)   # B116: +14 frame rate; B124: +6 seats; B135: +41; B145: +8
+ 
+     def test_against_this_tests_fake_hub(self):
+         hub = FakeHub()
+@@ -189,7 +189,7 @@ class BoardCheck(unittest.TestCase):
+             hub.close()
+         self.assertEqual(r.returncode, 0, r.stdout[-2000:] + r.stderr[-1000:])
+         # its eight "asked" ones (B124: +3), "listens" and (B116) the five frame-rate ones are ours here
+-        self.assertIn("HUB MINIGAME CHECK: PASS (56 assertions)", r.stdout)   # B135: +30 (its stand-in-only ones ours here)
++        self.assertIn("HUB MINIGAME CHECK: PASS (63 assertions)", r.stdout)   # B135: +30 (its stand-in-only ones ours here); B145: +7
+         starts = [c for c in hub.calls if "party-minigame-start" in c]
+         self.assertIn("/s/win1/plugins/games/party-minigame-start?id=mg_one&seats=1,2", starts)
+         self.assertIn("/s/mix4/plugins/games/party-minigame-start?id=mg_four&seats=3,1,4,2", starts)   # B124
+@@ -208,6 +208,11 @@ class BoardCheck(unittest.TestCase):
+         self.assertFalse(any(c.startswith("/s/refused/") and c.endswith("party-minigame-end") for c in hub.calls))
+         self.assertIn("PrivyParty: hub mini game: a draw: the hub gave it up (no end within 900 s)", r.stdout)
+         self.assertIn("PrivyParty: hub mini game: a draw: no hub (no hub)", r.stdout)
++        # B145: one line for each choice and each decision, never a game's name
++        for line in ("cards 2, chose 0", "cards 2, chose 1", "cards 2, chose random", "cards 1, chose 0", "practice",
++                     "start"):
++            self.assertIn("PrivyParty: hub mini game: " + line + "\n", r.stdout)
++        self.assertNotIn("Made-up", "".join(x for x in r.stdout.splitlines(True) if "hub mini game:" in x))
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index 32599e3..a323219 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -1552,6 +1552,57 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
+             wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+             finish_case("sl", r0)
+             S["sl_held_flag_after_end"] = bool(getattr(bridge, "_party_hold_select", False))
++            # B145: Select held through a practice too — Select + L1 / R1 / R3 from every pad while a practice plays;
++            # the practice left by Select + Start (Start passes: the way back, the title not quit); Select alone after
++            # a real go passes
++            st_before = {p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}
++            PAIRS_P = (0x0100, 0x0200, 0x0080)
++
++            def selector_p():
++                k = 0
++                while watching["on"] and SEL["on"]:
++                    pair = PAIRS_P[k % 3]; k += 1
++                    for pl in range(4):
++                        bridge._apply_report(pl, 0x0020 | pair, 0, 0, 0, 0, 0, 0)
++                    time.sleep(0.1)
++                    for pl in range(4):
++                        bridge._apply_report(pl, 0, 0, 0, 0, 0, 0, 0)
++                    time.sleep(0.1)
++            r0 = held_start("sp", tok2, "1,2", ["other"])
++            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++            S["sp_ready"] = b.get("phase")
++            S["sp_go"] = call("POST", "/plugins/games/party-minigame-go?practice=1")["body"].get("go")
++            b = wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
++            S["sp_playing"] = {k: b.get(k) for k in ("state", "practice")}
++            S["sp_held_in_practice"] = bool(getattr(bridge, "_party_hold_select", False))
++            S["sp_title_running"] = not fake["ra"].paused
++            h0, v0_ = len(HOTKEYS), len(VP["log"])
++            SEL["on"] = True
++            threading.Thread(target=selector_p, daemon=True).start()
++            time.sleep(1.5)                                 # the pairs while the practice plays
++            SEL["on"] = False; time.sleep(0.3)
++            S["sp_writes_in_practice"] = len(VP["log"]) - v0_
++            S["sp_select_written_in_practice"] = sum(1 for x in VP["log"][v0_:] if x[2] & 0x0020)
++            S["sp_hotkeys_in_practice"] = len(HOTKEYS) - h0
++            bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)     # Select + Start: Start leaves the practice
++            bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
++            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++            S["sp_back"] = b.get("phase")
++            S["sp_end_by"] = [r.get("by") for r in rows()[r0:] if r["step"] == "minigame_practice_end"]
++            S["sp_title_alive"] = title_alive()
++            S["sp_hotkeys_total"] = len(HOTKEYS) - h0
++            S["sp_states_same"] = ({p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}) == st_before
++            S["sp_real_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
++            wait_phase(lambda b: b.get("state") != "starting", 20)
++            v2_ = len(VP["log"])
++            bridge._apply_report(0, 0x0020, 0, 0, 0, 0, 0, 0)    # Select alone after a real go: passes
++            bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
++            S["sp_select_written_after_real_go"] = sum(1 for x in VP["log"][v2_:] if x[2] & 0x0020)
++            S["sp_held_after_real_go"] = bool(getattr(bridge, "_party_hold_select", False))
++            fake["ra"].screen = "end_P1"
++            wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++            finish_case("sp", r0)
++            S["sp_held_after_end"] = bool(getattr(bridge, "_party_hold_select", False))
+             # N5: during the mute — the board's end, the onn's Home, a second start, the onn's END
+             layer.advance_gap_s = 0.7
+             TITLE["show_after"] = 2
+diff --git a/tests/b145_party_small_things/test_b145.py b/tests/b145_party_small_things/test_b145.py
+new file mode 100644
+index 0000000..d457866
+--- /dev/null
++++ b/tests/b145_party_small_things/test_b145.py
+@@ -0,0 +1,70 @@
++#!/usr/bin/env python3
++"""B145 (host): Select held through a practice too, until a real go — through the real HTTP server on loopback.
++
++B141 held the pads' Select (RetroArch's hotkey button: + L1 load state, + R1 save state, + Start quit, + R3 pause
++toggle) from a held title's launch to the go, but let it through at a practice's go: in a practice Select + L1 / R1
++still loaded / saved over a slot of the users' cheat setup. B145: Select is held until a real go, practices included.
++
++B114's scenario, its `nopress` mode (B137's fake title reads the virtual pads and logs every poll that sees Select with
++a paired button; B141's cases first): a held start, a practice; **while it plays, Select + L1 / R1 / R3 from all four
++pads every 0.2 s → the virtual pads written, none with Select; the fake's hotkey log empty; its state folder
++byte-equal**; the practice left by Select + Start (Start passes: `start_button`, the title not quit); a real go → Select
++alone written; the hold off after it and after the end. HEAD's code (the mutation, run by the record): the same
++presses in a practice reach the fake. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b145_party_small_things -v
++"""
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "b114_party_minigame_hang"))
++sys.path.insert(0, str(ROOT / "tests" / "b124_party_four_seats"))
++import test_b114 as b114  # noqa: E402  (its harness; its tests are not collected here)
++import test_b124 as b124  # noqa: E402
++
++
++class SelectThroughPractice(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b114.b99.tree()
++        b124.IDS.clear()
++        b124.IDS.update(ids)
++        cls.s = b114.run(root, b114.BOTH, ids, "nopress", extra=b124.extra)["steps"]
++
++    def test_0_a_practice_plays(self):
++        s = self.s
++        self.assertEqual(s["sp_ready"], "ready")
++        self.assertEqual(s["sp_go"], "taken")
++        self.assertEqual(s["sp_playing"], {"state": "playing", "practice": True})
++        self.assertTrue(s["sp_title_running"])
++
++    def test_1_no_select_and_no_hotkey_in_the_practice(self):
++        s = self.s
++        self.assertTrue(s["sp_held_in_practice"])
++        self.assertGreater(s["sp_writes_in_practice"], 20)             # the pads did reach the title
++        self.assertEqual(s["sp_select_written_in_practice"], 0)
++        self.assertEqual(s["sp_hotkeys_in_practice"], 0)
++        self.assertTrue(s["sp_states_same"])
++
++    def test_2_select_start_leaves_the_practice_without_quitting(self):
++        s = self.s
++        self.assertEqual(s["sp_back"], "ready")
++        self.assertEqual(s["sp_end_by"], ["start_button"])
++        self.assertTrue(s["sp_title_alive"])
++        self.assertEqual(s["sp_hotkeys_total"], 0)
++
++    def test_3_a_real_go_lets_select_through(self):
++        s = self.s
++        self.assertEqual(s["sp_real_go"], "taken")
++        self.assertGreaterEqual(s["sp_select_written_after_real_go"], 1)
++        self.assertFalse(s["sp_held_after_real_go"])
++        self.assertFalse(s["sp_held_after_end"])
++
++
++if __name__ == "__main__":
++    unittest.main()

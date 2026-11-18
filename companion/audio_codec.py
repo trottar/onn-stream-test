@@ -230,12 +230,13 @@ def run_opus_sender(streamer: Any, session: OpusSession, client_ip: str, client_
     streamer._linux_pacing_frame = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame"
     streamer._linux_pacing_frame_spin = os.environ.get("PRIVYHUB_AUDIO_SENDER_PACING") == "frame_spin"
     sock = sock_factory() if sock_factory is not None else socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # B143: this run's token and its start ((0, 0) = today; a party's planned switch continues the last run's)
+    run = streamer._audio_run = object()
+    sequence, sample_timestamp = getattr(streamer, "_audio_start", (0, 0))
     try:
         if sock_factory is None:
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 64 * 1024)
             sock.setblocking(False)
-        sequence = 0
-        sample_timestamp = 0
         copies = streamer._redundancy_copies
         offset = copy_offset_packets(streamer._redundancy_offset_packets, session.frame_ms)
         history: deque[bytes] = deque(maxlen=offset + 1)
@@ -279,6 +280,9 @@ def run_opus_sender(streamer: Any, session: OpusSession, client_ip: str, client_
             sequence = (sequence + 1) & 0xFFFF
             sample_timestamp = (sample_timestamp + frame_samples) & 0xFFFFFFFF
     finally:
+        note = getattr(streamer, "_audio_note_sent", None)   # B143: where this run stopped
+        if note is not None:
+            note(run, sequence, sample_timestamp)
         encoder.close()
         try:
             sock.close()

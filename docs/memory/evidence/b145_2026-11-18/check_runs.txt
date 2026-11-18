@@ -1,0 +1,10 @@
+# Queue AX: the board's check (my file, extended) under Godot headless in a scratch copy of the board's tree (scripts/run_check.sh); the board's repo status unchanged.
+# A first set of three runs (before the counting fix below) gave PASS 89, PASS 89, then FAIL 1 of 89: one press counted on the load screen in a practice — it came between the stand-in hub taking the go and the board's gate going up (a frame or so), while the screen shown before the hand-over was still up; the re-show at the hand-over clears every mark, so it made no go. The check now counts from that re-show (what B145 asks); the five runs below after the fix.
+run 1: HUB MINIGAME CHECK: PASS (89 assertions)
+run 2: HUB MINIGAME CHECK: PASS (89 assertions)
+run 3: HUB MINIGAME CHECK: PASS (89 assertions)
+run 4: HUB MINIGAME CHECK: PASS (89 assertions)
+run 5: HUB MINIGAME CHECK: PASS (89 assertions)
+step25 (the PC side's, read only, the same scratch tree): STEP 25 CHECK: PASS (107 assertions)
+step8 (the PC side's, read only): STEP 8 CHECK: PASS (210 assertions)
+B111 (after the counting fix, Godot headless, its scratch copy, its fake hub): Ran 2 tests in 308.193s OK 

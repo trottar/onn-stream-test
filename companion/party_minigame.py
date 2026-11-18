@@ -55,6 +55,11 @@ B140 — after the paused load, frames in ADVANCE_STEPS with a grab after each, 
 from its pre-load picture (or the start is read); never → given up at once ("the title did not show its starting
 point"). B141 — from a held title's launch to the go, and on every way back, the pads' Select is not passed (RetroArch's
 hotkeys are pairs with Select); from the go on, as today.
+B143 — every planned switch arms the audio sender: the new process's sound continues the last run's sequence and
+timestamp (the app drops a frame behind what it has played: a new stream at sequence 0 was silent until it passed it).
+B144 — a practice's switch arms the stream: the encoder draws "PRACTICE — press Start to go back" across the top of the
+onn's picture (the title's window untouched); the way back's start takes it off. B145 — Select stays held through a
+practice too, until a real go.
 """
 from __future__ import annotations
 
@@ -458,7 +463,7 @@ class PartyMinigames:
         except Exception:
             pass
 
-    def _switch_stream(self, which: str, pid: int | None = None) -> bool:
+    def _switch_stream(self, which: str, pid: int | None = None, banner: bool = False) -> bool:
         """The onn's stream to the other window (B115: a planned switch for `pid`, the recovery told): the stream's own
         start for that process, with the remembered client, on a helper thread with no lock held (B114), waited for at
         most switch_limit_s. True when switched."""
@@ -474,12 +479,18 @@ class PartyMinigames:
         seq = ps.open(which, self.switch_limit_s + PLANNED_GRACE_S)
         t0 = self.clock()
         ns = self.p._native_stream
+        self._arm_switch(ns, int(pid))                       # B143: the new process's sound continues the old's
+        if banner:                                           # B144: a practice's band on the onn's picture only
+            self._arm_banner(ns, int(pid))
 
         def go():
             return ns.start(client_ip=str(args["client_ip"]), port=int(args["port"]), managed_process_id=int(pid))
         try:
             done, res = self._bounded(go, self.switch_limit_s)
         finally:
+            self._arm_switch(ns, None)
+            if banner:
+                self._arm_banner(ns, None)
             until = ps.close_after(seq, PLANNED_GRACE_S)
             threading.Thread(target=self._window_row, args=(ps, seq, until), daemon=True,
                              name="party-minigame-window").start()
@@ -495,6 +506,23 @@ class PartyMinigames:
         self.row({"step": "minigame_stream", "window": which, "switched": True, "planned": True,
                   "seconds": round(self.clock() - t0, 3)})
         return True
+
+    @staticmethod
+    def _arm_switch(ns: Any, pid: int | None) -> None:
+        """B143: the audio sender's next start for `pid` continues the last run's sequence and timestamp (None: disarmed).
+        A stream without the arm (a stub, an old object): nothing."""
+        audio = getattr(getattr(ns, "_session_io", None), "audio", None)
+        arm = getattr(audio, "party_continue_next", None)
+        if callable(arm):
+            arm(pid)
+
+    @staticmethod
+    def _arm_banner(ns: Any, pid: int | None) -> None:
+        """B144: the stream's next start for `pid` draws the practice banner (None: disarmed). A stream without it:
+        nothing."""
+        arm = getattr(type(ns), "party_banner_next", None) and getattr(ns, "party_banner_next", None)
+        if callable(arm):
+            arm(pid)
 
     def _window_row(self, ps: PlannedSwitch, seq: int, until: float | None) -> None:
         if until is not None:
@@ -708,7 +736,8 @@ class PartyMinigames:
             mg["phase"] = "handing_over"
         self.row({"step": "minigame_go", "held_s": round(t0 - (mg["ready_at"] or t0), 3),
                   "remembered": bool(go["remembered"]), **({"practice": True} if go["practice"] else {})})
-        self._hold_select(mg, False)                        # B141: from the go on, Select passes as today
+        if not go["practice"]:                              # B145: held through a practice too, until a real go
+            self._hold_select(mg, False)                    # B141: from the go on, Select passes as today
         if mg.get("ran_since_begin"):                       # B137: only when the title ran since its begin was loaded
             self._mute(mg, True)
             try:
@@ -724,7 +753,8 @@ class PartyMinigames:
             mg["routed"] = True
         self.row({"step": "minigame_route", "ports": {str(k + 1): s for k, s in enumerate(mg["seats"])},
                   "routed": mg["routed"]})
-        if self._step(mg, "switch", lambda: self._switch_stream("minigame", getattr(proc, "pid", None))):
+        if self._step(mg, "switch", lambda: self._switch_stream("minigame", getattr(proc, "pid", None),
+                                                               banner=bool(go["practice"]))):   # B144
             mg["switched_to"] = "minigame"
         if go["practice"] and bridge is not None:
             self._start_hook(mg, bridge)

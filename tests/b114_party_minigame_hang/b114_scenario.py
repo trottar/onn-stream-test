@@ -743,7 +743,7 @@ if args["mode"] == "cheat":
     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
     S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
     finish()
-if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
+if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143"):
     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
     n64 = args["n64_id"]
     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
@@ -957,6 +957,163 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
                 call("POST", "/plugins/games/native-stream-start?port=48100")
                 client.in_stream = True
                 call("POST", "/plugins/games/native-stream-ready")
+    if args["mode"] == "b143":
+        # B143 / B144: behind the stub's own start, the real stream start (`_start_linux_locked` on G8-S2's stubbed
+        # manager: nothing spawned, the encoder's command recorded) and the real audio streamer (Opus, as the hub runs
+        # it; pactl answered by stubs, the capture a made-up process writing silence at the real rate) sending to a
+        # socket on loopback — the onn's audio as it arrives: [t, sequence, version, timestamp] per datagram.
+        import socket as socket_, struct as struct_, importlib.util as ilu_
+        import native_stream as nsm, native_session_io as nsio_, audio_codec as ac_
+        spec_ = ilu_.find_spec("subprocess")                # the harness replaced subprocess.Popen (its fake title):
+        sp_ = ilu_.module_from_spec(spec_); spec_.loader.exec_module(sp_)   # a fresh copy for the made-up capture
+
+        class _Alive:
+            def is_dir(self):
+                return True
+
+        def _alias_path(*a_):                               # the fake title's pid has no /proc entry: alive for the
+            if len(a_) == 1 and str(a_[0]) == "/proc/999999999":   # stream's and the audio's own checks
+                return _Alive()
+            return Path(*a_)
+        nsm.Path = _alias_path
+        nsio_.Path = _alias_path
+        sys.path.insert(0, args["start_rung"])
+        import stub_manager as stubm
+        rx = socket_.socket(socket_.AF_INET, socket_.SOCK_DGRAM)
+        rx.bind(("127.0.0.1", 0)); rx.settimeout(0.2)
+        AP = rx.getsockname()[1]
+        DG = []
+
+        def rx_loop():
+            while watching["on"]:
+                try:
+                    d_ = rx.recv(2048)
+                except OSError:
+                    continue
+                if len(d_) >= 16 and d_[:4] == b"PHA1":
+                    _m, v_, _c, sq_, ts_, _f = struct_.unpack_from("<4sBBHII", d_)
+                    DG.append([round(time.monotonic() - T0, 4), sq_, v_, ts_])
+        threading.Thread(target=rx_loop, daemon=True).start()
+        PCM = ("import sys,time\nb=bytes(1920)\nt=time.monotonic()\nwhile True:\n t+=0.01\n"
+               " time.sleep(max(0,t-time.monotonic()))\n sys.stdout.buffer.write(b); sys.stdout.buffer.flush()\n")
+
+        class _SP:
+            PIPE, DEVNULL, STDOUT = sp_.PIPE, sp_.DEVNULL, sp_.STDOUT
+
+            def __getattr__(self, n):
+                return getattr(sp_, n)
+
+            @staticmethod
+            def Popen(cmd, **kw):
+                return sp_.Popen([sys.executable, "-c", PCM], stdout=sp_.PIPE, stdin=sp_.DEVNULL, stderr=sp_.DEVNULL,
+                                 bufsize=0)
+        nsio_.subprocess = _SP()
+        nsio_.AUDIO_CODEC = ac_.from_environ_fresh({"PRIVYHUB_AUDIO_CODEC": "opus"}, log=lambda *a_: None)
+        _fake_popen, subprocess.Popen = subprocess.Popen, sp_.Popen     # libopus found (ctypes asks ldconfig) with
+        try:                                                          # the real Popen, once
+            ac_.libopus()
+        finally:
+            subprocess.Popen = _fake_popen
+        audio = nsio_.NativeAudioStreamer(root / "b143_audio")
+        audio._linux_run_pactl = lambda *a_, **k_: types.SimpleNamespace(returncode=0, stdout="7\n", stderr="")
+        audio._linux_pactl_json = lambda *a_: ([{"name": audio._linux_sink_name, "index": 3,
+                                                 "monitor_source_name": "fixture.monitor"}] if a_[-1] == "sinks"
+                                               else [{"index": 5, "sink": 3}])
+        audio._linux_find_owned_sink_inputs = lambda pid_: [{"index": 5, "sink": 0}]
+        threading.excepthook = lambda a_: S.setdefault("b143_thread_exc", []).append(   # a worker's death, kept
+            f"{a_.exc_type.__name__}: {a_.exc_value}"[:300])
+        real = stubm.stub_manager(nsm, [])
+        shutil.rmtree(real.project_root, ignore_errors=True)
+        real.project_root = root / "b143_stream"; real.data_dir = real.project_root / "data"
+        real.log_dir = real.project_root / "logs"; real.log_path = real.log_dir / "native_video_alpha.log"
+
+        def sio_start(ffmpeg, client_ip, audio_port, input_port, process_id):
+            audio._audio_codec_opus = ac_.OpusSession(128, 10)        # as the codec's prepare (the onn declared opus)
+            return audio.start(ffmpeg=Path(sys.executable), client_ip="127.0.0.1", client_port=AP,
+                               process_id=process_id)
+        real._session_io = types.SimpleNamespace(stop_stream=audio.stop, start=sio_start, audio=audio)
+        nsm.subprocess = types.SimpleNamespace(Popen=lambda argv, **k_: stubm.FakeProc(argv), DEVNULL=-3, STDOUT=-2)
+        stream._session_io.audio = audio
+        if hasattr(nsm.NativeStreamManager, "party_banner_next"):
+            type(stream).party_banner_next = lambda self_, pid_: real.party_banner_next(pid_)
+        STARTS = []
+        stub_start = stream.start
+
+        def start_real(client_ip=None, port=None, managed_process_id=None):
+            r_ = stub_start(client_ip, port, managed_process_id)
+            with stream._lock:
+                t_stop = round(time.monotonic() - T0, 4)
+                try:
+                    real._start_linux_locked(client_ip="127.0.0.1", port=48100,
+                                             managed_process_id=int(managed_process_id))
+                except Exception as exc_:
+                    c_ = exc_.__cause__ or exc_.__context__
+                    S.setdefault("b143_errors", []).append(f"{type(exc_).__name__}: {exc_}"[:300]
+                                                           + (f" ({type(c_).__name__}: {c_})"[:300] if c_ else ""))
+                    raise
+                STARTS.append({"pid": int(managed_process_id), "board": int(managed_process_id) == board_pid_now(),
+                               "t_stop": t_stop, "t_up": round(time.monotonic() - T0, 4),
+                               "argv": list(real._encoder_command or []),
+                               "audio_start": list(getattr(audio, "_audio_start", (0, 0)))})
+            return r_
+        stream.start = start_real
+
+        def switches_since(r0):
+            return [{k: v for k, v in r.items() if k in ("window", "switched", "planned", "why")} for r in rows()[r0:]
+                    if r["step"] == "minigame_stream"]
+        n_ = len(STARTS)
+        board_up("b143")                                    # a fresh board: its stream a users' start (the onn's)
+        S["b143_board_up"] = [n_, len(STARTS), S.get("b143_board_launch")]
+        S["b143_users_start"] = list(STARTS[-1]["audio_start"]) if STARTS else None
+        time.sleep(1.0)
+        # two planned switches: a real go and its end
+        s0 = len(STARTS)
+        r0 = held_start("a2", tok2, "1,2", ["start"] * 400)
+        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+        time.sleep(0.8)
+        S["a2_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+        wait_phase(lambda b: b.get("state") != "starting", 20)
+        time.sleep(1.4)
+        pic.set(["end_P1"] * 400)
+        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+        S["a2"] = {k: e.get(k) for k in ("state", "class", "scores")}
+        finish_case("a2", r0)
+        time.sleep(1.2)
+        S["a2_switch_rows"] = switches_since(r0)
+        S["a2_starts"] = [s0, len(STARTS)]
+        # five planned switches (and the end's way back): practice by Start, practice by time, a real go
+        s0 = len(STARTS)
+        r0 = held_start("a5", tok2, "1,2", ["start"] * 400)
+        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+        time.sleep(0.6)
+        call("POST", "/plugins/games/party-minigame-go?practice=1")
+        wait_phase(lambda b: b.get("state") == "playing", 20)
+        time.sleep(1.0)
+        bridge._apply_report(1, 0x0010, 0, 0, 0, 0, 0, 0)            # Start leaves the practice
+        bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+        time.sleep(0.7)
+        call("POST", "/plugins/games/party-minigame-go?practice=1")
+        wait_phase(lambda b: b.get("state") == "playing", 20)
+        layer.practice_s = 1.6                                         # the practice's time alone (scaled)
+        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+        layer.practice_s = 90.0
+        time.sleep(0.9)
+        S["a5_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+        wait_phase(lambda b: b.get("state") != "starting", 20)
+        time.sleep(1.2)
+        pic.set(["end_P1"] * 400)
+        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+        S["a5"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
+        finish_case("a5", r0)
+        time.sleep(1.2)
+        S["a5_switch_rows"] = switches_since(r0)
+        S["a5_starts"] = [s0, len(STARTS)]
+        S["b143_starts"] = STARTS
+        S["b143_dg"] = DG
+        S["b143_redundancy"] = [audio._redundancy_copies, audio._redundancy_offset_packets]
+        S["b143_ffmpeg_fixture"] = "/fixture/ffmpeg"
+        audio.stop()
     if args["mode"] in ("nopress", "nopress_head"):
         # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
         # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but
@@ -1395,6 +1552,57 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head"):
             wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
             finish_case("sl", r0)
             S["sl_held_flag_after_end"] = bool(getattr(bridge, "_party_hold_select", False))
+            # B145: Select held through a practice too — Select + L1 / R1 / R3 from every pad while a practice plays;
+            # the practice left by Select + Start (Start passes: the way back, the title not quit); Select alone after
+            # a real go passes
+            st_before = {p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}
+            PAIRS_P = (0x0100, 0x0200, 0x0080)
+
+            def selector_p():
+                k = 0
+                while watching["on"] and SEL["on"]:
+                    pair = PAIRS_P[k % 3]; k += 1
+                    for pl in range(4):
+                        bridge._apply_report(pl, 0x0020 | pair, 0, 0, 0, 0, 0, 0)
+                    time.sleep(0.1)
+                    for pl in range(4):
+                        bridge._apply_report(pl, 0, 0, 0, 0, 0, 0, 0)
+                    time.sleep(0.1)
+            r0 = held_start("sp", tok2, "1,2", ["other"])
+            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            S["sp_ready"] = b.get("phase")
+            S["sp_go"] = call("POST", "/plugins/games/party-minigame-go?practice=1")["body"].get("go")
+            b = wait_phase(lambda b: b.get("state") == "playing" or b.get("state") in ("ended", "given_up"), 20)
+            S["sp_playing"] = {k: b.get(k) for k in ("state", "practice")}
+            S["sp_held_in_practice"] = bool(getattr(bridge, "_party_hold_select", False))
+            S["sp_title_running"] = not fake["ra"].paused
+            h0, v0_ = len(HOTKEYS), len(VP["log"])
+            SEL["on"] = True
+            threading.Thread(target=selector_p, daemon=True).start()
+            time.sleep(1.5)                                 # the pairs while the practice plays
+            SEL["on"] = False; time.sleep(0.3)
+            S["sp_writes_in_practice"] = len(VP["log"]) - v0_
+            S["sp_select_written_in_practice"] = sum(1 for x in VP["log"][v0_:] if x[2] & 0x0020)
+            S["sp_hotkeys_in_practice"] = len(HOTKEYS) - h0
+            bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)     # Select + Start: Start leaves the practice
+            bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+            b = wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+            S["sp_back"] = b.get("phase")
+            S["sp_end_by"] = [r.get("by") for r in rows()[r0:] if r["step"] == "minigame_practice_end"]
+            S["sp_title_alive"] = title_alive()
+            S["sp_hotkeys_total"] = len(HOTKEYS) - h0
+            S["sp_states_same"] = ({p_.name: p_.read_bytes() for p_ in st_dir.glob("*")} if st_dir.is_dir() else {}) == st_before
+            S["sp_real_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+            wait_phase(lambda b: b.get("state") != "starting", 20)
+            v2_ = len(VP["log"])
+            bridge._apply_report(0, 0x0020, 0, 0, 0, 0, 0, 0)    # Select alone after a real go: passes
+            bridge._apply_report(0, 0, 0, 0, 0, 0, 0, 0)
+            S["sp_select_written_after_real_go"] = sum(1 for x in VP["log"][v2_:] if x[2] & 0x0020)
+            S["sp_held_after_real_go"] = bool(getattr(bridge, "_party_hold_select", False))
+            fake["ra"].screen = "end_P1"
+            wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+            finish_case("sp", r0)
+            S["sp_held_after_end"] = bool(getattr(bridge, "_party_hold_select", False))
             # N5: during the mute — the board's end, the onn's Home, a second start, the onn's END
             layer.advance_gap_s = 0.7
             TITLE["show_after"] = 2

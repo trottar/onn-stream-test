@@ -31,6 +31,14 @@ from native_fec_relay import FEC_SCHEME_ENV, NativeVideoFecRelay
 #     was NOT adopted: 3x the loss of the cap).
 ENC_MAX_FRAME_SIZE_ENV = "PRIVYHUB_ENC_MAX_FRAME_SIZE"
 ENC_BUFSIZE_K_ENV = "PRIVYHUB_ENC_BUFSIZE_K"
+# B144: a party practice's band across the top of the onn's picture (the encoder's own filter, after format=nv12 and
+# before hwupload: the title's window is never drawn on). Only when the party layer arms a start for the practice's
+# process (`party_banner_next`); every other start's command is byte for byte today's.
+PARTY_BANNER_TEXT = "PRACTICE \u2014 press Start to go back"
+PARTY_BANNER_FILTER = (
+    "drawtext=font=Sans:text='" + PARTY_BANNER_TEXT + "':fontcolor=white:fontsize=h*30/720:"
+    "x=(w-text_w)/2:y=(h*56/720-text_h)/2:box=1:boxcolor=black@0.72:boxborderw=14|4096|14|4096"
+)
 # B70: the hub's X pointer is not drawn into the capture (x11grab -draw_mouse 0); =1 keeps today's argv
 CAPTURE_POINTER_ENV = "PRIVYHUB_CAPTURE_POINTER"
 
@@ -1400,6 +1408,17 @@ class NativeStreamManager:
         ]
 
 
+    def party_banner_next(self, pid: int | None) -> None:
+        """B144: the next start for process `pid` draws the practice banner (None disarms). Set only by the party
+        layer, for a practice's planned switch."""
+        self._party_banner_pid = None if pid is None else int(pid)
+
+    def _take_party_banner(self, process_id: int) -> bool:
+        """B144: once per Linux start — True when armed for this process; the arm cleared either way."""
+        armed = getattr(self, "_party_banner_pid", None)
+        self._party_banner_pid = None
+        return armed is not None and armed == int(process_id)
+
     def _build_linux_ffmpeg_command(
         self,
         ffmpeg: Path,
@@ -1469,6 +1488,8 @@ class NativeStreamManager:
             "(ow-iw)/2:(oh-ih)/2:black,"
             "format=nv12,hwupload"
         )
+        if getattr(self, "_party_banner_on", False):      # B144: a party practice's capture session only
+            video_filter = video_filter.replace(",hwupload", "," + PARTY_BANNER_FILTER + ",hwupload")
 
         # D-BASE-P6a: the frame cap comes from the PROFILE by default and
         # the environment variable overrides it, including with 0 to run
@@ -1691,6 +1712,7 @@ class NativeStreamManager:
             raise NativeStreamError(refusal)   # G4-W2: fails closed before anything is spawned
 
         self._stop_locked()
+        self._party_banner_on = self._take_party_banner(process_id)   # B144: False unless a practice's switch armed it
 
         capture_target = self._select_capture_target(
             managed_process_id=process_id

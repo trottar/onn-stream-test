@@ -1,0 +1,244 @@
+diff --git a/checks/hub_minigame_check.gd b/checks/hub_minigame_check.gd
+index e6502b9..23e596a 100644
+--- a/checks/hub_minigame_check.gd
++++ b/checks/hub_minigame_check.gd
+@@ -30,6 +30,12 @@ extends SceneTree
+ ##     one scored; the load screen hidden at each playing and on every way out;
+ ##     the pads reaching the board while its screens are up and swallowed while
+ ##     the hub's game is on; the frame cap only then; without the screens: as before
++##   - (queue AX) once the hub has handed a practice over, the load screen is shown
++##     again behind it, while the hub still answers "playing", and hidden only at a
++##     real playing; a pad press during a practice reaches neither the board nor the
++##     load screen, and no go comes from it; the board's log has one line for the
++##     choice ("cards <n>, chose <0 | 1 | random>") and one for each go ("start" /
++##     "practice"), never a game's name
+ ## Exit code 0 = PASS, 1 = FAIL.
+ 
+ const HubMinigame = preload("res://minigames/hub_minigame.gd")
+@@ -49,6 +55,18 @@ var _go_phase_list := {}          # scenario -> the hub's phase at each go
+ var _go_kinds := {}               # scenario -> "practice" / "start" for each go
+ var _go_reads := {}               # scenario -> the stage's choice reads when the go came
+ var _screens: Node = null
++var _now := ""                    # the scenario being played (the made-up presenter reads the stand-in hub's mode)
++var _lines := LineCatcher.new()   # queue AX: the board's own log lines, as printed
++
++
++## Queue AX: catches the board's "PrivyParty: hub mini game:" lines as they are printed.
++class LineCatcher extends Logger:
++	var lines: Array[String] = []
++
++	func _log_message(message: String, _error: bool) -> void:
++		var line := message.strip_edges()
++		if line.begins_with("PrivyParty: hub mini game: "):
++			lines.append(line.trim_prefix("PrivyParty: hub mini game: "))
+ 
+ 
+ class Witness extends Node:  # stands where the board's controls stand: sees what reaches them
+@@ -79,6 +97,14 @@ class FakeScreens extends Node:  # a made-up presenter with the five methods of
+ 	var wait_reads := 4           # reads answered "" each showing before the answer
+ 	var reads := 0
+ 	var up := false
++	var hub_mode := Callable()    # queue AX: the stand-in hub's mode at each showing
++	var show_modes: Array = []
++	var pads_in_practice := 0     # pad presses that reached the load screen shown behind a practice, while it played
++	var behind := false           # the last showing came while the hub played a practice (the re-show at its hand-over)
++
++	func _input(event: InputEvent) -> void:
++		if up and behind and event is InputEventJoypadButton and event.pressed and hub_mode.is_valid() and str(hub_mode.call()) == "practice":
++			pads_in_practice += 1
+ 
+ 	func reset(chosen: int, answers: Array) -> void:
+ 		card = chosen
+@@ -90,6 +116,9 @@ class FakeScreens extends Node:  # a made-up presenter with the five methods of
+ 		wait_reads = 4
+ 		reads = 0
+ 		up = false
++		show_modes = []
++		pads_in_practice = 0
++		behind = false
+ 
+ 	func second_id() -> String:
+ 		return "mg_b" if str(cards_seen[1].get("title")) == "Made-up B" else "mg_a"
+@@ -102,6 +131,8 @@ class FakeScreens extends Node:  # a made-up presenter with the five methods of
+ 
+ 	func show_minigame_loading(title: String, _players: Array) -> void:
+ 		shows.append(title)
++		show_modes.append(str(hub_mode.call()) if hub_mode.is_valid() else "")
++		behind = show_modes[-1] == "practice"
+ 		reads = 0
+ 		up = true
+ 
+@@ -126,6 +157,7 @@ func _initialize() -> void:
+ 
+ func _run() -> void:
+ 	await process_frame
++	OS.add_logger(_lines)
+ 	print("HUB MINIGAME CHECK: a mini game played on the hub")
+ 	var base := OS.get_environment("PRIVYPARTY_CHECK_HUB")
+ 	if base == "":
+@@ -226,6 +258,7 @@ func _run() -> void:
+ 	# --- choose, load, ready or practise (queue AU): a stage with the screens -------------------------------
+ 	var screens := FakeScreens.new()
+ 	_screens = screens
++	screens.hub_mode = func(): return str(_hub.get(_now, {}).get("mode", ""))
+ 	screens.controls = controls
+ 	root.add_child(screens)
+ 	controls.players = ["pad0", "pad1"]
+@@ -242,7 +275,9 @@ func _run() -> void:
+ 	screens.card = 0
+ 	screens.plan = ["start"]
+ 	poke_prep.call()
++	var mark := _lines.lines.size()
+ 	_same(await _play(screens, base, "hcard0", two), [1, 0], "with the screens: card 0 chosen, the scores come back")
++	_same(_lines.lines.slice(mark), ["cards 2, chose 0", "start", "scores [1, 0] for seats 1,2"], "the board's log: two cards, card 0, then the go, then the scores")
+ 	var titles_seen := screens.cards_seen.map(func(c): return str(c.get("title")))
+ 	titles_seen.sort()
+ 	_same(titles_seen, ["Made-up A", "Made-up B"], "two cards, the hub's names (seeded order)")
+@@ -260,16 +295,22 @@ func _run() -> void:
+ 	_same(Engine.max_fps, 0, "the board's own frame rate after")
+ 	_expect(not root.get_children().any(func(n): return n is HubMinigame.PadGate), "no gate left")
+ 	screens.reset(1, ["start"])
++	mark = _lines.lines.size()
+ 	_same(await _play(screens, base, "hcard1", two), [1, 0], "card 1 chosen")
++	_same(_lines.lines.slice(mark), ["cards 2, chose 1", "start", "scores [1, 0] for seats 1,2"], "the board's log: card 1")
+ 	_expect_asked(_asked("hcard1", "party-minigame-start?id=" + screens.second_id()), "card 1's game started")
+ 	_same(screens.shows, [str(screens.cards_seen[1].get("title"))], "card 1's name on the load screen")
+ 	var played: int = HubMinigame._played
+ 	screens.reset(-1, ["start"])
+ 	var predicted := _random_pick(played, ["mg_a", "mg_b"])
++	mark = _lines.lines.size()
+ 	_same(await _play(screens, base, "hrandom", two), [1, 0], "Random chosen")
++	_same(_lines.lines.slice(mark), ["cards 2, chose random", "start", "scores [1, 0] for seats 1,2"], "the board's log: Random")
+ 	_expect_asked(_asked("hrandom", "party-minigame-start?id=" + predicted), "Random: the seeded pick between the two (the same seed, the same game)")
+ 	screens.reset(0, ["start"])
++	mark = _lines.lines.size()
+ 	_same(await _play(screens, base, "hone", two), [1, 0], "one game fits: one card")
++	_same(_lines.lines.slice(mark), ["cards 1, chose 0", "start", "scores [1, 0] for seats 1,2"], "the board's log: one card")
+ 	_same(screens.cards_seen, [{"title": "Made-up A"}], "one card, no second")
+ 	# no go while nobody has decided, however long; then the plain go
+ 	screens.reset(0, ["start"])
+@@ -282,13 +323,30 @@ func _run() -> void:
+ 	screens.wait_reads = 0
+ 	_same(await _play(screens, base, "hearly", two), [1, 0], "the players ready before the hub")
+ 	_expect_asked(_go_phases("hearly") == ["ready"], "the go not before the hub was ready")
+-	# three practices, then a real one
++	# three practices, then a real one; a pad pressed every 0.3 s throughout
+ 	screens.reset(0, ["practice", "practice", "practice", "start"])
++	witness.pads = 0
++	var poking := [true]
++	var poke_all := func():
++		while poking[0]:
++			await create_timer(0.3).timeout
++			await _press()
++	poke_all.call()
++	mark = _lines.lines.size()
+ 	_same(await _play(screens, base, "hpractice", two), [1, 0], "three practices, then a real one scored")
++	poking[0] = false
+ 	_expect_asked(_go_kinds.get("hpractice", []) == ["practice", "practice", "practice", "start"], "three practice goes, then a plain one")
+-	_same(screens.shows.size(), 4, "the load screen shown again after each practice")
+-	_same(screens.hides, 4, "and hidden at each playing")
+-	_expect_asked(_go_phases("hpractice") == ["ready", "ready", "ready", "ready"], "every go with the hub ready")
++	_same(screens.shows.size(), 4, "the load screen shown again at each practice's hand-over")
++	_expect_asked(screens.show_modes.slice(1) == ["practice", "practice", "practice"],
++		"each shown again while the hub still answered playing (a practice), before its answer left playing")
++	_same(screens.hides, 1, "hidden only at the real playing (a practice keeps it up behind the hub's game)")
++	# (a press between the hub taking a go and the board's gate going up, a frame or so, can reach the screen still
++	# shown before the hand-over: the re-show at the hand-over clears every mark, so it makes no go)
++	_same(screens.pads_in_practice, 0, "no press made during a practice reaches the load screen shown behind it")
++	_expect_asked(_go_phases("hpractice") == ["ready", "ready", "ready", "ready"], "every go with the hub ready (none from a press in a practice)")
++	_same(_lines.lines.slice(mark), ["cards 2, chose 0", "practice", "practice", "practice", "start", "scores [1, 0] for seats 1,2"],
++		"the board's log: the choice, then each decision in order")
++	_expect(_lines.lines.all(func(l): return not l.contains("Made-up")), "no game's name in the board's log lines")
+ 	# every way out takes the load screen down
+ 	for scenario in ["hgiveup", "hrefused", "hsilent"]:
+ 		screens.reset(0, ["start"])
+@@ -320,6 +378,7 @@ func _run() -> void:
+ 
+ 
+ func _play(stage: Node, base: String, scenario: String, players: Array) -> Array:
++	_now = scenario
+ 	OS.set_environment("PRIVYPARTY_HUB", base + "/s/" + scenario if scenario != "nohub" else base)
+ 	var minigame = HubMinigame.new()
+ 	minigame.stage = stage
+diff --git a/minigames/hub_minigame.gd b/minigames/hub_minigame.gd
+index 12b4780..e2fc945 100644
+--- a/minigames/hub_minigame.gd
++++ b/minigames/hub_minigame.gd
+@@ -24,7 +24,12 @@ extends "res://rules/minigame.gd"
+ ## (minigame_loading_choice: "start" or "practice") is made and the hub is
+ ## ready, however long that takes; the screen goes at the first "playing"
+ ## (hide_minigame_loading) and on every way out. A practice gives the rules
+-## nothing: when the hub is back at "starting" the load screen comes up again.
++## nothing: once the hub has handed a practice over ("playing"), the load
++## screen is shown again behind it (every mark clear), so when the practice
++## ends the TV comes back to the load screen, not the board.
++## The board's log gets one line for the players' choice ("cards <n>, chose
++## <0 | 1 | random>") and one for each go the hub takes ("start" / "practice"):
++## numbers and words only, never a game's name.
+ ## The pads are swallowed, and the frame rate capped, only while the TV is on
+ ## the hub's game. A stage without the screens: everything as before.
+ 
+@@ -148,6 +153,8 @@ func play(players: Array) -> Array:
+ 	var phase := ""
+ 	var said_ready := -1     # what the load screen was last told (-1: nothing yet)
+ 	var went := false        # the go sent for this showing of the load screen
++	var practising := false  # the go sent was a practice
++	var behind := false      # the load screen shown again behind a practice the hub has handed over
+ 	var shown := screens
+ 	var since_poll := POLL_SECONDS
+ 	while true:
+@@ -162,6 +169,8 @@ func play(players: Array) -> Array:
+ 				var answer: Dictionary = await _call(tree, "POST", hub + GO + ("?practice=1" if choice == "practice" else ""))
+ 				if answer.get("ok", false):
+ 					went = true
++					practising = choice == "practice"
++					print("PrivyParty: hub mini game: %s" % choice)
+ 					if gate == null:
+ 						gate = PadGate.new()
+ 						tree.root.add_child(gate)
+@@ -189,6 +198,17 @@ func play(players: Array) -> Array:
+ 			break
+ 		if screens:
+ 			if state == "starting":
++				if behind:  # a practice is over: its load screen is already up; the pads are the board's again
++					if gate != null:
++						gate.restore()
++						if gate.get_parent() != null:
++							gate.get_parent().remove_child(gate)
++						gate.free()
++						gate = null
++					behind = false
++					practising = false
++					went = false
++					said_ready = -1
+ 				if not shown:  # a practice is over: the load screen again, the wait starts over
+ 					if gate != null:
+ 						gate.restore()
+@@ -205,7 +225,13 @@ func play(players: Array) -> Array:
+ 				if ready != said_ready:
+ 					stage.set_minigame_loading_ready(ready == 1)
+ 					said_ready = ready
+-			elif state == "playing" and shown:
++			elif state == "playing" and practising and not behind:
++				# a practice handed over: the load screen again behind it, every mark clear (the gate keeps the
++				# pads from it while the hub's game is on), so the way back lands on it
++				stage.show_minigame_loading(str(titles.get(id, "")), players)
++				behind = true
++				phase = ""
++			elif state == "playing" and shown and not practising:
+ 				stage.hide_minigame_loading()
+ 				shown = false
+ 				phase = ""
+@@ -242,9 +268,12 @@ func _choose(random: RandomNumberGenerator, fitting: Array, first: String, title
+ 	if typeof(answer) == TYPE_DICTIONARY:
+ 		card = int(answer.get("card", -2))
+ 	if card == -1 and ids.size() == 2:
++		print("PrivyParty: hub mini game: cards %d, chose random" % ids.size())
+ 		return ids[random.randi_range(0, 1)]
+ 	if card >= 0 and card < ids.size():
++		print("PrivyParty: hub mini game: cards %d, chose %d" % [ids.size(), card])
+ 		return ids[card]
++	print("PrivyParty: hub mini game: cards %d, chose 0" % ids.size())
+ 	return first
+ 
+ 
