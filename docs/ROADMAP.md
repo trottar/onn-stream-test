@@ -3237,6 +3237,8 @@ start and result; **the PrivyParty probe on the hub**.
 
 **H7-V6b (2026-11-18): T88 and T89 MET — a clean paused window, the hub's half.** On the bench, with RetroArch's own text off the mini game's window (queue AW), each title was prepared behind the board, paused at every second, and its starting screen read at once — about a second after its starting point was loaded, both titles, every time. The duel title held its ready for three minutes, took a go given before it was ready, came back from two practices by time and scored both ends; the four-player title came back from a practice and scored its results. No go loaded the game again; the users' files were unchanged. **What waits:** PP-H3c, the user alone with two pads at the TV (the onn must trust the hub's adb key again first); then PP-H4 (`docs/memory/evidence/H7_V6B_2026-11-18.md`).
 
+**PP-H3c (2026-11-18): stopped after its bench half.** The hub passed its own gate — the board's checks and one held start of the duel title on the bench, paused, read at once, no reload, scored. The sitting at the TV did not start: the onn no longer accepts the hub's debugging key and shows no box to allow it, and the user stopped to look into that first. **What waits:** the onn's debugging trust, then PP-H3c again (`docs/memory/evidence/PP_H3C_2026-11-18.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

@@ -18,8 +18,8 @@ E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`
 
 ## Current Work Item
 
-- **H7-V6b: T88 MET, T89 MET** (`evidence/H7_V6B_2026-11-18.md`): queue AW's clean window on the bench — both starts
-  read paused at the first read, PAUSED to every go, no reload, the ends and results as H7-V5b. Flags off; eighteen lines.
+- **PP-H3c stopped after part 1** (`evidence/PP_H3C_2026-11-18.md`): the bench gate MET; the sitting not run — the onn
+  refuses the hub's adb key, no box; the user stopped to look into it. Flags off; eighteen lines. H7-V6b MET.
 
 ## Verified State
 
@@ -87,8 +87,7 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — PP-H3c may be offered** (the user alone, two pads; H7-V6b MET), then PP-H4. The onn's adb answers
-   "unauthorized": trust it again before PP-H3c.
+1. **H7 — the onn's adb trust** (the user's: it refuses the hub's key, no box), then PP-H3c again, then PP-H4.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 
