@@ -3239,6 +3239,8 @@ start and result; **the PrivyParty probe on the hub**.
 
 **PP-H3c (2026-11-18): stopped after its bench half.** The hub passed its own gate — the board's checks and one held start of the duel title on the bench, paused, read at once, no reload, scored. The sitting at the TV did not start: the onn no longer accepts the hub's debugging key and shows no box to allow it, and the user stopped to look into that first. **What waits:** the onn's debugging trust, then PP-H3c again (`docs/memory/evidence/PP_H3C_2026-11-18.md`).
 
+**PP-H3c, second try (2026-11-18): MET — one person, two pads, the board and the hub together.** With the onn trusting the hub again, the user played the board game with a pad in each hand to its hub mini games: every load screen held the game paused until the board said go, a practice could be left by Start or ran out on time, both real matches were scored and credited to the right player, Home and Resume worked mid-fight, and END closed everything. The users' files were unchanged. **Seen for B:** the sound dropped out for part of the second fight; the user asked for a "practice" banner on the TV. **What waits:** PP-H4, four people (`docs/memory/evidence/PP_H3C2_2026-11-18.md`).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 

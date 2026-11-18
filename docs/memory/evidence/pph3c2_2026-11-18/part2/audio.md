@@ -1,0 +1,3 @@
+# PP-H3c (second try) — the user's "Audio was missing for half the fight" (the second real match, 03:49:50-03:51:50Z), the onn's own heartbeat (numbers only; not a cell)
+
+From the onn's heartbeat rows (every 2 s): `audio_rx_packets` rose ~100 / s throughout (the audio arrived); **`audio_queue_depth` 0 and `audio_underruns` rising ~75 / s from before the go until 03:51:26Z**, then **depth 8-14 and the underruns flat from 03:51:28Z to the end**; `audio_prolonged_starvation_events` 3 → 6 at 03:51:28-32Z, 7 at 03:51:52Z; `audio_lost_packets` 0. The same empty-queue pattern is in the rows before the go (on the board). Not read further here; for B.
