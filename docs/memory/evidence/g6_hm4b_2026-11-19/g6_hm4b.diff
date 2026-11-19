@@ -1,0 +1,98 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+index a75b0114..f665d167 100644
+--- a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
++++ b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+@@ -284,8 +284,14 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
+ object Ps2TouchLayout {
+     const val REF_W = 1200f
+     const val REF_H = 1325f
+-    const val STICK_R = 132f
+-    const val STICK_HIT = 1.2f
++    /** G6-HM4's stick radius (drawn ring = full throw). */
++    const val STICK_R_HM4 = 132f
++    /** G6-HM4b: the throw shortened to 0.875 x (the user: "10-15% smaller"); the drawn ring matches it. */
++    const val STICK_THROW = 0.875f
++    const val STICK_R = STICK_R_HM4 * STICK_THROW          // 115.5 px: full deflection here
++    /** G6-HM4b: the press (catch) area unchanged from G6-HM4: 132 x 1.2 = 158.4 px. */
++    const val STICK_PRESS_R = STICK_R_HM4 * 1.2f
++    const val STICK_HIT = STICK_PRESS_R / STICK_R
+     const val DPAD_R = 125f
+     const val DPAD_HIT = 1.25f
+     const val THUMB_R = 48f
+diff --git a/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt b/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
+index 2a0bcfb6..d6feb5a0 100644
+--- a/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
++++ b/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
+@@ -48,9 +48,10 @@ class G6TouchPs2Test {
+     }
+ 
+     // each stick's four directions and the sign (up and right positive; the sender stores -AXIS_Y)
++    // G6-HM4b: at the new radius (0.875 x G6-HM4's 132 px = 115.5 px)
+     @Test
+     fun eachStickHasFourDirectionsWithTheSendersSign() {
+-        val r = 132f
++        val r = Ps2TouchLayout.STICK_R
+         val (lx, ly) = c(Control.LSTICK)
+         s.down(1, lx, ly)
+         assertEquals(MAX, s.move(1, lx, ly - r).ly); assertEquals(0.toShort(), s.output().lx)
+@@ -72,7 +73,7 @@ class G6TouchPs2Test {
+ 
+     @Test
+     fun theClampAndTheDeadZone() {
+-        val r = 132f
++        val r = Ps2TouchLayout.STICK_R                                           // G6-HM4b: the new radius
+         val (lx, ly) = c(Control.LSTICK)
+         s.down(1, lx, ly)
+         assertEquals(MAX, s.move(1, lx + 3 * r, ly).lx)                         // clamped at 1
+@@ -80,8 +81,8 @@ class G6TouchPs2Test {
+         assertEquals(23170.0, diag.lx.toDouble(), 2.0); assertEquals(23170.0, diag.ly.toDouble(), 2.0)
+         assertEquals(TouchPadState.Output(), s.move(1, lx + 0.09f * r, ly))     // inside 0.1 r
+         assertTrue(s.move(1, lx + 0.11f * r, ly).lx > 0)                         // just outside
+-        assertEquals(0f to 0f, TouchPadState.stickVector(5f, 5f, 132f))
+-        assertEquals(1f, TouchPadState.stickVector(1000f, 0f, 132f).first, 1e-6f)
++        assertEquals(0f to 0f, TouchPadState.stickVector(5f, 5f, r))
++        assertEquals(1f, TouchPadState.stickVector(1000f, 0f, r).first, 1e-6f)
+     }
+ 
+     @Test
+@@ -109,6 +110,25 @@ class G6TouchPs2Test {
+         assertEquals(TouchPadState.Output(), s.up(1))
+     }
+ 
++    // G6-HM4b: full deflection at 0.875 x the old radius; the press area unchanged
++    @Test
++    fun fullDeflectionAt0875OfTheOldRadius() {
++        assertEquals(0.875f, Ps2TouchLayout.STICK_THROW, 0f)
++        assertEquals(115.5f, Ps2TouchLayout.STICK_R, 1e-4f)
++        assertEquals(158.4f, Ps2TouchLayout.STICK_PRESS_R, 1e-3f)
++        val (lx, ly) = c(Control.LSTICK)
++        s.down(1, lx, ly)
++        assertEquals(MAX, s.move(1, lx + 0.875f * 132f, ly).lx)                  // full at 115.5 px
++        val g6hm4Half = s.move(1, lx + 0.5f * 0.875f * 132f, ly).lx                // half of the new throw
++        assertEquals(16384.0, g6hm4Half.toDouble(), 2.0)
++        assertTrue(s.move(1, lx + 0.8f * 132f, ly).lx < MAX)                      // G6-HM4's 80 % is now ~91 %
++        assertEquals(0.914, s.output().lx / 32767.0, 0.001)
++        s.up(1)
++        // a touch 150 px from the centre (outside the new ring, inside the unchanged 158.4 px press area) lands on it
++        assertEquals(Control.LSTICK, s.controlAt(lx - 150f, ly))
++        assertEquals(Control.RSTICK, c(Control.RSTICK).let { (x, y) -> s.controlAt(x, y - 150f) })
++    }
++
+     @Test
+     fun l3AndR3BitsArePinned() {
+         assertEquals(0x0040, TouchPadState.XUSB_LEFT_THUMB)
+@@ -146,7 +166,13 @@ class G6TouchPs2Test {
+             val hCm = (if (d.halfH == 0f) 2 * d.halfW else 2 * d.halfH) / pxCm
+             assertTrue(d.control.name, minOf(wCm, hCm) >= 1.0)
+             if (d.control in setOf(Control.L1, Control.L2, Control.R1, Control.R2)) assertTrue(d.control.name, hCm >= 2.0)
+-            if (d.control in setOf(Control.DPAD, Control.LSTICK, Control.RSTICK)) assertTrue(d.control.name, wCm >= 2.5)
++            if (d.control == Control.DPAD) assertTrue(d.control.name, wCm >= 2.5)
++            // G6-HM4b: the sticks' drawn ring is 0.875 x G6-HM4's (2.44 cm at 240 dpi, under the amendment's 2.5 cm,
++            // kept at the user's request); their press area is unchanged and exceeds 2.5 cm
++            if (d.control == Control.LSTICK || d.control == Control.RSTICK) {
++                assertEquals(115.5f, d.halfW, 1e-3f)
++                assertTrue(d.control.name, 2 * d.hitHalfW / pxCm >= 2.5)
++            }
+         }
+     }
+ 

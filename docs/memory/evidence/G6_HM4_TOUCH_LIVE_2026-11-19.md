@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-19
-status: RECORD — G6-HM4 part 1 DONE (code, build, pre-registration). The PS2 touch controls live (shoulders as addendum B2) and the main app's 2 columns upright; candidate APK 12bb09e7… for the tablet only; 357 / 357 JVM tests. The tablet run (part 2) waits for the user. The onn keeps ca53df0d…. Nothing adopted.
+status: RECORD — G6-HM4 NOT MET by its pre-registered rule (c6: SELECT and START not pressed; c7: the right stick up 0.379 / left 0.791). c1–c5 and c8 met (join 5007 ms; worst gap 173 ms). By the user's own account the misses are steps not followed in full, not a code fault; the verdict stands. Candidate 12bb09e7… on the tablet only; the onn keeps ca53df0d…. Nothing adopted.
 ---
 
 # G6-HM4 — the PS2 touch controls live (part 1: code, build, pre-registration; 2026-11-19)
@@ -71,7 +71,48 @@ Task: `../handoffs/G6-HM4_TOUCH_LIVE_TASK.md`. Patch note: `../patches/G6_HM4_TO
 `git diff --check` is clean; `git apply -R --check g6_hm4.diff` is OK. The redactor is clean on the Kotlin files and
 the records.
 
-## 4. Part 2 — the tablet run (pending)
+## 4. Part 2 — the tablet run, scored (2026-11-19; scored by G6-HM4B)
 
-Pre-registered and hashed before the run: `g6_hm4_2026-11-19/preregistration.md`, sha256 `0fbaf9f2…`, at
-2026-11-19T19:09:08Z. It has eight cells (c1–c8) and the user's seven steps. The result is added here after the run.
+**Pre-registration intact:** `preregistration.md` sha256 `0fbaf9f2…` checks OK; hashed at 19:09:08Z.
+
+**The session (verified):**
+- the only tablet game session after the hash: recovery-log session 16, a PS2 game;
+- `launch_ports` 19:29:26.5Z, `session_started` 19:29:34.7Z, `session_end_bye` 19:32:38.4Z (`client_frame` 11230):
+  **183.7 s PLAYING**;
+- decoder report `logs/games/decoder_sessions/native_decoder_20261119_193238_516.json` (`4bab27a3…`, received
+  19:32:38.516Z, `duration_ms` 187738), with a `handheld` block, `layout` `ps2`, `touch_live` true.
+
+Figures as extracted: `g6_hm4b_2026-11-19/hm4_part2_figures.txt`.
+
+| Cell | Value | Bound | Verdict |
+|---|---|---|---|
+| G6-HM4.c1 decode | `OMX.Exynos.avc.dec`, hardware true, low latency true | hardware, low latency | **MET** |
+| G6-HM4.c2 rate | `recent_fps` 59.61 | ≥ 58 | **MET** |
+| G6-HM4.c3 drops | decoder 7 / 11236 = 0.06 %; video 1 / 11236 = 0.01 % | each ≤ 1 % | **MET** |
+| G6-HM4.c4 latency | `max_rx_to_decode_ms` 60; `max_output_gap_ms` 173 | ≤ 100; ≤ 250 | **MET** |
+| G6-HM4.c5 the join | `touch_slot` 0; `p1_join_after_release_ms` **5007** | 0; 5000–5300 | **MET** |
+| G6-HM4.c6 every control | `controls_pressed` **14 of 16**: `SELECT` and `START` absent | all 16 | **NOT MET** |
+| G6-HM4.c7 sticks | left: up 1, down 1, left 1, right 1; right: **up 0.379**, down 1, **left 0.791**, right 0.993 | each ≥ 0.9 | **NOT MET** (the right stick's up and left) |
+| G6-HM4.c8 End | `end_presses` 1; one bye after 183.7 s PLAYING | 1; ≥ 60 s | **MET** |
+
+**Verdict by the pre-registered rule: G6-HM4 NOT MET** (c6 and c7). No threshold changes after the hash.
+
+**Context (not cells):**
+- `touch_writes` 5852; `touch_events` 4094; `pointer_exempted_events` 4099;
+- `takeovers` 0 (no pad, as expected); `back_swallowed` 0;
+- `video.lost_packets` 2 (0 in resyncs), `fec_unrecoverable_groups` 1, **0 sequence resyncs**, 1 stall signal;
+- no `link_notice_shown`;
+- the order of first presses: RSTICK, LSTICK, CROSS, TRIANGLE, CIRCLE, SQUARE, R1, L1, L2, R2, DPAD, R3, L3, END.
+
+**The user's remarks and answers, verbatim (2026-11-19):**
+- "Overall played pretty nice. I think the sticks might actually have too much give. When driving I really had to
+  pull them pretty far for turning. Maybe like 10-15% smaller would be excellent."
+- Asked whether they pressed SELECT and START and pushed the right stick fully up and left: "I used the right stick
+  naturally, but never clicked select and start thAt was an oversight".
+
+**Reading of the misses (recorded, not re-scored).** By the user's own account, c6's miss (SELECT and START never
+pressed) and c7's miss (the right stick not pushed fully up and left; it was used "naturally") were steps of the run
+not followed in full. They are not a fault found in the code. NOT MET stands as scored.
+
+**Next:** G6-HM4b (`G6_HM4B_SHORTER_STICKS_2026-11-19.md`): the sticks' throw about 12.5 % shorter, as the user
+asked, a new candidate, and the run pre-registered again with steps that are harder to miss.

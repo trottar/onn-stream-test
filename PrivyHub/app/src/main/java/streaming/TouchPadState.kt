@@ -284,8 +284,14 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
 object Ps2TouchLayout {
     const val REF_W = 1200f
     const val REF_H = 1325f
-    const val STICK_R = 132f
-    const val STICK_HIT = 1.2f
+    /** G6-HM4's stick radius (drawn ring = full throw). */
+    const val STICK_R_HM4 = 132f
+    /** G6-HM4b: the throw shortened to 0.875 x (the user: "10-15% smaller"); the drawn ring matches it. */
+    const val STICK_THROW = 0.875f
+    const val STICK_R = STICK_R_HM4 * STICK_THROW          // 115.5 px: full deflection here
+    /** G6-HM4b: the press (catch) area unchanged from G6-HM4: 132 x 1.2 = 158.4 px. */
+    const val STICK_PRESS_R = STICK_R_HM4 * 1.2f
+    const val STICK_HIT = STICK_PRESS_R / STICK_R
     const val DPAD_R = 125f
     const val DPAD_HIT = 1.25f
     const val THUMB_R = 48f

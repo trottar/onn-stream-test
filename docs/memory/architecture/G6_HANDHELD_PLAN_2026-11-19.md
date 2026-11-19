@@ -115,3 +115,5 @@ Each stage starts only on the user's word, under the conflict rules in §3.
 **2026-11-19 — the tablet's setup (Q-B5):** Wi-Fi scanning and Bluetooth scanning off (Android: Settings → Location → Location services); nothing in the app.
 
 **2026-11-19:** G6-HM4 part 1 done (`../evidence/G6_HM4_TOUCH_LIVE_2026-11-19.md`): the PS2 touch controls live with the shoulders as addendum B2 (settled by the ergonomics chat at the user's request), the main app's 2 columns upright in handheld mode, 357 / 357 JVM tests, candidate APK `12bb09e7…` for the tablet only; the tablet run pre-registered (`0fbaf9f2…`). The onn keeps `ca53df0d…`.
+
+**2026-11-19:** G6-HM4's run scored **NOT MET** (c6: SELECT and START not pressed; c7: the right stick up 0.379 / left 0.791). By the user's own account these were steps not followed in full, not a code fault; c1–c5 and c8 met (join 5007 ms, worst gap 173 ms). G6-HM4b part 1 done (`../evidence/G6_HM4B_SHORTER_STICKS_2026-11-19.md`): the sticks' throw 0.875 ×, as the user asked; candidate `965d4f19…` for the tablet only; 358 / 358 JVM tests; the run pre-registered again with steps that are harder to miss (`e9694ff0…`).
