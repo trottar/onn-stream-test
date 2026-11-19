@@ -93,7 +93,7 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
    load screen. For B: the sound ~15 s after the onn's Home. PrivyParty's adoption only on the user's own go.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
-3. G6 (secondary): G6-HM4 NOT MET (steps missed); the G6-HM4b tablet run (sticks 0.875 ×, candidate `965d4f19…`, tablet only; `evidence/G6_HM4B_…`); never beside another run; the stale pairing's removal.
+3. G6 (secondary): G6-HM4b NOT MET on c6 alone (L3 / R3 skipped by the user; all else met; the user: "Played very nice with no issues"; `evidence/G6_HM4B_…`); next on the user's word; never beside another run; the stale pairing's removal.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-19
-status: RECORD — G6-HM4b part 1 DONE. The sticks' throw 0.875 × G6-HM4's (the user's "10-15% smaller"); candidate APK 965d4f19… for the tablet only; 358 / 358 JVM tests; the run pre-registered (e9694ff0…). Part 2 waits for the user. The onn keeps ca53df0d…. Nothing adopted.
+status: RECORD — G6-HM4b NOT MET by its pre-registered rule (c6: 14 of 16, L3 and R3 absent). c1–c5, c7 and c8 met (join 5091 ms; worst gap 75 ms; every stick direction ≥ 0.966). Candidate 965d4f19… on the tablet only; the onn keeps ca53df0d…. Nothing adopted.
 ---
 
 # G6-HM4b — the sticks' throw about 12.5 % shorter (part 1: code, build, pre-registration; 2026-11-19)
@@ -68,9 +68,56 @@ sticks' drawn size under 2.5 cm is **reported**, not failed, as the task asks.
 The only code file changed is `TouchPadState.kt`. `git diff --check` is clean; `git apply -R --check g6_hm4b.diff`
 is OK. The redactor is clean on the Kotlin files and the records.
 
-## 4. Part 2 — the tablet run (pending)
+## 4. Part 2 — the tablet run, scored (2026-11-19)
 
-Pre-registered and hashed before the run: `g6_hm4b_2026-11-19/preregistration.md`, sha256 `e9694ff0…`, at
-2026-11-19T20:18:05Z. It is G6-HM4's pre-registration copied exactly, changing only the candidate, the steps (all 16
-controls numbered one per line, SELECT and START on their own lines, the sticks pushed to the edge and held) and one
-added remark (whether the shorter throw suits driving). The result is added here after the run.
+**Pre-registration intact:** `preregistration.md` sha256 `e9694ff0…` checks OK; hashed at 20:18:05Z.
+
+**The session (verified):**
+- the only tablet game session after the hash: recovery-log session 17, a PS2 game;
+- `launch_ports` 22:07:02.2Z, `session_started` 22:07:10.2Z, `session_end_bye` 22:10:03.0Z (`client_frame` 10585):
+  **172.8 s PLAYING**;
+- decoder report `logs/games/decoder_sessions/native_decoder_20261119_221003_090.json` (`cad1863e…`, received
+  22:10:03.090Z, `duration_ms` 176751), with a `handheld` block, `layout` `ps2`, `touch_live` true.
+
+Figures as extracted: `g6_hm4b_2026-11-19/part2_figures.txt`.
+
+| Cell | Value | Bound | Verdict |
+|---|---|---|---|
+| G6-HM4.c1 decode | `OMX.Exynos.avc.dec`, hardware true, low latency true | hardware, low latency | **MET** |
+| G6-HM4.c2 rate | `recent_fps` 59.66 | ≥ 58 | **MET** |
+| G6-HM4.c3 drops | decoder 7 / 10590 = 0.07 %; video 0 / 10590 = 0 % | each ≤ 1 % | **MET** |
+| G6-HM4.c4 latency | `max_rx_to_decode_ms` 55; `max_output_gap_ms` 75 | ≤ 100; ≤ 250 | **MET** |
+| G6-HM4.c5 the join | `touch_slot` 0; `p1_join_after_release_ms` **5091** | 0; 5000–5300 | **MET** |
+| G6-HM4.c6 every control | `controls_pressed` **14 of 16**: `L3` and `R3` absent | all 16 | **NOT MET** |
+| G6-HM4.c7 sticks | left: up 1, down 0.966, left 1, right 1; right: up 1, down 1, left 0.999, right 1 | each ≥ 0.9 | **MET** |
+| G6-HM4.c8 End | `end_presses` 1; one bye after 172.8 s PLAYING | 1; ≥ 60 s | **MET** |
+
+**Verdict by the pre-registered rule: G6-HM4b NOT MET** (c6: L3 and R3 not in `controls_pressed`). No threshold
+changes after the hash.
+
+**Context (not cells):**
+- `touch_writes` 5680; `touch_events` 4098; `pointer_exempted_events` 4104;
+- `takeovers` 0 (no pad); `back_swallowed` 0;
+- `video.lost_packets` 0, `fec_unrecoverable_groups` 0, **0 sequence resyncs**, 0 stall signals;
+- no `link_notice_shown`;
+- the order of first presses: LSTICK, DPAD, CROSS, TRIANGLE, CIRCLE, SQUARE, R2, L2, L1, R1, SELECT, START, RSTICK,
+  END. G6-HM4's run on the previous candidate did record L3 and R3; G6-HM4b changed only the sticks' constants.
+
+**The user's remarks, verbatim (2026-11-19, asked once):**
+
+> "Played very nice with no issues"
+
+The question listed L3 / R3, the shorter throw for driving, each control's reach, the stick feel, the countdown, and
+the main app's 2 columns and Settings upright. The answer covers them as one remark and does not take them one by one.
+- **Not inferred:** whether L3 and R3 were pressed. c6 stays NOT MET as scored.
+- **The code read beside it, no claim made:** only the sticks' constants changed since G6-HM4, whose run recorded L3
+  and R3. `G6TouchPs2Test` still presses L3 and R3 at their centres (`l3AndR3BitsArePinned`,
+  `all16ControlsAreReachableAtTheirCentres`), and `layout_check_hm4b.py` finds no press area over them.
+
+**The user's follow-up, verbatim (2026-11-19):** "I pressed those last time, that was in the list. But they worked fine
+then". Asked whether L3 / R3 were pressed in this run, the user chose: **"Skipped them this time"**, because they had
+already worked in G6-HM4's run.
+- **Reading of c6's miss (recorded, not re-scored):** L3 and R3 were skipped in this run by the user's own account.
+  It is a step not followed, not a fault found in the code.
+- **G6-HM4's run recorded both** (`G6_HM4_TOUCH_LIVE_2026-11-19.md` §4: `controls_pressed` held `R3` and `L3`).
+- **NOT MET stands as scored.**
