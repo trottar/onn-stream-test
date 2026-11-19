@@ -121,3 +121,13 @@ cause is claimed. The verdict stands as NOT MET.
 **Next:** the design amendment G6-HM1a (`g6_hm1a_2026-11-19/design_amendment_written_before_code.md`), hashed before
 any code. Whether c4 is re-run as pre-registered, or carried into G6-HM4's cells, is the user's call (the amendment's
 open questions).
+
+## 5. The re-run (2026-11-19, the placement test's minute P1)
+
+**G6-HM3 re-run: MET** by its own pre-registered rule and cells (`bcbeff14…`), as G6-PLACE's minute P1. The tablet lay
+flat about 1 m from the travel router (session 14, 16:59–17:04Z).
+- c4: `max_output_gap_ms` 64, `max_rx_to_decode_ms` 56;
+- c7: Back tried (`back_swallowed` 5) and End;
+- every other cell met.
+
+Record: `G6_PLACE_PLACEMENT_TEST_2026-11-19.md`. The first run above stays NOT MET; both are on record.
