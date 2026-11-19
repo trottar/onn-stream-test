@@ -1,0 +1,53 @@
+diff --git a/checks/hub_minigame_check.gd b/checks/hub_minigame_check.gd
+index c9e77e0..67886e1 100644
+--- a/checks/hub_minigame_check.gd
++++ b/checks/hub_minigame_check.gd
+@@ -108,9 +108,14 @@ class FakeScreens extends Node:  # a made-up presenter with the five methods of
+ 	var show_modes: Array = []
+ 	var pads_in_practice := 0     # pad presses that reached the load screen shown behind a practice, while it played
+ 	var behind := false           # the last showing came while the hub played a practice (the re-show at its hand-over)
++	var hub_practice_goes := Callable()  # the stand-in hub's count of the practice goes it has taken
++	var behind_go := -1           # that count at the showing behind a practice: the practice it was shown behind
+ 
+ 	func _input(event: InputEvent) -> void:
+-		if up and behind and event is InputEventJoypadButton and event.pressed and hub_mode.is_valid() and str(hub_mode.call()) == "practice":
++		# only a press during the practice this showing is behind (the stand-in turns "practice" as it takes the next
++		# practice's go, a frame or so before the board's gate goes up: a press then is not during that one)
++		if up and behind and event is InputEventJoypadButton and event.pressed and hub_mode.is_valid() and str(hub_mode.call()) == "practice" \
++				and hub_practice_goes.is_valid() and int(hub_practice_goes.call()) == behind_go:
+ 			pads_in_practice += 1
+ 
+ 	func reset(chosen: int, answers: Array) -> void:
+@@ -126,6 +131,7 @@ class FakeScreens extends Node:  # a made-up presenter with the five methods of
+ 		show_modes = []
+ 		pads_in_practice = 0
+ 		behind = false
++		behind_go = -1
+ 
+ 	func second_id() -> String:
+ 		return "mg_b" if str(cards_seen[1].get("title")) == "Made-up B" else "mg_a"
+@@ -140,6 +146,7 @@ class FakeScreens extends Node:  # a made-up presenter with the five methods of
+ 		shows.append(title)
+ 		show_modes.append(str(hub_mode.call()) if hub_mode.is_valid() else "")
+ 		behind = show_modes[-1] == "practice"
++		behind_go = int(hub_practice_goes.call()) if behind and hub_practice_goes.is_valid() else -1
+ 		reads = 0
+ 		up = true
+ 
+@@ -266,6 +273,7 @@ func _run() -> void:
+ 	var screens := FakeScreens.new()
+ 	_screens = screens
+ 	screens.hub_mode = func(): return str(_hub.get(_now, {}).get("mode", ""))
++	screens.hub_practice_goes = func(): return int(_hub.get(_now, {}).get("practice_goes", 0))
+ 	screens.controls = controls
+ 	root.add_child(screens)
+ 	controls.players = ["pad0", "pad1"]
+@@ -610,6 +618,8 @@ func _held_answer(scenario: String, action: String, path: String) -> Array:
+ 			if phase != "ready":
+ 				return [400, {"ok": false, "error": "no mini game is waiting for the go"}]
+ 			st["mode"] = "practice" if path.contains("practice=1") else "play"
++			if st["mode"] == "practice":
++				st["practice_goes"] = int(st.get("practice_goes", 0)) + 1
+ 			st["p"] = 0
+ 			_ready_at.erase(scenario)
+ 			body.merge({"go": "taken", "phase": "ready"})

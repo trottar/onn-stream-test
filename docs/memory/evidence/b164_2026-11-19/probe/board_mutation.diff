@@ -1,0 +1,11 @@
+--- minigames/hub_minigame.gd	2026-11-19 00:47:30.869274612 -0500
++++ minigames/hub_minigame.gd	2026-11-18 23:43:05.464775814 -0500
+@@ -181,7 +181,7 @@
+ 					practising = choice == "practice"
+ 					practices_at_go = practices_seen
+ 					print("PrivyParty: hub mini game: %s" % choice)
+-					if gate == null:
++					if gate == null and not practising:
+ 						gate = PadGate.new()
+ 						tree.root.add_child(gate)
+ 		if since_poll + 0.0001 < POLL_SECONDS:

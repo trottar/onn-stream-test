@@ -4453,6 +4453,12 @@ class GamesPlugin:
             return self._party_minigame_runner().go(self._first(parse_qs(raw_query), "practice"))
         if action == "party-minigame-end" and _party_minigame is not None:
             return self._party_minigame_runner().end(by="board")
+        # B162: the add-a-game tool's solo — one title listed for its player count (loopback; memory only)
+        if action == "party-minigame-only" and _party_minigame is not None:
+            if str(client_ip or "") not in _h7_minigame.LOOPBACK:
+                raise ValueError(_h7_minigame.BENCH_LOOPBACK)
+            q = parse_qs(raw_query)
+            return self._party_minigame_runner().set_only(self._first(q, "game"), self._first(q, "clear"))
 
         # B105: the mini game's watch ended by a call, the game untouched (PRIVYHUB_H7=1 only)
         if action == "h7-stop" and _h7_minigame is not None:

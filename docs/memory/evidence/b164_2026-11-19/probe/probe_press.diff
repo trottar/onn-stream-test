@@ -1,0 +1,29 @@
+--- checks/hub_minigame_check.gd	2026-11-18 23:43:05.444775346 -0500
++++ checks/hub_minigame_check.gd	2026-11-18 23:43:05.464775814 -0500
+@@ -63,6 +63,7 @@
+ var _go_delays := {}              # queue AY: scenario -> ms from that ready to each go
+ var _screens: Node = null
+ var _now := ""                    # the scenario being played (the made-up presenter reads the stand-in hub's mode)
++var _probe_n := 0
+ var _lines := LineCatcher.new()   # queue AX: the board's own log lines, as printed
+ 
+ 
+@@ -610,6 +611,18 @@
+ 			if phase != "ready":
+ 				return [400, {"ok": false, "error": "no mini game is waiting for the go"}]
+ 			st["mode"] = "practice" if path.contains("practice=1") else "play"
++			if scenario == "hpractice" and st["mode"] == "practice":
++				_probe_n += 1
++				if _probe_n == 2:
++					var e := InputEventJoypadButton.new()
++					e.device = 0
++					e.button_index = JOY_BUTTON_A
++					e.pressed = true
++					Input.parse_input_event(e)
++					var r := e.duplicate()
++					r.pressed = false
++					Input.parse_input_event(r)
++					print("TRACE probe press at practice 2's go taken")
+ 			st["p"] = 0
+ 			_ready_at.erase(scenario)
+ 			body.merge({"go": "taken", "phase": "ready"})

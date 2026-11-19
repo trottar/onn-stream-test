@@ -1,0 +1,1541 @@
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 24e7c4e2..2570e0d8 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -68,6 +68,9 @@ B155 — the `minigame_launch` row carries "keys_written": the session config re
+ both PARTY_SESSION_SETTINGS keys in it once each with their values.
+ B158 — a sidecar's `"result": "winner"`: the scores one-hot for the winner (version 2: end_Pk = port k won; version 3:
+ place 1), the ended row and the result carry `"winner"` (that port's seat). Without the key: today.
++B162 — `POST party-minigame-only?game=<id>` (loopback; `?clear=1` clears): the add-a-game tool's solo setting, kept in
++memory only (any restart clears it) — while set, `party-minigames` lists that title alone for its player count. Never
++set: today.
+ """
+ from __future__ import annotations
+ 
+@@ -133,6 +136,8 @@ ADVANCE_SETTLE_S = 0.08     # after a step's last frame, before its grab
+ BEGIN_MOVED = 0.20          # the share of 64 x 48 cells moved > 16 grey levels: the begin is on the window (H7-D2:
+                             # a paused window 0.0, RetroArch's notices <= 0.10, the boot frame -> the begin >= 0.51)
+ NO_BEGIN = "the title did not show its starting point"
++# B162: the add-a-game tool's one-title setting (party-minigame-only, loopback)
++NOT_LISTED = "not a listed mini game: nothing set"
+ 
+ _local = threading.local()
+ 
+@@ -225,6 +230,7 @@ class PartyMinigames:
+         self.advance_steps, self.advance_settle_s, self.begin_moved = ADVANCE_STEPS, ADVANCE_SETTLE_S, BEGIN_MOVED  # B140
+         self.stream_needed = True               # B112's bench sets False (no stream, no switch)
+         self._reads: dict[str, dict] = {}       # B114: the last good answer of each bounded read, its helper
++        self.only: dict | None = None           # B162: the title under a solo's test (memory only), else None
+ 
+     # --- rows ---------------------------------------------------------------------------------------------------------
+     def row(self, fields: dict) -> None:
+@@ -343,8 +349,34 @@ class PartyMinigames:
+                 "winner_of": {c: k + 1 for k, c in enumerate(ends)}, **start}
+ 
+     def listing(self) -> dict:
++        entries = self._entries()
++        only = self.only
++        if only is not None:                     # B162: the title under test alone for its player count
++            entries = {t: e for t, e in entries.items()
++                       if e["players"] != only["players"] or e["game"] == only["game"]}
+         return {"ok": True, "minigames": [{"id": t, "players": e["players"], "title": e["title"]}   # B134: the name
+-                                          for t, e in sorted(self._entries().items())]}
++                                          for t, e in sorted(entries.items())]}
++
++    def set_only(self, game_text: str, clear_text: str) -> dict:
++        """B162: a bench setting for the add-a-game tool's solo — while set, `party-minigames` lists that title alone for
++        its player count (the other counts as they are). Kept in memory only: any restart clears it. One party row when
++        set and one when cleared, no title or id in either."""
++        if str(clear_text or "").strip():
++            if str(clear_text).strip() != "1":
++                raise ValueError("clear is 1")
++            with self._lock:
++                was, self.only = self.only, None
++            if was is not None:
++                self.row({"step": "minigame_only", "on": False})
++            return {"ok": True, "only": False}
++        game = str(game_text or "").strip()
++        entry = next((e for e in self._entries().values() if e["game"] == game), None) if game else None
++        if entry is None:
++            raise ValueError(NOT_LISTED)
++        with self._lock:
++            self.only = {"game": game, "players": entry["players"]}
++        self.row({"step": "minigame_only", "on": True, "players": entry["players"]})
++        return {"ok": True, "only": True, "players": entry["players"]}
+ 
+     # --- start --------------------------------------------------------------------------------------------------------
+     def start(self, token: str, seats_text: str, bench: bool = False, hold: bool = False) -> dict:
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index a976fa41..bf1d2d38 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -4453,6 +4453,12 @@ class GamesPlugin:
+             return self._party_minigame_runner().go(self._first(parse_qs(raw_query), "practice"))
+         if action == "party-minigame-end" and _party_minigame is not None:
+             return self._party_minigame_runner().end(by="board")
++        # B162: the add-a-game tool's solo — one title listed for its player count (loopback; memory only)
++        if action == "party-minigame-only" and _party_minigame is not None:
++            if str(client_ip or "") not in _h7_minigame.LOOPBACK:
++                raise ValueError(_h7_minigame.BENCH_LOOPBACK)
++            q = parse_qs(raw_query)
++            return self._party_minigame_runner().set_only(self._first(q, "game"), self._first(q, "clear"))
+ 
+         # B105: the mini game's watch ended by a call, the game untouched (PRIVYHUB_H7=1 only)
+         if action == "h7-stop" and _h7_minigame is not None:
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index 56934be9..70a905fe 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -360,6 +360,7 @@ if args["mode"] == "today":
+                             "result": ("GET", "/plugins/games/party-minigame-result"),
+                             "end": ("POST", "/plugins/games/party-minigame-end"),
+                             "go": ("POST", "/plugins/games/party-minigame-go"),     # B133
++                            "only": ("POST", "/plugins/games/party-minigame-only?clear=1"),     # B162
+                             "status_idle": ("GET", "/plugins/games/status"),
+                             "home_idle": ("POST", "/plugins/games/native-stream-stop"),
+                             "stop_idle": ("POST", "/plugins/games/stop")}.items():
+@@ -565,6 +566,8 @@ if args["mode"] == "winner158":
+     finish()
+ if args["mode"] == "b157":                              # B157: its own file (tests/b157_add_game)
+     exec(compile(Path(args["fake_dir"], "b157_scenario.py").read_text(), "b157_scenario.py", "exec"))
++if args["mode"] == "b162":                              # B162: its own file (tests/b162_solo_safe)
++    exec(compile(Path(args["b162_dir"], "b162_scenario.py").read_text(), "b162_scenario.py", "exec"))
+ if args["mode"] == "cheat":
+     # B127: the mini games under each title's cheat setup (the setups made by the onn's Extras launch from loopback)
+     n64 = args["n64_id"]
+diff --git a/tests/b157_add_game/test_b157.py b/tests/b157_add_game/test_b157.py
+index 7485d160..8165bd78 100644
+--- a/tests/b157_add_game/test_b157.py
++++ b/tests/b157_add_game/test_b157.py
+@@ -8,7 +8,8 @@ RetroArch (the fake shows the screen a loaded state names). Shown: **the whole p
+ failing with its cell named** — a missing state (register), an ending that reads as another's class (learn), a start
+ not PAUSED, a file changed, a reload (bench); **refused** without the stage before and after its inputs changed; **run
+ twice -> the same bytes, nothing rewritten**; no run-time name (title, id, path) in anything written or printed.
+-`SoloReads`: solo's lines, then its read of made-up logs — PASS, and each bar failing (a switch over 1.6 s, the sound
++`SoloReads`: solo's lines (B162: on a made-up hub that takes the one-title setting), then its read of made-up logs
++(B162: with a launch log for its title) — PASS, and each bar failing (a switch over 1.6 s, the sound
+ not back, the band outside a practice, the board's lines out of order, a winner the user did not name). `Described`:
+ **T88 and T89 from the hub's rules folder as it is, read only (`--check`): register and learn PASS, nothing written**
+ (skipped where there is no such folder). Temp dirs removed.
+@@ -37,6 +38,7 @@ sys.path.insert(0, str(ROOT / "tools"))
+ import test_b114 as b114  # noqa: E402
+ import test_b124 as b124  # noqa: E402
+ import fake_capture as fc  # noqa: E402
++import made_up_hub  # noqa: E402  (B162: solo's one-title setting needs a hub that takes it)
+ 
+ BARS: dict = {}                                     # the mutation runs leave this empty; a test may set a bar
+ 
+@@ -131,6 +133,9 @@ class SoloReads(unittest.TestCase):
+                     "PRIVYHUB_ADD_GAME_PROJECT": str(self.tmp / "proj"), "PRIVYHUB_H7_RULES": str(self.tmp / "rules"),
+                     "PRIVYHUB_ADD_GAME_DROPINS": str(self.tmp / "dropins"), "PRIVYHUB_ADD_GAME_SYSTEMCTL": "true",
+                     "PRIVYHUB_ADD_GAME_HUB": "http://127.0.0.1:9", "PRIVYHUB_ADD_GAME_KEPT_ROOT": str(self.tmp / "kept")}
++        self.hub = made_up_hub.MadeUpHub([{"id": "mg_1", "players": 2, "title": "", "game": "madeupgame1"},
++                                          {"id": "mg_2", "players": 2, "title": "", "game": "madeupgame2"}])
++        self.env["PRIVYHUB_ADD_GAME_HUB"] = self.hub.url
+         (self.tmp / "dropins").mkdir()                       # never the hub's own: eighteen made-up lines
+         for i in range(18):
+             (self.tmp / "dropins" / f"line{i:02d}.conf").write_text(f"[Service]\nEnvironment=PRIVYHUB_LINE{i:02d}=1\n")
+@@ -147,6 +152,7 @@ class SoloReads(unittest.TestCase):
+         (ev / "bench.json").write_text(json.dumps({"verdict": "PASS", "inputs": pag.bench_inputs("T93", b)}))
+ 
+     def tearDown(self):
++        self.hub.close()
+         for k, v in self.old.items():
+             if v is None:
+                 os.environ.pop(k, None)
+@@ -182,6 +188,8 @@ class SoloReads(unittest.TestCase):
+         if not board_order:
+             lines = [lines[0], lines[3], lines[1], lines[2], lines[4]]
+         (g / "20990101-000000-party.log").write_text("".join(f"PrivyParty: hub mini game: {x}\n" for x in lines))
++        import time as _t                                   # B162: the title's own launch, as the manager logs it
++        (g / (_t.strftime("%Y%m%d-%H%M%S") + "-madeupgame1.log")).write_text("made-up launch\n")
+ 
+     def read(self, **kw):
+         (self.tmp / "home/T93/solo_mark.json").write_text(json.dumps(
+diff --git a/tools/party_add_game.py b/tools/party_add_game.py
+index 1a87f5be..7405c18a 100644
+--- a/tools/party_add_game.py
++++ b/tools/party_add_game.py
+@@ -5,6 +5,8 @@
+                                              (--find <words> | --rules-players N) [--setup none|slot1]
+                                              [--collect role=slot ...] [--check]
+     python3 tools/party_add_game.py learn <code> [--check]
++    python3 tools/party_add_game.py rehearse <code> [--collect role=slot ...]   (B163: a title already in the rules
++                                             folder; a role its kept folder lacks taken from the user's slot, read only)
+     python3 tools/party_add_game.py bench <code>
+     python3 tools/party_add_game.py solo  <code> [--read --winner <seat>]
+     python3 tools/party_add_game.py close <code>
+@@ -26,9 +28,11 @@ PRIVYHUB_ADD_GAME_PROJECT (the hub's project root: logs, slot indexes, the sessi
+ """
+ from __future__ import annotations
+ 
++import contextlib
+ import csv
+ import hashlib
+ import importlib
++import io
+ import json
+ import os
+ import re
+@@ -36,6 +40,7 @@ import shutil
+ import socket
+ import subprocess
+ import sys
++import tempfile
+ import time
+ import urllib.error
+ import urllib.parse
+@@ -44,7 +49,7 @@ from pathlib import Path
+ 
+ TOOLS = Path(__file__).resolve().parent
+ REPO = TOOLS.parent
+-STAGES = ("register", "learn", "bench", "solo", "close")
++STAGES = ("register", "learn", "rehearse", "bench", "solo", "close")
+ CODE = re.compile(r"^T\d\d$")
+ SYSTEMS = {"ps1", "n64", "snes"}                       # h7-start's systems (B103 / B123)
+ NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B159)",
+@@ -69,6 +74,9 @@ BARS = {
+     "arrival_gap_ms_max": (1200, "B153's bound"),
+     "sound_within_s": (4.0, "B150's S: audio_queue_depth > 0 within 4 s of a switch"),
+     "underrun_rise_max": (20, "B150's S: underruns rising at most 20 a row"),
++    "listed_within_s": (4.0, "B150's S: a switch whose next switch starts sooner is listed, not read"),
++    "s_span_s": (30.0, "B150's S: from a switch to the next one's start, or 30 s"),
++    "switches_read_min": (4, "B162: four read (a practice in and out, the go, the end)"),
+     "flag_lines_task": (20, "PP-H4: twenty lines with the two flags"),
+     "flag_lines_found": (18, "the eighteen adopted lines"),
+ }
+@@ -220,9 +228,12 @@ def require(code: str, stage: str, inputs_digest: str) -> None:
+         raise Refused(f"{stage}'s PASS was for other inputs (they changed since): run {stage} again")
+ 
+ 
+-def finish(code: str, stage: str, cells: Cells, inputs: str, write: bool = True, note: str = "") -> int:
++def finish(code: str, stage: str, cells: Cells, inputs: str, write: bool = True, note: str = "",
++           recorded: dict | None = None) -> int:
+     v = {"schema": 1, "stage": stage, "code": code, "verdict": "PASS" if cells.passed else "FAIL", "inputs": inputs,
+          "cells": cells.rows}
++    if recorded is not None:                                 # B162: recorded beside the cells, never a cell
++        v["recorded"] = recorded
+     text = GUARD.check(json.dumps(v, indent=1, sort_keys=True) + "\n")
+     lines = [f"# {code} — {stage}: {v['verdict']}", "",
+              "Written by `tools/party_add_game.py` (B157). Every cell as read / bar / met; no title, id or path.", "",
+@@ -658,6 +669,193 @@ def learn_inputs(code: str, b: dict) -> str:
+     return digest({"register": b["register_inputs"], "kept": kept_states(code)})
+ 
+ 
++# --- B163: rehearse — learn's whole real path on a title already added, into a scratch rules folder --------------------------
++SCRATCH_ENV = ("PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE")
++
++
++def kept_source(code: str) -> Path:
++    """The title's kept H7 folder (read only): ~/privyhub_h7/<code in lower case>."""
++    return _env_path("PRIVYHUB_ADD_GAME_KEPT_ROOT", Path.home() / "privyhub_h7") / code.lower()
++
++
++def rehearse_roles(code: str) -> dict:
++    """The kept states as the tool's roles, by name: begin; other* / mid* -> other, other2 ...; end_p<k> -> end_P<k>;
++    end_p<k>_<x> -> another ending of end_P<k> (read, not a learning role); results_<n> -> an ending whose row the real
++    rules read (a role end_r<row> for a `places` title)."""
++    src = kept_source(code)
++    files = sorted(p for p in src.iterdir() if p.is_file() and p.suffix == ".state") if src.is_dir() else []
++    roles: dict = {}
++    extra: dict = {}
++    results: list = []
++    unused: list = []
++    for p in files:
++        stem = p.name[:-6]
++        m_end = re.match(r"^end_p([1-4])$", stem)
++        m_more = re.match(r"^end_p([1-4])_[a-z0-9]+$", stem)
++        if stem == "begin":
++            roles["begin"] = p
++        elif re.match(r"^(other|mid)[a-z0-9_]*$", stem):
++            roles["other" if "other" not in roles else f"other{sum(1 for r in roles if r.startswith('other')) + 1}"] = p
++        elif m_end:
++            roles[f"end_P{m_end.group(1)}"] = p
++        elif m_more:
++            extra[stem] = (p, f"end_P{m_more.group(1)}")
++        elif re.match(r"^results_[0-9]+$", stem):
++            results.append(p)
++        else:
++            unused.append(p.name)
++    return {"roles": roles, "extra": extra, "results": results, "unused": unused}
++
++
++def _read_run(es, spec: dict, arrays: dict, run: Path):
++    """A run's pictures read as learn's replays read them (the begin loaded first): [class, places] once ended."""
++    from PIL import Image
++    rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((run / "index.csv").open())]
++    now = [0.0]
++    reader = es.Reader(spec, arrays, clock=lambda: now[0])
++    ended = es.Ended(spec)
++    ended.start_loaded()
++    for t, f in rows:
++        now[0] = t
++        with Image.open(run / f) as im:
++            r = reader.read(im.convert("L"), now=t)
++        done = ended.feed(r["class"], r.get("places"))
++        if done:
++            return [done, list(ended.places) if ended.places else None]
++    return None
++
++
++def _capture_run(state: Path, b: dict, run: Path) -> None:
++    run.mkdir(parents=True, exist_ok=True)
++    rows = _capture_fn()(state, b, run, CAPTURE_SECONDS, CAPTURE_EVERY)
++    with (run / "index.csv").open("w", newline="") as f:
++        w = csv.writer(f)
++        w.writerow(["seconds", "file"])
++        for t, name in rows:
++            w.writerow([f"{t:.2f}", name])
++
++
++def _rules_shas() -> dict:
++    r = rules_folder()
++    return {p.name: sha(p) for p in sorted(r.iterdir()) if p.is_file()} if r.is_dir() else {}
++
++
++def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells) -> None:
++    """rehearse's work inside the scratch (the environment pointed at it and put back by the caller)."""
++    for p in found["results"]:                            # a results screen: its row as the real rules read it
++        run = scratch / "extra" / p.name[:-6]
++        _capture_run(p, sb, run)
++        got = _read_run(es, rspec, rarr, run)
++        row = "".join(str(x) for x in (got[1] or [])) if got else ""
++        ok_row = len(row) == b["players"] and sorted(row) == [str(i) for i in range(1, b["players"] + 1)]
++        if b["result"] == "places" and ok_row and f"end_r{row}" not in roles:
++            roles[f"end_r{row}"] = p
++            said_rows[p.name] = f"end_r{row}"
++        else:
++            extra[p.name[:-6]] = (p, None)
++    need = _roles_needed(b["players"], b["result"])
++    missing.extend(r for r in need if r not in roles)
++    if b["result"] == "places":
++        rows_ = [r[5:] for r in roles if r.startswith("end_r")]
++        if not all({r[c] for r in rows_} == {str(i) for i in range(1, b["players"] + 1)} for c in range(b["players"])):
++            missing.append("results rows with every place in every column (have " + (", ".join(sorted(rows_)) or "none") + ")")
++    os.environ.update({"PRIVYHUB_H7_RULES": str(scratch / "rules"), "PRIVYHUB_ADD_GAME_HOME": str(scratch / "home"),
++                       "PRIVYHUB_ADD_GAME_EVIDENCE": str(scratch / "evidence")})   # put back by the caller
++    (scratch / "rules").mkdir()
++    kf = kept_folder(code)
++    kf.mkdir(parents=True)
++    for role, p in roles.items():
++        shutil.copyfile(p, kf / f"{role}.state")             # the kept copies; the kept folder only read
++    sb["register_inputs"] = register_inputs(sb, kept_states(code))
++    write_if_changed(binding_path(code), json.dumps(sb, indent=1, sort_keys=True) + "\n")
++    write_if_changed(verdict_path(code, "register"),
++                     json.dumps({"verdict": "PASS", "inputs": sb["register_inputs"]}) + "\n")
++    buf = io.StringIO()
++    try:
++        with contextlib.redirect_stdout(buf):
++            cmd_learn(code, {"check": False})             # learn's whole real path, into the scratch rules
++        learnt = load_verdict(code, "learn") or {}
++        for r in learnt.get("cells", []):
++            cells.add(f"learn: {r['cell']}", r["read"], r["bar"], r["met"])
++        cells.add("learn's verdict in the scratch", learnt.get("verdict"), "PASS", learnt.get("verdict") == "PASS")
++    except Exception as exc:                                   # the capture or the learner failed: said, not hidden
++        cells.add("learn ran in the scratch", f"{type(exc).__name__}: {str(exc)[:120]}", "no error", False)
++    spec_path = rules_folder() / f"{b['game']}.endscreen.json"
++    sspec = es.load_spec(spec_path) if spec_path.is_file() else None
++    endings = {r: (home(code) / "pictures" / r, r) for r in roles if r.startswith("end_")}
++    for name, (p, want) in sorted(extra.items()):
++        run = scratch / "extra" / name
++        if not (run / "index.csv").is_file():
++            _capture_run(p, sb, run)
++        endings[name] = (run, want)
++    for name, (run, want) in sorted(endings.items()):
++        got_real = _read_run(es, rspec, rarr, run) if (run / "index.csv").is_file() else None
++        got_scr = _read_run(es, sspec[0], sspec[1], run) if sspec and (run / "index.csv").is_file() else None
++        as_role = (got_real is not None and (want is None or got_real[0] == want or
++                                             (want.startswith("end_r") and got_real[1] == [int(c) for c in want[5:]])))
++        cells.add(f"{name}: the scratch rules read it as the real rules", [got_scr, got_real],
++                  "the same, ended, its own ending", got_scr is not None and got_scr == got_real and as_role)
++
++
++def cmd_rehearse(code: str, a: dict) -> int:
++    b = load_binding(code)
++    if not b.get("described"):
++        raise Refused("rehearse is for a title already in the rules folder (registered with --rules-players)")
++    require(code, "learn", learn_inputs(code, b))
++    _private_paths()
++    found = rehearse_roles(code)
++    if not found["roles"] and not found["extra"] and not found["results"] and not a.get("collect"):
++        raise Refused(f"no kept states for {code}: nothing to rehearse")
++    rel = _game_relpath(b)
++    if not rel:
++        raise Refused("the hub did not give the game file for this title (is the companion up?)")
++    shown = {r: p.name for r, p in found["roles"].items()}
++    for item in a.get("collect") or []:                     # a role the kept folder lacks: the user's slot, read only
++        role, _, slot = item.partition("=")
++        if not ROLE.match(role) or role in found["roles"] or slot not in ("1", "2", "3"):
++            raise Usage("rehearse --collect role=slot: a role its kept folder lacks (e.g. other=2), slots 1-3")
++        found["roles"][role] = _slot_file({**b, "relative_path": rel}, int(slot))
++        shown[role] = f"slot {slot}"
++    es = _endscreen()
++    real = rules_folder()
++    rspec, rarr = es.load_spec(real / f"{b['game']}.endscreen.json")          # the real rules, read only
++    kept_in = {p.name: sha(p) for p in sorted(kept_source(code).iterdir()) if p.is_file()} if kept_source(code).is_dir() else {}
++    kept_in.update({f"slot:{r}": sha(p) for r, p in found["roles"].items() if shown[r].startswith("slot ")})
++    inputs = digest({"register": b["register_inputs"], "kept": kept_in})
++    shas_before = _rules_shas()
++    cells = Cells()
++    sb = {"code": code, "game": b["game"], "players": b["players"], "system": b["system"], "result": b["result"],
++          "cheat": b.get("cheat"), "relative_path": rel, "title": "", "content": str(project() / rel)}
++    scratch = Path(tempfile.mkdtemp(prefix="rehearse_", dir=str(home(code))))
++    roles = dict(found["roles"])
++    extra = dict(found["extra"])
++    said_rows: dict = {}
++    old_env = {k: os.environ.get(k) for k in SCRATCH_ENV}
++    missing: list = []
++    try:
++        _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells)
++    except Exception as exc:                                       # anything else in the scratch: a cell, not a trace
++        cells.add("rehearse ran in the scratch", type(exc).__name__, "no error", False)
++    finally:
++        for k, v in old_env.items():
++            if v is None:
++                os.environ.pop(k, None)
++            else:
++                os.environ[k] = v
++        shutil.rmtree(scratch, ignore_errors=True)
++    shas_after = _rules_shas()
++    changed = [n for n in set(shas_before) | set(shas_after) if shas_before.get(n) != shas_after.get(n)]
++    cells.add("the real rules folder: every file's sha256 before = after", [len(shas_before), len(shas_after), len(changed)],
++              "the same files, 0 changed", not changed)
++    cells.add("the scratch removed", not scratch.exists(), True, not scratch.exists())
++    rec = {"roles": {r: shown.get(r, p.name) for r, p in sorted(roles.items())}, "missing": missing,
++           "endings read, not a role": sorted(extra), "unused": found["unused"], "rows read by the real rules": said_rows}
++    note = ("Roles (kept file -> role): " + ", ".join(f"{shown.get(r, p.name)} -> {r}" for r, p in sorted(roles.items())) +
++            ". Missing: " + (", ".join(missing) or "none") + ". Endings read, not a role: " +
++            (", ".join(sorted(extra)) or "none") + ".")
++    return finish(code, "rehearse", cells, inputs, note=note, recorded=rec)
++
++
+ # --- the files that must not change (before = after) ------------------------------------------------------------------------
+ def files_digest(b: dict) -> dict:
+     """sha256 of the title's user slots and slot pictures (both indexes), every rules file, the kept folders (names
+@@ -676,6 +874,64 @@ def files_digest(b: dict) -> dict:
+     return out_
+ 
+ 
++# --- B162: the title's own in-game saves (recorded before and after, never a cell) -------------------------------------------
++SAVES = "data/games/retroarch/saves"
++
++
++def _game_relpath(b: dict) -> str:
++    """The game file's path in the library: the binding's, or (a title already in the rules folder) the hub's
++    `details` for its id — in memory, never written."""
++    rel = str(b.get("relative_path") or "")
++    if not rel and b.get("game"):
++        rel = str(hub("GET", "details", {"id": b["game"]}, timeout=10)["body"].get("relative_path") or "")
++        GUARD.add(rel, Path(rel.replace("\\", "/")).stem)
++    return rel
++
++
++def ingame_saves(b: dict) -> dict:
++    """{hashed name: {"kind": "setup" | "own", "sha": ...}}: every file under the title's setup's saves/ (files_digest's
++    own names for them) and every file in the hub's saves/<core>/ whose stem is the game file's."""
++    root = project()
++    out_: dict = {}
++    if b.get("cheat"):
++        profiles = root / "data/games/retroarch/cheat_profiles"
++        d = profiles / b["game"] / b["cheat"]["profile_id"] / "saves"
++        if d.is_dir():
++            for p in sorted(d.rglob("*")):
++                if p.is_file():
++                    out_[hashlib.sha256(str(p.relative_to(profiles.parent)).encode()).hexdigest()[:16]] = \
++                        {"kind": "setup", "sha": sha(p)}
++    rel = _game_relpath(b)
++    stem = Path(rel.replace("\\", "/")).stem if rel else ""
++    d = root / SAVES
++    if stem and d.is_dir():
++        for p in sorted(d.glob("*/*")):
++            if p.is_file() and p.stem == stem:
++                out_[hashlib.sha256(str(p.relative_to(d.parent)).encode()).hexdigest()[:16]] = {"kind": "own", "sha": sha(p)}
++    return out_
++
++
++def saves_before(code: str, b: dict, again: bool) -> None:
++    path = home(code) / "saves_before.json"
++    if again or not path.is_file():
++        write_if_changed(path, json.dumps(ingame_saves(b), sort_keys=True))
++
++
++def saves_recorded(before: dict | None, after: dict) -> list:
++    """Each in-game save named by kind and number only, as changed / unchanged / new / gone."""
++    if before is None:
++        return [{"save": "-", "is": "no before (neither bench nor solo's lines ran)"}]
++    rows = []
++    for kind, word in (("setup", "under the setup"), ("own", "own")):
++        keys = sorted(k for k in set(before) | set(after) if (before.get(k) or after.get(k))["kind"] == kind)
++        for i, k in enumerate(keys, 1):
++            b0, a0 = before.get(k), after.get(k)
++            state = ("new" if b0 is None else "gone" if a0 is None else
++                     "changed" if b0["sha"] != a0["sha"] else "unchanged")
++            rows.append({"save": f"{word} {i}", "is": state})
++    return rows
++
++
+ # --- the flags --------------------------------------------------------------------------------------------------------------
+ def _systemctl(*args: str) -> int:
+     cmd = os.environ.get("PRIVYHUB_ADD_GAME_SYSTEMCTL", "systemctl").split() + ["--user", *args]
+@@ -849,6 +1105,7 @@ def cmd_bench(code: str, a: dict) -> int:
+               lines == BARS["flag_lines_task"][0])
+     before = files_digest(b)
+     write_if_changed(home(code) / "files_before.json", json.dumps(before, sort_keys=True))
++    saves_before(code, b, again=True)                         # B162: the title's in-game saves, recorded
+     up = _board_up()
+     if not cells.add("the board up as the session", up, [True, "…"], up[0]):
+         return finish(code, "bench", cells, bench_inputs(code, b))
+@@ -952,18 +1209,83 @@ def _board_log() -> Path | None:
+     return logs[-1] if logs else None
+ 
+ 
+-def solo_lines(b: dict) -> list[str]:
++PAD_WORDS = {                                                  # B162: the buttons by the pads' class
++    "playstation": {"practice": "△", "play": "✕", "back": "the Select button (Share)"},
++    "xbox": {"practice": "Y", "play": "A", "back": "the View button (Back)"},
++    "both": {"practice": "△ (Y on an Xbox pad)", "play": "✕ (A on an Xbox pad)",
++             "back": "the Select button (Share; View on an Xbox pad)"},
++}
++
++
++def pad_classes() -> list[str] | None:
++    """The `class` of each pad in the onn's last heartbeat row with pads in `pad_slots`; None when there is none."""
++    p = project() / LOGS["heartbeat"]
++    try:
++        with p.open("rb") as f:
++            f.seek(0, 2)
++            f.seek(max(0, f.tell() - 4_000_000))
++            tail = f.read().decode(errors="replace").splitlines()
++    except OSError:
++        return None
++    for ln in reversed(tail):
++        if '"pad_slots"' not in ln:
++            continue
++        try:
++            slots = json.loads(ln).get("pad_slots")
++        except ValueError:
++            continue
++        if isinstance(slots, list) and slots:
++            return [str(x.get("class") or "") for x in slots if isinstance(x, dict)]
++    return None
++
++
++def pad_words(classes: list[str] | None) -> str:
++    """PlayStation words for `sony`, Xbox words otherwise, both if mixed, PlayStation if no row yet."""
++    if not classes:
++        return "playstation"
++    sony = [c == "sony" for c in classes]
++    return "playstation" if all(sony) else "xbox" if not any(sony) else "both"
++
++
++def solo_lines(b: dict, words: str = "playstation") -> list[str]:
+     n = b["players"]
+-    who = "you and one more person" if n == 2 else "four people"
++    who = "you alone with two pads, or two of you" if n == 2 else "four people, or you with four pads"
++    w = PAD_WORDS[words]
+     return [
+         "YOU, now: open Games, 'PrivyParty (1)', Launch on Companion, Start Fresh; play the board with "
+-        f"{who} until a mini game for {n} comes up (this game).",
+-        "YOU, now: on its load screen press △ for a practice, leave it with the Select button (Share on a "
+-        "PlayStation pad), then press ✕ to play it for real and play it to its end.",
++        f"{who} until a mini game for {n} comes up (this game, the only card shown; if two cards show, stop and "
++        "tell me).",
++        f"YOU, now: on its load screen press {w['practice']} for a practice, stay in it at least ten seconds, leave "
++        f"it with {w['back']}, then press {w['play']} to play it for real and play it to its end.",
+         "YOU, now: when you are back on the board, reply with who won (P1, P2" + (", P3 or P4" if n == 4 else "") + ").",
+     ]
+ 
+ 
++LAUNCH_LOG = re.compile(r"^(\d{8}-\d{6})-(.+)\.log$")
++NOT_A_LAUNCH = ("party", "ps2", "gamecube")                   # the board's, PCSX2's and Dolphin's own logs
++
++
++def launched_since(since: float) -> list[str]:
++    """The game id of every RetroArch launch logged at or after `since` (the manager's <time>-<game id>.log)."""
++    out_ = []
++    for p in sorted((project() / "logs/games").glob("*.log")):
++        m = LAUNCH_LOG.match(p.name)
++        if not m or m.group(2) in NOT_A_LAUNCH:
++            continue
++        try:
++            t = time.mktime(time.strptime(m.group(1), "%Y%m%d-%H%M%S"))
++        except (ValueError, OverflowError):
++            continue
++        if t >= int(since):
++            out_.append(m.group(2))
++    return out_
++
++
++def only_clear() -> dict:
++    """B162: the one-title setting cleared on the hub (solo --read, close)."""
++    return hub("POST", "party-minigame-only", {"clear": "1"}, timeout=10)
++
++
+ def solo_after(code: str, b: dict) -> str:
+     """solo follows bench's PASS — or, for a title already in the rules folder (T88 / T89), learn's."""
+     if b.get("described"):
+@@ -982,22 +1304,37 @@ def cmd_solo(code: str, a: dict) -> int:
+         n_lines = flags(True)                                # the bench flags for the task (bench put them on)
+         if n_lines != BARS["flag_lines_task"][0]:
+             raise Refused(f"the companion has {n_lines} lines, not {BARS['flag_lines_task'][0]}: nothing asked of the user")
++        only = hub("POST", "party-minigame-only", {"game": b["game"]}, timeout=10)    # B162: this title alone
++        listed = [m for m in (hub("GET", "party-minigames")["body"].get("minigames") or [])
++                  if m.get("players") == b["players"]]
++        if (only["code"] != 200 or only["body"].get("only") is not True or only["body"].get("players") != b["players"]
++                or len(listed) != 1 or (b.get("title") and listed[0].get("title") != b["title"])):
++            only_clear()
++            raise Refused(f"the one-title setting was not taken (the hub lists {len(listed)} titles for "
++                          f"{b['players']} players): nothing asked of the user")
++        saves_before(code, b, again=False)                   # B162: the in-game saves' before, if bench left none
+         bl = _board_log()
+         mark = {k: _count(project() / v) for k, v in LOGS.items()}
++        mark["since_unix"] = time.time()                     # B162: the launches after this are the solo's
+         mark["board_log"] = bl.name if bl else None
+         mark["board_lines"] = _count(bl) if bl else 0
+         mark["video_bytes"] = (project() / LOGS["video"]).stat().st_size if (project() / LOGS["video"]).is_file() else 0
+         if not mark_path.is_file():
+             write_if_changed(mark_path, json.dumps(mark, sort_keys=True))
+-        for ln in solo_lines(b):
++        for ln in solo_lines(b, pad_words(pad_classes())):
+             out(ln)
+         out(f"solo {code}: WAITING — after the user's reply: solo {code} --read --winner <seat>")
+         return 3
++    only_clear()                                             # B162: the setting cleared first, whatever the cells
+     mark = read_json(mark_path)
+     if not mark:
+         raise Refused("solo's lines were not given yet: run solo first")
+     winner = int(a["winner"])
+     cells = Cells()
++    ids = launched_since(float(mark.get("since_unix") or 0))  # B162: compared in memory, neither id written
++    this = sum(1 for g in ids if g == str(b["game"])[:80])
++    cells.add("the mini game played was this title", {"this title": this, "another": len(ids) - this},
++              "this title >= 1, another 0", this >= 1 and len(ids) == this)
+     rows = party_rows(mark["party"])
+     sw = [x for x in rows if x.get("step") == "minigame_stream" and x.get("planned")]
+     cells.add("planned switches", len(sw), ">= 4 (a practice in and out, the go, the end)", len(sw) >= 4)
+@@ -1016,9 +1353,21 @@ def cmd_solo(code: str, a: dict) -> int:
+     hbt = [(_utc(r.get("received_at_utc")), r) for r in hb]
+     s_ok, gaps = [], []
+     times = [x.get("time_unix") for x in sw]
++    starts = [None if t is None else t - float(x.get("seconds") or 0) for t, x in zip(times, sw)]
++    read_i, listed = [], []                                  # B162: B150's S — a switch followed within 4 s is listed
+     for i, t in enumerate(times):
+-        nxt = times[i + 1] if i + 1 < len(times) else None
+-        after = [(ts, r) for ts, r in hbt if ts is not None and ts >= t and (nxt is None or ts < nxt)]
++        nxt = starts[i + 1] if i + 1 < len(sw) else None
++        if t is not None and nxt is not None and nxt - t < BARS["listed_within_s"][0]:
++            listed.append(i)
++        else:
++            read_i.append(i)
++    cells.add("switches read for S (the next starts 4 s or more after)", [len(read_i), len(listed)],
++              f">= {BARS['switches_read_min'][0]} read", len(read_i) >= BARS["switches_read_min"][0])
++    for i in read_i:
++        t = times[i]
++        nxt = starts[i + 1] if i + 1 < len(sw) else None
++        until = (t or 0) + BARS["s_span_s"][0] if nxt is None else min(nxt, (t or 0) + BARS["s_span_s"][0])
++        after = [(ts, r) for ts, r in hbt if t is not None and ts is not None and t <= ts < until]
+         sound = any((r.get("audio_queue_depth") or 0) > 0 for ts, r in after if ts - t <= BARS["sound_within_s"][0])
+         und = [r.get("audio_underruns") for ts, r in after if r.get("audio_underruns") is not None]
+         rise = max([y - x for x, y in zip(und, und[1:])] or [0])
+@@ -1061,7 +1410,12 @@ def cmd_solo(code: str, a: dict) -> int:
+         sc = last["scores"]
+         hub_winner = sc.index(max(sc)) + 1 if sc.count(max(sc)) == 1 else None
+     cells.add("the hub's result = the winner the user named", hub_winner, winner, hub_winner == winner)
+-    return finish(code, "solo", cells, digest({"after": before_solo, "mark": mark, "winner": winner}))
++    note = ""
++    if listed:
++        note = "Listed, not read (the next switch began less than 4 s after): " + "; ".join(
++            f"switch {i + 1} (to the {sw[i].get('window') or '?'}, {sw[i].get('seconds')} s; the next began "
++            f"{round(starts[i + 1] - times[i], 2)} s after)" for i in listed) + "."
++    return finish(code, "solo", cells, digest({"after": before_solo, "mark": mark, "winner": winner}), note=note)
+ 
+ 
+ def _utc(s) -> float | None:
+@@ -1080,6 +1434,7 @@ def cmd_close(code: str, a: dict) -> int:
+     b = load_binding(code)
+     _private_paths()
+     cells = Cells()
++    only_clear()                                             # B162: the one-title setting cleared (if the hub is up)
+     hub("POST", "stop")
+     lines = flags(False)
+     cells.add("the companion's lines", lines, BARS["flag_lines_found"][0], lines == BARS["flag_lines_found"][0])
+@@ -1089,11 +1444,18 @@ def cmd_close(code: str, a: dict) -> int:
+     cells.add("active units", units, ["privyhub-companion", "privyhub-diag"],
+               units == ["privyhub-companion", "privyhub-diag"])
+     before = read_json(home(code) / "files_before.json")
++    s_before = read_json(home(code) / "saves_before.json")   # B162: the title's in-game saves, recorded only
++    s_after = ingame_saves(b)
++    saves = saves_recorded(s_before, s_after)
++    own_saves = set(s_after) | set(s_before or {})
+     if before is not None:                                   # bench ran: its before
+         after = files_digest(b)
+-        changed = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
++        changed = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k) and k not in own_saves)
+         cells.add("every file = bench's before", len(changed), 0, not changed)
+-    return finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}))
++    note = "The title's own in-game saves (recorded, never a cell): " + (
++        "; ".join(f"{r['save']}: {r['is']}" for r in saves) if saves else "none found") + "."
++    return finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}),
++                  note=note, recorded={"in_game_saves": saves})
+ 
+ 
+ def _active_units() -> list[str]:
+@@ -1150,7 +1512,8 @@ def main(argv: list[str]) -> int:
+         _private_paths()
+         if stage == "register":
+             return cmd_register(code, a)
+-        return {"learn": cmd_learn, "bench": cmd_bench, "solo": cmd_solo, "close": cmd_close}[stage](code, a)
++        return {"learn": cmd_learn, "rehearse": cmd_rehearse, "bench": cmd_bench, "solo": cmd_solo,
++                "close": cmd_close}[stage](code, a)
+     except Usage as exc:
+         print(f"usage: {exc}", file=sys.stderr)
+         return 2
+diff --git a/tests/b157_add_game/made_up_hub.py b/tests/b157_add_game/made_up_hub.py
+new file mode 100644
+index 00000000..f122a752
+--- /dev/null
++++ b/tests/b157_add_game/made_up_hub.py
+@@ -0,0 +1,69 @@
++"""B162: a made-up hub on loopback for the add-a-game tool's unit tests — the routes solo, close and rehearse call:
++`party-minigame-only` (set / clear, kept in its own memory), `party-minigames` (the listed titles, filtered while set,
++as the companion does), `details` (a made-up game file), `status` / `native-stream-status` (nothing running).
++Everything made up; nothing read from the hub."""
++from __future__ import annotations
++
++import json
++import threading
++import http.server
++from urllib.parse import parse_qs, urlparse
++
++
++class MadeUpHub:
++    def __init__(self, listed: list[dict], relative_path: str = "games/ps1/Made Up (USA).cue", take_only: bool = True):
++        self.listed = listed                    # [{"id", "players", "title", "game"}]
++        self.relative_path = relative_path
++        self.take_only = take_only              # False: the route answers as on a hub without it (an old companion)
++        self.only: dict | None = None
++        self.calls: list[str] = []
++        hub = self
++
++        class H(http.server.BaseHTTPRequestHandler):
++            def _answer(self, method):
++                u = urlparse(self.path)
++                action = u.path.rsplit("/", 1)[-1]
++                q = {k: v[0] for k, v in parse_qs(u.query).items()}
++                hub.calls.append(f"{method} {action}" + (" clear" if "clear" in q else " set" if "game" in q else ""))
++                code, body = 200, {"ok": True}
++                if action == "party-minigame-only" and method == "POST" and hub.take_only:
++                    if q.get("clear") == "1":
++                        hub.only = None
++                        body = {"ok": True, "only": False}
++                    else:
++                        e = next((x for x in hub.listed if x["game"] == q.get("game")), None)
++                        if e is None:
++                            code, body = 400, {"ok": False, "error": "not a listed mini game: nothing set"}
++                        else:
++                            hub.only = {"game": e["game"], "players": e["players"]}
++                            body = {"ok": True, "only": True, "players": e["players"]}
++                elif action == "party-minigame-only":
++                    code, body = 400, {"ok": False, "error": "Unknown Games plugin action: party-minigame-only"}
++                elif action == "party-minigames":
++                    lst = [x for x in hub.listed if hub.only is None or x["players"] != hub.only["players"]
++                           or x["game"] == hub.only["game"]]
++                    body = {"ok": True, "minigames": [{k: x[k] for k in ("id", "players", "title")} for x in lst]}
++                elif action == "details":
++                    body = {"relative_path": hub.relative_path}
++                raw = json.dumps(body).encode()
++                self.send_response(code)
++                self.send_header("Content-Length", str(len(raw)))
++                self.end_headers()
++                self.wfile.write(raw)
++
++            def do_GET(self):
++                self._answer("GET")
++
++            def do_POST(self):
++                self._answer("POST")
++
++            def log_message(self, *a):
++                pass
++
++        self.srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
++        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
++        self.url = f"http://127.0.0.1:{self.srv.server_address[1]}"
++
++    def close(self) -> None:
++        self.srv.shutdown()
++        self.srv.server_close()
+diff --git a/tests/b162_solo_safe/b162_scenario.py b/tests/b162_solo_safe/b162_scenario.py
+new file mode 100644
+index 00000000..e9512a90
+--- /dev/null
++++ b/tests/b162_solo_safe/b162_scenario.py
+@@ -0,0 +1,136 @@
++# B162: run inside B114's child (its globals: root, port, rules_, g, m, layer, pic, call, rows, one, END1, board_up,
++# client, S, finish, title, ...) by b114_scenario.py's `b162` mode; kept in its own file (the child's -c text has a
++# size limit). The add-a-game tool's solo against this companion: two made-up two-player titles and a four-player one
++# listed (the other two-player one the harness's N64 title), the one-title setting set by solo, a match of the other, the setting cleared by solo --read, by close
++# and by a new layer (a restart); three two-player titles, the one under test always the only two-player entry.
++sys.path.insert(0, args["tools"])
++try:
++    agw = root / "ag"
++    (agw / "dropins").mkdir(parents=True, exist_ok=True)
++    for i in range(18):
++        (agw / "dropins" / f"line{i:02d}.conf").write_text(f"[Service]\nEnvironment=PRIVYHUB_LINE{i:02d}=1\n")
++    ctl = agw / "systemctl"
++    ctl.write_text("#!/bin/sh\nif [ \"$1\" = \"--user\" ] && [ \"$2\" = \"list-units\" ]; then\n"
++                   "  echo 'privyhub-companion.service loaded active running x'\n"
++                   "  echo 'privyhub-diag.service loaded active running x'\nfi\nexit 0\n")
++    ctl.chmod(0o755)
++    (agw / "kept").mkdir(parents=True, exist_ok=True)
++    os.environ.update({"PRIVYHUB_ADD_GAME_HUB": f"http://127.0.0.1:{port}", "PRIVYHUB_ADD_GAME_HOME": str(agw / "home"),
++                       "PRIVYHUB_ADD_GAME_EVIDENCE": str(agw / "evidence"), "PRIVYHUB_ADD_GAME_PROJECT": str(root),
++                       "PRIVYHUB_ADD_GAME_DROPINS": str(agw / "dropins"), "PRIVYHUB_ADD_GAME_SYSTEMCTL": str(ctl),
++                       "PRIVYHUB_ADD_GAME_KEPT_ROOT": str(agw / "kept")})
++    import party_add_game as pag
++    import importlib.util as ilu2_
++    spec2_ = ilu2_.find_spec("subprocess"); sp2_ = ilu2_.module_from_spec(spec2_); spec2_.loader.exec_module(sp2_)
++    pag.subprocess = sp2_                                    # the harness replaced subprocess.Popen (its fake title)
++    kilo, bravo = args["kilo"], args["bravo"]
++    def put(gid_, players_):                                 # a title in the rules folder: the harness title's spec
++        js2 = json.loads((rules_ / f"{title}.endscreen.json").read_text())
++        shutil.copyfile(rules_ / js2["arrays"], rules_ / f"{gid_}.endscreen.npz")
++        js2["arrays"] = f"{gid_}.endscreen.npz"
++        (rules_ / f"{gid_}.endscreen.json").write_text(json.dumps(js2))
++        (rules_ / f"{gid_}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
++        sc_ = {"end_P1": [1, 0] + [0] * (players_ - 2), "end_P2": [0, 1] + [0] * (players_ - 2)}
++        (rules_ / f"{gid_}.party.json").write_text(json.dumps({"players": players_, "scores": sc_}))
++    put(kilo, 2)
++    put(bravo, 4)
++    def listed():
++        return sorted((e["players"], e["title"], e["id"]) for e in
++                      call("GET", "/plugins/games/party-minigames")["body"]["minigames"])
++    def two_titles():
++        return sorted(t_ for n_, t_, _i in listed() if n_ == 2)
++    def name_of(gid_):
++        return str(g._find_game_by_id(gid_)["title"])
++    TOK = {name_of(x): None for x in (title, kilo, bravo)}
++    for n_, t_, i_ in listed():
++        TOK[t_] = i_
++    S["names"] = [name_of(x) for x in (title, kilo, bravo)] + [title, kilo, bravo, str(root)]
++    S["list_before"] = [[n_, t_] for n_, t_, _i in listed()]
++    def tool(*a_):
++        import io, contextlib
++        buf = io.StringIO()
++        with contextlib.redirect_stdout(buf):
++            rc_ = pag.main([str(x) for x in a_])
++        keep_ = [ln for ln in buf.getvalue().splitlines() if not ln.startswith("127.0.0.1 - ")]
++        return {"rc": rc_, "out": "\n".join(keep_)}
++    def verdict(code_, stage_):
++        v_ = pag.load_verdict(code_, stage_) or {}
++        return {"verdict": v_.get("verdict"), "bad": [c["cell"] for c in v_.get("cells", []) if not c["met"]],
++                "cells": {c["cell"]: c["read"] for c in v_.get("cells", [])}}
++    lines0 = pag._companion_lines()
++    for code_, gid_ in (("T90", title), ("T91", kilo)):      # described titles (T88's way), learn's PASS kept
++        b_ = {"code": code_, "game": gid_, "players": 2, "system": "ps1" if gid_ == title else "n64", "result": "winner",
++              "cheat": None,
++              "relative_path": "", "title": "", "content": "", "described": True, "register_inputs": "r" + code_,
++              "found_lines": pag.digest(lines0)}
++        (agw / "home" / code_).mkdir(parents=True, exist_ok=True)
++        (agw / "home" / code_ / "binding.json").write_text(json.dumps(b_))
++        (agw / "evidence" / code_).mkdir(parents=True, exist_ok=True)
++        (agw / "evidence" / code_ / "learn.json").write_text(json.dumps({"verdict": "PASS",
++                                                                           "inputs": pag.learn_inputs(code_, b_)}))
++    def snapshot():                                          # every file under the tree but the logs and the tool's own
++        out_ = {}
++        for p_ in sorted(root.rglob("*")):
++            rel_ = str(p_.relative_to(root))
++            if p_.is_file() and not rel_.startswith(("logs/", "ag/", "xdg/")) and "__pycache__" not in rel_:
++                out_[rel_] = hashlib.sha256(p_.read_bytes()).hexdigest()
++        return out_
++    # 1. two two-player titles and a four-player one: the solo of T90 offers it alone
++    call("POST", "/plugins/games/native-stream-stop"); client.in_stream = False
++    files0 = snapshot()
++    r0 = len(rows())
++    S["solo_set"] = tool("solo", "T90")
++    S["files_same_after_set"] = snapshot() == files0
++    S["list_set"] = [[n_, t_] for n_, t_, _i in listed()]
++    S["only_rows_set"] = [r_ for r_ in rows()[r0:] if r_.get("step") == "minigame_only"]
++    S["only_not_loopback"] = None
++    try:
++        g.handle_post_request("party-minigame-only", "clear=1", "a-remote-caller")
++    except ValueError as exc_:
++        S["only_not_loopback"] = str(exc_)
++    S["list_after_refused"] = [[n_, t_] for n_, t_, _i in listed()]
++    # a match of the other two-player title (its token from before the setting)
++    board_up("b162a")
++    one("b162kilo", "1,2", END1, tok=TOK[name_of(kilo)])
++    call("POST", "/plugins/games/native-stream-stop"); client.in_stream = False
++    r1 = len(rows())
++    S["read_other"] = tool("solo", "T90", "--read", "--winner", 1)
++    S["read_other_v"] = verdict("T90", "solo")
++    S["list_after_read"] = [[n_, t_] for n_, t_, _i in listed()]
++    S["only_rows_read"] = [r_ for r_ in rows()[r1:] if r_.get("step") == "minigame_only"]
++    S["launch_logs"] = len([p_ for p_ in (root / "logs/games").glob("*.log") if pag.LAUNCH_LOG.match(p_.name)
++                            and pag.LAUNCH_LOG.match(p_.name).group(2) not in pag.NOT_A_LAUNCH])
++    # 2. three two-player titles: the one under test (T91) the only two-player entry at every read
++    put(bravo, 2)
++    S["three_before"] = two_titles()
++    S["solo_set3"] = tool("solo", "T91")
++    S["reads3"] = [two_titles() for _ in range(20)]
++    board_up("b162b")
++    one("b162kilo2", "1,2", END1, tok=TOK[name_of(kilo)])
++    call("POST", "/plugins/games/native-stream-stop"); client.in_stream = False
++    S["read_this"] = tool("solo", "T91", "--read", "--winner", 1)
++    S["read_this_v"] = verdict("T91", "solo")
++    S["three_after_read"] = two_titles()
++    # 3. cleared by close
++    S["solo_again"] = tool("solo", "T90")
++    S["before_close"] = two_titles()
++    call("POST", "/plugins/games/stop")
++    r2 = len(rows())
++    S["close"] = tool("close", "T90")
++    S["close_v"] = verdict("T90", "close")
++    S["after_close"] = two_titles()
++    S["only_rows_close"] = [r_ for r_ in rows()[r2:] if r_.get("step") == "minigame_only"]
++    # 4. cleared by a restart: the setting is the layer's memory; a new layer (as a new process has) lists all
++    S["solo_restart"] = tool("solo", "T90")
++    S["before_restart"] = two_titles()
++    g._party_minigame_obj = None
++    S["after_restart"] = two_titles()
++    tool("close", "T90")
++    S["texts"] = "\n".join(p_.read_text() for p_ in sorted((agw / "evidence").rglob("*")) if p_.is_file()) + \
++        "\n".join(S[k_]["out"] for k_ in list(S) if isinstance(S[k_], dict) and "out" in S[k_])
++    S["only_rows_all"] = [r_ for r_ in rows() if r_.get("step") == "minigame_only"]
++except Exception as exc_:
++    import traceback as tb_
++    S["b162_error"] = tb_.format_exc()[-3000:]
++timed("end_onn", "POST", "/plugins/games/stop")
++finish()
+diff --git a/tests/b162_solo_safe/test_b162.py b/tests/b162_solo_safe/test_b162.py
+new file mode 100644
+index 00000000..1a284fe0
+--- /dev/null
++++ b/tests/b162_solo_safe/test_b162.py
+@@ -0,0 +1,397 @@
++#!/usr/bin/env python3
++"""B162 (host): the add-a-game tool's solo, safe for many titles — through the real HTTP server on loopback, behind
++PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 (the companion's part); the tool's reads on made-up logs.
++
++`Harness` (B114's harness, its `b162` mode, `b162_scenario.py`): two made-up two-player titles and a four-player one
++listed → `solo` of one sets the one-title setting: the list has it alone for two players, the four-player one as it
++was; one `minigame_only` row (no name); a non-loopback caller refused (nothing cleared); nothing written to a file by
++the setting. A match of the other title → `solo --read`: **the title cell not met, named**; the setting cleared by
++`--read` (one row). Three two-player titles → the one under test is the only two-player entry at 20 reads of 20; a
++match of it → the title cell met. Cleared by `close` (one row) and by a new layer (a restart). Nothing named in
++anything the tool wrote or printed.
++`FlagsAndUsers`: B114's `today` mode, each flag absent, HEAD's companion against mine — every route's bytes the same
++(`party-minigame-only` included: unknown on both); `today` and `cheat_today` with both flags — the same bytes but the
++new route's own answer.
++`Unit` (made-up logs, a made-up hub): the title cell; a quick switch listed, not read, and named on the page; three
++read → not met; a changed in-game save recorded and close PASS, any other changed file close FAIL; the lines for
++`sony`, `xbox`, mixed and no row, two and four players; the setting not taken → REFUSED, no line for the user; the
++setting set by solo and cleared by `--read` and by `close`. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b162_solo_safe -v
++"""
++from __future__ import annotations
++
++import contextlib
++import io
++import json
++import os
++import re
++import shutil
++import sys
++import tempfile
++import time
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b114_party_minigame_hang", "b124_party_four_seats", "b157_add_game"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++sys.path.insert(0, str(ROOT / "tools"))
++import test_b114 as b114  # noqa: E402  (its harness; its tests are not collected here)
++import test_b124 as b124  # noqa: E402
++import test_b157 as b157t  # noqa: E402  (its SoloReads fixture, reused)
++import made_up_hub  # noqa: E402
++
++HEAD = "58497ab8"
++MASK = re.compile(r'(?<![A-Za-z_])\d+\.\d+|\b\d{4,}\b|\d{4}-\d\d-\d\dT[0-9:.]+Z?')
++_IDS: dict = {}
++
++
++def masked(step: dict) -> tuple:
++    return step["code"], MASK.sub("<n>", b114.CLOCK.sub("<ms>", step["raw"]))
++
++
++def extra(work, frames):
++    return {"tools": str(ROOT / "tools"), "b162_dir": str(HERE), "kilo": _IDS[("n64", "Alpha Racer (USA)")],
++            "bravo": _IDS[("n64", "Bravo Kart (USA) (Rev 1)")]}
++
++
++class Harness(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        root, ids = b114.b99.tree()
++        try:
++            _IDS.clear()
++            _IDS.update(ids)
++            b124.IDS.clear()
++            b124.IDS.update(ids)
++            cls.s = b114.run(root, b114.BOTH, ids, "b162", timeout=900, extra=extra)["steps"]
++        finally:
++            shutil.rmtree(root, ignore_errors=True)
++
++    def test_0_no_error(self):
++        self.assertIsNone(self.s.get("b162_error"), self.s.get("b162_error"))
++
++    def test_1_two_listed_the_one_under_test_alone(self):
++        s = self.s
++        two = lambda lst: sorted(t for n, t in lst if n == 2)
++        four = lambda lst: sorted(t for n, t in lst if n == 4)
++        self.assertEqual(s["solo_set"]["rc"], 3, s["solo_set"])
++        self.assertEqual(two(s["list_before"]), ["Alpha Racer (USA)", "Juliet Run (USA)"])
++        self.assertEqual(two(s["list_set"]), ["Juliet Run (USA)"])
++        self.assertEqual(four(s["list_set"]), four(s["list_before"]))
++        self.assertEqual(four(s["list_set"]), ["Bravo Kart (USA) (Rev 1)"])
++        self.assertTrue(s["files_same_after_set"])                 # memory only: no file written by the setting
++        self.assertEqual(len(s["only_rows_set"]), 1)
++        self.assertEqual({k: v for k, v in s["only_rows_set"][0].items() if k != "time_unix"},
++                         {"step": "minigame_only", "on": True, "players": 2})
++        self.assertIn("loopback", s["only_not_loopback"] or "")
++        self.assertEqual(s["list_after_refused"], s["list_set"])
++
++    def test_2_a_match_of_the_other_is_not_met(self):
++        s = self.s
++        self.assertGreaterEqual(s["launch_logs"], 1)                # the harness's launches are logged by the manager
++        self.assertEqual(s["read_other"]["rc"], 1)
++        self.assertIn("the mini game played was this title", s["read_other_v"]["bad"])
++        got = s["read_other_v"]["cells"]["the mini game played was this title"]
++        self.assertEqual(got["this title"], 0)
++        self.assertGreaterEqual(got["another"], 1)
++
++    def test_3_cleared_by_read(self):
++        s = self.s
++        self.assertEqual(s["list_after_read"], s["list_before"])
++        self.assertEqual([{k: v for k, v in r.items() if k != "time_unix"} for r in s["only_rows_read"]],
++                         [{"step": "minigame_only", "on": False}])
++
++    def test_4_three_listed_the_one_under_test_always(self):
++        s = self.s
++        self.assertEqual(len(s["three_before"]), 3)
++        self.assertEqual(s["solo_set3"]["rc"], 3, s["solo_set3"])
++        self.assertEqual(s["reads3"], [["Alpha Racer (USA)"]] * 20)
++        self.assertNotIn("the mini game played was this title", s["read_this_v"]["bad"])
++        got = s["read_this_v"]["cells"]["the mini game played was this title"]
++        self.assertEqual(got["another"], 0)
++        self.assertGreaterEqual(got["this title"], 1)
++        self.assertEqual(s["three_after_read"], s["three_before"])
++
++    def test_5_cleared_by_close_and_by_a_restart(self):
++        s = self.s
++        self.assertEqual(s["before_close"], ["Juliet Run (USA)"])
++        self.assertEqual(s["close"]["rc"], 0, (s["close"], s["close_v"]))
++        self.assertEqual(s["after_close"], s["three_before"])
++        self.assertEqual([r.get("on") for r in s["only_rows_close"]], [False])
++        self.assertEqual(s["before_restart"], ["Juliet Run (USA)"])
++        self.assertEqual(s["after_restart"], s["three_before"])
++
++    def test_6_no_name_written_or_printed(self):
++        text = self.s["texts"].casefold()
++        for n in self.s["names"]:
++            self.assertNotIn(str(n).casefold(), text)
++        for r in self.s["only_rows_all"]:
++            self.assertEqual(set(r) - {"step", "on", "players", "time_unix"}, set(), r)
++
++
++class FlagsAndUsers(unittest.TestCase):
++    """The flags absent: today, byte for byte, HEAD's companion against mine. Both flags set: the users' routes the
++    same (the setting is never set by them)."""
++
++    def run_mode(self, mode, env, rev=None):
++        code = b114.code_of(rev) if rev else None
++        if rev and code is None:
++            self.skipTest("git is absent")
++        root, ids = b114.b99.tree(code)
++        try:
++            return b114.run(root, env, ids, mode)["steps"]
++        finally:
++            shutil.rmtree(root, ignore_errors=True)
++            if code is not None:
++                shutil.rmtree(code, ignore_errors=True)
++
++    def test_each_flag_absent_is_heads(self):
++        F = {**b114.b85.FLAGS, **b114.ADOPTED}
++        for env in ({**F, "PRIVYHUB_PARTY": "1"}, {**F, "PRIVYHUB_H7": "1"}, F, {**F, "PRIVYHUB_PARTY": "1", "PRIVYHUB_H7": "0"}):
++            base, mine = self.run_mode("today", env, HEAD), self.run_mode("today", env)
++            routes = [k for k in base if isinstance(base[k], dict) and "code" in base[k] and "raw" in base[k]]
++            self.assertIn("only", routes)
++            for k in routes:
++                self.assertEqual(masked(mine[k]), masked(base[k]), (sorted(env), k))
++            self.assertIn("Unknown Games plugin", base["only"]["body"]["error"])
++            self.assertEqual(mine["ports_today"], base["ports_today"])
++            self.assertEqual(mine["b139_users_cfg"], base["b139_users_cfg"])
++
++    def test_users_sessions_with_both_flags(self):
++        for mode in ("today", "cheat_today"):
++            base, mine = self.run_mode(mode, b114.BOTH, HEAD), self.run_mode(mode, b114.BOTH)
++            routes = [k for k in base if isinstance(base[k], dict) and "code" in base[k] and "raw" in base[k]]
++            self.assertGreaterEqual(len(routes), 9, mode)
++            for k in routes:
++                if k == "only":                                 # the new route: unknown on HEAD, answered here
++                    self.assertIn("Unknown Games plugin", base[k]["body"]["error"])
++                    self.assertEqual(mine[k]["body"], {"ok": True, "only": False})
++                    continue
++                self.assertEqual(masked(mine[k]), masked(base[k]), (mode, k))
++            if mode == "today":
++                self.assertEqual(mine["ports_today"], base["ports_today"])
++                self.assertEqual(mine["b139_users_cfg"], base["b139_users_cfg"])
++
++
++def _tool(*argv):
++    import party_add_game as pag
++    buf = io.StringIO()
++    with contextlib.redirect_stdout(buf):
++        rc = pag.main([str(a) for a in argv])
++    return rc, buf.getvalue()
++
++
++class Unit(unittest.TestCase):
++    """B157's solo fixture (a made-up binding, logs and hub), with B162's cases."""
++    setUp = b157t.SoloReads.setUp
++    tearDown = b157t.SoloReads.tearDown
++    logs = b157t.SoloReads.logs
++    read = b157t.SoloReads.read
++
++    def verdict(self):
++        v = json.loads((self.tmp / "ev/T93/solo.json").read_text())
++        return v, {c["cell"]: c for c in v["cells"]}
++
++    def launch_logs(self, *games):
++        g = self.tmp / "proj/logs/games"
++        for p in g.glob("*.log"):                        # the launches only (not the heartbeat's, the encoder's)
++            if re.match(r"^\d{8}-\d{6}-", p.name) and not p.name.endswith("-party.log"):
++                p.unlink()
++        for i, gid in enumerate(games):
++            (g / (time.strftime("%Y%m%d-%H%M%S", time.localtime(time.time() + i)) + f"-{gid}.log")).write_text("x\n")
++
++    # --- the title cell
++    def test_title_cell(self):
++        for games, met, read in ((("madeupgame1",), True, {"this title": 1, "another": 0}),
++                                 (("madeupgame2",), False, {"this title": 0, "another": 1}),
++                                 (("madeupgame1", "madeupgame2"), False, {"this title": 1, "another": 1}),
++                                 ((), False, {"this title": 0, "another": 0})):
++            (self.tmp / "home/T93/solo_mark.json").write_text(json.dumps(
++                {"party": 0, "heartbeat": 0, "video": 0, "video_bytes": 0, "board_log": None, "board_lines": 0,
++                 "since_unix": time.time() - 5}))
++            self.logs()
++            self.launch_logs(*games)
++            rc, text = _tool("solo", "T93", "--read", "--winner", 1)
++            v, c = self.verdict()
++            self.assertEqual(c["the mini game played was this title"]["met"], met, games)
++            self.assertEqual(c["the mini game played was this title"]["read"], read, games)
++            self.assertEqual(rc, 0 if met else 1, (games, text))
++            self.assertNotIn("madeupgame", json.dumps(v) + text)
++
++    def test_launches_before_the_mark_not_counted(self):
++        self.logs()
++        self.launch_logs("madeupgame2")
++        old = self.tmp / "proj/logs/games" / "20200101-000000-madeupgame2.log"
++        next(p for p in (self.tmp / "proj/logs/games").glob("*-madeupgame2.log")).rename(old)
++        (self.tmp / "proj/logs/games" / (time.strftime("%Y%m%d-%H%M%S") + "-madeupgame1.log")).write_text("x\n")
++        (self.tmp / "home/T93/solo_mark.json").write_text(json.dumps(
++            {"party": 0, "heartbeat": 0, "video": 0, "video_bytes": 0, "board_log": None, "board_lines": 0,
++             "since_unix": time.time() - 5}))
++        rc, _ = _tool("solo", "T93", "--read", "--winner", 1)
++        self.assertEqual(rc, 0)
++
++    # --- S as B150 words it
++    def switch_logs(self, spec):
++        """spec: [(T offset, seconds, window, practice?, heartbeat rows?)] — one switch each."""
++        import datetime as dt
++        import party_add_game as pag
++        g = self.tmp / "proj/logs/games"
++        t0 = 1_800_000_000.0
++        rows = [{"step": "minigame_launch", "keys_written": True, "time_unix": t0}]
++        hb, enc = [], []
++        for off, sec, window, practice, beats in spec:
++            t = t0 + off
++            rows.append({"step": "minigame_stream", "planned": True, "switched": True, "seconds": sec, "time_unix": t,
++                         "window": window})
++            if practice:
++                rows.append({"step": "minigame_playing", "practice": True, "time_unix": t})
++            enc.append("encoder argv: x" + (",drawtext=" + pag.BAND if practice else ""))
++            for k in range(1, 4 if beats else 0):
++                ts = dt.datetime.fromtimestamp(t + k * 0.9, dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
++                hb.append({"received_at_utc": ts, "audio_queue_depth": 3, "audio_underruns": k,
++                           "audio_max_arrival_gap_ms": 500})
++        rows.append({"step": "minigame_ended", "class": "end_P1", "scores": [1, 0], "winner": 1,
++                     "time_unix": t0 + spec[-1][0] + 5})
++        (g / "party.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
++        (g / "native_stream_heartbeat.log").write_text("\n".join(json.dumps(r) for r in hb) + "\n")
++        (g / "native_video_alpha.log").write_text("\n".join(enc) + "\n")
++        lines = ["cards 1, chose 0", "practice", "load screen again", "start", "scores [1, 0] for seats 1,2"]
++        (g / "20990101-000000-party.log").write_text("".join(f"PrivyParty: hub mini game: {x}\n" for x in lines))
++        (g / (time.strftime("%Y%m%d-%H%M%S") + "-madeupgame1.log")).write_text("x\n")
++        (self.tmp / "home/T93/solo_mark.json").write_text(json.dumps(
++            {"party": 0, "heartbeat": 0, "video": 0, "video_bytes": 0, "board_log": None, "board_lines": 0,
++             "since_unix": time.time() - 5}))
++        return _tool("solo", "T93", "--read", "--winner", 1)
++
++    def test_a_quick_switch_listed_not_read(self):
++        # a practice left 2.6 s after its hand-over (the next switch began 1.3 s after the first's T): no heartbeat
++        # row there — listed, not read; five read
++        rc, text = self.switch_logs([(0, 1.3, "minigame", True, False), (2.6, 1.3, "board", False, True),
++                                     (20, 1.3, "minigame", True, True), (40, 1.3, "board", False, True),
++                                     (60, 1.3, "minigame", False, True), (90, 1.3, "board", False, True)])
++        v, c = self.verdict()
++        self.assertEqual(c["switches read for S (the next starts 4 s or more after)"]["read"], [5, 1])
++        self.assertTrue(c["switches read for S (the next starts 4 s or more after)"]["met"])
++        self.assertTrue(c["S: sound within 4 s of each switch, underruns rising <= 20 a row"]["met"])
++        self.assertTrue(c["audio_max_arrival_gap_ms at each switch"]["met"])
++        self.assertEqual(rc, 0, text + (self.tmp / "ev/T93/solo.md").read_text())
++        page = (self.tmp / "ev/T93/solo.md").read_text()
++        self.assertIn("Listed, not read", page)
++        self.assertIn("switch 1 (to the minigame, 1.3 s; the next began 1.3 s after)", page)
++
++    def test_three_read_not_met(self):
++        rc, _ = self.switch_logs([(0, 1.3, "minigame", True, False), (2.6, 1.3, "board", False, True),
++                                  (30, 1.3, "minigame", False, True), (60, 1.3, "board", False, True)])
++        v, c = self.verdict()
++        self.assertEqual(c["switches read for S (the next starts 4 s or more after)"]["read"], [3, 1])
++        self.assertFalse(c["switches read for S (the next starts 4 s or more after)"]["met"])
++        self.assertEqual(rc, 1)
++
++    # --- the lines
++    def heartbeat(self, classes):
++        rows = [{"received_at_utc": "2026-01-01T00:00:00.000Z", "audio_queue_depth": 1}]
++        if classes is not None:
++            rows.append({"received_at_utc": "2026-01-01T00:00:02.000Z", "pad_slots": [
++                {"slot": i, "pad": f"{i:06x}", "class": c} for i, c in enumerate(classes)]})
++            rows.append({"received_at_utc": "2026-01-01T00:00:04.000Z", "pad_slots": []})   # pads gone: the last with pads counts
++        (self.tmp / "proj/logs/games/native_stream_heartbeat.log").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
++
++    def test_lines_by_pad_class(self):
++        import party_add_game as pag
++        for classes, words, must, must_not in ((["sony", "sony"], "playstation", ["△", "✕", "Select button (Share)"], ["Y ", "View"]),
++                                               (["xbox", "generic"], "xbox", ["press Y", "press A", "View button (Back)"], ["△", "✕"]),
++                                               (["sony", "xbox"], "both", ["△ (Y on an Xbox pad)", "✕ (A on an Xbox pad)", "View on an Xbox pad"], []),
++                                               (None, "playstation", ["△", "✕"], ["View"])):
++            self.heartbeat(classes)
++            self.assertEqual(pag.pad_words(pag.pad_classes()), words, classes)
++            rc, text = _tool("solo", "T93")
++            self.assertEqual(rc, 3, text)
++            for w in must:
++                self.assertIn(w, text, classes)
++            for w in must_not:
++                self.assertNotIn(w, text, classes)
++            self.assertIn("you alone with two pads, or two of you", text)
++            self.assertIn("at least ten seconds", text)
++            self.assertIn("if two cards show, stop and tell me", text)
++        four = pag.solo_lines({"players": 4}, "playstation")
++        self.assertIn("four people, or you with four pads", four[0])
++        self.assertIn("P3 or P4", four[2])
++
++    # --- the setting
++    def test_setting_set_then_cleared_by_read_and_close(self):
++        rc, _ = _tool("solo", "T93")
++        self.assertEqual(rc, 3)
++        self.assertEqual(self.hub.only, {"game": "madeupgame1", "players": 2})
++        self.read()
++        self.assertIsNone(self.hub.only)
++        self.assertIn("POST party-minigame-only clear", self.hub.calls)
++        _tool("solo", "T93")
++        self.assertIsNotNone(self.hub.only)
++        self.close_ready()
++        _tool("close", "T93")
++        self.assertIsNone(self.hub.only)
++
++    def test_setting_not_taken_nothing_asked(self):
++        self.hub.take_only = False                              # a companion without the route
++        rc, text = _tool("solo", "T93")
++        self.assertEqual(rc, 2, text)
++        self.assertIn("the one-title setting was not taken", text)
++        self.assertNotIn("YOU, now", text)
++        self.assertFalse((self.tmp / "home/T93/solo_mark.json").exists())
++
++    # --- close: the in-game saves recorded, never a cell
++    def close_ready(self, cheat=False):
++        import party_add_game as pag
++        ctl = self.tmp / "systemctl"
++        ctl.write_text("#!/bin/sh\nif [ \"$1\" = \"--user\" ] && [ \"$2\" = \"list-units\" ]; then\n"
++                       "  echo 'privyhub-companion.service loaded active running x'\n"
++                       "  echo 'privyhub-diag.service loaded active running x'\nfi\nexit 0\n")
++        ctl.chmod(0o755)
++        os.environ["PRIVYHUB_ADD_GAME_SYSTEMCTL"] = str(ctl)
++        b = json.loads((self.tmp / "home/T93/binding.json").read_text())
++        for p in (self.tmp / "dropins").glob("*.conf"):
++            if p.name in pag.FLAG_FILES:
++                p.unlink()
++        b["found_lines"] = pag.digest(pag._companion_lines())
++        if cheat:
++            b["cheat"] = {"source_index": 0, "enabled_cheat_indexes": [1], "profile_id": "AB" * 32}
++        (self.tmp / "home/T93/binding.json").write_text(json.dumps(b))
++        return b
++
++    def test_close_records_in_game_saves(self):
++        import party_add_game as pag
++        b = self.close_ready(cheat=True)
++        proj = self.tmp / "proj/data/games/retroarch"
++        prof = proj / "cheat_profiles/madeupgame1" / ("AB" * 32)
++        (prof / "saves/Beetle PSX HW").mkdir(parents=True)
++        (prof / "states/Beetle PSX HW").mkdir(parents=True)
++        (prof / "saves/Beetle PSX HW/Made Up (USA).srm").write_text("in-game save 1")
++        (prof / "states/Beetle PSX HW/Made Up (USA).state1").write_text("the user's slot 1")
++        (proj / "saves/Beetle PSX HW").mkdir(parents=True)
++        (proj / "saves/Beetle PSX HW/Made Up (USA).srm").write_text("own in-game save")
++        (proj / "saves/Beetle PSX HW/Another (USA).srm").write_text("another title's save")
++        (self.tmp / "home/T93/files_before.json").write_text(json.dumps(pag.files_digest(b)))
++        pag.saves_before("T93", b, again=True)
++        (prof / "saves/Beetle PSX HW/Made Up (USA).srm").write_text("in-game save 1, after a match")
++        (proj / "saves/Beetle PSX HW/Made Up (USA).srm").write_text("own in-game save, after a match")
++        rc, text = _tool("close", "T93")
++        v = json.loads((self.tmp / "ev/T93/close.json").read_text())
++        self.assertEqual(rc, 0, text + json.dumps(v))
++        self.assertEqual(v["recorded"]["in_game_saves"], [{"save": "under the setup 1", "is": "changed"},
++                                                          {"save": "own 1", "is": "changed"}])
++        self.assertNotIn("in-game", " ".join(c["cell"] for c in v["cells"]))      # never a cell
++        page = (self.tmp / "ev/T93/close.md").read_text()
++        self.assertIn("under the setup 1: changed; own 1: changed", page)
++        self.assertNotIn("Made Up", page + json.dumps(v) + text)
++        (prof / "states/Beetle PSX HW/Made Up (USA).state1").write_text("the user's slot 1, changed")
++        rc, text = _tool("close", "T93")
++        v = json.loads((self.tmp / "ev/T93/close.json").read_text())
++        self.assertEqual(rc, 1, text)
++        self.assertIn("every file = bench's before", [c["cell"] for c in v["cells"] if not c["met"]])
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/b163_rehearse/test_b163.py b/tests/b163_rehearse/test_b163.py
+new file mode 100644
+index 00000000..8ef0cf24
+--- /dev/null
++++ b/tests/b163_rehearse/test_b163.py
+@@ -0,0 +1,223 @@
++#!/usr/bin/env python3
++"""B163 (host): `rehearse <code>` — learn's whole real path on a title already in the rules folder, into a scratch
++rules folder; the real one only read.
++
++Everything made up: a title already added (its rules — spec, begin, sidecar — learnt from made-up pictures, B157's
++`fake_capture`), its kept folder (begin, end_p1, end_p2, end_p1_b; no `other`, as T88's), a made-up hub on loopback answering its game
++file, a made-up user's slot 2 holding a mid-match state. **Without `other` the learner cannot run: rehearse FAIL, the
++missing role and the learner's own words named.** `register --rules-players` → `learn` → **`rehearse --collect
++other=2` PASS** (the slot read only, copied into the scratch only): the roles on the page,
++learn's cells inside, every kept ending read by the scratch rules as by the real ones, **the real rules folder's every
++sha256 before = after**, the scratch removed, nothing named. A kept extra ending that shows the other player's screen →
++its cell not met. A learn bar raised past the made-up spec → rehearse FAIL with `learn: …` named. Refused before
++learn's PASS and for a title not already in the rules folder. **The real picture source is not run here** (the title
++started headless is A's to run). Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b163_rehearse -v
++"""
++from __future__ import annotations
++
++import contextlib
++import hashlib
++import io
++import json
++import os
++import shutil
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "b157_add_game"))
++sys.path.insert(0, str(ROOT / "tools"))
++import fake_capture as fc  # noqa: E402
++import made_up_hub  # noqa: E402
++
++GAME = "madeupgame3"
++CODES = {"start": 100, "other": 101, "end_P1": 102, "end_P2": 103}
++
++
++def state(token: str, extra: int = 0) -> str:
++    return json.dumps({"P1": CODES[token], "P2": extra})
++
++
++def _tool(*argv):
++    import party_add_game as pag
++    buf = io.StringIO()
++    with contextlib.redirect_stdout(buf):
++        rc = pag.main([str(a) for a in argv])
++    return rc, buf.getvalue()
++
++
++class Rehearse(unittest.TestCase):
++    def setUp(self):
++        import party_add_game as pag
++        self.pag = pag
++        self.tmp = Path(tempfile.mkdtemp(prefix="b163_"))
++        self.hub = made_up_hub.MadeUpHub([], relative_path="games/ps1/Made Up Three (USA).cue")
++        self.env = {"PRIVYHUB_ADD_GAME_HOME": str(self.tmp / "home"), "PRIVYHUB_ADD_GAME_EVIDENCE": str(self.tmp / "ev"),
++                    "PRIVYHUB_ADD_GAME_PROJECT": str(self.tmp / "proj"), "PRIVYHUB_H7_RULES": str(self.tmp / "rules"),
++                    "PRIVYHUB_ADD_GAME_DROPINS": str(self.tmp / "dropins"), "PRIVYHUB_ADD_GAME_SYSTEMCTL": "true",
++                    "PRIVYHUB_ADD_GAME_HUB": self.hub.url, "PRIVYHUB_ADD_GAME_KEPT_ROOT": str(self.tmp / "kept"),
++                    "PARTY_ADD_GAME_CAPTURE": "fake_capture:capture"}
++        self.old = {k: os.environ.get(k) for k in self.env}
++        os.environ.update(self.env)
++        self.bars = dict(pag.BARS)
++        (self.tmp / "dropins").mkdir()
++        (self.tmp / "proj").mkdir()
++        rules = self.tmp / "rules"
++        rules.mkdir()
++        # the title as it was added: its spec learnt from made-up pictures of shorter runs (12 s, not the tool's 20 s),
++        # so a spec the scratch learns is never the same file — a learn written into this folder would change its
++        # sha256 — its begin, its sidecar as learn writes it (the same bytes: only the spec can tell)
++        es = pag._endscreen()
++        pics = self.tmp / "made" / "pictures"
++        kept = {}
++        for role, tok in (("begin", "start"), ("other", "other"), ("end_P1", "end_P1"), ("end_P2", "end_P2")):
++            sf = self.tmp / "made" / f"{role}.state"
++            sf.parent.mkdir(parents=True, exist_ok=True)
++            sf.write_text(state(tok))
++            (pics / role).mkdir(parents=True)
++            rows = fc.capture(sf, {}, pics / role, 12.0, pag.CAPTURE_EVERY)
++            (pics / role / "index.csv").write_text("seconds,file\n" + "".join(f"{t:.2f},{n}\n" for t, n in rows))
++            kept[role] = role
++        labels = pag._labels(pics, kept, es)
++        (pics / "labels.json").write_text(json.dumps(labels))
++        spec, arrays, _rep = es.learn(pics, pics / "labels.json", "first", name=GAME)
++        es.save_spec(spec, arrays, rules / f"{GAME}.endscreen.json")
++        (rules / f"{GAME}.state").write_text(state("start"))
++        (rules / f"{GAME}.party.json").write_text(json.dumps({"players": 2, "result": "winner"}, indent=1,
++                                                             sort_keys=True) + "\n")
++        shutil.rmtree(self.tmp / "made")
++        k = self.tmp / "kept" / "t95"
++        k.mkdir(parents=True)
++        (k / "begin.state").write_text(state("start"))
++        (k / "end_p1.state").write_text(state("end_P1"))
++        (k / "end_p2.state").write_text(state("end_P2"))
++        (k / "end_p1_b.state").write_text(state("end_P1", 7))
++        (k / "SHA256SUMS").write_text("made-up\n")
++        # the user's own slot 2 (a mid-match save), as the hub's slot index keeps it — read only by rehearse
++        ra = self.tmp / "proj/data/games/retroarch"
++        (ra / "states/Beetle PSX HW").mkdir(parents=True)
++        (ra / "states/Beetle PSX HW/Made Up Three (USA).state2").write_text(state("other"))
++        (ra / "privyhub_state_slots.json").write_text(json.dumps({"schema": 1, "games": {
++            "ps1::games/ps1/made up three (usa).cue": {"slots": {"2": {
++                "state_file": "data/games/retroarch/states/Beetle PSX HW/Made Up Three (USA).state2"}}}}}))
++        self.slot2 = hashlib.sha256((ra / "states/Beetle PSX HW/Made Up Three (USA).state2").read_bytes()).hexdigest()
++
++    def tearDown(self):
++        self.pag.BARS.clear()
++        self.pag.BARS.update(self.bars)
++        self.hub.close()
++        for k, v in self.old.items():
++            if v is None:
++                os.environ.pop(k, None)
++            else:
++                os.environ[k] = v
++        shutil.rmtree(self.tmp, ignore_errors=True)
++
++    def rules_shas(self):
++        return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((self.tmp / "rules").iterdir())}
++
++    def added(self):
++        args = ("T95", "--players", 2, "--system", "ps1", "--result", "winner", "--rules-players", 2)
++        rc, text = _tool("register", *args)
++        self.assertEqual(rc, 0, text)
++        rc, text = _tool("learn", "T95")
++        self.assertEqual(rc, 0, text)
++
++    def verdict(self):
++        v = json.loads((self.tmp / "ev/T95/rehearse.json").read_text())
++        return v, {c["cell"]: c for c in v["cells"]}
++
++    def test_0_refused_before_learn_and_for_a_new_title(self):
++        rc, text = _tool("rehearse", "T95")
++        self.assertEqual(rc, 2, text)                                     # no register
++        _tool("register", "T95", "--players", 2, "--system", "ps1", "--result", "winner", "--rules-players", 2)
++        rc, text = _tool("rehearse", "T95")
++        self.assertEqual(rc, 2, text)                                     # no learn
++        self.assertIn("learn has no PASS", text)
++        b = json.loads((self.tmp / "home/T95/binding.json").read_text())
++        b["described"] = False
++        (self.tmp / "home/T95/binding.json").write_text(json.dumps(b))
++        rc, text = _tool("rehearse", "T95")
++        self.assertEqual(rc, 2, text)
++        self.assertIn("already in the rules folder", text)
++
++    def test_1_pass(self):
++        self.added()
++        before = self.rules_shas()
++        rc, text = _tool("rehearse", "T95", "--collect", "other=2")
++        v, c = self.verdict()
++        self.assertEqual(rc, 0, text + (self.tmp / "ev/T95/rehearse.md").read_text())
++        self.assertEqual(before, self.rules_shas())
++        self.assertTrue(c["the real rules folder: every file's sha256 before = after"]["met"])
++        self.assertEqual(c["the real rules folder: every file's sha256 before = after"]["read"], [3 + 1, 3 + 1, 0])
++        self.assertTrue(c["the scratch removed"]["met"])
++        self.assertEqual([p.name for p in (self.tmp / "home/T95").iterdir() if p.name.startswith("rehearse_")], [])
++        self.assertTrue(any(k.startswith("learn: ") for k in c))
++        self.assertEqual(c["learn's verdict in the scratch"]["read"], "PASS")
++        for e in ("end_P1", "end_P2", "end_p1_b"):
++            self.assertTrue(c[f"{e}: the scratch rules read it as the real rules"]["met"], e)
++        self.assertEqual(c["end_p1_b: the scratch rules read it as the real rules"]["read"][1][0], "end_P1")
++        self.assertEqual(v["recorded"]["roles"], {"begin": "begin.state", "end_P1": "end_p1.state",
++                                                  "end_P2": "end_p2.state", "other": "slot 2"})
++        self.assertEqual(v["recorded"]["missing"], [])
++        self.assertEqual(self.slot2, hashlib.sha256((self.tmp / "proj/data/games/retroarch/states/Beetle PSX HW/"
++                                                     "Made Up Three (USA).state2").read_bytes()).hexdigest())
++        self.assertEqual(v["recorded"]["endings read, not a role"], ["end_p1_b"])
++        page = (self.tmp / "ev/T95/rehearse.md").read_text()
++        self.assertIn("Missing: none", page)
++        self.assertIn("slot 2 -> other", page)
++        self.assertIn("Endings read, not a role: end_p1_b", page)
++        for n in (GAME, str(self.tmp), "Made Up Three"):
++            self.assertNotIn(n, page + json.dumps(v) + text)
++        rc2, _ = _tool("rehearse", "T95", "--collect", "other=2")         # twice: the same verdict, the same bytes
++        self.assertEqual(rc2, 0)
++        self.assertEqual(json.loads((self.tmp / "ev/T95/rehearse.json").read_text()), v)
++
++    def test_2_an_extra_ending_that_is_another_players(self):
++        (self.tmp / "kept/t95/end_p2_b.state").write_text(state("end_P1", 9))     # saved as P2 won, shows P1's screen
++        self.added()
++        rc, _ = _tool("rehearse", "T95", "--collect", "other=2")
++        v, c = self.verdict()
++        self.assertEqual(rc, 1)
++        bad = [k for k, x in c.items() if not x["met"]]
++        self.assertEqual(bad, ["end_p2_b: the scratch rules read it as the real rules"])
++        self.assertEqual(c["end_p2_b: the scratch rules read it as the real rules"]["read"][1][0], "end_P1")
++
++    def test_3_a_learn_bar_not_met_in_the_scratch(self):
++        self.added()
++        self.pag.BARS["margin_needed_min"] = (9.9, "test: past the made-up spec")
++        before = self.rules_shas()
++        rc, _ = _tool("rehearse", "T95", "--collect", "other=2")
++        v, c = self.verdict()
++        self.assertEqual(rc, 1)
++        self.assertFalse(c["learn: margin_needed"]["met"])
++        self.assertEqual(before, self.rules_shas())
++        self.assertTrue(c["the scratch removed"]["met"])
++
++
++    def test_4_no_other_kept_the_learner_cannot_run(self):
++        """T88's kept folder as it is: no mid-match state. Said plainly: FAIL, other missing, the learner's words."""
++        self.added()
++        before = self.rules_shas()
++        rc, text = _tool("rehearse", "T95")
++        v, c = self.verdict()
++        self.assertEqual(rc, 1, text)
++        self.assertEqual(v["recorded"]["missing"], ["other"])
++        self.assertIn("no other frames", c["learn ran in the scratch"]["read"])
++        self.assertEqual(before, self.rules_shas())
++        self.assertTrue(c["the scratch removed"]["met"])
++        self.assertIn("Missing: other", (self.tmp / "ev/T95/rehearse.md").read_text())
++
++    def test_5_collect_only_a_missing_role(self):
++        self.added()
++        rc, _ = _tool("rehearse", "T95", "--collect", "end_P1=2")       # the kept folder has end_P1
++        self.assertEqual(rc, 2)
++
++
++if __name__ == "__main__":
++    unittest.main()

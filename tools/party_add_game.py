@@ -5,6 +5,8 @@
                                              (--find <words> | --rules-players N) [--setup none|slot1]
                                              [--collect role=slot ...] [--check]
     python3 tools/party_add_game.py learn <code> [--check]
+    python3 tools/party_add_game.py rehearse <code> [--collect role=slot ...]   (B163: a title already in the rules
+                                             folder; a role its kept folder lacks taken from the user's slot, read only)
     python3 tools/party_add_game.py bench <code>
     python3 tools/party_add_game.py solo  <code> [--read --winner <seat>]
     python3 tools/party_add_game.py close <code>
@@ -26,9 +28,11 @@ PRIVYHUB_ADD_GAME_PROJECT (the hub's project root: logs, slot indexes, the sessi
 """
 from __future__ import annotations
 
+import contextlib
 import csv
 import hashlib
 import importlib
+import io
 import json
 import os
 import re
@@ -36,6 +40,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -44,7 +49,7 @@ from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
-STAGES = ("register", "learn", "bench", "solo", "close")
+STAGES = ("register", "learn", "rehearse", "bench", "solo", "close")
 CODE = re.compile(r"^T\d\d$")
 SYSTEMS = {"ps1", "n64", "snes"}                       # h7-start's systems (B103 / B123)
 NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B159)",
@@ -69,6 +74,9 @@ BARS = {
     "arrival_gap_ms_max": (1200, "B153's bound"),
     "sound_within_s": (4.0, "B150's S: audio_queue_depth > 0 within 4 s of a switch"),
     "underrun_rise_max": (20, "B150's S: underruns rising at most 20 a row"),
+    "listed_within_s": (4.0, "B150's S: a switch whose next switch starts sooner is listed, not read"),
+    "s_span_s": (30.0, "B150's S: from a switch to the next one's start, or 30 s"),
+    "switches_read_min": (4, "B162: four read (a practice in and out, the go, the end)"),
     "flag_lines_task": (20, "PP-H4: twenty lines with the two flags"),
     "flag_lines_found": (18, "the eighteen adopted lines"),
 }
@@ -220,9 +228,12 @@ def require(code: str, stage: str, inputs_digest: str) -> None:
         raise Refused(f"{stage}'s PASS was for other inputs (they changed since): run {stage} again")
 
 
-def finish(code: str, stage: str, cells: Cells, inputs: str, write: bool = True, note: str = "") -> int:
+def finish(code: str, stage: str, cells: Cells, inputs: str, write: bool = True, note: str = "",
+           recorded: dict | None = None) -> int:
     v = {"schema": 1, "stage": stage, "code": code, "verdict": "PASS" if cells.passed else "FAIL", "inputs": inputs,
          "cells": cells.rows}
+    if recorded is not None:                                 # B162: recorded beside the cells, never a cell
+        v["recorded"] = recorded
     text = GUARD.check(json.dumps(v, indent=1, sort_keys=True) + "\n")
     lines = [f"# {code} — {stage}: {v['verdict']}", "",
              "Written by `tools/party_add_game.py` (B157). Every cell as read / bar / met; no title, id or path.", "",
@@ -658,6 +669,193 @@ def learn_inputs(code: str, b: dict) -> str:
     return digest({"register": b["register_inputs"], "kept": kept_states(code)})
 
 
+# --- B163: rehearse — learn's whole real path on a title already added, into a scratch rules folder --------------------------
+SCRATCH_ENV = ("PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE")
+
+
+def kept_source(code: str) -> Path:
+    """The title's kept H7 folder (read only): ~/privyhub_h7/<code in lower case>."""
+    return _env_path("PRIVYHUB_ADD_GAME_KEPT_ROOT", Path.home() / "privyhub_h7") / code.lower()
+
+
+def rehearse_roles(code: str) -> dict:
+    """The kept states as the tool's roles, by name: begin; other* / mid* -> other, other2 ...; end_p<k> -> end_P<k>;
+    end_p<k>_<x> -> another ending of end_P<k> (read, not a learning role); results_<n> -> an ending whose row the real
+    rules read (a role end_r<row> for a `places` title)."""
+    src = kept_source(code)
+    files = sorted(p for p in src.iterdir() if p.is_file() and p.suffix == ".state") if src.is_dir() else []
+    roles: dict = {}
+    extra: dict = {}
+    results: list = []
+    unused: list = []
+    for p in files:
+        stem = p.name[:-6]
+        m_end = re.match(r"^end_p([1-4])$", stem)
+        m_more = re.match(r"^end_p([1-4])_[a-z0-9]+$", stem)
+        if stem == "begin":
+            roles["begin"] = p
+        elif re.match(r"^(other|mid)[a-z0-9_]*$", stem):
+            roles["other" if "other" not in roles else f"other{sum(1 for r in roles if r.startswith('other')) + 1}"] = p
+        elif m_end:
+            roles[f"end_P{m_end.group(1)}"] = p
+        elif m_more:
+            extra[stem] = (p, f"end_P{m_more.group(1)}")
+        elif re.match(r"^results_[0-9]+$", stem):
+            results.append(p)
+        else:
+            unused.append(p.name)
+    return {"roles": roles, "extra": extra, "results": results, "unused": unused}
+
+
+def _read_run(es, spec: dict, arrays: dict, run: Path):
+    """A run's pictures read as learn's replays read them (the begin loaded first): [class, places] once ended."""
+    from PIL import Image
+    rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((run / "index.csv").open())]
+    now = [0.0]
+    reader = es.Reader(spec, arrays, clock=lambda: now[0])
+    ended = es.Ended(spec)
+    ended.start_loaded()
+    for t, f in rows:
+        now[0] = t
+        with Image.open(run / f) as im:
+            r = reader.read(im.convert("L"), now=t)
+        done = ended.feed(r["class"], r.get("places"))
+        if done:
+            return [done, list(ended.places) if ended.places else None]
+    return None
+
+
+def _capture_run(state: Path, b: dict, run: Path) -> None:
+    run.mkdir(parents=True, exist_ok=True)
+    rows = _capture_fn()(state, b, run, CAPTURE_SECONDS, CAPTURE_EVERY)
+    with (run / "index.csv").open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["seconds", "file"])
+        for t, name in rows:
+            w.writerow([f"{t:.2f}", name])
+
+
+def _rules_shas() -> dict:
+    r = rules_folder()
+    return {p.name: sha(p) for p in sorted(r.iterdir()) if p.is_file()} if r.is_dir() else {}
+
+
+def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells) -> None:
+    """rehearse's work inside the scratch (the environment pointed at it and put back by the caller)."""
+    for p in found["results"]:                            # a results screen: its row as the real rules read it
+        run = scratch / "extra" / p.name[:-6]
+        _capture_run(p, sb, run)
+        got = _read_run(es, rspec, rarr, run)
+        row = "".join(str(x) for x in (got[1] or [])) if got else ""
+        ok_row = len(row) == b["players"] and sorted(row) == [str(i) for i in range(1, b["players"] + 1)]
+        if b["result"] == "places" and ok_row and f"end_r{row}" not in roles:
+            roles[f"end_r{row}"] = p
+            said_rows[p.name] = f"end_r{row}"
+        else:
+            extra[p.name[:-6]] = (p, None)
+    need = _roles_needed(b["players"], b["result"])
+    missing.extend(r for r in need if r not in roles)
+    if b["result"] == "places":
+        rows_ = [r[5:] for r in roles if r.startswith("end_r")]
+        if not all({r[c] for r in rows_} == {str(i) for i in range(1, b["players"] + 1)} for c in range(b["players"])):
+            missing.append("results rows with every place in every column (have " + (", ".join(sorted(rows_)) or "none") + ")")
+    os.environ.update({"PRIVYHUB_H7_RULES": str(scratch / "rules"), "PRIVYHUB_ADD_GAME_HOME": str(scratch / "home"),
+                       "PRIVYHUB_ADD_GAME_EVIDENCE": str(scratch / "evidence")})   # put back by the caller
+    (scratch / "rules").mkdir()
+    kf = kept_folder(code)
+    kf.mkdir(parents=True)
+    for role, p in roles.items():
+        shutil.copyfile(p, kf / f"{role}.state")             # the kept copies; the kept folder only read
+    sb["register_inputs"] = register_inputs(sb, kept_states(code))
+    write_if_changed(binding_path(code), json.dumps(sb, indent=1, sort_keys=True) + "\n")
+    write_if_changed(verdict_path(code, "register"),
+                     json.dumps({"verdict": "PASS", "inputs": sb["register_inputs"]}) + "\n")
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            cmd_learn(code, {"check": False})             # learn's whole real path, into the scratch rules
+        learnt = load_verdict(code, "learn") or {}
+        for r in learnt.get("cells", []):
+            cells.add(f"learn: {r['cell']}", r["read"], r["bar"], r["met"])
+        cells.add("learn's verdict in the scratch", learnt.get("verdict"), "PASS", learnt.get("verdict") == "PASS")
+    except Exception as exc:                                   # the capture or the learner failed: said, not hidden
+        cells.add("learn ran in the scratch", f"{type(exc).__name__}: {str(exc)[:120]}", "no error", False)
+    spec_path = rules_folder() / f"{b['game']}.endscreen.json"
+    sspec = es.load_spec(spec_path) if spec_path.is_file() else None
+    endings = {r: (home(code) / "pictures" / r, r) for r in roles if r.startswith("end_")}
+    for name, (p, want) in sorted(extra.items()):
+        run = scratch / "extra" / name
+        if not (run / "index.csv").is_file():
+            _capture_run(p, sb, run)
+        endings[name] = (run, want)
+    for name, (run, want) in sorted(endings.items()):
+        got_real = _read_run(es, rspec, rarr, run) if (run / "index.csv").is_file() else None
+        got_scr = _read_run(es, sspec[0], sspec[1], run) if sspec and (run / "index.csv").is_file() else None
+        as_role = (got_real is not None and (want is None or got_real[0] == want or
+                                             (want.startswith("end_r") and got_real[1] == [int(c) for c in want[5:]])))
+        cells.add(f"{name}: the scratch rules read it as the real rules", [got_scr, got_real],
+                  "the same, ended, its own ending", got_scr is not None and got_scr == got_real and as_role)
+
+
+def cmd_rehearse(code: str, a: dict) -> int:
+    b = load_binding(code)
+    if not b.get("described"):
+        raise Refused("rehearse is for a title already in the rules folder (registered with --rules-players)")
+    require(code, "learn", learn_inputs(code, b))
+    _private_paths()
+    found = rehearse_roles(code)
+    if not found["roles"] and not found["extra"] and not found["results"] and not a.get("collect"):
+        raise Refused(f"no kept states for {code}: nothing to rehearse")
+    rel = _game_relpath(b)
+    if not rel:
+        raise Refused("the hub did not give the game file for this title (is the companion up?)")
+    shown = {r: p.name for r, p in found["roles"].items()}
+    for item in a.get("collect") or []:                     # a role the kept folder lacks: the user's slot, read only
+        role, _, slot = item.partition("=")
+        if not ROLE.match(role) or role in found["roles"] or slot not in ("1", "2", "3"):
+            raise Usage("rehearse --collect role=slot: a role its kept folder lacks (e.g. other=2), slots 1-3")
+        found["roles"][role] = _slot_file({**b, "relative_path": rel}, int(slot))
+        shown[role] = f"slot {slot}"
+    es = _endscreen()
+    real = rules_folder()
+    rspec, rarr = es.load_spec(real / f"{b['game']}.endscreen.json")          # the real rules, read only
+    kept_in = {p.name: sha(p) for p in sorted(kept_source(code).iterdir()) if p.is_file()} if kept_source(code).is_dir() else {}
+    kept_in.update({f"slot:{r}": sha(p) for r, p in found["roles"].items() if shown[r].startswith("slot ")})
+    inputs = digest({"register": b["register_inputs"], "kept": kept_in})
+    shas_before = _rules_shas()
+    cells = Cells()
+    sb = {"code": code, "game": b["game"], "players": b["players"], "system": b["system"], "result": b["result"],
+          "cheat": b.get("cheat"), "relative_path": rel, "title": "", "content": str(project() / rel)}
+    scratch = Path(tempfile.mkdtemp(prefix="rehearse_", dir=str(home(code))))
+    roles = dict(found["roles"])
+    extra = dict(found["extra"])
+    said_rows: dict = {}
+    old_env = {k: os.environ.get(k) for k in SCRATCH_ENV}
+    missing: list = []
+    try:
+        _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells)
+    except Exception as exc:                                       # anything else in the scratch: a cell, not a trace
+        cells.add("rehearse ran in the scratch", type(exc).__name__, "no error", False)
+    finally:
+        for k, v in old_env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        shutil.rmtree(scratch, ignore_errors=True)
+    shas_after = _rules_shas()
+    changed = [n for n in set(shas_before) | set(shas_after) if shas_before.get(n) != shas_after.get(n)]
+    cells.add("the real rules folder: every file's sha256 before = after", [len(shas_before), len(shas_after), len(changed)],
+              "the same files, 0 changed", not changed)
+    cells.add("the scratch removed", not scratch.exists(), True, not scratch.exists())
+    rec = {"roles": {r: shown.get(r, p.name) for r, p in sorted(roles.items())}, "missing": missing,
+           "endings read, not a role": sorted(extra), "unused": found["unused"], "rows read by the real rules": said_rows}
+    note = ("Roles (kept file -> role): " + ", ".join(f"{shown.get(r, p.name)} -> {r}" for r, p in sorted(roles.items())) +
+            ". Missing: " + (", ".join(missing) or "none") + ". Endings read, not a role: " +
+            (", ".join(sorted(extra)) or "none") + ".")
+    return finish(code, "rehearse", cells, inputs, note=note, recorded=rec)
+
+
 # --- the files that must not change (before = after) ------------------------------------------------------------------------
 def files_digest(b: dict) -> dict:
     """sha256 of the title's user slots and slot pictures (both indexes), every rules file, the kept folders (names
@@ -674,6 +872,64 @@ def files_digest(b: dict) -> dict:
             if p.is_file() and not p.name.endswith(".state8"):
                 out_[hashlib.sha256(str(p.relative_to(root.parent)).encode()).hexdigest()[:16]] = sha(p)
     return out_
+
+
+# --- B162: the title's own in-game saves (recorded before and after, never a cell) -------------------------------------------
+SAVES = "data/games/retroarch/saves"
+
+
+def _game_relpath(b: dict) -> str:
+    """The game file's path in the library: the binding's, or (a title already in the rules folder) the hub's
+    `details` for its id — in memory, never written."""
+    rel = str(b.get("relative_path") or "")
+    if not rel and b.get("game"):
+        rel = str(hub("GET", "details", {"id": b["game"]}, timeout=10)["body"].get("relative_path") or "")
+        GUARD.add(rel, Path(rel.replace("\\", "/")).stem)
+    return rel
+
+
+def ingame_saves(b: dict) -> dict:
+    """{hashed name: {"kind": "setup" | "own", "sha": ...}}: every file under the title's setup's saves/ (files_digest's
+    own names for them) and every file in the hub's saves/<core>/ whose stem is the game file's."""
+    root = project()
+    out_: dict = {}
+    if b.get("cheat"):
+        profiles = root / "data/games/retroarch/cheat_profiles"
+        d = profiles / b["game"] / b["cheat"]["profile_id"] / "saves"
+        if d.is_dir():
+            for p in sorted(d.rglob("*")):
+                if p.is_file():
+                    out_[hashlib.sha256(str(p.relative_to(profiles.parent)).encode()).hexdigest()[:16]] = \
+                        {"kind": "setup", "sha": sha(p)}
+    rel = _game_relpath(b)
+    stem = Path(rel.replace("\\", "/")).stem if rel else ""
+    d = root / SAVES
+    if stem and d.is_dir():
+        for p in sorted(d.glob("*/*")):
+            if p.is_file() and p.stem == stem:
+                out_[hashlib.sha256(str(p.relative_to(d.parent)).encode()).hexdigest()[:16]] = {"kind": "own", "sha": sha(p)}
+    return out_
+
+
+def saves_before(code: str, b: dict, again: bool) -> None:
+    path = home(code) / "saves_before.json"
+    if again or not path.is_file():
+        write_if_changed(path, json.dumps(ingame_saves(b), sort_keys=True))
+
+
+def saves_recorded(before: dict | None, after: dict) -> list:
+    """Each in-game save named by kind and number only, as changed / unchanged / new / gone."""
+    if before is None:
+        return [{"save": "-", "is": "no before (neither bench nor solo's lines ran)"}]
+    rows = []
+    for kind, word in (("setup", "under the setup"), ("own", "own")):
+        keys = sorted(k for k in set(before) | set(after) if (before.get(k) or after.get(k))["kind"] == kind)
+        for i, k in enumerate(keys, 1):
+            b0, a0 = before.get(k), after.get(k)
+            state = ("new" if b0 is None else "gone" if a0 is None else
+                     "changed" if b0["sha"] != a0["sha"] else "unchanged")
+            rows.append({"save": f"{word} {i}", "is": state})
+    return rows
 
 
 # --- the flags --------------------------------------------------------------------------------------------------------------
@@ -849,6 +1105,7 @@ def cmd_bench(code: str, a: dict) -> int:
               lines == BARS["flag_lines_task"][0])
     before = files_digest(b)
     write_if_changed(home(code) / "files_before.json", json.dumps(before, sort_keys=True))
+    saves_before(code, b, again=True)                         # B162: the title's in-game saves, recorded
     up = _board_up()
     if not cells.add("the board up as the session", up, [True, "…"], up[0]):
         return finish(code, "bench", cells, bench_inputs(code, b))
@@ -952,16 +1209,81 @@ def _board_log() -> Path | None:
     return logs[-1] if logs else None
 
 
-def solo_lines(b: dict) -> list[str]:
+PAD_WORDS = {                                                  # B162: the buttons by the pads' class
+    "playstation": {"practice": "△", "play": "✕", "back": "the Select button (Share)"},
+    "xbox": {"practice": "Y", "play": "A", "back": "the View button (Back)"},
+    "both": {"practice": "△ (Y on an Xbox pad)", "play": "✕ (A on an Xbox pad)",
+             "back": "the Select button (Share; View on an Xbox pad)"},
+}
+
+
+def pad_classes() -> list[str] | None:
+    """The `class` of each pad in the onn's last heartbeat row with pads in `pad_slots`; None when there is none."""
+    p = project() / LOGS["heartbeat"]
+    try:
+        with p.open("rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 4_000_000))
+            tail = f.read().decode(errors="replace").splitlines()
+    except OSError:
+        return None
+    for ln in reversed(tail):
+        if '"pad_slots"' not in ln:
+            continue
+        try:
+            slots = json.loads(ln).get("pad_slots")
+        except ValueError:
+            continue
+        if isinstance(slots, list) and slots:
+            return [str(x.get("class") or "") for x in slots if isinstance(x, dict)]
+    return None
+
+
+def pad_words(classes: list[str] | None) -> str:
+    """PlayStation words for `sony`, Xbox words otherwise, both if mixed, PlayStation if no row yet."""
+    if not classes:
+        return "playstation"
+    sony = [c == "sony" for c in classes]
+    return "playstation" if all(sony) else "xbox" if not any(sony) else "both"
+
+
+def solo_lines(b: dict, words: str = "playstation") -> list[str]:
     n = b["players"]
-    who = "you and one more person" if n == 2 else "four people"
+    who = "you alone with two pads, or two of you" if n == 2 else "four people, or you with four pads"
+    w = PAD_WORDS[words]
     return [
         "YOU, now: open Games, 'PrivyParty (1)', Launch on Companion, Start Fresh; play the board with "
-        f"{who} until a mini game for {n} comes up (this game).",
-        "YOU, now: on its load screen press △ for a practice, leave it with the Select button (Share on a "
-        "PlayStation pad), then press ✕ to play it for real and play it to its end.",
+        f"{who} until a mini game for {n} comes up (this game, the only card shown; if two cards show, stop and "
+        "tell me).",
+        f"YOU, now: on its load screen press {w['practice']} for a practice, stay in it at least ten seconds, leave "
+        f"it with {w['back']}, then press {w['play']} to play it for real and play it to its end.",
         "YOU, now: when you are back on the board, reply with who won (P1, P2" + (", P3 or P4" if n == 4 else "") + ").",
     ]
+
+
+LAUNCH_LOG = re.compile(r"^(\d{8}-\d{6})-(.+)\.log$")
+NOT_A_LAUNCH = ("party", "ps2", "gamecube")                   # the board's, PCSX2's and Dolphin's own logs
+
+
+def launched_since(since: float) -> list[str]:
+    """The game id of every RetroArch launch logged at or after `since` (the manager's <time>-<game id>.log)."""
+    out_ = []
+    for p in sorted((project() / "logs/games").glob("*.log")):
+        m = LAUNCH_LOG.match(p.name)
+        if not m or m.group(2) in NOT_A_LAUNCH:
+            continue
+        try:
+            t = time.mktime(time.strptime(m.group(1), "%Y%m%d-%H%M%S"))
+        except (ValueError, OverflowError):
+            continue
+        if t >= int(since):
+            out_.append(m.group(2))
+    return out_
+
+
+def only_clear() -> dict:
+    """B162: the one-title setting cleared on the hub (solo --read, close)."""
+    return hub("POST", "party-minigame-only", {"clear": "1"}, timeout=10)
 
 
 def solo_after(code: str, b: dict) -> str:
@@ -982,22 +1304,37 @@ def cmd_solo(code: str, a: dict) -> int:
         n_lines = flags(True)                                # the bench flags for the task (bench put them on)
         if n_lines != BARS["flag_lines_task"][0]:
             raise Refused(f"the companion has {n_lines} lines, not {BARS['flag_lines_task'][0]}: nothing asked of the user")
+        only = hub("POST", "party-minigame-only", {"game": b["game"]}, timeout=10)    # B162: this title alone
+        listed = [m for m in (hub("GET", "party-minigames")["body"].get("minigames") or [])
+                  if m.get("players") == b["players"]]
+        if (only["code"] != 200 or only["body"].get("only") is not True or only["body"].get("players") != b["players"]
+                or len(listed) != 1 or (b.get("title") and listed[0].get("title") != b["title"])):
+            only_clear()
+            raise Refused(f"the one-title setting was not taken (the hub lists {len(listed)} titles for "
+                          f"{b['players']} players): nothing asked of the user")
+        saves_before(code, b, again=False)                   # B162: the in-game saves' before, if bench left none
         bl = _board_log()
         mark = {k: _count(project() / v) for k, v in LOGS.items()}
+        mark["since_unix"] = time.time()                     # B162: the launches after this are the solo's
         mark["board_log"] = bl.name if bl else None
         mark["board_lines"] = _count(bl) if bl else 0
         mark["video_bytes"] = (project() / LOGS["video"]).stat().st_size if (project() / LOGS["video"]).is_file() else 0
         if not mark_path.is_file():
             write_if_changed(mark_path, json.dumps(mark, sort_keys=True))
-        for ln in solo_lines(b):
+        for ln in solo_lines(b, pad_words(pad_classes())):
             out(ln)
         out(f"solo {code}: WAITING — after the user's reply: solo {code} --read --winner <seat>")
         return 3
+    only_clear()                                             # B162: the setting cleared first, whatever the cells
     mark = read_json(mark_path)
     if not mark:
         raise Refused("solo's lines were not given yet: run solo first")
     winner = int(a["winner"])
     cells = Cells()
+    ids = launched_since(float(mark.get("since_unix") or 0))  # B162: compared in memory, neither id written
+    this = sum(1 for g in ids if g == str(b["game"])[:80])
+    cells.add("the mini game played was this title", {"this title": this, "another": len(ids) - this},
+              "this title >= 1, another 0", this >= 1 and len(ids) == this)
     rows = party_rows(mark["party"])
     sw = [x for x in rows if x.get("step") == "minigame_stream" and x.get("planned")]
     cells.add("planned switches", len(sw), ">= 4 (a practice in and out, the go, the end)", len(sw) >= 4)
@@ -1016,9 +1353,21 @@ def cmd_solo(code: str, a: dict) -> int:
     hbt = [(_utc(r.get("received_at_utc")), r) for r in hb]
     s_ok, gaps = [], []
     times = [x.get("time_unix") for x in sw]
+    starts = [None if t is None else t - float(x.get("seconds") or 0) for t, x in zip(times, sw)]
+    read_i, listed = [], []                                  # B162: B150's S — a switch followed within 4 s is listed
     for i, t in enumerate(times):
-        nxt = times[i + 1] if i + 1 < len(times) else None
-        after = [(ts, r) for ts, r in hbt if ts is not None and ts >= t and (nxt is None or ts < nxt)]
+        nxt = starts[i + 1] if i + 1 < len(sw) else None
+        if t is not None and nxt is not None and nxt - t < BARS["listed_within_s"][0]:
+            listed.append(i)
+        else:
+            read_i.append(i)
+    cells.add("switches read for S (the next starts 4 s or more after)", [len(read_i), len(listed)],
+              f">= {BARS['switches_read_min'][0]} read", len(read_i) >= BARS["switches_read_min"][0])
+    for i in read_i:
+        t = times[i]
+        nxt = starts[i + 1] if i + 1 < len(sw) else None
+        until = (t or 0) + BARS["s_span_s"][0] if nxt is None else min(nxt, (t or 0) + BARS["s_span_s"][0])
+        after = [(ts, r) for ts, r in hbt if t is not None and ts is not None and t <= ts < until]
         sound = any((r.get("audio_queue_depth") or 0) > 0 for ts, r in after if ts - t <= BARS["sound_within_s"][0])
         und = [r.get("audio_underruns") for ts, r in after if r.get("audio_underruns") is not None]
         rise = max([y - x for x, y in zip(und, und[1:])] or [0])
@@ -1061,7 +1410,12 @@ def cmd_solo(code: str, a: dict) -> int:
         sc = last["scores"]
         hub_winner = sc.index(max(sc)) + 1 if sc.count(max(sc)) == 1 else None
     cells.add("the hub's result = the winner the user named", hub_winner, winner, hub_winner == winner)
-    return finish(code, "solo", cells, digest({"after": before_solo, "mark": mark, "winner": winner}))
+    note = ""
+    if listed:
+        note = "Listed, not read (the next switch began less than 4 s after): " + "; ".join(
+            f"switch {i + 1} (to the {sw[i].get('window') or '?'}, {sw[i].get('seconds')} s; the next began "
+            f"{round(starts[i + 1] - times[i], 2)} s after)" for i in listed) + "."
+    return finish(code, "solo", cells, digest({"after": before_solo, "mark": mark, "winner": winner}), note=note)
 
 
 def _utc(s) -> float | None:
@@ -1080,6 +1434,7 @@ def cmd_close(code: str, a: dict) -> int:
     b = load_binding(code)
     _private_paths()
     cells = Cells()
+    only_clear()                                             # B162: the one-title setting cleared (if the hub is up)
     hub("POST", "stop")
     lines = flags(False)
     cells.add("the companion's lines", lines, BARS["flag_lines_found"][0], lines == BARS["flag_lines_found"][0])
@@ -1089,11 +1444,18 @@ def cmd_close(code: str, a: dict) -> int:
     cells.add("active units", units, ["privyhub-companion", "privyhub-diag"],
               units == ["privyhub-companion", "privyhub-diag"])
     before = read_json(home(code) / "files_before.json")
+    s_before = read_json(home(code) / "saves_before.json")   # B162: the title's in-game saves, recorded only
+    s_after = ingame_saves(b)
+    saves = saves_recorded(s_before, s_after)
+    own_saves = set(s_after) | set(s_before or {})
     if before is not None:                                   # bench ran: its before
         after = files_digest(b)
-        changed = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
+        changed = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k) and k not in own_saves)
         cells.add("every file = bench's before", len(changed), 0, not changed)
-    return finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}))
+    note = "The title's own in-game saves (recorded, never a cell): " + (
+        "; ".join(f"{r['save']}: {r['is']}" for r in saves) if saves else "none found") + "."
+    return finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}),
+                  note=note, recorded={"in_game_saves": saves})
 
 
 def _active_units() -> list[str]:
@@ -1150,7 +1512,8 @@ def main(argv: list[str]) -> int:
         _private_paths()
         if stage == "register":
             return cmd_register(code, a)
-        return {"learn": cmd_learn, "bench": cmd_bench, "solo": cmd_solo, "close": cmd_close}[stage](code, a)
+        return {"learn": cmd_learn, "rehearse": cmd_rehearse, "bench": cmd_bench, "solo": cmd_solo,
+                "close": cmd_close}[stage](code, a)
     except Usage as exc:
         print(f"usage: {exc}", file=sys.stderr)
         return 2

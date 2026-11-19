@@ -360,6 +360,7 @@ if args["mode"] == "today":
                             "result": ("GET", "/plugins/games/party-minigame-result"),
                             "end": ("POST", "/plugins/games/party-minigame-end"),
                             "go": ("POST", "/plugins/games/party-minigame-go"),     # B133
+                            "only": ("POST", "/plugins/games/party-minigame-only?clear=1"),     # B162
                             "status_idle": ("GET", "/plugins/games/status"),
                             "home_idle": ("POST", "/plugins/games/native-stream-stop"),
                             "stop_idle": ("POST", "/plugins/games/stop")}.items():
@@ -565,6 +566,8 @@ if args["mode"] == "winner158":
     finish()
 if args["mode"] == "b157":                              # B157: its own file (tests/b157_add_game)
     exec(compile(Path(args["fake_dir"], "b157_scenario.py").read_text(), "b157_scenario.py", "exec"))
+if args["mode"] == "b162":                              # B162: its own file (tests/b162_solo_safe)
+    exec(compile(Path(args["b162_dir"], "b162_scenario.py").read_text(), "b162_scenario.py", "exec"))
 if args["mode"] == "cheat":
     # B127: the mini games under each title's cheat setup (the setups made by the onn's Extras launch from loopback)
     n64 = args["n64_id"]

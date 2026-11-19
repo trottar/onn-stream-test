@@ -8,7 +8,8 @@ RetroArch (the fake shows the screen a loaded state names). Shown: **the whole p
 failing with its cell named** — a missing state (register), an ending that reads as another's class (learn), a start
 not PAUSED, a file changed, a reload (bench); **refused** without the stage before and after its inputs changed; **run
 twice -> the same bytes, nothing rewritten**; no run-time name (title, id, path) in anything written or printed.
-`SoloReads`: solo's lines, then its read of made-up logs — PASS, and each bar failing (a switch over 1.6 s, the sound
+`SoloReads`: solo's lines (B162: on a made-up hub that takes the one-title setting), then its read of made-up logs
+(B162: with a launch log for its title) — PASS, and each bar failing (a switch over 1.6 s, the sound
 not back, the band outside a practice, the board's lines out of order, a winner the user did not name). `Described`:
 **T88 and T89 from the hub's rules folder as it is, read only (`--check`): register and learn PASS, nothing written**
 (skipped where there is no such folder). Temp dirs removed.
@@ -37,6 +38,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import test_b114 as b114  # noqa: E402
 import test_b124 as b124  # noqa: E402
 import fake_capture as fc  # noqa: E402
+import made_up_hub  # noqa: E402  (B162: solo's one-title setting needs a hub that takes it)
 
 BARS: dict = {}                                     # the mutation runs leave this empty; a test may set a bar
 
@@ -131,6 +133,9 @@ class SoloReads(unittest.TestCase):
                     "PRIVYHUB_ADD_GAME_PROJECT": str(self.tmp / "proj"), "PRIVYHUB_H7_RULES": str(self.tmp / "rules"),
                     "PRIVYHUB_ADD_GAME_DROPINS": str(self.tmp / "dropins"), "PRIVYHUB_ADD_GAME_SYSTEMCTL": "true",
                     "PRIVYHUB_ADD_GAME_HUB": "http://127.0.0.1:9", "PRIVYHUB_ADD_GAME_KEPT_ROOT": str(self.tmp / "kept")}
+        self.hub = made_up_hub.MadeUpHub([{"id": "mg_1", "players": 2, "title": "", "game": "madeupgame1"},
+                                          {"id": "mg_2", "players": 2, "title": "", "game": "madeupgame2"}])
+        self.env["PRIVYHUB_ADD_GAME_HUB"] = self.hub.url
         (self.tmp / "dropins").mkdir()                       # never the hub's own: eighteen made-up lines
         for i in range(18):
             (self.tmp / "dropins" / f"line{i:02d}.conf").write_text(f"[Service]\nEnvironment=PRIVYHUB_LINE{i:02d}=1\n")
@@ -147,6 +152,7 @@ class SoloReads(unittest.TestCase):
         (ev / "bench.json").write_text(json.dumps({"verdict": "PASS", "inputs": pag.bench_inputs("T93", b)}))
 
     def tearDown(self):
+        self.hub.close()
         for k, v in self.old.items():
             if v is None:
                 os.environ.pop(k, None)
@@ -182,6 +188,8 @@ class SoloReads(unittest.TestCase):
         if not board_order:
             lines = [lines[0], lines[3], lines[1], lines[2], lines[4]]
         (g / "20990101-000000-party.log").write_text("".join(f"PrivyParty: hub mini game: {x}\n" for x in lines))
+        import time as _t                                   # B162: the title's own launch, as the manager logs it
+        (g / (_t.strftime("%Y%m%d-%H%M%S") + "-madeupgame1.log")).write_text("made-up launch\n")
 
     def read(self, **kw):
         (self.tmp / "home/T93/solo_mark.json").write_text(json.dumps(

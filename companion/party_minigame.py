@@ -68,6 +68,9 @@ B155 — the `minigame_launch` row carries "keys_written": the session config re
 both PARTY_SESSION_SETTINGS keys in it once each with their values.
 B158 — a sidecar's `"result": "winner"`: the scores one-hot for the winner (version 2: end_Pk = port k won; version 3:
 place 1), the ended row and the result carry `"winner"` (that port's seat). Without the key: today.
+B162 — `POST party-minigame-only?game=<id>` (loopback; `?clear=1` clears): the add-a-game tool's solo setting, kept in
+memory only (any restart clears it) — while set, `party-minigames` lists that title alone for its player count. Never
+set: today.
 """
 from __future__ import annotations
 
@@ -133,6 +136,8 @@ ADVANCE_SETTLE_S = 0.08     # after a step's last frame, before its grab
 BEGIN_MOVED = 0.20          # the share of 64 x 48 cells moved > 16 grey levels: the begin is on the window (H7-D2:
                             # a paused window 0.0, RetroArch's notices <= 0.10, the boot frame -> the begin >= 0.51)
 NO_BEGIN = "the title did not show its starting point"
+# B162: the add-a-game tool's one-title setting (party-minigame-only, loopback)
+NOT_LISTED = "not a listed mini game: nothing set"
 
 _local = threading.local()
 
@@ -225,6 +230,7 @@ class PartyMinigames:
         self.advance_steps, self.advance_settle_s, self.begin_moved = ADVANCE_STEPS, ADVANCE_SETTLE_S, BEGIN_MOVED  # B140
         self.stream_needed = True               # B112's bench sets False (no stream, no switch)
         self._reads: dict[str, dict] = {}       # B114: the last good answer of each bounded read, its helper
+        self.only: dict | None = None           # B162: the title under a solo's test (memory only), else None
 
     # --- rows ---------------------------------------------------------------------------------------------------------
     def row(self, fields: dict) -> None:
@@ -343,8 +349,34 @@ class PartyMinigames:
                 "winner_of": {c: k + 1 for k, c in enumerate(ends)}, **start}
 
     def listing(self) -> dict:
+        entries = self._entries()
+        only = self.only
+        if only is not None:                     # B162: the title under test alone for its player count
+            entries = {t: e for t, e in entries.items()
+                       if e["players"] != only["players"] or e["game"] == only["game"]}
         return {"ok": True, "minigames": [{"id": t, "players": e["players"], "title": e["title"]}   # B134: the name
-                                          for t, e in sorted(self._entries().items())]}
+                                          for t, e in sorted(entries.items())]}
+
+    def set_only(self, game_text: str, clear_text: str) -> dict:
+        """B162: a bench setting for the add-a-game tool's solo — while set, `party-minigames` lists that title alone for
+        its player count (the other counts as they are). Kept in memory only: any restart clears it. One party row when
+        set and one when cleared, no title or id in either."""
+        if str(clear_text or "").strip():
+            if str(clear_text).strip() != "1":
+                raise ValueError("clear is 1")
+            with self._lock:
+                was, self.only = self.only, None
+            if was is not None:
+                self.row({"step": "minigame_only", "on": False})
+            return {"ok": True, "only": False}
+        game = str(game_text or "").strip()
+        entry = next((e for e in self._entries().values() if e["game"] == game), None) if game else None
+        if entry is None:
+            raise ValueError(NOT_LISTED)
+        with self._lock:
+            self.only = {"game": game, "players": entry["players"]}
+        self.row({"step": "minigame_only", "on": True, "players": entry["players"]})
+        return {"ok": True, "only": True, "players": entry["players"]}
 
     # --- start --------------------------------------------------------------------------------------------------------
     def start(self, token: str, seats_text: str, bench: bool = False, hold: bool = False) -> dict:
