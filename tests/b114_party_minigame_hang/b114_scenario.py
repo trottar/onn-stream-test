@@ -530,6 +530,41 @@ if args["mode"] == "four":
                     if r.get("event") in ("ssrc_change", "escalation_armed", "transition", "transition_done")]
     timed("end_onn", "POST", "/plugins/games/stop")
     finish()
+if args["mode"] == "winner158":
+    # B158: winner-only — the made-up two-player title and B124's four-player one (version-3 places), both with
+    # "result": "winner"; then sidecars that must not be listed
+    n64 = args["n64_id"]
+    v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+    shutil.copyfile(v3.with_name(js4["arrays"]), rules_ / f"{n64}.endscreen.npz")
+    js4["arrays"] = f"{n64}.endscreen.npz"
+    (rules_ / f"{n64}.endscreen.json").write_text(json.dumps(js4))
+    (rules_ / f"{n64}.state").write_text(json.dumps({"P1": 0, "P2": 0}))
+    (rules_ / f"{n64}.party.json").write_text(json.dumps({"players": 4, "result": "winner"}))
+    (rules_ / f"{title}.party.json").write_text(json.dumps({"players": 2, "result": "winner"}))
+    def folder():                                     # the fake's slot folder: the running title's core's own
+        return m._state_root() / ("Mupen64Plus-Next" if m._n64_core else "Beetle PSX HW")
+    listed = call("GET", "/plugins/games/party-minigames")["body"]["minigames"]
+    S["w_list"] = sorted(e["players"] for e in listed)
+    tok2 = next(e["id"] for e in listed if e["players"] == 2)
+    tok4 = next(e["id"] for e in listed if e["players"] == 4)
+    call("POST", "/plugins/games/native-stream-start?port=48100&player_prompt=1")
+    call("POST", "/plugins/games/native-stream-ready")
+    R2143 = ["s4start"] * 4 + ["s4other"] * 8 + ["s4r2143"] * 40
+    for tag, seats, script, tok in (("w2a", "1,2", END1, tok2), ("w2b", "2,1", END2, tok2),
+                                    ("w4", "3,1,4,2", R2143, tok4)):
+        r0 = len(rows())
+        one(tag, seats, script, tok=tok)
+        S[tag + "_ended_rows"] = [r for r in rows()[r0:] if r["step"] == "minigame_ended"]
+    for tag, side4, side2 in (("both", {"players": 4, "result": "winner", "places_to_scores": [1, 0, 0, 0]},
+                                       {"players": 2, "result": "winner", "scores": {"end_P1": [1, 0], "end_P2": [0, 1]}}),
+                              ("word", {"players": 4, "result": "places"}, {"players": 2, "result": "first"})):
+        (rules_ / f"{n64}.party.json").write_text(json.dumps(side4))
+        (rules_ / f"{title}.party.json").write_text(json.dumps(side2))
+        S["w_list_" + tag] = sorted(e["players"] for e in call("GET", "/plugins/games/party-minigames")["body"]["minigames"])
+    timed("end_onn", "POST", "/plugins/games/stop")
+    finish()
+if args["mode"] == "b157":                              # B157: its own file (tests/b157_add_game)
+    exec(compile(Path(args["fake_dir"], "b157_scenario.py").read_text(), "b157_scenario.py", "exec"))
 if args["mode"] == "cheat":
     # B127: the mini games under each title's cheat setup (the setups made by the onn's Extras launch from loopback)
     n64 = args["n64_id"]

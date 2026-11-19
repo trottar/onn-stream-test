@@ -66,6 +66,8 @@ killed at once (a SIGTERM'd capture could block on its undrained pipe until a 2-
 the new sound starts before the encoder's 0.75-s check. Every other start (the users') is today's.
 B155 — the `minigame_launch` row carries "keys_written": the session config read back after the launch — written by it,
 both PARTY_SESSION_SETTINGS keys in it once each with their values.
+B158 — a sidecar's `"result": "winner"`: the scores one-hot for the winner (version 2: end_Pk = port k won; version 3:
+place 1), the ended row and the result carry `"winner"` (that port's seat). Without the key: today.
 """
 from __future__ import annotations
 
@@ -260,6 +262,13 @@ class PartyMinigames:
                     continue
                 n = int(side["players"])
                 more = {"cheat": cheat} if cheat is not None else {}
+                if "result" in side:                                    # B158: winner-only (absent: today)
+                    entry = self._winner_entry(spec, side, n)
+                    record = self.p._find_game_by_id(game) if entry is not None else None
+                    if entry is None or record is None:
+                        continue
+                    out[self._token(game)] = {"game": game, **entry, **more, "title": str(record.get("title") or "")}
+                    continue
                 if spec.get("version") == PLACES_VERSION or "places_to_scores" in side:
                     entry = self._places_entry(spec, side, n)          # B123: a place for every player
                     record = self.p._find_game_by_id(game) if entry is not None else None
@@ -313,6 +322,25 @@ class PartyMinigames:
             return None
         p2s = [int(x) if float(x).is_integer() else float(x) for x in raw]
         return {"players": n, "scores": None, "places_to_scores": p2s, "start_class": spec["start_class"]}
+
+    @staticmethod
+    def _winner_entry(spec: dict, side: dict, n: int) -> dict | None:
+        """B158: `{"players": n, "result": "winner"}` -> the entry, else None (not listed). A version-2 spec's end
+        classes must be exactly end_P1..end_Pn (end_Pk: port k won); a version-3 spec of n ports: place 1 won. The
+        scores one-hot (1 for the winner, 0 for the rest); `winner_of` / `winner_places` say where the winner is read."""
+        if side.get("result") != "winner" or "scores" in side or "places_to_scores" in side or not 2 <= n <= 4:
+            return None
+        start = {"start_class": spec["start_class"]}
+        if spec.get("version") == PLACES_VERSION:
+            if int((spec.get("places") or {}).get("ports", 0)) != n:
+                return None
+            return {"players": n, "scores": None, "places_to_scores": [1] + [0] * (n - 1), "winner_places": True,
+                    **start}
+        ends = [f"end_P{k}" for k in range(1, n + 1)]
+        if sorted(spec.get("end_classes") or []) != sorted(ends):
+            return None
+        return {"players": n, "scores": {c: [1 if j == k else 0 for j in range(n)] for k, c in enumerate(ends)},
+                "winner_of": {c: k + 1 for k, c in enumerate(ends)}, **start}
 
     def listing(self) -> dict:
         return {"ok": True, "minigames": [{"id": t, "players": e["players"], "title": e["title"]}   # B134: the name
@@ -413,7 +441,7 @@ class PartyMinigames:
                 return
             mg.update(state=state, final_at=self.clock(), **fields)
         self.row({"step": "minigame_" + state, **{k: v for k, v in fields.items()
-                                                  if k in ("class", "scores", "why", "places")}})
+                                                  if k in ("class", "scores", "why", "places", "winner")}})
 
     # --- B114: bounded calls ------------------------------------------------------------------------------------------
     def _emu_call(self, mg: dict | None, fn: Callable[[], Any], bound: float | None = None, abort: bool = True):
@@ -1131,14 +1159,18 @@ class PartyMinigames:
                         self._final(mg, "given_up", why="an end the places do not name")
                     else:
                         p2s = mg["entry"]["places_to_scores"]
+                        won = ({"winner": mg["seats"][list(places).index(1)]}         # B158: winner-only
+                               if mg["entry"].get("winner_places") else {})
                         self._final(mg, "ended", **{"class": cls, "places": list(places),
-                                                    "scores": [p2s[q - 1] for q in places]})
+                                                    "scores": [p2s[q - 1] for q in places], **won})
                     continue
                 scores = mg["entry"]["scores"].get(cls)
                 if scores is None:
                     self._final(mg, "given_up", why="an end the sidecar does not name")
                 else:
-                    self._final(mg, "ended", **{"class": cls, "scores": list(scores)})
+                    port = (mg["entry"].get("winner_of") or {}).get(cls)              # B158: winner-only
+                    won = {"winner": mg["seats"][port - 1]} if port is not None else {}
+                    self._final(mg, "ended", **{"class": cls, "scores": list(scores), **won})
                 continue
             if r.get("state") in ("no_game", "idle", "no_spec"):
                 self._final(mg, "given_up", why="the watch stopped")
@@ -1169,6 +1201,8 @@ class PartyMinigames:
                 out["practices"] = mg["practices"]
             if mg["entry"].get("places_to_scores") is not None:   # B123: the places read, port by port
                 out["places"] = mg["places"]
+            if mg["entry"].get("winner_of") is not None or mg["entry"].get("winner_places"):   # B158
+                out["winner"] = mg.get("winner")
             return out
 
     def end(self, by: str = "board") -> dict:

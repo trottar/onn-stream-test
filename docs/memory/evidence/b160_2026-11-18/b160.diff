@@ -1,0 +1,43 @@
+diff --git a/checks/hub_minigame_check.gd b/checks/hub_minigame_check.gd
+index f814cd1..c9e77e0 100644
+--- a/checks/hub_minigame_check.gd
++++ b/checks/hub_minigame_check.gd
+@@ -44,6 +44,7 @@ extends SceneTree
+ 
+ const HubMinigame = preload("res://minigames/hub_minigame.gd")
+ const Registry = preload("res://core/registry.gd")
++const MinigamePicker = preload("res://game/minigame_picker.gd")
+ 
+ var _checked := 0
+ var _failures: Array[String] = []
+@@ -385,6 +386,7 @@ func _run() -> void:
+ 	_expect(Registry.register_minigame(script), "it follows the registry's contract")
+ 	_same([int(constants["MIN_PLAYERS"]), int(constants["MAX_PLAYERS"])], [2, 4], "it is offered for two to four players")
+ 	_expect(Registry.minigames().has(str(constants["ID"])), "the registry lists it")
++	_expect(constants.get("ELSEWHERE", false) == true and MinigamePicker.elsewhere(script), "it says it is played elsewhere, and the picker believes it")
+ 
+ 	_server.stop()
+ 	print("")
+diff --git a/minigames/hub_minigame.gd b/minigames/hub_minigame.gd
+index a73f42c..f27c94c 100644
+--- a/minigames/hub_minigame.gd
++++ b/minigames/hub_minigame.gd
+@@ -27,7 +27,7 @@ extends "res://rules/minigame.gd"
+ ## nothing: once the hub has handed a practice over ("playing"), the load
+ ## screen is shown again behind it (every mark clear), so when the practice
+ ## ends the TV comes back to the load screen, not the board.
+-## A practice the board never saw playing (its Start pressed within a poll of
++## A practice the board never saw playing (its Select pressed within a poll of
+ ## the hand-over) is known by the hub's practices count rising: the load screen
+ ## is shown again then, every mark clear, and the next choice taken at once.
+ ## The board's log gets one line for the players' choice ("cards <n>, chose
+@@ -38,6 +38,9 @@ extends "res://rules/minigame.gd"
+ ## the hub's game. A stage without the screens: everything as before.
+ 
+ const ID := "hub"
++## Played on the hub's emulator, the board only waiting for the result: the board
++## is told so (game/minigame_picker.gd, elsewhere()) and need not guess.
++const ELSEWHERE := true
+ const TITLE := "On the hub"
+ ## Two players (a duel) play one of the hub's two-player games, four (a
+ ## round's end) one of its four-player games; three: a draw (none fits).
