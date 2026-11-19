@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-19
-status: RECORD — G6-HM3 part 1 DONE (code, build, pre-registration). Candidate APK 1d658a3f… for the tablet only; the tablet run (part 2) waits for the user. The onn keeps ca53df0d…. Nothing adopted.
+status: RECORD — G6-HM3 NOT MET by its pre-registered rule (c4: max_output_gap_ms 936 > 250); c1–c3, c5, c6 met; c7 met for End. Candidate APK 1d658a3f… on the tablet only; the onn keeps ca53df0d…. Nothing adopted.
 ---
 
 # G6-HM3 — the portrait screen with an inert touch pad (2026-11-19)
@@ -63,8 +63,61 @@ touched.
 `git diff --check` is clean; `git apply -R --check g6_hm3.diff` is OK. The redactor is clean on the Kotlin files and
 the records.
 
-## 4. Part 2 — the tablet run (pending)
+## 4. Part 2 — the tablet run, scored (2026-11-19; scored by G6-HM3S, docs only)
 
-Pre-registered and hashed before the run: `g6_hm3_2026-11-19/preregistration.md`, sha256 `bcbeff14…`
-(`preregistration.sha256`, `preregistration_hashed_at.txt`). It has seven cells read from the tablet's decoder report
-and the user's steps. The result is added here after the run.
+**Pre-registration intact:** `preregistration.md` sha256 `bcbeff14…` checks OK against `preregistration.sha256`.
+
+**The run (verified in the logs):**
+- the tablet, the candidate `1d658a3f…`, a PS2 game (`launch_ports` 15:44:47.9Z, `pcsx2`), recovery-log session 12;
+- `session_started` 15:44:55.9Z, `session_end_bye` 15:48:11.5Z (`client_frame` 11697), `session_ended` 15:48:11.6Z:
+  195.5 s PLAYING;
+- decoder report `logs/games/decoder_sessions/native_decoder_20261119_154811_583.json` (received 15:48:11.583Z,
+  `duration_ms` 199487).
+
+| Cell | Read | Value | Bound | Verdict |
+|---|---|---|---|---|
+| G6-HM3.c1 decode | `decoder.codec_name`, `hardware_accelerated`, `low_latency_enabled` | `OMX.Exynos.avc.dec`, true, true | hardware, low latency | **MET** |
+| G6-HM3.c2 rate | `video.recent_fps` | 60.16 | ≥ 58 | **MET** |
+| G6-HM3.c3 drops | `decoder.dropped_frames` / `queued_frames`; `video.dropped_frames` / `video.frames` | 53 / 11764 = 0.45 %; 32 / 11764 = 0.27 % | each ≤ 1 % | **MET** |
+| G6-HM3.c4 latency | `decoder.max_rx_to_decode_ms`; `decoder.max_output_gap_ms` | 74 ms; **936 ms** | ≤ 100; ≤ 250 | **NOT MET** (the gap) |
+| G6-HM3.c5 the box | `handheld.mode`, `video_box`, `pad_region` | `portrait`, `1200x675` (= 1200·9/16), `1200x1325` (= 2000 − 675) | as stated | **MET** |
+| G6-HM3.c6 the inert pad | `touch_live`, `touch_events`, `touch_writes`, `touch_slot`, `pointer_exempted_events` | false, 174, 0, −1, 182 | false; > 0; 0; −1; > 0 | **MET** |
+| G6-HM3.c7 Back and End | `back_swallowed`; `end_presses`; the bye | 0 (Back not tried); 1; one bye after 195.5 s PLAYING | ≥ 1 if tried; 1; one bye after ≥ 60 s | **MET for End**; Back untested |
+
+**Verdict by the pre-registered rule: G6-HM3 NOT MET.** The rule needs c1–c6 met; c4 missed with
+`max_output_gap_ms` 936. No threshold changes after the hash.
+
+**Where c4's gap falls (verified).** The report's largest output gap (936 ms, slow-event row at `elapsed_ms` 56967)
+lands at 15:45:49.06Z. The decoder session started about 15:44:52.10Z (the report's receipt minus `duration_ms`).
+At that moment:
+- the decoder logged a `sequence_resync` with `jump_packets` 455 (`elapsed_ms` 57003);
+- the hub logged `client_stall` / `desync_pause` at 15:45:49.059Z (`age_ms` 415);
+- `input_release` followed, `why` `dark_span` (the hub's window counted 0 lost packets), and `resumed` at
+  15:45:49.995Z.
+
+**So the gap is inside a stall: a dark span of the link, not a decode or display delay.**
+`max_rx_to_decode_ms` was 74 ms across the session. The other large gaps line up the same way:
+- 929 ms at 153.9 s with a 433-packet resync, matching a stall at 15:47:26.04Z;
+- 868 ms at 104.8 s with a 431-packet resync, matching the stall run at 15:46:36.9–15:46:39.5Z.
+
+The five resyncs come at 6.9, 57.0, 104.8 / 105.5 and 154.0 s, about every 48–50 s. That is recorded as seen; no
+cause is claimed. The verdict stands as NOT MET.
+
+**Context (not cells):**
+- `video.lost_packets` 1738, of which `lost_packets_in_resyncs` 1627;
+- `fec_unrecoverable_groups` 1; 5 sequence resyncs;
+- `stall_signal_stalls_sent` 90 (ends 21);
+- 7 `client_stall` / `desync_pause` rows in the recovery log;
+- Opus 19658 packets, 203 lost;
+- one `link_notice_shown` at 15:45:45.4Z, `rssi_weak`: 5180 MHz, −72 dBm, tx 65 Mb/s (heartbeat 27).
+
+**The user's remarks, verbatim (2026-11-19):**
+- "Handheld games, portrait PrivyHub menu is cutoff." Asked which screen: **the main app** (the catalog and Settings
+  outside a game, held upright).
+- "R\L buttons need to be lower, there positioning isn't goood either."
+- "I decided we should be using PS2 setup for everything because this literally won't work for PS2 and GameCube."
+- "I also get a persistent wifi weak signal message even if I'm right next to the router."
+
+**Next:** the design amendment G6-HM1a (`g6_hm1a_2026-11-19/design_amendment_written_before_code.md`), hashed before
+any code. Whether c4 is re-run as pre-registered, or carried into G6-HM4's cells, is the user's call (the amendment's
+open questions).

@@ -79,7 +79,8 @@ about 10 % per 30 min at 50 % brightness.
 | Id | Decision |
 |---|---|
 | D2 | The touch pad becomes **P1 by default** when no real pad has joined as P1 (the existing long-press join) within **5 s** of the game starting. A later pad takes the next player. |
-| D3 | **The PS1 layout first.** |
+| D3 | ~~The PS1 layout first.~~ **Replaced 2026-11-19 by D5.** |
+| D5 | **The PS2 (DualShock 2) layout on every system**: D-pad, four face buttons, L1 / L2 / R1 / R2, two analog sticks (absolute) with L3 / R3, Select / Start, End. It also replaces Q6 (b). The user: "I decided we should be using PS2 setup for everything because this literally won't work for PS2 and GameCube." (G6-HM1a, `../evidence/g6_hm1a_2026-11-19/`) |
 | D4 | Tablet landscape **keeps today's full-screen fill** (about 6.7 % stretched, inferred); no letterbox. |
 | D1 | **Partly settled** by D2. Open: portrait as a Settings choice, or following the rotation. |
 
@@ -89,11 +90,12 @@ about 10 % per 30 min at 50 % brightness.
 
 | Id | Aim |
 |---|---|
-| G6-HM1 | The design, hashed before any code |
-| G6-HM2 | The bench logic and its JVM tests |
-| G6-HM3 | Portrait video with an inert pad; the onn's confirmation sits before any APK replaces `ca53df0d…` |
-| G6-HM4 | The PS1 digital controls live |
-| G6-HM5 | Sticks, L3 / R3, a latency video |
+| G6-HM1 | The design, hashed before any code — done (`c38dbd82…`) |
+| G6-HM1a | The amendment: the PS2 layout everywhere, the shoulders lower, the main app upright, the weak-signal notice — written, awaiting approval (`2272705f…`) |
+| G6-HM2 | The bench logic and its JVM tests — met; extended at G6-HM4 for the PS2 controls |
+| G6-HM3 | Portrait video with an inert pad — **NOT MET** by its rule (c4's gap 936 ms, inside a link stall); the onn's confirmation sits before any APK replaces `ca53df0d…` |
+| G6-HM4 | **The PS2 layout live, sticks and L3 / R3 included**; the 5-s rule, the takeover and End live; the new shoulders; the user's picks for the main app upright and the notice |
+| G6-HM5 | A latency video (touch → picture); the sticks moved to G6-HM4 |
 | G6-HM6 | Live rotation, customization, the battery / heat comparison (feeds G6-S5) |
 
 Each stage starts only on the user's word, under the conflict rules in §3.
@@ -103,3 +105,5 @@ Each stage starts only on the user's word, under the conflict rules in §3.
 **2026-11-19:** G6-HM2 done (bench): the touch pad's logic and its JVM tests, 346 / 346 pass; no APK; the onn's paths unchanged (`../evidence/G6_HM2_TOUCH_PAD_LOGIC_2026-11-19.md`). Next: G6-HM3 on the user's word.
 
 **2026-11-19:** G6-HM3 part 1 done: the portrait screen with an inert pad, candidate APK `1d658a3f…` for the tablet only; the tablet run is pre-registered (`../evidence/G6_HM3_PORTRAIT_SCREEN_2026-11-19.md`).
+
+**2026-11-19:** G6-HM3 scored **NOT MET** (c4: `max_output_gap_ms` 936 > 250, inside a link stall; c1–c3, c5, c6 met; End met). The user's remarks recorded verbatim (record §4). D3 replaced by D5 (the PS2 layout everywhere). G6-HM1a written and hashed (`../evidence/g6_hm1a_2026-11-19/design_amendment_written_before_code.md`, `2272705f…`), awaiting the user's approval and their picks (Q-HM3, Q-B4, Q-B5, Q-L1, Q-L2, Q-PAD).
