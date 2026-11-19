@@ -202,6 +202,21 @@ class NativeAudioStreamer:
             except Exception:
                 pass
 
+    @staticmethod
+    def _kill_process_now(
+        process: subprocess.Popen[Any] | None,
+    ) -> None:
+        """B153: a party's planned switch — the capture SIGKILLed at once, then waited. Its output is raw PCM to our own
+        pipe, which the reader stops draining at the stop event: on SIGTERM ffmpeg can block on that full pipe until the
+        2-s wait above runs out. Every other stop: `_kill_process`, as today."""
+        try:
+            if process is None or process.poll() is not None:
+                return
+            process.kill()
+            process.wait(timeout=2)
+        except Exception:
+            pass
+
     def _read_status(
         self,
     ) -> dict[str, Any]:
@@ -822,7 +837,7 @@ class NativeAudioStreamer:
         except OSError:
             pass
 
-    def _stop_linux_locked(self) -> None:
+    def _stop_linux_locked(self, now: bool = False) -> None:
         had_session = bool(
             self._process is not None
             or self._linux_sink_module
@@ -847,7 +862,10 @@ class NativeAudioStreamer:
 
         process = self._process
         self._process = None
-        self._kill_process(process)
+        if now:   # B153: SIGKILL at once
+            self._kill_process_now(process)
+        else:
+            self._kill_process(process)
 
         if process is not None and process.stdout is not None:
             try:
@@ -1623,10 +1641,14 @@ class NativeAudioStreamer:
 
     def stop(
         self,
+        now: bool = False,
     ) -> None:
         if sys.platform.startswith("linux"):
             with self._lock:
-                self._stop_linux_locked()
+                if now:   # B153: a party's planned switch
+                    self._stop_linux_locked(now=True)
+                else:
+                    self._stop_linux_locked()
             return
 
         process = (
@@ -2961,8 +2983,11 @@ class NativeSessionIO:
             controller["error"] = self._controller_error
         return {"audio": audio, "controller": controller}
 
-    def stop_stream(self) -> None:
-        self.audio.stop()
+    def stop_stream(self, now: bool = False) -> None:
+        if now:   # B153: a party's planned switch — the capture killed at once
+            self.audio.stop(now=True)
+        else:
+            self.audio.stop()
         self._audio_error = None
 
     def stop(self) -> None:

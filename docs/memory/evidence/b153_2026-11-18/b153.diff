@@ -1,0 +1,704 @@
+diff --git a/companion/native_session_io.py b/companion/native_session_io.py
+index 84e5d29..d17b950 100644
+--- a/companion/native_session_io.py
++++ b/companion/native_session_io.py
+@@ -202,6 +202,21 @@ class NativeAudioStreamer:
+             except Exception:
+                 pass
+ 
++    @staticmethod
++    def _kill_process_now(
++        process: subprocess.Popen[Any] | None,
++    ) -> None:
++        """B153: a party's planned switch — the capture SIGKILLed at once, then waited. Its output is raw PCM to our own
++        pipe, which the reader stops draining at the stop event: on SIGTERM ffmpeg can block on that full pipe until the
++        2-s wait above runs out. Every other stop: `_kill_process`, as today."""
++        try:
++            if process is None or process.poll() is not None:
++                return
++            process.kill()
++            process.wait(timeout=2)
++        except Exception:
++            pass
++
+     def _read_status(
+         self,
+     ) -> dict[str, Any]:
+@@ -822,7 +837,7 @@ class NativeAudioStreamer:
+         except OSError:
+             pass
+ 
+-    def _stop_linux_locked(self) -> None:
++    def _stop_linux_locked(self, now: bool = False) -> None:
+         had_session = bool(
+             self._process is not None
+             or self._linux_sink_module
+@@ -847,7 +862,10 @@ class NativeAudioStreamer:
+ 
+         process = self._process
+         self._process = None
+-        self._kill_process(process)
++        if now:   # B153: SIGKILL at once
++            self._kill_process_now(process)
++        else:
++            self._kill_process(process)
+ 
+         if process is not None and process.stdout is not None:
+             try:
+@@ -1623,10 +1641,14 @@ class NativeAudioStreamer:
+ 
+     def stop(
+         self,
++        now: bool = False,
+     ) -> None:
+         if sys.platform.startswith("linux"):
+             with self._lock:
+-                self._stop_linux_locked()
++                if now:   # B153: a party's planned switch
++                    self._stop_linux_locked(now=True)
++                else:
++                    self._stop_linux_locked()
+             return
+ 
+         process = (
+@@ -2961,8 +2983,11 @@ class NativeSessionIO:
+             controller["error"] = self._controller_error
+         return {"audio": audio, "controller": controller}
+ 
+-    def stop_stream(self) -> None:
+-        self.audio.stop()
++    def stop_stream(self, now: bool = False) -> None:
++        if now:   # B153: a party's planned switch — the capture killed at once
++            self.audio.stop(now=True)
++        else:
++            self.audio.stop()
+         self._audio_error = None
+ 
+     def stop(self) -> None:
+diff --git a/companion/native_stream.py b/companion/native_stream.py
+index e57a1d0..92ba6d3 100644
+--- a/companion/native_stream.py
++++ b/companion/native_stream.py
+@@ -1421,6 +1421,18 @@ class NativeStreamManager:
+         self._party_banner_pid = None
+         return armed is not None and armed == int(process_id)
+ 
++    def party_switch_next(self, pid: int | None) -> None:
++        """B153: the next start for process `pid` is a party mini game's planned switch (None disarms): the old
++        capture and encoder are killed at once and the new sound starts before the encoder's check. Set only by the
++        party layer around its planned switch; every other start is today's."""
++        self._party_switch_pid = None if pid is None else int(pid)
++
++    def _take_party_switch(self, process_id: int) -> bool:
++        """B153: once per Linux start — True when armed for this process; the arm cleared either way."""
++        armed = getattr(self, "_party_switch_pid", None)
++        self._party_switch_pid = None
++        return armed is not None and armed == int(process_id)
++
+     def _build_linux_ffmpeg_command(
+         self,
+         ffmpeg: Path,
+@@ -1608,6 +1620,20 @@ class NativeStreamManager:
+             except Exception:
+                 pass
+ 
++    @staticmethod
++    def _kill_managed_process_now(
++        process: subprocess.Popen[Any] | None,
++    ) -> None:
++        """B153: a planned switch's old encoder — SIGKILL at once, then waited (its RTP goes to our own relay; the new
++        encoder starts on a key frame). Every other stop: `_kill_managed_process`, as today."""
++        try:
++            if process is None or process.poll() is not None:
++                return
++            process.kill()
++            process.wait(timeout=5)
++        except Exception:
++            pass
++
+     def _tail_log(self, max_chars: int = 3000) -> str:
+         try:
+             text = self.log_path.read_text(
+@@ -1619,19 +1645,27 @@ class NativeStreamManager:
+ 
+         return text[-max_chars:].strip()
+ 
+-    def _stop_locked(self) -> None:
++    def _stop_locked(self, fast: bool = False) -> None:
+         # Finalize resource telemetry while the managed processes still exist.
+         self._host_telemetry.stop()
+ 
+-        self._session_io.stop_stream()
++        if fast:   # B153: a party's planned switch — the old capture killed at once
++            self._session_io.stop_stream(now=True)
++        else:
++            self._session_io.stop_stream()
+ 
+         ffmpeg = self._process
+         capture = self._capture_process
+ 
+         # Stop the encoder first. That closes its raw-video input reader.
+-        self._kill_managed_process(
+-            ffmpeg
+-        )
++        if fast:   # B153: the old encoder killed at once
++            self._kill_managed_process_now(
++                ffmpeg
++            )
++        else:
++            self._kill_managed_process(
++                ffmpeg
++            )
+         self._kill_managed_process(
+             capture
+         )
+@@ -1713,7 +1747,11 @@ class NativeStreamManager:
+         if AUDIO_CODEC is not None and (refusal := AUDIO_CODEC.prepare(self._session_io.audio, client_ip)):
+             raise NativeStreamError(refusal)   # G4-W2: fails closed before anything is spawned
+ 
+-        self._stop_locked()
++        fast = self._take_party_switch(process_id)   # B153: False unless a party's planned switch armed it
++        if fast:
++            self._stop_locked(fast=True)
++        else:
++            self._stop_locked()
+         self._party_banner_on = self._take_party_banner(process_id)   # B144: False unless a practice's switch armed it
+ 
+         capture_target = self._select_capture_target(
+@@ -1822,7 +1860,10 @@ class NativeStreamManager:
+ 
+         deadline = time.monotonic() + 0.75
+ 
+-        while time.monotonic() < deadline:
++        if fast:   # B153: a planned switch's new sound starts now, inside the encoder's check (it never raises)
++            self._start_session_io_locked(ffmpeg, client_ip, process_id)
++
++        while time.monotonic() < deadline or fast:
+             if (
+                 self._process is None
+                 or self._process.poll() is not None
+@@ -1842,8 +1883,25 @@ class NativeStreamManager:
+                     + detail
+                 )
+ 
++            if fast and time.monotonic() >= deadline:
++                break   # B153: the check polled once more after its deadline, then done
++
+             time.sleep(0.05)
+ 
++        if not fast:
++            self._start_session_io_locked(ffmpeg, client_ip, process_id)
++
++        payload = self.status()
++        payload["bootstrap"] = "in_band_h264_parameter_sets"
++        payload["fec_enabled"] = True
++        payload["fec_group_size"] = self.FEC_GROUP_SIZE
++        payload["source_bitrate_kbps"] = self.BITRATE_KBPS
++        payload["capture_target"] = self._public_capture_target(
++            capture_target
++        )
++
++        return payload
++    def _start_session_io_locked(self, ffmpeg: Path, client_ip: str, process_id: int) -> None:
+         # D-BASE-P10: the audio sender reads this once when it starts.
+         redundancy = self.audio_redundancy()
+         self._session_io.audio.set_redundancy(
+@@ -1859,16 +1917,6 @@ class NativeStreamManager:
+             process_id=process_id,
+         )
+ 
+-        payload = self.status()
+-        payload["bootstrap"] = "in_band_h264_parameter_sets"
+-        payload["fec_enabled"] = True
+-        payload["fec_group_size"] = self.FEC_GROUP_SIZE
+-        payload["source_bitrate_kbps"] = self.BITRATE_KBPS
+-        payload["capture_target"] = self._public_capture_target(
+-            capture_target
+-        )
+-
+-        return payload
+     def start(
+         self,
+         client_ip: str,
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 12c2759..e436eae 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -61,6 +61,9 @@ B144 — a practice's switch arms the stream: the encoder draws the practice's b
+ to go back") on the onn's picture (the title's window untouched); the way back's start takes it off. B145 — Select stays
+ held through a practice too, until a real go. B151 — a practice is left by a Select press on any pad (one already down
+ at its hand-over counts only once let go and pressed again), or by its time; Start reaches the title as in a real one.
++B153 — every planned switch arms the stream's start for its process: the old sound's capture and the old encoder are
++killed at once (a SIGTERM'd capture could block on its undrained pipe until a 2-s wait ran out: the long switches), and
++the new sound starts before the encoder's 0.75-s check. Every other start (the users') is today's.
+ """
+ from __future__ import annotations
+ 
+@@ -481,6 +484,7 @@ class PartyMinigames:
+         t0 = self.clock()
+         ns = self.p._native_stream
+         self._arm_switch(ns, int(pid))                       # B143: the new process's sound continues the old's
++        self._arm_fast(ns, int(pid))                         # B153: the old killed at once, the new sound early
+         if banner:                                           # B144: a practice's band on the onn's picture only
+             self._arm_banner(ns, int(pid))
+ 
+@@ -490,6 +494,7 @@ class PartyMinigames:
+             done, res = self._bounded(go, self.switch_limit_s)
+         finally:
+             self._arm_switch(ns, None)
++            self._arm_fast(ns, None)
+             if banner:
+                 self._arm_banner(ns, None)
+             until = ps.close_after(seq, PLANNED_GRACE_S)
+@@ -517,6 +522,14 @@ class PartyMinigames:
+         if callable(arm):
+             arm(pid)
+ 
++    @staticmethod
++    def _arm_fast(ns: Any, pid: int | None) -> None:
++        """B153: the stream's next start for `pid` is this planned switch (None: disarmed). A stream without it:
++        nothing."""
++        arm = getattr(type(ns), "party_switch_next", None) and getattr(ns, "party_switch_next", None)
++        if callable(arm):
++            arm(pid)
++
+     @staticmethod
+     def _arm_banner(ns: Any, pid: int | None) -> None:
+         """B144: the stream's next start for `pid` draws the practice banner (None: disarmed). A stream without it:
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index 922561f..3e29055 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -743,7 +743,7 @@ if args["mode"] == "cheat":
+     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
+     S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
+     finish()
+-if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "select151"):
++if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "select151", "b153"):
+     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
+     n64 = args["n64_id"]
+     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+@@ -963,7 +963,9 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
+                 call("POST", "/plugins/games/native-stream-start?port=48100")
+                 client.in_stream = True
+                 call("POST", "/plugins/games/native-stream-ready")
+-    if args["mode"] == "b143":
++    if args["mode"] in ("b143", "b153"):
++        # B153: the same, the capture the real ffmpeg (lavfi silence at the real rate standing in for the pulse
++        # monitor, the same s16le pipe; no device, no title) and twenty planned switches in a row (b153 below).
+         # B143 / B144: behind the stub's own start, the real stream start (`_start_linux_locked` on G8-S2's stubbed
+         # manager: nothing spawned, the encoder's command recorded) and the real audio streamer (Opus, as the hub runs
+         # it; pactl answered by stubs, the capture a made-up process writing silence at the real rate) sending to a
+@@ -1011,6 +1013,11 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
+ 
+             @staticmethod
+             def Popen(cmd, **kw):
++                if args["mode"] == "b153":                  # B153: the real program's own way of stopping
++                    return sp_.Popen(["ffmpeg", "-hide_banner", "-loglevel", "warning", "-nostdin", "-re", "-f", "lavfi",
++                                      "-i", "anullsrc=r=48000:cl=stereo", "-ac", "2", "-ar", "48000", "-c:a",
++                                      "pcm_s16le", "-f", "s16le", "pipe:1"], stdout=sp_.PIPE, stdin=sp_.DEVNULL,
++                                     stderr=sp_.DEVNULL, bufsize=0)
+                 return sp_.Popen([sys.executable, "-c", PCM], stdout=sp_.PIPE, stdin=sp_.DEVNULL, stderr=sp_.DEVNULL,
+                                  bufsize=0)
+         nsio_.subprocess = _SP()
+@@ -1042,6 +1049,26 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
+         stream._session_io.audio = audio
+         if hasattr(nsm.NativeStreamManager, "party_banner_next"):
+             type(stream).party_banner_next = lambda self_, pid_: real.party_banner_next(pid_)
++        KILLS = []                                          # B153: every stop of a capture / encoder: kind, ms
++        if args["mode"] == "b153":
++            if hasattr(nsm.NativeStreamManager, "party_switch_next"):
++                type(stream).party_switch_next = lambda self_, pid_: real.party_switch_next(pid_)
++
++            def _timed_kill(kind, fn):
++                def k_(proc):
++                    if proc is None or proc.poll() is not None:    # nothing running: not a stop
++                        return fn(proc)
++                    t_ = time.monotonic()
++                    fn(proc)
++                    KILLS.append({"t": round(t_ - T0, 4), "kind": kind,
++                                  "ms": round((time.monotonic() - t_) * 1000.0, 1)})
++                return k_
++            audio._kill_process = _timed_kill("capture_term", nsio_.NativeAudioStreamer._kill_process)
++            if hasattr(nsio_.NativeAudioStreamer, "_kill_process_now"):
++                audio._kill_process_now = _timed_kill("capture_kill", nsio_.NativeAudioStreamer._kill_process_now)
++            real._kill_managed_process = _timed_kill("encoder_term", lambda proc: None)   # the stub's FakeProc
++            if hasattr(nsm.NativeStreamManager, "_kill_managed_process_now"):
++                real._kill_managed_process_now = _timed_kill("encoder_kill", lambda proc: None)
+         STARTS = []
+         stub_start = stream.start
+ 
+@@ -1064,63 +1091,106 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
+             return r_
+         stream.start = start_real
+ 
+-        def switches_since(r0):
+-            return [{k: v for k, v in r.items() if k in ("window", "switched", "planned", "why")} for r in rows()[r0:]
+-                    if r["step"] == "minigame_stream"]
+-        n_ = len(STARTS)
+-        board_up("b143")                                    # a fresh board: its stream a users' start (the onn's)
+-        S["b143_board_up"] = [n_, len(STARTS), S.get("b143_board_launch")]
+-        S["b143_users_start"] = list(STARTS[-1]["audio_start"]) if STARTS else None
+-        time.sleep(1.0)
+-        # two planned switches: a real go and its end
+-        s0 = len(STARTS)
+-        r0 = held_start("a2", tok2, "1,2", ["start"] * 400)
+-        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+-        time.sleep(0.8)
+-        S["a2_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+-        wait_phase(lambda b: b.get("state") != "starting", 20)
+-        time.sleep(1.4)
+-        pic.set(["end_P1"] * 400)
+-        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+-        S["a2"] = {k: e.get(k) for k in ("state", "class", "scores")}
+-        finish_case("a2", r0)
+-        time.sleep(1.2)
+-        S["a2_switch_rows"] = switches_since(r0)
+-        S["a2_starts"] = [s0, len(STARTS)]
+-        # five planned switches (and the end's way back): practice by Select (B151), practice by time, a real go
+-        s0 = len(STARTS)
+-        r0 = held_start("a5", tok2, "1,2", ["start"] * 400)
+-        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+-        time.sleep(0.6)
+-        call("POST", "/plugins/games/party-minigame-go?practice=1")
+-        wait_phase(lambda b: b.get("state") == "playing", 20)
+-        time.sleep(1.0)
+-        bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)   # B151: Select leaves it (Start passes); the
+-                                                                       # HEAD runs of this mode: Start, as before
+-        bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+-        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+-        time.sleep(0.7)
+-        call("POST", "/plugins/games/party-minigame-go?practice=1")
+-        wait_phase(lambda b: b.get("state") == "playing", 20)
+-        layer.practice_s = 1.6                                         # the practice's time alone (scaled)
+-        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+-        layer.practice_s = 90.0
+-        time.sleep(0.9)
+-        S["a5_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+-        wait_phase(lambda b: b.get("state") != "starting", 20)
+-        time.sleep(1.2)
+-        pic.set(["end_P1"] * 400)
+-        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+-        S["a5"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
+-        finish_case("a5", r0)
+-        time.sleep(1.2)
+-        S["a5_switch_rows"] = switches_since(r0)
+-        S["a5_starts"] = [s0, len(STARTS)]
+-        S["b143_starts"] = STARTS
+-        S["b143_dg"] = DG
+-        S["b143_redundancy"] = [audio._redundancy_copies, audio._redundancy_offset_packets]
+-        S["b143_ffmpeg_fixture"] = "/fixture/ffmpeg"
+-        audio.stop()
++        if args["mode"] == "b143":
++            def switches_since(r0):
++                return [{k: v for k, v in r.items() if k in ("window", "switched", "planned", "why")} for r in rows()[r0:]
++                        if r["step"] == "minigame_stream"]
++            n_ = len(STARTS)
++            board_up("b143")                                    # a fresh board: its stream a users' start (the onn's)
++            S["b143_board_up"] = [n_, len(STARTS), S.get("b143_board_launch")]
++            S["b143_users_start"] = list(STARTS[-1]["audio_start"]) if STARTS else None
++            time.sleep(1.0)
++            # two planned switches: a real go and its end
++            s0 = len(STARTS)
++            r0 = held_start("a2", tok2, "1,2", ["start"] * 400)
++            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++            time.sleep(0.8)
++            S["a2_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
++            wait_phase(lambda b: b.get("state") != "starting", 20)
++            time.sleep(1.4)
++            pic.set(["end_P1"] * 400)
++            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++            S["a2"] = {k: e.get(k) for k in ("state", "class", "scores")}
++            finish_case("a2", r0)
++            time.sleep(1.2)
++            S["a2_switch_rows"] = switches_since(r0)
++            S["a2_starts"] = [s0, len(STARTS)]
++            # five planned switches (and the end's way back): practice by Select (B151), practice by time, a real go
++            s0 = len(STARTS)
++            r0 = held_start("a5", tok2, "1,2", ["start"] * 400)
++            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++            time.sleep(0.6)
++            call("POST", "/plugins/games/party-minigame-go?practice=1")
++            wait_phase(lambda b: b.get("state") == "playing", 20)
++            time.sleep(1.0)
++            bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)   # B151: Select leaves it (Start passes); the
++                                                                           # HEAD runs of this mode: Start, as before
++            bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
++            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++            time.sleep(0.7)
++            call("POST", "/plugins/games/party-minigame-go?practice=1")
++            wait_phase(lambda b: b.get("state") == "playing", 20)
++            layer.practice_s = 1.6                                         # the practice's time alone (scaled)
++            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++            layer.practice_s = 90.0
++            time.sleep(0.9)
++            S["a5_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
++            wait_phase(lambda b: b.get("state") != "starting", 20)
++            time.sleep(1.2)
++            pic.set(["end_P1"] * 400)
++            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
++            S["a5"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
++            finish_case("a5", r0)
++            time.sleep(1.2)
++            S["a5_switch_rows"] = switches_since(r0)
++            S["a5_starts"] = [s0, len(STARTS)]
++            S["b143_starts"] = STARTS
++            S["b143_dg"] = DG
++            S["b143_redundancy"] = [audio._redundancy_copies, audio._redundancy_offset_packets]
++            S["b143_ffmpeg_fixture"] = "/fixture/ffmpeg"
++            audio.stop()
++        if args["mode"] == "b153":
++            # B153: a fresh board (the onn's own start), then a users' restart of its stream (the onn's start route again,
++            # another process armed); a held start, ten practices in a row, each left by Select (twenty planned
++            # switches), a real go and its end (two more)
++            import random as random_
++            board_up("b153")
++            S["b153_users_kills_board"] = list(KILLS)
++            time.sleep(1.0)
++            k0 = len(KILLS)
++            if hasattr(real, "party_switch_next"):
++                real.party_switch_next(424242)                   # an arm for another process: must not touch this start
++            S["b153_users_restart"] = call("POST", "/plugins/games/native-stream-start?port=48100")["code"]
++            S["b153_users_kills_restart"] = KILLS[k0:]
++            S["b153_users_restart_start"] = STARTS[-1] if STARTS else None
++            time.sleep(1.0)
++            s0 = len(STARTS)
++            r0 = held_start("b153", tok2, "1,2", ["start"] * 4000)
++            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++            for i_ in range(10):
++                time.sleep(0.6 + random_.random() * 0.5)      # B153: the stops' phase against ffmpeg's 0.5-s wake varies
++                call("POST", "/plugins/games/party-minigame-go?practice=1")
++                wait_phase(lambda b: b.get("state") == "playing", 20)
++                time.sleep(1.0 + random_.random() * 0.5)
++                bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)          # Select (B151) leaves the practice
++                bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
++                wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
++            time.sleep(0.9)
++            S["b153_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
++            wait_phase(lambda b: b.get("state") != "starting", 20)
++            time.sleep(1.2)
++            pic.set(["end_P1"] * 400)
++            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 40)
++            S["b153"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
++            finish_case("b153", r0)
++            time.sleep(1.2)
++            S["b153_switch_rows"] = [{k: r.get(k) for k in ("window", "switched", "planned", "seconds", "why")}
++                                     for r in rows()[r0:] if r["step"] == "minigame_stream"]
++            S["b153_starts"] = STARTS
++            S["b153_starts_from"] = s0
++            S["b153_dg"] = DG
++            S["b153_kills"] = KILLS
++            audio.stop()
+     if args["mode"] in ("nopress", "nopress_head", "select151"):
+         # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
+         # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but
+diff --git a/tests/b153_party_switch_length/test_b153.py b/tests/b153_party_switch_length/test_b153.py
+new file mode 100644
+index 0000000..b625bdf
+--- /dev/null
++++ b/tests/b153_party_switch_length/test_b153.py
+@@ -0,0 +1,204 @@
++#!/usr/bin/env python3
++"""B153 (host): the planned switch's length — through the real HTTP server on loopback.
++
++PP-H4: the planned switches came in two lengths, 1.66-1.98 s and 3.48-3.61 s. The long kind's whole extra was the old
++sound's stop: the stop event ends the audio reader's draining, ffmpeg notices SIGTERM only at its next 0.5-s wake, a
++full pipe then blocks its last write, and `_kill_process`'s 2-s wait runs out before SIGKILL. B153: a party's planned
++switch kills the old capture and the old encoder at once and starts the new sound before the encoder's 0.75-s check;
++every other start is today's.
++
++B114's harness, its `b153` mode (B143's set-up: the real routes, the real `PartyMinigames._switch_stream`, the real
++`NativeStreamManager._start_linux_locked` on G8-S2's stubbed manager, the real `NativeAudioStreamer`, Opus, to a socket
++on loopback) **with the capture the real ffmpeg** — lavfi silence at the real rate standing in for the pulse monitor,
++the same s16le pipe (no audio device, no pulse, no title; B114's made-up title). A fresh board (the onn's own start), a
++users' restart of its stream (the start route again, another process armed), then a held start, **ten practices in a
++row left by Select (twenty planned switches, both ways)**, a real go and its end (two more).
++
++Shown: every planned switch ≤ BOUND_S and its sound's gap ≤ GAP_MS; the capture and the encoder killed at once at
++every planned switch, never at the users' starts; the sequence continued (B143). **HEAD's code, the same scenario: the
++long kind** — a capture's SIGTERM stop ≥ 1.9 s and its switch ≥ 1.9 s. **A users' start on G8-S2's recorders** (the
++flags' arm for another process set): its calls, argv and payload the same as HEAD's. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b153_party_switch_length -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import shutil
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "b114_party_minigame_hang"))
++sys.path.insert(0, str(ROOT / "tests" / "b124_party_four_seats"))
++sys.path.insert(0, str(ROOT / "tests" / "b143_party_audio_switch"))
++sys.path.insert(0, str(ROOT / "tests" / "start_rung"))
++import test_b114 as b114  # noqa: E402  (its harness; its tests are not collected here)
++import test_b124 as b124  # noqa: E402
++
++BASELINE = "d7a99b62"            # queue BA's baseline: the companion before B153
++STUB_S = 0.6                     # the harness's stream stub's own start, before the real one (B114's start_s)
++OWN_S = 0.9                      # the real start's own bound (the 0.75-s check + the rest; no window search, no VAAPI)
++BOUND_S = STUB_S + OWN_S         # a planned switch's row
++GAP_MS = 300.0                   # the harness's bound on the sound's gap at a planned switch
++LONG_MS = 1900.0                 # a capture's stop this long: the 2-s wait ran out (the long kind)
++
++
++def extra(work, frames):
++    return {**b124.extra(work, frames), "start_rung": str(ROOT / "tests" / "start_rung")}
++
++
++def run_mode(code_rev: str | None) -> dict:
++    code = b114.code_of(code_rev) if code_rev else None
++    if code_rev and code is None:
++        raise unittest.SkipTest("git is absent")
++    root, ids = b114.b99.tree(code)
++    try:
++        b124.IDS.clear()
++        b124.IDS.update(ids)
++        return b114.run(root, b114.BOTH, ids, "b153", extra=extra)["steps"]
++    finally:
++        shutil.rmtree(root, ignore_errors=True)
++        if code is not None:
++            shutil.rmtree(code, ignore_errors=True)
++
++
++def analyse(s: dict) -> dict:
++    """Per planned start (from the held start on): its row's seconds, the stops inside it (kind, ms), the sound's gap
++    (the last datagram before the new stream's first) and whether the sequence went on."""
++    starts = s["b153_starts"]
++    s0 = s["b153_starts_from"]
++    dg = sorted(s["b153_dg"], key=lambda d: d[0])
++    times = [d[0] for d in dg]
++    kills = s["b153_kills"]
++    rows = [r for r in s["b153_switch_rows"] if r.get("switched")]
++    out = []
++    for k, st in enumerate(starts[s0:], start=s0):
++        t_stop, t_up = st["t_stop"], st["t_up"]
++        inside = [x for x in kills if t_stop - 0.01 <= x["t"] <= t_up]
++        # the switch's own gap: the longest silence between two datagrams from the stop to 0.5 s after the start
++        js = [j for j in range(1, len(dg)) if t_stop <= times[j] <= t_up + 0.5]
++        j = max(js, key=lambda j: times[j] - times[j - 1]) if js else None
++        gap = None if j is None else round((times[j] - times[j - 1]) * 1000.0, 1)
++        cont = None if j is None else dg[j][1] == (max(d[1] for d in dg[max(0, j - 8):j]) + 1) & 0xFFFF
++        out.append({"k": k, "board": st["board"], "stops": [[x["kind"], x["ms"]] for x in inside], "gap_ms": gap,
++                    "continued": cont, "up_s": round(t_up - t_stop, 3)})
++    return {"starts": out, "rows": rows}
++
++
++class TwentyInARow(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.s = run_mode(None)
++        cls.a = analyse(cls.s)
++        if os.environ.get("B153_OUT"):
++            Path(os.environ["B153_OUT"]).write_text(json.dumps({"mine": cls.a, "users": {
++                k: cls.s.get(k) for k in ("b153_users_kills_board", "b153_users_kills_restart", "b153_users_restart")},
++                "b153": cls.s.get("b153"), "errors": cls.s.get("b143_errors"),
++                "thread_exc": cls.s.get("b143_thread_exc")}, indent=1))
++
++    def test_0_the_scenario_played(self):
++        s = self.s
++        self.assertIsNone(s.get("b143_errors"), s.get("b143_errors"))
++        self.assertIsNone(s.get("b143_thread_exc"), s.get("b143_thread_exc"))
++        self.assertEqual(s["b153"]["state"], "ended", s["b153"])
++        self.assertEqual(s["b153"].get("practices"), 10, s["b153"])
++        self.assertEqual(s["b153_users_restart"], 200)
++        windows = [r["window"] for r in self.a["rows"]]
++        self.assertEqual(windows, ["minigame", "board"] * 11, windows)     # 20 practices' switches + the go + the end
++
++    def test_1_every_planned_switch_under_the_bound(self):
++        rows = self.a["rows"]
++        self.assertEqual(len(rows), 22)
++        for r in rows:
++            self.assertTrue(r["planned"], r)
++            self.assertLessEqual(r["seconds"], BOUND_S, rows)
++        for x in self.a["starts"]:
++            self.assertLessEqual(x["up_s"], OWN_S, x)
++
++    def test_2_the_sound_back_quickly_and_continued(self):
++        planned = self.a["starts"]
++        self.assertEqual(len(planned), 22, planned)
++        for x in planned:
++            self.assertIsNotNone(x["gap_ms"], x)
++            self.assertLessEqual(x["gap_ms"], GAP_MS, planned)
++            self.assertTrue(x["continued"], x)                          # B143: the sequence goes on
++
++    def test_3_killed_at_once_only_at_planned_switches(self):
++        for x in self.a["starts"]:
++            kinds = [k for k, _ms in x["stops"]]
++            self.assertIn("capture_kill", kinds, x)
++            self.assertIn("encoder_kill", kinds, x)
++            self.assertNotIn("capture_term", kinds, x)
++            self.assertNotIn("encoder_term", kinds, x)
++            self.assertTrue(all(ms < 300 for _k, ms in x["stops"]), x)
++        for key in ("b153_users_kills_board", "b153_users_kills_restart"):   # the users' starts: today's SIGTERM
++            kinds = {k["kind"] for k in self.s[key]}          # the board's first start: nothing running to stop
++            self.assertTrue(kinds <= {"capture_term", "encoder_term"}, (key, self.s[key]))
++        self.assertEqual({k["kind"] for k in self.s["b153_users_kills_restart"]}, {"capture_term", "encoder_term"})
++
++
++class HeadShowsTheLongKind(unittest.TestCase):
++    """HEAD's companion, the same twenty-two switches: the capture stopped by SIGTERM, and at least one stop runs the
++    2-s wait out (the long kind; ~1 in 3 on the hub and here)."""
++
++    @classmethod
++    def setUpClass(cls):
++        cls.s = run_mode(BASELINE)
++        cls.a = analyse(cls.s)
++        if os.environ.get("B153_OUT_HEAD"):
++            Path(os.environ["B153_OUT_HEAD"]).write_text(json.dumps({"head": cls.a}, indent=1))
++
++    def test_head_long_kind(self):
++        rows = self.a["rows"]
++        self.assertEqual(len(rows), 22, rows)
++        stops = [ms for x in self.a["starts"] for k, ms in x["stops"] if k == "capture_term"]
++        self.assertEqual(len(stops), 22, self.a["starts"])
++        self.assertFalse(any(k == "capture_kill" for x in self.a["starts"] for k, _ in x["stops"]))
++        long_ = [ms for ms in stops if ms >= LONG_MS]
++        self.assertGreaterEqual(len(long_), 1, stops)
++        self.assertGreaterEqual(max(r["seconds"] for r in rows), LONG_MS / 1000.0, rows)
++
++
++class UsersStartOnRecorders(unittest.TestCase):
++    """G8-S2's stubbed manager: `_start_linux_locked` for a users' start (an arm for another process set on mine) —
++    every stub call, the encoder's argv and the payload the same on HEAD's module and mine."""
++
++    def one(self, companion: Path, arm: bool) -> dict:
++        import importlib
++        import stub_manager as stubm
++        for name in ("native_stream", "native_session_io", "native_host_telemetry"):
++            sys.modules.pop(name, None)
++        sys.path.insert(0, str(companion))
++        try:
++            mod = importlib.import_module("native_stream")
++            calls: list = []
++            if arm and hasattr(mod.NativeStreamManager, "party_switch_next"):
++                mod.NativeStreamManager._party_switch_pid = 424242      # armed for another process
++            r = stubm.run_start(mod, "127.0.0.1", calls)
++            shutil.rmtree(r["manager"].project_root, ignore_errors=True)
++            return {"calls": r["calls"], "argv": r["argv"], "payload": r["payload"]}
++        finally:
++            sys.path.remove(str(companion))
++            for name in ("native_stream", "native_session_io", "native_host_telemetry"):
++                sys.modules.pop(name, None)
++
++    def test_users_start_the_same(self):
++        head = b114.code_of(BASELINE)
++        if head is None:
++            self.skipTest("git is absent")
++        try:
++            theirs = self.one(head / "companion", arm=False)
++            mine = self.one(ROOT / "companion", arm=True)
++        finally:
++            shutil.rmtree(head, ignore_errors=True)
++        self.assertTrue(theirs["calls"])
++        self.assertEqual(json.dumps(mine, sort_keys=True, default=str), json.dumps(theirs, sort_keys=True, default=str))
++
++
++if __name__ == "__main__":
++    unittest.main()

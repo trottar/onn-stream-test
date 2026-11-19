@@ -1,0 +1,21 @@
+# One short (switch 15, to the title, 1.852 s) and one long (switch 16, to the board, 3.480 s) — the sitting's consecutive pair.
+# party rows (ids dropped, as PP-H4's part2/party_rows.txt):
+{"planned": true, "seconds": 1.852, "step": "minigame_stream", "switched": true, "time_unix": 1795030875.693, "window": "minigame"}
+{"planned": true, "seconds": 3.48, "step": "minigame_stream", "switched": true, "time_unix": 1795030892.231, "window": "board"}
+# t0 = time_unix - seconds: short 1795030873.841, long 1795030888.751
+# the audio stop's end = the audio timing snapshot's mtime (written after the capture is gone and the sink restored):
+snapshot 144000 1795030874.163
+snapshot 144115 1795030890.759
+# the video log (native_video_alpha.log), the encoder blocks around them (first-frame time = x11grab's 'start'; last = its final 'time=' line):
+frame= 5012 fps= 60 q=-0.0 Lsize=   72343KiB time=00:01:23.53
+Exiting normally, received signal 15.
+Starting PrivyHub Linux native-video backend v0.7
+  Duration: N/A, start: 1795030799.770199, bitrate: 3981312 kb/s
+frame= 4473 fps= 60 q=-0.0 Lsize=   64404KiB time=00:01:14.55
+Exiting normally, received signal 15.
+Starting PrivyHub Linux native-video backend v0.7
+  Duration: N/A, start: 1795030874.822839, bitrate: 3981312 kb/s
+frame=  962 fps= 60 q=-0.0 Lsize=   13865KiB time=00:00:16.03
+Exiting normally, received signal 15.
+Starting PrivyHub Linux native-video backend v0.7
+  Duration: N/A, start: 1795030891.355916, bitrate: 3981312 kb/s

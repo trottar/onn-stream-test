@@ -1,0 +1,255 @@
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index e436eae..f37ed15 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -64,6 +64,8 @@ at its hand-over counts only once let go and pressed again), or by its time; Sta
+ B153 — every planned switch arms the stream's start for its process: the old sound's capture and the old encoder are
+ killed at once (a SIGTERM'd capture could block on its undrained pipe until a 2-s wait ran out: the long switches), and
+ the new sound starts before the encoder's 0.75-s check. Every other start (the users') is today's.
++B155 — the `minigame_launch` row carries "keys_written": the session config read back after the launch — written by it,
++both PARTY_SESSION_SETTINGS keys in it once each with their values.
+ """
+ from __future__ import annotations
+ 
+@@ -118,6 +120,7 @@ NOT_RECOGNISED = "the title's start screen was not recognised"
+ # B139: a party mini game's own launch writes these into its session config (RetroArch's on-screen text off: the
+ # notices, "Paused." and the content banner — nothing of RetroArch's on the title's window, paused or running)
+ PARTY_SESSION_SETTINGS = {"video_font_enable": "false", "menu_show_load_content_animation": "false"}
++SESSION_CONFIG_NAME = "privyhub-session.cfg"   # B155: where the emulator writes them (read back after the launch)
+ PARTY_LABEL_MASK = False    # B139: no text left on the window, so the watch reads it unmasked
+ # B137
+ ADVANCE_FRAMES = 2          # B137's fixed count (B140: replaced by ADVANCE_STEPS; kept for the row's history)
+@@ -522,6 +525,44 @@ class PartyMinigames:
+         if callable(arm):
+             arm(pid)
+ 
++    @staticmethod
++    def _session_config_path(emu: Any) -> Path | None:
++        """B155: the session config every RetroArch launch writes (the emulator's own place for it), or None."""
++        where = getattr(emu, "_project_path", None)
++        if not callable(where):
++            return None
++        try:
++            return Path(where("data/games/retroarch/config")) / SESSION_CONFIG_NAME
++        except Exception:
++            return None
++
++    @classmethod
++    def _session_config_stamp(cls, emu: Any) -> tuple[int, int] | None:
++        path = cls._session_config_path(emu)
++        try:
++            st = path.stat() if path is not None else None
++        except OSError:
++            return None
++        return None if st is None else (st.st_ino, st.st_mtime_ns)
++
++    @classmethod
++    def _keys_written(cls, emu: Any, before: tuple[int, int] | None) -> bool:
++        """B155: read back after the launch — True when this launch wrote the session config (its inode or mtime
++        changed) and each of PARTY_SESSION_SETTINGS's keys has exactly one assignment there, `key = "value"`."""
++        path = cls._session_config_path(emu)
++        after = cls._session_config_stamp(emu)
++        if path is None or after is None or after == before:
++            return False
++        try:
++            lines = [ln.strip() for ln in path.read_text(encoding="utf-8", errors="replace").splitlines()]
++        except OSError:
++            return False
++        for key, value in PARTY_SESSION_SETTINGS.items():
++            assigned = [ln for ln in lines if re.match(rf"^{re.escape(key)}\s*=", ln)]
++            if assigned != [f'{key} = "{value}"']:
++                return False
++        return True
++
+     @staticmethod
+     def _arm_fast(ns: Any, pid: int | None) -> None:
+         """B153: the stream's next start for `pid` is this planned switch (None: disarmed). A stream without it:
+@@ -570,6 +611,7 @@ class PartyMinigames:
+             self._hold_select(mg, True)              # B141: from the launch to the go
+ 
+         def launch():
++            before = self._session_config_stamp(emu)                        # B155: this launch's write, told apart
+             emu._party_session_settings = dict(PARTY_SESSION_SETTINGS)    # B139: this one launch only
+             try:
+                 if cheat is None:
+@@ -578,6 +620,7 @@ class PartyMinigames:
+                     self.p.handle_post("launch", self._cheat_query(mg["entry"]["game"], cheat))
+             finally:
+                 emu._party_session_settings = None
++            mg["keys_written"] = self._keys_written(emu, before)
+             return emu.process
+         proc = self._step(mg, "launch", lambda: self._emu_call(mg, launch))
+         with self._lock:
+@@ -586,12 +629,14 @@ class PartyMinigames:
+         if late:                                     # the end ran while the title launched: it is not left running
+             self._kill(proc)
+             raise _Abort()
++        keys = bool(mg.get("keys_written"))                                # B155
+         if cheat is None:
+-            self.row({"step": "minigame_launch", "pid_owned": True})
++            self.row({"step": "minigame_launch", "pid_owned": True, "keys_written": keys})
+         else:
+             from h7_minigame import session_profile_id
+             matches = session_profile_id(emu) == cheat["profile_id"]
+-            self.row({"step": "minigame_launch", "pid_owned": True, "cheat": True, "profile_matches": matches})
++            self.row({"step": "minigame_launch", "pid_owned": True, "cheat": True, "profile_matches": matches,
++                      "keys_written": keys})
+             if not matches:
+                 raise RuntimeError(NOT_UNDER_SETUP)
+         if mg["hold"]:                               # B133: prepared behind the board, handed over on the go
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index 3e29055..7276695 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -743,7 +743,7 @@ if args["mode"] == "cheat":
+     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
+     S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
+     finish()
+-if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "select151", "b153"):
++if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "select151", "b153", "b155"):
+     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
+     n64 = args["n64_id"]
+     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
+@@ -1191,6 +1191,46 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
+             S["b153_dg"] = DG
+             S["b153_kills"] = KILLS
+             audio.stop()
++    if args["mode"] == "b155":
++        # B155: a held party launch (its row's keys_written, the file's two lines); a second one with the emulator's
++        # write made keyless after the fact (the row must say false: the read is real); then a users' launch of the
++        # title (no minigame row; its config without the keys)
++        import re as re_
++        cfgp = m._project_path("data/games/retroarch/config") / "privyhub-session.cfg"
++        KEYS_ = ("video_font_enable", "menu_show_load_content_animation")
++
++        def key_lines():
++            try:
++                return [ln.strip() for ln in cfgp.read_text().splitlines() if ln.split("=")[0].strip() in KEYS_]
++            except OSError:
++                return None
++        r0 = held_start("b155a", tok2, "1,2", ["start"] * 400)
++        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++        S["b155a_lines"] = key_lines()
++        finish_case("b155a", r0)
++        S["b155a_launch_rows"] = [r for r in rows()[r0:] if r["step"] == "minigame_launch"]
++        orig_ = m._prepare_retroarch_session_config
++
++        def keyless(*a_, **k_):
++            out_ = orig_(*a_, **k_)
++            t_ = Path(out_).read_text()
++            Path(out_).write_text(re_.sub(r"(?m)^(video_font_enable|menu_show_load_content_animation) = .*\n", "", t_))
++            return out_
++        m._prepare_retroarch_session_config = keyless
++        try:
++            r1 = held_start("b155b", tok2, "1,2", ["start"] * 400)
++            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
++            S["b155b_lines"] = key_lines()
++            finish_case("b155b", r1)
++        finally:
++            m._prepare_retroarch_session_config = orig_
++        S["b155b_launch_rows"] = [r for r in rows()[r1:] if r["step"] == "minigame_launch"]
++        r2 = len(rows())
++        S["b155_users_launch"] = call("POST", f"/plugins/games/launch?id={title}")["code"]
++        time.sleep(1.0)
++        S["b155_users_lines"] = key_lines()
++        S["b155_users_rows"] = [r for r in rows()[r2:] if "keys_written" in r or r["step"] == "minigame_launch"]
++        call("POST", "/plugins/games/stop")
+     if args["mode"] in ("nopress", "nopress_head", "select151"):
+         # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
+         # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but
+diff --git a/tests/b155_party_keys_written/test_b155.py b/tests/b155_party_keys_written/test_b155.py
+new file mode 100644
+index 0000000..c6e057c
+--- /dev/null
++++ b/tests/b155_party_keys_written/test_b155.py
+@@ -0,0 +1,90 @@
++#!/usr/bin/env python3
++"""B155 (host): the `minigame_launch` row carries "keys_written" — through the real HTTP server on loopback, behind
++PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1.
++
++PP-H4's C cell read the session config's two keys at three of seven launches (each launch rewrites the file). B155: the
++party layer reads the session config back after each of its launches — written by that launch, each of
++PARTY_SESSION_SETTINGS's keys there once with its value → `"keys_written": true`.
++
++B114's harness, its `b155` mode: a held party launch (true; the file's two lines); a second with the emulator's write
++made keyless after the fact (false: the read is real, not the arm); a users' launch of the same title (no minigame row,
++no field; its config without the keys). The flags absent: the routes as HEAD's (B114's `today` mode, the same answers
++on HEAD's code and mine). Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b155_party_keys_written -v
++"""
++from __future__ import annotations
++
++import json
++import shutil
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "b114_party_minigame_hang"))
++sys.path.insert(0, str(ROOT / "tests" / "b124_party_four_seats"))
++import test_b114 as b114  # noqa: E402  (its harness; its tests are not collected here)
++import test_b124 as b124  # noqa: E402
++
++BASELINE = "d7a99b62"
++LINES = ['video_font_enable = "false"', 'menu_show_load_content_animation = "false"']
++
++
++def run_mode(mode: str, env: dict, code_rev: str | None = None) -> dict:
++    code = b114.code_of(code_rev) if code_rev else None
++    if code_rev and code is None:
++        raise unittest.SkipTest("git is absent")
++    root, ids = b114.b99.tree(code)
++    try:
++        b124.IDS.clear()
++        b124.IDS.update(ids)
++        return b114.run(root, env, ids, mode, extra=b124.extra)["steps"]
++    finally:
++        shutil.rmtree(root, ignore_errors=True)
++        if code is not None:
++            shutil.rmtree(code, ignore_errors=True)
++
++
++class KeysWritten(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        cls.s = run_mode("b155", b114.BOTH)
++
++    def test_party_launch_true(self):
++        rows = self.s["b155a_launch_rows"]
++        self.assertEqual(len(rows), 1, rows)
++        self.assertIs(rows[0].get("keys_written"), True, rows)
++        self.assertTrue(rows[0].get("pid_owned"), rows)
++        self.assertEqual(sorted(self.s["b155a_lines"]), sorted(LINES))
++
++    def test_a_keyless_write_reads_false(self):
++        rows = self.s["b155b_launch_rows"]
++        self.assertEqual(len(rows), 1, rows)
++        self.assertIs(rows[0].get("keys_written"), False, rows)
++        self.assertEqual(self.s["b155b_lines"], [])
++
++    def test_users_launch_no_field(self):
++        self.assertEqual(self.s["b155_users_launch"], 200)
++        self.assertEqual(self.s["b155_users_rows"], [])
++        self.assertEqual(self.s["b155_users_lines"], [])
++
++
++class FlagsAbsent(unittest.TestCase):
++    """B114's `today` mode with the flags absent: every answer the same on HEAD's code and mine."""
++
++    def test_today_the_same(self):
++        env = {**b114.b85.FLAGS, **b114.ADOPTED}                      # the hub's adopted flags, the party's absent
++        mine = run_mode("today", env)
++        head = run_mode("today", env, BASELINE)
++        for k in ("list", "start", "result", "end", "go", "status_idle", "home_idle", "stop_idle"):
++            self.assertEqual((mine[k]["code"], b114.CLOCK.sub("<ms>", mine[k]["raw"])),
++                             (head[k]["code"], b114.CLOCK.sub("<ms>", head[k]["raw"])), k)
++        self.assertEqual(mine["ports_today"], head["ports_today"])
++        self.assertEqual(mine["b139_users_cfg"], head["b139_users_cfg"])      # the users' launch's config
++        self.assertEqual(mine["b139_users_cfg"]["keys"], {})
++
++
++if __name__ == "__main__":
++    unittest.main()

@@ -1421,6 +1421,18 @@ class NativeStreamManager:
         self._party_banner_pid = None
         return armed is not None and armed == int(process_id)
 
+    def party_switch_next(self, pid: int | None) -> None:
+        """B153: the next start for process `pid` is a party mini game's planned switch (None disarms): the old
+        capture and encoder are killed at once and the new sound starts before the encoder's check. Set only by the
+        party layer around its planned switch; every other start is today's."""
+        self._party_switch_pid = None if pid is None else int(pid)
+
+    def _take_party_switch(self, process_id: int) -> bool:
+        """B153: once per Linux start — True when armed for this process; the arm cleared either way."""
+        armed = getattr(self, "_party_switch_pid", None)
+        self._party_switch_pid = None
+        return armed is not None and armed == int(process_id)
+
     def _build_linux_ffmpeg_command(
         self,
         ffmpeg: Path,
@@ -1608,6 +1620,20 @@ class NativeStreamManager:
             except Exception:
                 pass
 
+    @staticmethod
+    def _kill_managed_process_now(
+        process: subprocess.Popen[Any] | None,
+    ) -> None:
+        """B153: a planned switch's old encoder — SIGKILL at once, then waited (its RTP goes to our own relay; the new
+        encoder starts on a key frame). Every other stop: `_kill_managed_process`, as today."""
+        try:
+            if process is None or process.poll() is not None:
+                return
+            process.kill()
+            process.wait(timeout=5)
+        except Exception:
+            pass
+
     def _tail_log(self, max_chars: int = 3000) -> str:
         try:
             text = self.log_path.read_text(
@@ -1619,19 +1645,27 @@ class NativeStreamManager:
 
         return text[-max_chars:].strip()
 
-    def _stop_locked(self) -> None:
+    def _stop_locked(self, fast: bool = False) -> None:
         # Finalize resource telemetry while the managed processes still exist.
         self._host_telemetry.stop()
 
-        self._session_io.stop_stream()
+        if fast:   # B153: a party's planned switch — the old capture killed at once
+            self._session_io.stop_stream(now=True)
+        else:
+            self._session_io.stop_stream()
 
         ffmpeg = self._process
         capture = self._capture_process
 
         # Stop the encoder first. That closes its raw-video input reader.
-        self._kill_managed_process(
-            ffmpeg
-        )
+        if fast:   # B153: the old encoder killed at once
+            self._kill_managed_process_now(
+                ffmpeg
+            )
+        else:
+            self._kill_managed_process(
+                ffmpeg
+            )
         self._kill_managed_process(
             capture
         )
@@ -1713,7 +1747,11 @@ class NativeStreamManager:
         if AUDIO_CODEC is not None and (refusal := AUDIO_CODEC.prepare(self._session_io.audio, client_ip)):
             raise NativeStreamError(refusal)   # G4-W2: fails closed before anything is spawned
 
-        self._stop_locked()
+        fast = self._take_party_switch(process_id)   # B153: False unless a party's planned switch armed it
+        if fast:
+            self._stop_locked(fast=True)
+        else:
+            self._stop_locked()
         self._party_banner_on = self._take_party_banner(process_id)   # B144: False unless a practice's switch armed it
 
         capture_target = self._select_capture_target(
@@ -1822,7 +1860,10 @@ class NativeStreamManager:
 
         deadline = time.monotonic() + 0.75
 
-        while time.monotonic() < deadline:
+        if fast:   # B153: a planned switch's new sound starts now, inside the encoder's check (it never raises)
+            self._start_session_io_locked(ffmpeg, client_ip, process_id)
+
+        while time.monotonic() < deadline or fast:
             if (
                 self._process is None
                 or self._process.poll() is not None
@@ -1842,8 +1883,25 @@ class NativeStreamManager:
                     + detail
                 )
 
+            if fast and time.monotonic() >= deadline:
+                break   # B153: the check polled once more after its deadline, then done
+
             time.sleep(0.05)
 
+        if not fast:
+            self._start_session_io_locked(ffmpeg, client_ip, process_id)
+
+        payload = self.status()
+        payload["bootstrap"] = "in_band_h264_parameter_sets"
+        payload["fec_enabled"] = True
+        payload["fec_group_size"] = self.FEC_GROUP_SIZE
+        payload["source_bitrate_kbps"] = self.BITRATE_KBPS
+        payload["capture_target"] = self._public_capture_target(
+            capture_target
+        )
+
+        return payload
+    def _start_session_io_locked(self, ffmpeg: Path, client_ip: str, process_id: int) -> None:
         # D-BASE-P10: the audio sender reads this once when it starts.
         redundancy = self.audio_redundancy()
         self._session_io.audio.set_redundancy(
@@ -1859,16 +1917,6 @@ class NativeStreamManager:
             process_id=process_id,
         )
 
-        payload = self.status()
-        payload["bootstrap"] = "in_band_h264_parameter_sets"
-        payload["fec_enabled"] = True
-        payload["fec_group_size"] = self.FEC_GROUP_SIZE
-        payload["source_bitrate_kbps"] = self.BITRATE_KBPS
-        payload["capture_target"] = self._public_capture_target(
-            capture_target
-        )
-
-        return payload
     def start(
         self,
         client_ip: str,

@@ -1,0 +1,7 @@
+# The stand-in's stops (exp1.py / exp1_drain.py, run 2026-11-18 ~20:08Z on the hub, no audio device, no title):
+# real ffmpeg 7.1.5, lavfi silence paced at the real rate (-re) in place of the pulse monitor, s16le 48 kHz stereo to a
+# pipe; ms from the stop to the process gone.
+{"mode": "today", "n": 30, "ms": [216, 115, 266, 367, 366, 165, 215, 2006, 2007, 367, 367, 266, 316, 366, 2007, 166, 266, 2008, 2008, 266, 266, 116, 2007, 316, 115, 164, 367, 2008, 417, 2007], "sigkill_after_2s": 8}
+{"mode": "kill", "n": 10, "ms": [6, 7, 7, 7, 7, 7, 7, 7, 6, 6], "sigkill_after_2s": 0}
+# exp1_drain.py: the same, but the reader drains the pipe until the process exits (not only until the stop event)
+{"mode": "today", "n": 20, "ms": [115, 165, 518, 517, 65, 65, 316, 518, 417, 267, 316, 266, 316, 467, 115, 316, 567, 518, 215, 518], "sigkill_after_2s": 0}

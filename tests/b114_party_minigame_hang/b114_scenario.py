@@ -743,7 +743,7 @@ if args["mode"] == "cheat":
     S["c_running_after"] = [m.process is not None and m.process.poll() is None, board_pid_now()]
     S["c_b139_cfg"] = [{"party": c["party"], "keys": c["keys"]} for c in B139_CFG]
     finish()
-if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "select151"):
+if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "select151", "b153", "b155"):
     # B133 / B134: the title prepared behind the board, handed over on the board's go; practice from the load screen
     n64 = args["n64_id"]
     v3 = Path(args["v3"]); js4 = json.loads(v3.read_text())
@@ -963,7 +963,9 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
                 call("POST", "/plugins/games/native-stream-start?port=48100")
                 client.in_stream = True
                 call("POST", "/plugins/games/native-stream-ready")
-    if args["mode"] == "b143":
+    if args["mode"] in ("b143", "b153"):
+        # B153: the same, the capture the real ffmpeg (lavfi silence at the real rate standing in for the pulse
+        # monitor, the same s16le pipe; no device, no title) and twenty planned switches in a row (b153 below).
         # B143 / B144: behind the stub's own start, the real stream start (`_start_linux_locked` on G8-S2's stubbed
         # manager: nothing spawned, the encoder's command recorded) and the real audio streamer (Opus, as the hub runs
         # it; pactl answered by stubs, the capture a made-up process writing silence at the real rate) sending to a
@@ -1011,6 +1013,11 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
 
             @staticmethod
             def Popen(cmd, **kw):
+                if args["mode"] == "b153":                  # B153: the real program's own way of stopping
+                    return sp_.Popen(["ffmpeg", "-hide_banner", "-loglevel", "warning", "-nostdin", "-re", "-f", "lavfi",
+                                      "-i", "anullsrc=r=48000:cl=stereo", "-ac", "2", "-ar", "48000", "-c:a",
+                                      "pcm_s16le", "-f", "s16le", "pipe:1"], stdout=sp_.PIPE, stdin=sp_.DEVNULL,
+                                     stderr=sp_.DEVNULL, bufsize=0)
                 return sp_.Popen([sys.executable, "-c", PCM], stdout=sp_.PIPE, stdin=sp_.DEVNULL, stderr=sp_.DEVNULL,
                                  bufsize=0)
         nsio_.subprocess = _SP()
@@ -1042,6 +1049,26 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
         stream._session_io.audio = audio
         if hasattr(nsm.NativeStreamManager, "party_banner_next"):
             type(stream).party_banner_next = lambda self_, pid_: real.party_banner_next(pid_)
+        KILLS = []                                          # B153: every stop of a capture / encoder: kind, ms
+        if args["mode"] == "b153":
+            if hasattr(nsm.NativeStreamManager, "party_switch_next"):
+                type(stream).party_switch_next = lambda self_, pid_: real.party_switch_next(pid_)
+
+            def _timed_kill(kind, fn):
+                def k_(proc):
+                    if proc is None or proc.poll() is not None:    # nothing running: not a stop
+                        return fn(proc)
+                    t_ = time.monotonic()
+                    fn(proc)
+                    KILLS.append({"t": round(t_ - T0, 4), "kind": kind,
+                                  "ms": round((time.monotonic() - t_) * 1000.0, 1)})
+                return k_
+            audio._kill_process = _timed_kill("capture_term", nsio_.NativeAudioStreamer._kill_process)
+            if hasattr(nsio_.NativeAudioStreamer, "_kill_process_now"):
+                audio._kill_process_now = _timed_kill("capture_kill", nsio_.NativeAudioStreamer._kill_process_now)
+            real._kill_managed_process = _timed_kill("encoder_term", lambda proc: None)   # the stub's FakeProc
+            if hasattr(nsm.NativeStreamManager, "_kill_managed_process_now"):
+                real._kill_managed_process_now = _timed_kill("encoder_kill", lambda proc: None)
         STARTS = []
         stub_start = stream.start
 
@@ -1064,63 +1091,146 @@ if args["mode"] in ("hold", "practice", "nopress", "nopress_head", "b143", "sele
             return r_
         stream.start = start_real
 
-        def switches_since(r0):
-            return [{k: v for k, v in r.items() if k in ("window", "switched", "planned", "why")} for r in rows()[r0:]
-                    if r["step"] == "minigame_stream"]
-        n_ = len(STARTS)
-        board_up("b143")                                    # a fresh board: its stream a users' start (the onn's)
-        S["b143_board_up"] = [n_, len(STARTS), S.get("b143_board_launch")]
-        S["b143_users_start"] = list(STARTS[-1]["audio_start"]) if STARTS else None
-        time.sleep(1.0)
-        # two planned switches: a real go and its end
-        s0 = len(STARTS)
-        r0 = held_start("a2", tok2, "1,2", ["start"] * 400)
+        if args["mode"] == "b143":
+            def switches_since(r0):
+                return [{k: v for k, v in r.items() if k in ("window", "switched", "planned", "why")} for r in rows()[r0:]
+                        if r["step"] == "minigame_stream"]
+            n_ = len(STARTS)
+            board_up("b143")                                    # a fresh board: its stream a users' start (the onn's)
+            S["b143_board_up"] = [n_, len(STARTS), S.get("b143_board_launch")]
+            S["b143_users_start"] = list(STARTS[-1]["audio_start"]) if STARTS else None
+            time.sleep(1.0)
+            # two planned switches: a real go and its end
+            s0 = len(STARTS)
+            r0 = held_start("a2", tok2, "1,2", ["start"] * 400)
+            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            time.sleep(0.8)
+            S["a2_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+            wait_phase(lambda b: b.get("state") != "starting", 20)
+            time.sleep(1.4)
+            pic.set(["end_P1"] * 400)
+            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+            S["a2"] = {k: e.get(k) for k in ("state", "class", "scores")}
+            finish_case("a2", r0)
+            time.sleep(1.2)
+            S["a2_switch_rows"] = switches_since(r0)
+            S["a2_starts"] = [s0, len(STARTS)]
+            # five planned switches (and the end's way back): practice by Select (B151), practice by time, a real go
+            s0 = len(STARTS)
+            r0 = held_start("a5", tok2, "1,2", ["start"] * 400)
+            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            time.sleep(0.6)
+            call("POST", "/plugins/games/party-minigame-go?practice=1")
+            wait_phase(lambda b: b.get("state") == "playing", 20)
+            time.sleep(1.0)
+            bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)   # B151: Select leaves it (Start passes); the
+                                                                           # HEAD runs of this mode: Start, as before
+            bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+            time.sleep(0.7)
+            call("POST", "/plugins/games/party-minigame-go?practice=1")
+            wait_phase(lambda b: b.get("state") == "playing", 20)
+            layer.practice_s = 1.6                                         # the practice's time alone (scaled)
+            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+            layer.practice_s = 90.0
+            time.sleep(0.9)
+            S["a5_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+            wait_phase(lambda b: b.get("state") != "starting", 20)
+            time.sleep(1.2)
+            pic.set(["end_P1"] * 400)
+            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
+            S["a5"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
+            finish_case("a5", r0)
+            time.sleep(1.2)
+            S["a5_switch_rows"] = switches_since(r0)
+            S["a5_starts"] = [s0, len(STARTS)]
+            S["b143_starts"] = STARTS
+            S["b143_dg"] = DG
+            S["b143_redundancy"] = [audio._redundancy_copies, audio._redundancy_offset_packets]
+            S["b143_ffmpeg_fixture"] = "/fixture/ffmpeg"
+            audio.stop()
+        if args["mode"] == "b153":
+            # B153: a fresh board (the onn's own start), then a users' restart of its stream (the onn's start route again,
+            # another process armed); a held start, ten practices in a row, each left by Select (twenty planned
+            # switches), a real go and its end (two more)
+            import random as random_
+            board_up("b153")
+            S["b153_users_kills_board"] = list(KILLS)
+            time.sleep(1.0)
+            k0 = len(KILLS)
+            if hasattr(real, "party_switch_next"):
+                real.party_switch_next(424242)                   # an arm for another process: must not touch this start
+            S["b153_users_restart"] = call("POST", "/plugins/games/native-stream-start?port=48100")["code"]
+            S["b153_users_kills_restart"] = KILLS[k0:]
+            S["b153_users_restart_start"] = STARTS[-1] if STARTS else None
+            time.sleep(1.0)
+            s0 = len(STARTS)
+            r0 = held_start("b153", tok2, "1,2", ["start"] * 4000)
+            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            for i_ in range(10):
+                time.sleep(0.6 + random_.random() * 0.5)      # B153: the stops' phase against ffmpeg's 0.5-s wake varies
+                call("POST", "/plugins/games/party-minigame-go?practice=1")
+                wait_phase(lambda b: b.get("state") == "playing", 20)
+                time.sleep(1.0 + random_.random() * 0.5)
+                bridge._apply_report(1, 0x0020, 0, 0, 0, 0, 0, 0)          # Select (B151) leaves the practice
+                bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
+                wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
+            time.sleep(0.9)
+            S["b153_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
+            wait_phase(lambda b: b.get("state") != "starting", 20)
+            time.sleep(1.2)
+            pic.set(["end_P1"] * 400)
+            e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 40)
+            S["b153"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
+            finish_case("b153", r0)
+            time.sleep(1.2)
+            S["b153_switch_rows"] = [{k: r.get(k) for k in ("window", "switched", "planned", "seconds", "why")}
+                                     for r in rows()[r0:] if r["step"] == "minigame_stream"]
+            S["b153_starts"] = STARTS
+            S["b153_starts_from"] = s0
+            S["b153_dg"] = DG
+            S["b153_kills"] = KILLS
+            audio.stop()
+    if args["mode"] == "b155":
+        # B155: a held party launch (its row's keys_written, the file's two lines); a second one with the emulator's
+        # write made keyless after the fact (the row must say false: the read is real); then a users' launch of the
+        # title (no minigame row; its config without the keys)
+        import re as re_
+        cfgp = m._project_path("data/games/retroarch/config") / "privyhub-session.cfg"
+        KEYS_ = ("video_font_enable", "menu_show_load_content_animation")
+
+        def key_lines():
+            try:
+                return [ln.strip() for ln in cfgp.read_text().splitlines() if ln.split("=")[0].strip() in KEYS_]
+            except OSError:
+                return None
+        r0 = held_start("b155a", tok2, "1,2", ["start"] * 400)
         wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
-        time.sleep(0.8)
-        S["a2_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
-        wait_phase(lambda b: b.get("state") != "starting", 20)
-        time.sleep(1.4)
-        pic.set(["end_P1"] * 400)
-        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
-        S["a2"] = {k: e.get(k) for k in ("state", "class", "scores")}
-        finish_case("a2", r0)
-        time.sleep(1.2)
-        S["a2_switch_rows"] = switches_since(r0)
-        S["a2_starts"] = [s0, len(STARTS)]
-        # five planned switches (and the end's way back): practice by Select (B151), practice by time, a real go
-        s0 = len(STARTS)
-        r0 = held_start("a5", tok2, "1,2", ["start"] * 400)
-        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
-        time.sleep(0.6)
-        call("POST", "/plugins/games/party-minigame-go?practice=1")
-        wait_phase(lambda b: b.get("state") == "playing", 20)
+        S["b155a_lines"] = key_lines()
+        finish_case("b155a", r0)
+        S["b155a_launch_rows"] = [r for r in rows()[r0:] if r["step"] == "minigame_launch"]
+        orig_ = m._prepare_retroarch_session_config
+
+        def keyless(*a_, **k_):
+            out_ = orig_(*a_, **k_)
+            t_ = Path(out_).read_text()
+            Path(out_).write_text(re_.sub(r"(?m)^(video_font_enable|menu_show_load_content_animation) = .*\n", "", t_))
+            return out_
+        m._prepare_retroarch_session_config = keyless
+        try:
+            r1 = held_start("b155b", tok2, "1,2", ["start"] * 400)
+            wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") != "starting", 20)
+            S["b155b_lines"] = key_lines()
+            finish_case("b155b", r1)
+        finally:
+            m._prepare_retroarch_session_config = orig_
+        S["b155b_launch_rows"] = [r for r in rows()[r1:] if r["step"] == "minigame_launch"]
+        r2 = len(rows())
+        S["b155_users_launch"] = call("POST", f"/plugins/games/launch?id={title}")["code"]
         time.sleep(1.0)
-        bridge._apply_report(1, 0x0020 | 0x0010, 0, 0, 0, 0, 0, 0)   # B151: Select leaves it (Start passes); the
-                                                                       # HEAD runs of this mode: Start, as before
-        bridge._apply_report(1, 0, 0, 0, 0, 0, 0, 0)
-        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
-        time.sleep(0.7)
-        call("POST", "/plugins/games/party-minigame-go?practice=1")
-        wait_phase(lambda b: b.get("state") == "playing", 20)
-        layer.practice_s = 1.6                                         # the practice's time alone (scaled)
-        wait_phase(lambda b: b.get("phase") == "ready" or b.get("state") in ("ended", "given_up"), 30)
-        layer.practice_s = 90.0
-        time.sleep(0.9)
-        S["a5_go"] = call("POST", "/plugins/games/party-minigame-go")["body"].get("go")
-        wait_phase(lambda b: b.get("state") != "starting", 20)
-        time.sleep(1.2)
-        pic.set(["end_P1"] * 400)
-        e = wait_for(lambda b: b.get("state") in ("ended", "given_up"), 30)
-        S["a5"] = {k: e.get(k) for k in ("state", "class", "scores", "practices")}
-        finish_case("a5", r0)
-        time.sleep(1.2)
-        S["a5_switch_rows"] = switches_since(r0)
-        S["a5_starts"] = [s0, len(STARTS)]
-        S["b143_starts"] = STARTS
-        S["b143_dg"] = DG
-        S["b143_redundancy"] = [audio._redundancy_copies, audio._redundancy_offset_packets]
-        S["b143_ffmpeg_fixture"] = "/fixture/ffmpeg"
-        audio.stop()
+        S["b155_users_lines"] = key_lines()
+        S["b155_users_rows"] = [r for r in rows()[r2:] if "keys_written" in r or r["step"] == "minigame_launch"]
+        call("POST", "/plugins/games/stop")
     if args["mode"] in ("nopress", "nopress_head", "select151"):
         # B137: nothing a player presses reaches the title before the go. B101's fake RetroArch taught FRAMEADVANCE and
         # a title: running, it reads the virtual pads every 1/60 s and leaves its start screen when any button but

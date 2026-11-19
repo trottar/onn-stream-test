@@ -61,6 +61,11 @@ B144 — a practice's switch arms the stream: the encoder draws the practice's b
 to go back") on the onn's picture (the title's window untouched); the way back's start takes it off. B145 — Select stays
 held through a practice too, until a real go. B151 — a practice is left by a Select press on any pad (one already down
 at its hand-over counts only once let go and pressed again), or by its time; Start reaches the title as in a real one.
+B153 — every planned switch arms the stream's start for its process: the old sound's capture and the old encoder are
+killed at once (a SIGTERM'd capture could block on its undrained pipe until a 2-s wait ran out: the long switches), and
+the new sound starts before the encoder's 0.75-s check. Every other start (the users') is today's.
+B155 — the `minigame_launch` row carries "keys_written": the session config read back after the launch — written by it,
+both PARTY_SESSION_SETTINGS keys in it once each with their values.
 """
 from __future__ import annotations
 
@@ -115,6 +120,7 @@ NOT_RECOGNISED = "the title's start screen was not recognised"
 # B139: a party mini game's own launch writes these into its session config (RetroArch's on-screen text off: the
 # notices, "Paused." and the content banner — nothing of RetroArch's on the title's window, paused or running)
 PARTY_SESSION_SETTINGS = {"video_font_enable": "false", "menu_show_load_content_animation": "false"}
+SESSION_CONFIG_NAME = "privyhub-session.cfg"   # B155: where the emulator writes them (read back after the launch)
 PARTY_LABEL_MASK = False    # B139: no text left on the window, so the watch reads it unmasked
 # B137
 ADVANCE_FRAMES = 2          # B137's fixed count (B140: replaced by ADVANCE_STEPS; kept for the row's history)
@@ -481,6 +487,7 @@ class PartyMinigames:
         t0 = self.clock()
         ns = self.p._native_stream
         self._arm_switch(ns, int(pid))                       # B143: the new process's sound continues the old's
+        self._arm_fast(ns, int(pid))                         # B153: the old killed at once, the new sound early
         if banner:                                           # B144: a practice's band on the onn's picture only
             self._arm_banner(ns, int(pid))
 
@@ -490,6 +497,7 @@ class PartyMinigames:
             done, res = self._bounded(go, self.switch_limit_s)
         finally:
             self._arm_switch(ns, None)
+            self._arm_fast(ns, None)
             if banner:
                 self._arm_banner(ns, None)
             until = ps.close_after(seq, PLANNED_GRACE_S)
@@ -514,6 +522,52 @@ class PartyMinigames:
         A stream without the arm (a stub, an old object): nothing."""
         audio = getattr(getattr(ns, "_session_io", None), "audio", None)
         arm = getattr(audio, "party_continue_next", None)
+        if callable(arm):
+            arm(pid)
+
+    @staticmethod
+    def _session_config_path(emu: Any) -> Path | None:
+        """B155: the session config every RetroArch launch writes (the emulator's own place for it), or None."""
+        where = getattr(emu, "_project_path", None)
+        if not callable(where):
+            return None
+        try:
+            return Path(where("data/games/retroarch/config")) / SESSION_CONFIG_NAME
+        except Exception:
+            return None
+
+    @classmethod
+    def _session_config_stamp(cls, emu: Any) -> tuple[int, int] | None:
+        path = cls._session_config_path(emu)
+        try:
+            st = path.stat() if path is not None else None
+        except OSError:
+            return None
+        return None if st is None else (st.st_ino, st.st_mtime_ns)
+
+    @classmethod
+    def _keys_written(cls, emu: Any, before: tuple[int, int] | None) -> bool:
+        """B155: read back after the launch — True when this launch wrote the session config (its inode or mtime
+        changed) and each of PARTY_SESSION_SETTINGS's keys has exactly one assignment there, `key = "value"`."""
+        path = cls._session_config_path(emu)
+        after = cls._session_config_stamp(emu)
+        if path is None or after is None or after == before:
+            return False
+        try:
+            lines = [ln.strip() for ln in path.read_text(encoding="utf-8", errors="replace").splitlines()]
+        except OSError:
+            return False
+        for key, value in PARTY_SESSION_SETTINGS.items():
+            assigned = [ln for ln in lines if re.match(rf"^{re.escape(key)}\s*=", ln)]
+            if assigned != [f'{key} = "{value}"']:
+                return False
+        return True
+
+    @staticmethod
+    def _arm_fast(ns: Any, pid: int | None) -> None:
+        """B153: the stream's next start for `pid` is this planned switch (None: disarmed). A stream without it:
+        nothing."""
+        arm = getattr(type(ns), "party_switch_next", None) and getattr(ns, "party_switch_next", None)
         if callable(arm):
             arm(pid)
 
@@ -557,6 +611,7 @@ class PartyMinigames:
             self._hold_select(mg, True)              # B141: from the launch to the go
 
         def launch():
+            before = self._session_config_stamp(emu)                        # B155: this launch's write, told apart
             emu._party_session_settings = dict(PARTY_SESSION_SETTINGS)    # B139: this one launch only
             try:
                 if cheat is None:
@@ -565,6 +620,7 @@ class PartyMinigames:
                     self.p.handle_post("launch", self._cheat_query(mg["entry"]["game"], cheat))
             finally:
                 emu._party_session_settings = None
+            mg["keys_written"] = self._keys_written(emu, before)
             return emu.process
         proc = self._step(mg, "launch", lambda: self._emu_call(mg, launch))
         with self._lock:
@@ -573,12 +629,14 @@ class PartyMinigames:
         if late:                                     # the end ran while the title launched: it is not left running
             self._kill(proc)
             raise _Abort()
+        keys = bool(mg.get("keys_written"))                                # B155
         if cheat is None:
-            self.row({"step": "minigame_launch", "pid_owned": True})
+            self.row({"step": "minigame_launch", "pid_owned": True, "keys_written": keys})
         else:
             from h7_minigame import session_profile_id
             matches = session_profile_id(emu) == cheat["profile_id"]
-            self.row({"step": "minigame_launch", "pid_owned": True, "cheat": True, "profile_matches": matches})
+            self.row({"step": "minigame_launch", "pid_owned": True, "cheat": True, "profile_matches": matches,
+                      "keys_written": keys})
             if not matches:
                 raise RuntimeError(NOT_UNDER_SETUP)
         if mg["hold"]:                               # B133: prepared behind the board, handed over on the go
