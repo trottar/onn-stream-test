@@ -109,6 +109,8 @@ Everything below is a **[G3-S1 proposal]**.
   today, and audited; **never over the overlay**. The hub itself is always
   the operator. **Do not put a reverse proxy or `tailscale serve` in front of
   the companion**: it would make overlay requests look local.
+  Since G-A2 requires Opus (§9), an unpaired legacy-LAN client can browse and play VOD but cannot start a game
+  stream, so a new client is paired first (`docs/memory/evidence/G6_S1_TABLET_FIRST_INSTALL_2026-11-19.md`).
 - **Audit.** `logs/session_audit.jsonl`: every pairing, setup, token, refusal
   and denial, with the client id, the reason and the routing class — never
   an address, a key or a token.

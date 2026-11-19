@@ -1937,6 +1937,16 @@ similar low-cost client:
 Absence of handheld hardware must not block the onn-based Phase G remote
 foundation.
 
+**Status 2026-11-19 — G6 OPEN** (secondary priority) with a Samsung Galaxy Tab S6 Lite (SM-P610):
+
+- **G6-S1 MET**: the CONFIRMED APK `ca53df0d…` unchanged, sideloaded with no adb. It installs, launches, shows the
+  catalog, takes touch and plays VOD. Paired, it streamed T88 on the hardware AVC decoder
+  (`docs/memory/evidence/G6_S1_TABLET_FIRST_INSTALL_2026-11-19.md`).
+- **Next:** G6-S2 (tablet interface) … G6-S6 (the physical handheld), and the portrait handheld mode G6-HM1 … G6-HM6.
+  All are proposed, none started; each on the user's word.
+- The plan, the conflict rules and the user's decisions: `docs/memory/architecture/G6_HANDHELD_PLAN_2026-11-19.md`.
+- The G9 checkpoint table below is a record and is not changed.
+
 ## G7 — Existing-PC / Steam provider over the remote foundation
 
 Use an existing gaming PC/laptop as optional external compute without making it

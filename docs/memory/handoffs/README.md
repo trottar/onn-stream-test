@@ -126,6 +126,7 @@ Status: **done** (its record exists), **superseded** (replaced by the file named
 | D7-R1_LINUX_REGRESSION_TASK.md | done | D7_R1_…_2026-09-25 (named in a tool docstring) | phase-c |
 | DOCS-APPLY_2026-11-03_TASK.md | live | running now; its report is to be MEMORY_MAINTENANCE_REPORT_2026-11-03 | docs |
 | DOCS-AUDIT_2026-11-02_TASK.md | done | DOCS_AUDIT_2026-11-02 | docs |
+| DOCS-G6_TABLET_RECORD_TASK.md | done | G6_S1_TABLET_FIRST_INSTALL_2026-11-19 + `../architecture/`G6_HANDHELD_PLAN_2026-11-19 | docs |
 | E1-S1_WORKLOAD_SUITE_FREEZE_TASK.md | done | E1_S1_…_2026-10-05 | phase-e |
 | E2-S1_WHOLE_SYSTEM_MEASUREMENTS_TASK.md | done | E2_S1_…_2026-10-06 | phase-e |
 | E3-A2_FRAME_SPIN_AND_SNES9X_ADOPTION_TASK.md | done | E3_A2_…_2026-10-07 | phase-e |
@@ -185,6 +186,8 @@ Status: **done** (its record exists), **superseded** (replaced by the file named
 | G5-S3_LAN_SMOKE_TASK.md | done | G5_S3_LAN_SMOKE_2026-10-17 | g-track |
 | G5-S3_REMOTE_LADDER_TASK.md | done | G5_S3_REMOTE_LADDER_2026-10-17 | g-track |
 | G5-S4_REMOTE_RUNG_CAP_TASK.md | done | G5_S4_…_2026-10-17 | g-track |
+| G6_PORTRAIT_INVESTIGATION_HANDOFF_2026-11-19.md | done | the user's brief (read-only); its result in `../architecture/`G6_HANDHELD_PLAN_2026-11-19 §4–§6 | g-track |
+| G6_TABLET_PROJECT_HANDOFF_2026-11-19.md | done | the user's brief; T1 = G6-S1 met (G6_S1_TABLET_FIRST_INSTALL_2026-11-19); T2–T6 in `../architecture/`G6_HANDHELD_PLAN_2026-11-19 | g-track |
 | G8-P1_IMPAIRMENT_SHIM_TASK.md | done | G8_P1_…_2026-10-16 | g-track |
 | G8-S1_ADVERSE_NETWORK_ENVELOPE_TASK.md | done | G8_S1_…_2026-10-17 | g-track |
 | G8-S1_FINAL_RECORD_TASK.md | done | G8_S1_…_2026-10-17 | g-track |

@@ -91,6 +91,25 @@ retention (its only deletion), `status.txt` and `STOP` at the root. Read it
 with `tools/diag_read.py` and check with `tools/diag_check.py`; it reuses
 `tools/trip_log_keeper.py`, which must stay in the tree while the unit
 exists (`evidence/B36_DIAG_KEEPER_2026-10-31.md`).
+
+**The legacy path cannot stream games since G-A2.** A client with no pairing
+(or `identity_v2` off) runs no `/session/setup`, so it never declares Opus.
+It browses and plays VOD; a game launch starts RetroArch but the stream is
+refused ("audio codec opus is required by this host …"; no
+`session_started`, `client_frame` 0). Pair a new client first
+(`evidence/G6_S1_TABLET_FIRST_INSTALL_2026-11-19.md`; `docs/REMOTE_TRUST.md` §9).
+
+**B70's pointer guard consumes the touchscreen during a game.**
+`SOURCE_TOUCHSCREEN` carries the pointer class bit, so `PointerGuard` (on
+unless `debug.privyhub.pointer_hide=0`) swallows every touch in the stream
+activity. On-screen controls need a
+touchscreen-only exemption (`architecture/G6_HANDHELD_PLAN_2026-11-19.md` §4).
+
+**A second adb device on the hub breaks the bare-`adb` tools.**
+`tools/e1_suite.py` and `tools/c3_l4_nft_night.py` call `adb` with no `-s`,
+so any second device (a tablet over USB or wireless debugging) fails them
+with "more than one device", the nightly included. Only the onn is ever on
+the hub's adb (`architecture/G6_HANDHELD_PLAN_2026-11-19.md` §3).
 <!-- PRIVYHUB_PHASE_E_G_DURABLE:END -->
 
 <!-- PRIVYHUB_BASELINE_STREAM_HEALTH:BEGIN -->

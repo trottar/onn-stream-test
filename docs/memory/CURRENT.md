@@ -15,6 +15,7 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 **H6 (feature parity) OPEN**: the first parity queue met (B76-B81, B84-B92; HOME-12V); its rest on the user's pick. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
 E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`ca53df0d…` CONFIRMED**.
 **H7 (PrivyParty) OPEN**: the hub side begun on the user's word 2026-11-11 (B93's tool; the first 2-player state made at HOME-12V); PC side in a separate repo (`docs/ROADMAP.md` §H7; design notes `architecture/H7_PRIVYPARTY_DESIGN_NOTES_2026-11-10.md`)
+**G6 (the tablet handheld) OPEN** 2026-11-19 at secondary priority: G6-S1 met (`architecture/G6_HANDHELD_PLAN_2026-11-19.md`).
 
 ## Current Work Item
 
@@ -58,7 +59,8 @@ the name out of `tools/e1_suite.py` `ADOPTED`. Each record names its exceptions;
 **The client.**
 - APK **`ca53df0d…` CONFIRMED** on the onn (HOME-12V, queue AH), pinned in the three places; `218d9a82…` (HOME-12U)
   in `home12v_previous/`. Not confirmed: `de6682db…`, `c801caab…`, `3f21e2c6…`.
-- The twenty client properties are empty. One device is paired, with `identity_v2` on.
+- The twenty client properties are empty. Three devices are paired, with `identity_v2` on: the onn, the tablet
+  (`dev-954a…`, the CONFIRMED APK unchanged) and a stale first tablet pairing (`dev-c320…`) awaiting removal.
 
 **Units.** `privyhub-companion` and `privyhub-diag` are running. `privyhub-diag` is the B36 keeper:
 `tools/diag_keeper.py`, read with `tools/diag_read.py` and `tools/diag_check.py`.
@@ -91,10 +93,11 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
    load screen. For B: the sound ~15 s after the onn's Home. PrivyParty's adoption only on the user's own go.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
+3. G6 (secondary): G6-S2 / G6-HM1 on the user's word, never beside another run; the stale pairing's removal.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over
-the overlay to read; the handheld (pending) and Steam / external compute (deferred); the client's 1–3-s output stalls;
+the overlay to read; the handheld (G6 open) and Steam / external compute (deferred); the client's 1–3-s output stalls;
 the host-CPU band gate (CL-B2 R3); `privyhub-diag`'s session row 5 s past its 150-s bound in the G-A10 window.
 
 ## Success Criteria
