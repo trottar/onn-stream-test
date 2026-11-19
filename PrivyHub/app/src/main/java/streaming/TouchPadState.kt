@@ -17,9 +17,15 @@ import kotlin.math.roundToInt
  * - One finger, one button. L2 / R2 are digital (255). The output is the sender's state fields.
  * - The PS1 layout (D3) in fractions of the pad region; G6-HM6 adds customization.
  */
-class TouchPadState {
+class TouchPadState(private val kind: Kind = Kind.PS1) {
 
-    enum class Control { DPAD, CROSS, CIRCLE, SQUARE, TRIANGLE, L1, R1, L2, R2, SELECT, START }
+    /**
+     * G6-HM4: [Kind.PS2] is the layout in use (the amendment G6-HM1a, the shoulders as addendum B2). [Kind.PS1] is
+     * G6-HM2's first layout, kept as the default only so G6-HM2's tests run unchanged; the app does not use it.
+     */
+    enum class Kind { PS1, PS2 }
+
+    enum class Control { DPAD, CROSS, CIRCLE, SQUARE, TRIANGLE, L1, R1, L2, R2, SELECT, START, LSTICK, RSTICK, L3, R3 }
 
     /** The sender's fields (NativeControllerSender.writePlayerState). */
     data class Output(
@@ -54,6 +60,7 @@ class TouchPadState {
         shapes.clear()
         fingers.clear()
         if (w <= 0 || h <= 0) return
+        if (kind == Kind.PS2) { layoutPs2(w, h); return }
         val W = w.toFloat()
         val H = h.toFloat()
         fun band(x0: Float, x1: Float) =
@@ -76,17 +83,69 @@ class TouchPadState {
         shapes[Control.START] = Shape.Rect(0.60f * W, 0.82f * H, 0.07f * W, 0.03f * H, BUTTON_HIT)
     }
 
+    /**
+     * G6-HM4: addendum B2's numbers exactly (`docs/memory/evidence/g6_hm1a_2026-11-19/layout_check_b.py`, B2), in px of
+     * the 1200 x 1325 reference region, scaled to the measured size (x and radii by the width, y by the height).
+     */
+    private fun layoutPs2(w: Int, h: Int) {
+        val sx = w / Ps2TouchLayout.REF_W
+        val sy = h / Ps2TouchLayout.REF_H
+        fun circle(c: Control, x: Float, y: Float, r: Float, hit: Float) {
+            shapes[c] = Shape.Circle(x * sx, y * sy, r * sx, hit)
+        }
+        fun rect(c: Control, x: Float, y: Float, hw: Float, hh: Float, hit: Float) {
+            shapes[c] = Shape.Rect(x * sx, y * sy, hw * sx, hh * sy, hit)
+        }
+        circle(Control.LSTICK, 300f, 1030f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
+        circle(Control.DPAD, 300f, 520f, Ps2TouchLayout.DPAD_R, Ps2TouchLayout.DPAD_HIT)
+        dpadR = Ps2TouchLayout.DPAD_R * sx
+        circle(Control.L3, 540f, 1040f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.TRIANGLE, 900f, 940f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.CIRCLE, 990f, 1030f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.CROSS, 900f, 1120f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.SQUARE, 810f, 1030f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.RSTICK, 900f, 520f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
+        circle(Control.R3, 690f, 790f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
+        rect(Control.SELECT, 400f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
+        rect(Control.START, 600f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
+        rect(Control.L2, 56f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
+        rect(Control.L1, 170f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
+        rect(Control.R1, 1030f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
+        rect(Control.R2, 1144f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
+    }
+
+    /** G6-HM4: the End button's place in the PS2 layout (a separate view; reserved here so nothing overlaps it). */
+    fun endRect(w: Int, h: Int): FloatArray {
+        val sx = w / Ps2TouchLayout.REF_W
+        val sy = h / Ps2TouchLayout.REF_H
+        return floatArrayOf((960f - Ps2TouchLayout.SMALL_HW) * sx, (70f - Ps2TouchLayout.SMALL_HH) * sy, (960f + Ps2TouchLayout.SMALL_HW) * sx, (70f + Ps2TouchLayout.SMALL_HH) * sy)
+    }
+
+    /** The controls held now (a stick or the D-pad counts as held while a finger owns it). */
+    fun heldControls(): Set<Control> = fingers.values.map { it.control }.toSet()
+
+    /**
+     * G6-HM4: a stick's deflection now, (x right-positive, y up-positive), each in -1..1, clamped to the unit circle,
+     * 0 inside the 0.1 r dead zone; (0, 0) when no finger owns it. The stick is absolute: its base never moves.
+     */
+    fun stickDeflection(c: Control): Pair<Float, Float> {
+        val s = shapes[c] as? Shape.Circle ?: return 0f to 0f
+        val f = fingers.values.lastOrNull { it.control == c } ?: return 0f to 0f
+        return stickVector(f.x - s.cx, s.cy - f.y, s.r)
+    }
+
     /** The control whose hit area holds the point (the nearest centre among several), or null. */
     fun controlAt(x: Float, y: Float): Control? =
         shapes.entries.filter { it.value.hit(x, y) }.minByOrNull { hypot(x - it.value.cx, y - it.value.cy) }?.key
 
     /** G6-HM3: what the view draws: a circle (halfH = 0) of radius halfW, or a rectangle of half-sizes halfW x halfH. */
-    data class Drawn(val control: Control, val cx: Float, val cy: Float, val halfW: Float, val halfH: Float)
+    data class Drawn(val control: Control, val cx: Float, val cy: Float, val halfW: Float, val halfH: Float,
+                     val hitHalfW: Float = halfW, val hitHalfH: Float = halfH)
 
     fun drawn(): List<Drawn> = shapes.map { (c, s) ->
         when (s) {
-            is Shape.Circle -> Drawn(c, s.cx, s.cy, s.r, 0f)
-            is Shape.Rect -> Drawn(c, s.cx, s.cy, s.halfW, s.halfH)
+            is Shape.Circle -> Drawn(c, s.cx, s.cy, s.r, 0f, s.r * s.hitScale, 0f)
+            is Shape.Rect -> Drawn(c, s.cx, s.cy, s.halfW, s.halfH, s.halfW * s.hitScale, s.halfH * s.hitScale)
         }
     }
 
@@ -134,9 +193,15 @@ class TouchPadState {
                 Control.R2 -> rt = 255
                 Control.SELECT -> buttons = buttons or XUSB_BACK
                 Control.START -> buttons = buttons or XUSB_START
+                Control.L3 -> buttons = buttons or XUSB_LEFT_THUMB
+                Control.R3 -> buttons = buttons or XUSB_RIGHT_THUMB
+                Control.LSTICK, Control.RSTICK -> {}
             }
         }
-        return Output(buttons = buttons, lt = lt, rt = rt)
+        val (lxf, lyf) = stickDeflection(Control.LSTICK)
+        val (rxf, ryf) = stickDeflection(Control.RSTICK)
+        return Output(buttons = buttons, lx = toShort(lxf), ly = toShort(lyf), rx = toShort(rxf), ry = toShort(ryf),
+            lt = lt, rt = rt)
     }
 
     private fun dpadBits(x: Float, y: Float): Int {
@@ -151,6 +216,9 @@ class TouchPadState {
         const val XUSB_DPAD_LEFT = 0x0004
         const val XUSB_DPAD_RIGHT = 0x0008
         const val XUSB_START = 0x0010
+        const val XUSB_LEFT_THUMB = 0x0040     // L3 (G6-HM4)
+        const val XUSB_RIGHT_THUMB = 0x0080    // R3 (G6-HM4)
+        const val STICK_DEAD = 0.1f
         const val XUSB_BACK = 0x0020
         const val XUSB_LEFT_SHOULDER = 0x0100
         const val XUSB_RIGHT_SHOULDER = 0x0200
@@ -180,6 +248,19 @@ class TouchPadState {
          * The D-pad's sector for an offset from its centre, `dy` positive **up** (screen y flipped); null inside the
          * dead radius. Sector k covers `[k·45° − 22.5°, k·45° + 22.5°)`.
          */
+        /** G6-HM4: a stick's offset (dx right, dyUp up) over its radius: clamped to the unit circle; 0 inside 0.1 r. */
+        fun stickVector(dx: Float, dyUp: Float, radius: Float): Pair<Float, Float> {
+            if (radius <= 0f) return 0f to 0f
+            var x = dx / radius
+            var y = dyUp / radius
+            val m = hypot(x, y)
+            if (m < STICK_DEAD) return 0f to 0f
+            if (m > 1f) { x /= m; y /= m }
+            return x to y
+        }
+
+        private fun toShort(v: Float): Short = (v.coerceIn(-1f, 1f) * 32767f).roundToInt().coerceIn(-32768, 32767).toShort()
+
         fun dpadSector(dx: Float, dyUp: Float, radius: Float): Int? {
             if (hypot(dx, dyUp) < DPAD_DEAD * radius) return null
             var a = Math.toDegrees(atan2(dyUp.toDouble(), dx.toDouble()))
@@ -197,4 +278,23 @@ class TouchPadState {
             return (v * 32767f).roundToInt().coerceIn(-32768, 32767).toShort()
         }
     }
+}
+
+/** G6-HM4: addendum B2's reference numbers (px of the 1200 x 1325 region; `layout_check_b.py`, B2), exactly. */
+object Ps2TouchLayout {
+    const val REF_W = 1200f
+    const val REF_H = 1325f
+    const val STICK_R = 132f
+    const val STICK_HIT = 1.2f
+    const val DPAD_R = 125f
+    const val DPAD_HIT = 1.25f
+    const val THUMB_R = 48f
+    const val FACE_R = 52f
+    const val BUTTON_HIT = 1.2f
+    const val SMALL_HW = 75.5f
+    const val SMALL_HH = 47.5f
+    const val SHOULDER_Y = 774f
+    const val SHOULDER_HW = 50f
+    const val SHOULDER_HH = 100f
+    const val SHOULDER_HIT = 1.1f
 }

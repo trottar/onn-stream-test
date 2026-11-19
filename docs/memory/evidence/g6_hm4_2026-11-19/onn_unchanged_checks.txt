@@ -1,0 +1,17 @@
+1 manifest NativeStreamActivity element vs pre-G6: 4d36c0bbfc04341d 4d36c0bbfc04341d EQUAL
+  manifest changed by HM4: no
+2 NativeStreamActivity changed by HM4: no
+  default: protected open val streamOrientation: Int get() = ActivityInfo.SCREEN_ORIENTAT OK
+  default: protected open fun wrapStreamLayer(streamLayer: FrameLayout): View = streamLay OK
+  default: protected open fun exemptFromPointerGuard(event: MotionEvent): Boolean = false OK
+  default: protected open fun connectedPadDevices(): List<PadDevice> = AndroidPadDevice.c OK
+  default: protected open fun onPlayersOpened(selfRestart: Boolean) {} OK
+  default: protected open fun onGameplayReleased() {} OK
+  default: protected open fun putHandheldReport(report: JSONObject) {} OK
+  deleted lines vs pre-G6: 9 (G6-HM3's 9, each replaced as listed there)
+3 PadSlots.kt unchanged since pre-G6
+3 PointerGuard.kt unchanged since pre-G6
+4 MainActivity HM4: +11 / -0
+  the only statement sits in: if (!tvGuideListPage && useHandheldGameScreen()) { OK
+  useHandheldGameScreen() requires a touchscreen and the stored choice: OK
+5 companion/ and tools/ changed: no

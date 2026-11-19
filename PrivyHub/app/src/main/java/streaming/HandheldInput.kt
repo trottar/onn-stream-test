@@ -23,6 +23,21 @@ object HandheldGeometry {
 
     /** The pad region's height under the box (never negative). */
     fun padRegionHeight(widthPx: Int, heightPx: Int): Int = (heightPx - videoBoxHeight(widthPx)).coerceAtLeast(0)
+
+    /** G6-HM4: a catalog row of 3 cards (3 x (300 + 12) dp + 24 dp of padding): the onn's width exactly. */
+    const val CATALOG_FULL_WIDTH_DP = 960
+
+    /**
+     * G6-HM4 (the user's Q-B4 (a)): the main app's catalog columns. 1 on the TV guide list and 3 otherwise, as today;
+     * **2** only with the handheld choice on a touchscreen device narrower than [CATALOG_FULL_WIDTH_DP] (the tablet
+     * upright, 800 dp). The cards keep their 300 dp.
+     */
+    fun catalogColumns(handheld: Boolean, touchscreen: Boolean, widthDp: Int, tvGuideList: Boolean): Int =
+        when {
+            tvGuideList -> 1
+            handheld && touchscreen && widthDp < CATALOG_FULL_WIDTH_DP -> 2
+            else -> 3
+        }
 }
 
 /**

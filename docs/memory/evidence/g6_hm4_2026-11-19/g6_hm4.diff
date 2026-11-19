@@ -1,0 +1,739 @@
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+index 1de5c843..93b0a7ca 100644
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -1758,6 +1758,17 @@ class MainActivity : AppCompatActivity() {
+                 3
+             }
+ 
++        // G6-HM4: 2 columns upright, only behind the handheld choice (a touchscreen device; the onn never enters)
++        if (!tvGuideListPage && useHandheldGameScreen()) {
++            sourceGrid.columnCount =
++                com.safeiot.privyhub.streaming.HandheldGeometry.catalogColumns(
++                    handheld = true,
++                    touchscreen = true,
++                    widthDp = resources.configuration.screenWidthDp,
++                    tvGuideList = false
++                )
++        }
++
+ 
+         val currentNodes =
+             if (
+diff --git a/PrivyHub/app/src/main/java/streaming/HandheldInput.kt b/PrivyHub/app/src/main/java/streaming/HandheldInput.kt
+index 60dde6cb..f99ed143 100644
+--- a/PrivyHub/app/src/main/java/streaming/HandheldInput.kt
++++ b/PrivyHub/app/src/main/java/streaming/HandheldInput.kt
+@@ -23,6 +23,21 @@ object HandheldGeometry {
+ 
+     /** The pad region's height under the box (never negative). */
+     fun padRegionHeight(widthPx: Int, heightPx: Int): Int = (heightPx - videoBoxHeight(widthPx)).coerceAtLeast(0)
++
++    /** G6-HM4: a catalog row of 3 cards (3 x (300 + 12) dp + 24 dp of padding): the onn's width exactly. */
++    const val CATALOG_FULL_WIDTH_DP = 960
++
++    /**
++     * G6-HM4 (the user's Q-B4 (a)): the main app's catalog columns. 1 on the TV guide list and 3 otherwise, as today;
++     * **2** only with the handheld choice on a touchscreen device narrower than [CATALOG_FULL_WIDTH_DP] (the tablet
++     * upright, 800 dp). The cards keep their 300 dp.
++     */
++    fun catalogColumns(handheld: Boolean, touchscreen: Boolean, widthDp: Int, tvGuideList: Boolean): Int =
++        when {
++            tvGuideList -> 1
++            handheld && touchscreen && widthDp < CATALOG_FULL_WIDTH_DP -> 2
++            else -> 3
++        }
+ }
+ 
+ /**
+diff --git a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+index b07c287b..b3485a9b 100644
+--- a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+@@ -19,30 +19,35 @@ import android.view.ViewGroup
+ import android.widget.Button
+ import android.widget.FrameLayout
+ import android.widget.TextView
++import org.json.JSONArray
+ import org.json.JSONObject
+ import java.util.concurrent.atomic.AtomicLong
+ 
+ /**
+- * G6-HM3: the tablet's portrait handheld mode (design `docs/memory/evidence/g6_hm1_2026-11-19/`, hashed before code,
+- * with the user's answers). The game's picture in a W x W·9/16 box at the top (every overlay inside it, unchanged);
+- * the touch pad below. Launched only when the user picks "Handheld" in Settings on a device with a touchscreen; the
+- * onn's NativeStreamActivity entry and paths are unchanged.
++ * G6-HM3 / G6-HM4: the tablet's portrait handheld mode (design `docs/memory/evidence/g6_hm1_2026-11-19/`, the amendment
++ * `…/g6_hm1a_2026-11-19/` and addendum B2, all hashed before code, with the user's answers). The game's picture in a
++ * W x W·9/16 box at the top (every overlay inside it, unchanged); the PS2 touch pad below. Launched only when the user
++ * picks "Handheld" in Settings on a device with a touchscreen; the onn's NativeStreamActivity entry and paths are
++ * unchanged.
+  *
+- * - Q5 (c): Back does nothing in a game (a key or an edge swipe); the **End** button ends to the paused picture.
+- * - Q1 (c): when a real pad is P1, the lower region shows a status panel instead of the touch pad.
+- * - [TOUCH_LIVE] false (G6-HM3): the pad is drawn and counts touches but takes no slot and writes nothing. G6-HM4 sets
+- *   it true: D2's 5-s rule (Q3 (b)/(i)), the countdown (Q4 (b)), the 2-s takeover (Q2 (d)), the writes.
++ * - D5: the PS2 layout on every system: D-pad, four face buttons, L1 / L2 / R1 / R2 (side by side, B2), two absolute
++ *   sticks with L3 / R3, Select, Start, End.
++ * - D2 with Q3 (b)/(i) and Q4 (b): the touch pad becomes P1 5 s after the gameplay release unless a real pad holds P1;
++ *   a countdown in the pad region. Q2 (d): a real pad's unjoined hold kept 2 s takes P1 from the touch pad.
++ * - Q5 (c): Back does nothing in a game; **End** ends to the paused picture. Q1 (c): a real P1 -> the status panel.
+  */
+ class HandheldStreamActivity : NativeStreamActivity() {
+ 
+     companion object {
+-        const val TOUCH_LIVE = false
++        /** G6-HM4: live (G6-HM3 had it false: the pad drawn and inert). */
++        const val TOUCH_LIVE = true
+         private const val TICK_MS = 100L
+         private const val TEXT_PREVIEW = "Touch buttons: coming in the next update"
++        private val DIRECTIONS = arrayOf("up", "down", "left", "right")
+     }
+ 
+     private val ui = Handler(Looper.getMainLooper())
+-    private val pad = TouchPadState()
++    private val pad = TouchPadState(TouchPadState.Kind.PS2)
+     private val p1Rule = TouchP1Rule()
+     private val takeover = TouchTakeover()
+     private var padView: TouchPadView? = null
+@@ -55,8 +60,14 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     private val exempted = AtomicLong(0)
+     private val backSwallowed = AtomicLong(0)
+     private val endPresses = AtomicLong(0)
++    private val takeovers = AtomicLong(0)
+     @Volatile private var navMode = -1
+     @Volatile private var density = 0f
++    @Volatile private var releaseAtMs: Long? = null
++    @Volatile private var p1JoinAfterReleaseMs: Long = -1
++    private val pressed = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
++    /** [left, right] stick x [up, down, left, right]: the largest deflection seen, 0..1. */
++    private val stickMax = Array(2) { FloatArray(4) }
+ 
+     override val streamOrientation: Int get() = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+ 
+@@ -68,7 +79,18 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     }
+ 
+     override fun wrapStreamLayer(streamLayer: FrameLayout): View {
+-        val area = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
++        val end = Button(this).apply {
++            text = "End"
++            isAllCaps = false
++            minWidth = 0
++            minimumWidth = 0
++            minHeight = 0
++            minimumHeight = 0
++            setPadding(0, 0, 0, 0)
++            // Q5 (c): the only way out of a game here (Back does nothing)
++            setOnClickListener { endPresses.incrementAndGet(); pressed.add("END"); endToPausedFrame() }
++        }
++        val area = PadArea(this, pad, end).apply { setBackgroundColor(Color.BLACK) }
+         val pv = TouchPadView(this, pad, { touchEvents.incrementAndGet() }) { out -> onPadOutput(out) }
+         padView = pv
+         area.addView(pv, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
+@@ -88,17 +110,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             area.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+                 .apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; bottomMargin = 24 })
+         }
+-        // Q5 (c): the only way out of a game here (Back does nothing)
+-        Button(this).apply {
+-            text = "End"
+-            isAllCaps = false
+-            minWidth = 0
+-            minimumWidth = 0
+-            setOnClickListener { endPresses.incrementAndGet(); endToPausedFrame() }
+-        }.also {
+-            area.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+-                .apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; topMargin = 8 })
+-        }
++        // End last: on top of the pad and the panel, so it stays reachable with the status panel shown (Q1 (c))
++        area.addView(end, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+         return HandheldLayout(this, streamLayer, area).also { frame = it }
+     }
+ 
+@@ -111,11 +124,14 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         if (TOUCH_LIVE) super.connectedPadDevices() + TouchPadDevice else super.connectedPadDevices()
+ 
+     override fun onPlayersOpened(selfRestart: Boolean) {
+-        ui.post { p1Rule.onStart(selfRestart); takeover.clear() }
++        ui.post { p1Rule.onStart(selfRestart); takeover.clear(); releaseAtMs = null }
+     }
+ 
+     override fun onGameplayReleased() {
+-        p1Rule.onGameplayReleased(nowMs())
++        val now = nowMs()
++        val wasArmed = p1Rule.armed()
++        p1Rule.onGameplayReleased(now)
++        if (!wasArmed && p1Rule.armed()) releaseAtMs = now
+     }
+ 
+     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+@@ -153,8 +169,17 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     override fun putHandheldReport(report: JSONObject) {
+         val w = frame?.width ?: 0
+         val h = frame?.height ?: 0
++        val sticks = JSONObject()
++        synchronized(stickMax) {
++            for ((i, name) in arrayOf("left", "right").withIndex()) {
++                val o = JSONObject()
++                for ((j, dir) in DIRECTIONS.withIndex()) o.put(dir, Math.round(stickMax[i][j] * 1000.0) / 1000.0)
++                sticks.put(name, o)
++            }
++        }
+         report.put("handheld", JSONObject()
+             .put("mode", "portrait")
++            .put("layout", "ps2")
+             .put("touch_live", TOUCH_LIVE)
+             .put("video_box", "${w}x${HandheldGeometry.videoBoxHeight(w)}")
+             .put("pad_region", "${w}x${HandheldGeometry.padRegionHeight(w, h)}")
+@@ -164,6 +189,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             .put("touch_events", touchEvents.get())
+             .put("touch_writes", touchWrites.get())
+             .put("touch_slot", streamSlots?.slotOf(TouchPadDevice) ?: -1)
++            .put("p1_join_after_release_ms", p1JoinAfterReleaseMs)
++            .put("takeovers", takeovers.get())
++            .put("controls_pressed", JSONArray(synchronized(pressed) { pressed.toList() }))
++            .put("stick_max_deflection", sticks)
+             .put("pointer_exempted_events", exempted.get())
+             .put("back_swallowed", backSwallowed.get())
+             .put("end_presses", endPresses.get()))
+@@ -176,8 +205,19 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         padView?.invalidate()
+     }
+ 
+-    /** The touch pad's fields into its own slot (none = nothing; before the release = neutral). */
++    /** What was touched (the report's keys), then the touch pad's fields into its own slot (none = nothing). */
+     private fun onPadOutput(out: TouchPadState.Output) {
++        pad.heldControls().forEach { pressed.add(it.name) }
++        synchronized(stickMax) {
++            for ((i, c) in arrayOf(TouchPadState.Control.LSTICK, TouchPadState.Control.RSTICK).withIndex()) {
++                val (x, y) = pad.stickDeflection(c)
++                val m = stickMax[i]
++                if (y > m[0]) m[0] = y
++                if (-y > m[1]) m[1] = -y
++                if (-x > m[2]) m[2] = -x
++                if (x > m[3]) m[3] = x
++            }
++        }
+         if (!TOUCH_LIVE) return
+         val sender = streamSender ?: return
+         val slot = streamSlots?.slotOf(TouchPadDevice) ?: return
+@@ -194,19 +234,21 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             if (TOUCH_LIVE) {
+                 val prompt = streamPrompt
+                 if (p1Rule.tick(now, realP1) == TouchP1Rule.Action.JOIN_P1) {
+-                    prompt?.joinAsP1WithoutHold(TouchPadDevice, now, connectedPadDevices())
++                    val s = prompt?.joinAsP1WithoutHold(TouchPadDevice, now, connectedPadDevices())
++                    if (s == 0) releaseAtMs?.let { p1JoinAfterReleaseMs = now - it }
+                 }
+                 takeover.due(now, p1 == TouchPadDevice.KEY)?.let { real ->
+                     streamSender?.writePlayerState(0, 0, 0, 0, 0, 0, 0, 0)
+                     pad.reset()
+-                    prompt?.takeOverP1(real, TouchPadDevice.KEY, now)
++                    if (prompt?.takeOverP1(real, TouchPadDevice.KEY, now) == 0) takeovers.incrementAndGet()
+                 }
+                 onPadOutput(pad.output())
+             }
+-            // Q1 (c): a real pad as P1 -> the status panel instead of the pad
++            // Q1 (c): a real pad as P1 -> the status panel instead of the pad (End stays on top)
+             padView?.let { v ->
+                 val want = if (realP1) View.GONE else View.VISIBLE
+                 if (v.visibility != want) v.visibility = want
++                v.invalidate()
+             }
+             panel?.let { t ->
+                 t.visibility = if (realP1) View.VISIBLE else View.GONE
+@@ -214,7 +256,11 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             }
+             hint?.let { t ->
+                 t.visibility = if (realP1) View.GONE else View.VISIBLE
+-                t.text = if (!TOUCH_LIVE) TEXT_PREVIEW else p1Rule.secondsLeft(now)?.let { "Touch buttons: P1 in $it…" } ?: ""
++                t.text = when {
++                    !TOUCH_LIVE -> TEXT_PREVIEW
++                    p1 == TouchPadDevice.KEY -> "Touch buttons: Player 1"
++                    else -> p1Rule.secondsLeft(now)?.let { "Touch buttons: P1 in $it…" } ?: ""
++                }
+             }
+             ui.postDelayed(this, TICK_MS)
+         }
+@@ -250,6 +296,22 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         }
+     }
+ 
++    /** The pad region: its children as a FrameLayout, then the End button put exactly on B2's End rectangle. */
++    private class PadArea(ctx: Context, private val state: TouchPadState, private val end: View) : FrameLayout(ctx) {
++        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
++            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
++            val r = state.endRect(measuredWidth, measuredHeight)
++            end.measure(MeasureSpec.makeMeasureSpec((r[2] - r[0]).toInt(), MeasureSpec.EXACTLY),
++                MeasureSpec.makeMeasureSpec((r[3] - r[1]).toInt(), MeasureSpec.EXACTLY))
++        }
++
++        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
++            super.onLayout(changed, left, top, right, bottom)
++            val r = state.endRect(right - left, bottom - top)
++            end.layout(r[0].toInt(), r[1].toInt(), r[0].toInt() + end.measuredWidth, r[1].toInt() + end.measuredHeight)
++        }
++    }
++
+     /** Draws [TouchPadState]'s layout and feeds it the fingers; releases on cancel, hide and detach. */
+     private class TouchPadView(
+         ctx: Context,
+@@ -268,38 +330,53 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             excludeEdgeGestures()
+         }
+ 
+-        /** Design §7: the D-pad's and the face buttons' bands kept from the side-edge gestures (200 dp per edge). */
++        /**
++         * Design §7: the side-edge back gesture kept off the shoulders, the controls nearest the edges (200 dp per edge
++         * at most; the band is the shoulders' press height). A swipe there would otherwise cancel a held L2 / R2.
++         */
+         private fun excludeEdgeGestures() {
+             if (Build.VERSION.SDK_INT < 29) return
+             val maxPx = (200 * resources.displayMetrics.density).toInt()
+-            val rects = state.drawn().filter { it.control == TouchPadState.Control.DPAD || it.control == TouchPadState.Control.CIRCLE }
+-                .map { d ->
+-                    val half = minOf((d.halfW * TouchPadState.DPAD_HIT).toInt(), maxPx / 2)
+-                    if (d.control == TouchPadState.Control.DPAD) Rect(0, d.cy.toInt() - half, (d.cx + d.halfW).toInt(), d.cy.toInt() + half)
+-                    else Rect((d.cx - d.halfW).toInt(), d.cy.toInt() - half, width, d.cy.toInt() + half)
+-                }
++            val rects = state.drawn().filter {
++                it.control == TouchPadState.Control.L2 || it.control == TouchPadState.Control.L1 ||
++                    it.control == TouchPadState.Control.R1 || it.control == TouchPadState.Control.R2
++            }.map { d ->
++                val half = minOf(d.hitHalfH.toInt(), maxPx / 2)
++                Rect((d.cx - d.hitHalfW).toInt(), d.cy.toInt() - half, (d.cx + d.hitHalfW).toInt(), d.cy.toInt() + half)
++            }
+             systemGestureExclusionRects = rects
+         }
+ 
+         override fun onDraw(canvas: Canvas) {
+             super.onDraw(canvas)
+             val alpha = if (TOUCH_LIVE) 255 else 110
++            val held = state.heldControls()
+             for (d in state.drawn()) {
+-                fill.color = 0xFF2A2A2A.toInt(); fill.alpha = alpha
++                val on = d.control in held
++                fill.color = if (on) 0xFF5A5A5A.toInt() else 0xFF2A2A2A.toInt(); fill.alpha = alpha
+                 line.color = 0xFF888888.toInt(); line.alpha = alpha
+                 label.alpha = alpha
+                 if (d.halfH == 0f) {
+                     canvas.drawCircle(d.cx, d.cy, d.halfW, fill)
+                     canvas.drawCircle(d.cx, d.cy, d.halfW, line)
+-                    if (d.control == TouchPadState.Control.DPAD) {
+-                        canvas.drawLine(d.cx - d.halfW, d.cy, d.cx + d.halfW, d.cy, line)
+-                        canvas.drawLine(d.cx, d.cy - d.halfW, d.cx, d.cy + d.halfW, line)
++                    when (d.control) {
++                        TouchPadState.Control.DPAD -> {
++                            canvas.drawLine(d.cx - d.halfW, d.cy, d.cx + d.halfW, d.cy, line)
++                            canvas.drawLine(d.cx, d.cy - d.halfW, d.cx, d.cy + d.halfW, line)
++                        }
++                        TouchPadState.Control.LSTICK, TouchPadState.Control.RSTICK -> {
++                            // the knob at the deflection (absolute: the base never moves)
++                            val (x, y) = state.stickDeflection(d.control)
++                            fill.color = 0xFF777777.toInt(); fill.alpha = alpha
++                            canvas.drawCircle(d.cx + x * d.halfW, d.cy - y * d.halfW, d.halfW * 0.45f, fill)
++                        }
++                        else -> {}
+                     }
+                     label.textSize = d.halfW * 0.8f
+                 } else {
+                     canvas.drawRoundRect(d.cx - d.halfW, d.cy - d.halfH, d.cx + d.halfW, d.cy + d.halfH, 16f, 16f, fill)
+                     canvas.drawRoundRect(d.cx - d.halfW, d.cy - d.halfH, d.cx + d.halfW, d.cy + d.halfH, 16f, 16f, line)
+-                    label.textSize = d.halfH * 0.9f
++                    label.textSize = minOf(d.halfH, d.halfW) * 0.8f
+                 }
+                 val text = labelOf(d.control)
+                 if (text.isNotEmpty()) canvas.drawText(text, d.cx, d.cy + label.textSize / 3f, label)
+@@ -307,7 +384,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         }
+ 
+         private fun labelOf(c: TouchPadState.Control): String = when (c) {
+-            TouchPadState.Control.DPAD -> ""
++            TouchPadState.Control.DPAD, TouchPadState.Control.LSTICK, TouchPadState.Control.RSTICK -> ""
+             TouchPadState.Control.TRIANGLE -> glyph("△", "T")
+             TouchPadState.Control.CIRCLE -> glyph("○", "O")
+             TouchPadState.Control.CROSS -> glyph("✕", "X")
+@@ -334,6 +411,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
+                 else -> state.output()
+             }
+             onOutput(out)
++            invalidate()
+             return true
+         }
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+index a62f5880..a75b0114 100644
+--- a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
++++ b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+@@ -17,9 +17,15 @@ import kotlin.math.roundToInt
+  * - One finger, one button. L2 / R2 are digital (255). The output is the sender's state fields.
+  * - The PS1 layout (D3) in fractions of the pad region; G6-HM6 adds customization.
+  */
+-class TouchPadState {
++class TouchPadState(private val kind: Kind = Kind.PS1) {
+ 
+-    enum class Control { DPAD, CROSS, CIRCLE, SQUARE, TRIANGLE, L1, R1, L2, R2, SELECT, START }
++    /**
++     * G6-HM4: [Kind.PS2] is the layout in use (the amendment G6-HM1a, the shoulders as addendum B2). [Kind.PS1] is
++     * G6-HM2's first layout, kept as the default only so G6-HM2's tests run unchanged; the app does not use it.
++     */
++    enum class Kind { PS1, PS2 }
++
++    enum class Control { DPAD, CROSS, CIRCLE, SQUARE, TRIANGLE, L1, R1, L2, R2, SELECT, START, LSTICK, RSTICK, L3, R3 }
+ 
+     /** The sender's fields (NativeControllerSender.writePlayerState). */
+     data class Output(
+@@ -54,6 +60,7 @@ class TouchPadState {
+         shapes.clear()
+         fingers.clear()
+         if (w <= 0 || h <= 0) return
++        if (kind == Kind.PS2) { layoutPs2(w, h); return }
+         val W = w.toFloat()
+         val H = h.toFloat()
+         fun band(x0: Float, x1: Float) =
+@@ -76,17 +83,69 @@ class TouchPadState {
+         shapes[Control.START] = Shape.Rect(0.60f * W, 0.82f * H, 0.07f * W, 0.03f * H, BUTTON_HIT)
+     }
+ 
++    /**
++     * G6-HM4: addendum B2's numbers exactly (`docs/memory/evidence/g6_hm1a_2026-11-19/layout_check_b.py`, B2), in px of
++     * the 1200 x 1325 reference region, scaled to the measured size (x and radii by the width, y by the height).
++     */
++    private fun layoutPs2(w: Int, h: Int) {
++        val sx = w / Ps2TouchLayout.REF_W
++        val sy = h / Ps2TouchLayout.REF_H
++        fun circle(c: Control, x: Float, y: Float, r: Float, hit: Float) {
++            shapes[c] = Shape.Circle(x * sx, y * sy, r * sx, hit)
++        }
++        fun rect(c: Control, x: Float, y: Float, hw: Float, hh: Float, hit: Float) {
++            shapes[c] = Shape.Rect(x * sx, y * sy, hw * sx, hh * sy, hit)
++        }
++        circle(Control.LSTICK, 300f, 1030f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
++        circle(Control.DPAD, 300f, 520f, Ps2TouchLayout.DPAD_R, Ps2TouchLayout.DPAD_HIT)
++        dpadR = Ps2TouchLayout.DPAD_R * sx
++        circle(Control.L3, 540f, 1040f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.TRIANGLE, 900f, 940f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.CIRCLE, 990f, 1030f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.CROSS, 900f, 1120f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.SQUARE, 810f, 1030f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.RSTICK, 900f, 520f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
++        circle(Control.R3, 690f, 790f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
++        rect(Control.SELECT, 400f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
++        rect(Control.START, 600f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
++        rect(Control.L2, 56f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
++        rect(Control.L1, 170f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
++        rect(Control.R1, 1030f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
++        rect(Control.R2, 1144f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
++    }
++
++    /** G6-HM4: the End button's place in the PS2 layout (a separate view; reserved here so nothing overlaps it). */
++    fun endRect(w: Int, h: Int): FloatArray {
++        val sx = w / Ps2TouchLayout.REF_W
++        val sy = h / Ps2TouchLayout.REF_H
++        return floatArrayOf((960f - Ps2TouchLayout.SMALL_HW) * sx, (70f - Ps2TouchLayout.SMALL_HH) * sy, (960f + Ps2TouchLayout.SMALL_HW) * sx, (70f + Ps2TouchLayout.SMALL_HH) * sy)
++    }
++
++    /** The controls held now (a stick or the D-pad counts as held while a finger owns it). */
++    fun heldControls(): Set<Control> = fingers.values.map { it.control }.toSet()
++
++    /**
++     * G6-HM4: a stick's deflection now, (x right-positive, y up-positive), each in -1..1, clamped to the unit circle,
++     * 0 inside the 0.1 r dead zone; (0, 0) when no finger owns it. The stick is absolute: its base never moves.
++     */
++    fun stickDeflection(c: Control): Pair<Float, Float> {
++        val s = shapes[c] as? Shape.Circle ?: return 0f to 0f
++        val f = fingers.values.lastOrNull { it.control == c } ?: return 0f to 0f
++        return stickVector(f.x - s.cx, s.cy - f.y, s.r)
++    }
++
+     /** The control whose hit area holds the point (the nearest centre among several), or null. */
+     fun controlAt(x: Float, y: Float): Control? =
+         shapes.entries.filter { it.value.hit(x, y) }.minByOrNull { hypot(x - it.value.cx, y - it.value.cy) }?.key
+ 
+     /** G6-HM3: what the view draws: a circle (halfH = 0) of radius halfW, or a rectangle of half-sizes halfW x halfH. */
+-    data class Drawn(val control: Control, val cx: Float, val cy: Float, val halfW: Float, val halfH: Float)
++    data class Drawn(val control: Control, val cx: Float, val cy: Float, val halfW: Float, val halfH: Float,
++                     val hitHalfW: Float = halfW, val hitHalfH: Float = halfH)
+ 
+     fun drawn(): List<Drawn> = shapes.map { (c, s) ->
+         when (s) {
+-            is Shape.Circle -> Drawn(c, s.cx, s.cy, s.r, 0f)
+-            is Shape.Rect -> Drawn(c, s.cx, s.cy, s.halfW, s.halfH)
++            is Shape.Circle -> Drawn(c, s.cx, s.cy, s.r, 0f, s.r * s.hitScale, 0f)
++            is Shape.Rect -> Drawn(c, s.cx, s.cy, s.halfW, s.halfH, s.halfW * s.hitScale, s.halfH * s.hitScale)
+         }
+     }
+ 
+@@ -134,9 +193,15 @@ class TouchPadState {
+                 Control.R2 -> rt = 255
+                 Control.SELECT -> buttons = buttons or XUSB_BACK
+                 Control.START -> buttons = buttons or XUSB_START
++                Control.L3 -> buttons = buttons or XUSB_LEFT_THUMB
++                Control.R3 -> buttons = buttons or XUSB_RIGHT_THUMB
++                Control.LSTICK, Control.RSTICK -> {}
+             }
+         }
+-        return Output(buttons = buttons, lt = lt, rt = rt)
++        val (lxf, lyf) = stickDeflection(Control.LSTICK)
++        val (rxf, ryf) = stickDeflection(Control.RSTICK)
++        return Output(buttons = buttons, lx = toShort(lxf), ly = toShort(lyf), rx = toShort(rxf), ry = toShort(ryf),
++            lt = lt, rt = rt)
+     }
+ 
+     private fun dpadBits(x: Float, y: Float): Int {
+@@ -151,6 +216,9 @@ class TouchPadState {
+         const val XUSB_DPAD_LEFT = 0x0004
+         const val XUSB_DPAD_RIGHT = 0x0008
+         const val XUSB_START = 0x0010
++        const val XUSB_LEFT_THUMB = 0x0040     // L3 (G6-HM4)
++        const val XUSB_RIGHT_THUMB = 0x0080    // R3 (G6-HM4)
++        const val STICK_DEAD = 0.1f
+         const val XUSB_BACK = 0x0020
+         const val XUSB_LEFT_SHOULDER = 0x0100
+         const val XUSB_RIGHT_SHOULDER = 0x0200
+@@ -180,6 +248,19 @@ class TouchPadState {
+          * The D-pad's sector for an offset from its centre, `dy` positive **up** (screen y flipped); null inside the
+          * dead radius. Sector k covers `[k·45° − 22.5°, k·45° + 22.5°)`.
+          */
++        /** G6-HM4: a stick's offset (dx right, dyUp up) over its radius: clamped to the unit circle; 0 inside 0.1 r. */
++        fun stickVector(dx: Float, dyUp: Float, radius: Float): Pair<Float, Float> {
++            if (radius <= 0f) return 0f to 0f
++            var x = dx / radius
++            var y = dyUp / radius
++            val m = hypot(x, y)
++            if (m < STICK_DEAD) return 0f to 0f
++            if (m > 1f) { x /= m; y /= m }
++            return x to y
++        }
++
++        private fun toShort(v: Float): Short = (v.coerceIn(-1f, 1f) * 32767f).roundToInt().coerceIn(-32768, 32767).toShort()
++
+         fun dpadSector(dx: Float, dyUp: Float, radius: Float): Int? {
+             if (hypot(dx, dyUp) < DPAD_DEAD * radius) return null
+             var a = Math.toDegrees(atan2(dyUp.toDouble(), dx.toDouble()))
+@@ -198,3 +279,22 @@ class TouchPadState {
+         }
+     }
+ }
++
++/** G6-HM4: addendum B2's reference numbers (px of the 1200 x 1325 region; `layout_check_b.py`, B2), exactly. */
++object Ps2TouchLayout {
++    const val REF_W = 1200f
++    const val REF_H = 1325f
++    const val STICK_R = 132f
++    const val STICK_HIT = 1.2f
++    const val DPAD_R = 125f
++    const val DPAD_HIT = 1.25f
++    const val THUMB_R = 48f
++    const val FACE_R = 52f
++    const val BUTTON_HIT = 1.2f
++    const val SMALL_HW = 75.5f
++    const val SMALL_HH = 47.5f
++    const val SHOULDER_Y = 774f
++    const val SHOULDER_HW = 50f
++    const val SHOULDER_HH = 100f
++    const val SHOULDER_HIT = 1.1f
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt b/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
+new file mode 100644
+index 00000000..2a0bcfb6
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
+@@ -0,0 +1,196 @@
++package com.safeiot.privyhub.streaming
++
++import com.safeiot.privyhub.streaming.TouchPadState.Control
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++import kotlin.math.abs
++import kotlin.math.hypot
++import kotlin.math.max
++
++/**
++ * G6-HM4: the PS2 touch layout (the amendment G6-HM1a; the shoulders as addendum B2, settled by the ergonomics chat)
++ * on the tablet's 1200 x 1325 pad region, the sticks, L3 / R3, and the main app's 2-column rule.
++ * B2's numbers are `docs/memory/evidence/g6_hm1a_2026-11-19/layout_check_b.py`'s, exactly.
++ */
++class G6TouchPs2Test {
++
++    private val W = 1200
++    private val H = 1325
++    private lateinit var s: TouchPadState
++
++    @Before
++    fun setUp() {
++        s = TouchPadState(TouchPadState.Kind.PS2).apply { layout(W, H) }
++    }
++
++    private fun c(control: Control) = s.centreOf(control)!!
++    private val MAX = 32767.toShort()
++    private val MIN = (-32767).toShort()
++
++    // B2's centres, exactly as layout_check_b.py
++    @Test
++    fun theLayoutIsAddendumB2() {
++        val b2 = mapOf(
++            Control.LSTICK to (300f to 1030f), Control.DPAD to (300f to 520f), Control.L3 to (540f to 1040f),
++            Control.TRIANGLE to (900f to 940f), Control.CIRCLE to (990f to 1030f), Control.CROSS to (900f to 1120f),
++            Control.SQUARE to (810f to 1030f), Control.RSTICK to (900f to 520f), Control.R3 to (690f to 790f),
++            Control.SELECT to (400f to 70f), Control.START to (600f to 70f),
++            Control.L2 to (56f to 774f), Control.L1 to (170f to 774f), Control.R1 to (1030f to 774f), Control.R2 to (1144f to 774f),
++        )
++        assertEquals(15, s.drawn().size)
++        for ((control, xy) in b2) assertEquals(control.name, xy, c(control))
++        val e = s.endRect(W, H)
++        assertEquals(listOf(884.5f, 22.5f, 1035.5f, 117.5f), e.toList())   // End at (960, 70), 151 x 95
++    }
++
++    // each stick's four directions and the sign (up and right positive; the sender stores -AXIS_Y)
++    @Test
++    fun eachStickHasFourDirectionsWithTheSendersSign() {
++        val r = 132f
++        val (lx, ly) = c(Control.LSTICK)
++        s.down(1, lx, ly)
++        assertEquals(MAX, s.move(1, lx, ly - r).ly); assertEquals(0.toShort(), s.output().lx)
++        assertEquals(MIN, s.move(1, lx, ly + r).ly)
++        assertEquals(MIN, s.move(1, lx - r, ly).lx); assertEquals(0.toShort(), s.output().ly)
++        assertEquals(MAX, s.move(1, lx + r, ly).lx)
++        s.up(1)
++        val (rx, ry) = c(Control.RSTICK)
++        s.down(2, rx, ry)
++        assertEquals(MAX, s.move(2, rx, ry - r).ry)
++        assertEquals(MIN, s.move(2, rx, ry + r).ry)
++        assertEquals(MIN, s.move(2, rx - r, ry).rx)
++        val right = s.move(2, rx + r, ry)
++        assertEquals(MAX, right.rx); assertEquals(0.toShort(), right.lx); assertEquals(0.toShort(), right.ly)
++        assertEquals(TouchPadState.Output(), s.up(2))
++        // the same sign as G6-HM2's stub
++        assertTrue(TouchPadState.stickY(ly - 50f, ly, r) > 0 && s.down(3, lx, ly - 50f).ly > 0)
++    }
++
++    @Test
++    fun theClampAndTheDeadZone() {
++        val r = 132f
++        val (lx, ly) = c(Control.LSTICK)
++        s.down(1, lx, ly)
++        assertEquals(MAX, s.move(1, lx + 3 * r, ly).lx)                         // clamped at 1
++        val diag = s.move(1, lx + 3 * r, ly - 3 * r)                             // clamped to the unit circle
++        assertEquals(23170.0, diag.lx.toDouble(), 2.0); assertEquals(23170.0, diag.ly.toDouble(), 2.0)
++        assertEquals(TouchPadState.Output(), s.move(1, lx + 0.09f * r, ly))     // inside 0.1 r
++        assertTrue(s.move(1, lx + 0.11f * r, ly).lx > 0)                         // just outside
++        assertEquals(0f to 0f, TouchPadState.stickVector(5f, 5f, 132f))
++        assertEquals(1f, TouchPadState.stickVector(1000f, 0f, 132f).first, 1e-6f)
++    }
++
++    @Test
++    fun aStickAndAButtonTogether() {
++        val (lx, ly) = c(Control.LSTICK)
++        val (cx, cy) = c(Control.CROSS)
++        s.down(1, lx, ly)
++        s.move(1, lx, ly - 132f)
++        val both = s.down(2, cx, cy)
++        assertEquals(TouchPadState.XUSB_A, both.buttons)
++        assertEquals(MAX, both.ly)
++        assertEquals(setOf(Control.LSTICK, Control.CROSS), s.heldControls())
++        assertEquals(0, s.up(2).buttons); assertEquals(MAX, s.output().ly)
++    }
++
++    @Test
++    fun aStickFingerLeavingItsBaseKeepsTheStick() {
++        val (lx, ly) = c(Control.LSTICK)
++        s.down(1, lx, ly)
++        assertEquals(MAX, s.move(1, lx + 600f, ly).lx)                            // far outside its press area
++        val (cx, cy) = c(Control.CROSS)
++        val onCross = s.move(1, cx, cy)                                          // over the Cross button: still the stick
++        assertEquals(0, onCross.buttons)
++        assertTrue(onCross.lx > 0)
++        assertEquals(TouchPadState.Output(), s.up(1))
++    }
++
++    @Test
++    fun l3AndR3BitsArePinned() {
++        assertEquals(0x0040, TouchPadState.XUSB_LEFT_THUMB)
++        assertEquals(0x0080, TouchPadState.XUSB_RIGHT_THUMB)
++        assertEquals(0x0040, c(Control.L3).let { (x, y) -> s.down(1, x, y) }.buttons)
++        assertEquals(0x0040 or 0x0080, c(Control.R3).let { (x, y) -> s.down(2, x, y) }.buttons)
++        assertEquals(0, s.cancel().buttons)
++    }
++
++    // B2's checks, as layout_check_b.py: no overlap (End included), the bottom tenth, the sizes
++    @Test
++    fun b2HasNoOverlapAndTheMinimumSizes() {
++        val pxCm = 240.0 / 2.54
++        data class Hit(val name: String, val circle: Boolean, val x: Double, val y: Double, val a: Double, val b: Double)
++        val hits = s.drawn().map { Hit(it.control.name, it.halfH == 0f, it.cx.toDouble(), it.cy.toDouble(), it.hitHalfW.toDouble(),
++            if (it.halfH == 0f) it.hitHalfW.toDouble() else it.hitHalfH.toDouble()) } +
++            Hit("END", false, 960.0, 70.0, 75.5 * 1.2, 47.5 * 1.2)
++        fun overlap(p: Hit, q: Hit): Boolean = when {
++            p.circle && q.circle -> hypot(p.x - q.x, p.y - q.y) < p.a + q.a
++            !p.circle && !q.circle -> abs(p.x - q.x) < p.a + q.a && abs(p.y - q.y) < p.b + q.b
++            else -> {
++                val (ci, re) = if (p.circle) p to q else q to p
++                hypot(max(abs(ci.x - re.x) - re.a, 0.0), max(abs(ci.y - re.y) - re.b, 0.0)) < ci.a
++            }
++        }
++        for (i in hits.indices) for (j in i + 1 until hits.size)
++            assertFalse("${hits[i].name} / ${hits[j].name}", overlap(hits[i], hits[j]))
++        val bottom = 0.9 * H
++        for (h in hits) {
++            assertTrue(h.name, h.x - h.a >= 0 && h.x + h.a <= W && h.y - h.b >= 0 && h.y + h.b <= bottom)
++            if (h.name in setOf("L1", "L2", "R1", "R2")) assertTrue(h.name, h.y + h.b <= bottom - pxCm)
++        }
++        for (d in s.drawn()) {
++            val wCm = 2 * d.halfW / pxCm
++            val hCm = (if (d.halfH == 0f) 2 * d.halfW else 2 * d.halfH) / pxCm
++            assertTrue(d.control.name, minOf(wCm, hCm) >= 1.0)
++            if (d.control in setOf(Control.L1, Control.L2, Control.R1, Control.R2)) assertTrue(d.control.name, hCm >= 2.0)
++            if (d.control in setOf(Control.DPAD, Control.LSTICK, Control.RSTICK)) assertTrue(d.control.name, wCm >= 2.5)
++        }
++    }
++
++    // all 16 controls reachable by a press at their centre (End is its own view: no pad control claims its centre)
++    @Test
++    fun all16ControlsAreReachableAtTheirCentres() {
++        val pad = Control.values().toList()
++        assertEquals(15, pad.size)
++        for (control in pad) {
++            val (x, y) = c(control)
++            assertEquals(control.name, control, s.controlAt(x, y))
++        }
++        val e = s.endRect(W, H)
++        assertNull(s.controlAt((e[0] + e[2]) / 2, (e[1] + e[3]) / 2))
++        assertNull(s.controlAt(e[0] + 2f, e[1] + 2f))
++        assertNull(s.controlAt(e[2] - 2f, e[3] - 2f))
++    }
++
++    @Test
++    fun theLayoutScalesWithTheMeasuredSize() {
++        val t = TouchPadState(TouchPadState.Kind.PS2).apply { layout(600, 662) }
++        val (x, y) = t.centreOf(Control.L1)!!
++        assertEquals(85f, x, 0.01f); assertEquals(774f * 662 / 1325, y, 0.01f)
++    }
++
++    @Test
++    fun ps1RemainsTheDefaultAndHasNoSticks() {
++        val t = TouchPadState().apply { layout(W, H) }
++        assertNull(t.centreOf(Control.LSTICK)); assertNull(t.centreOf(Control.L3))
++        assertEquals(11, t.drawn().size)
++    }
++
++    // the main app's 2-column rule (Q-B4 (a))
++    @Test
++    fun theCatalogUsesTwoColumnsOnlyUprightInHandheldMode() {
++        assertEquals(2, HandheldGeometry.catalogColumns(handheld = true, touchscreen = true, widthDp = 800, tvGuideList = false))
++        assertEquals(3, HandheldGeometry.catalogColumns(handheld = true, touchscreen = true, widthDp = 960, tvGuideList = false))
++        assertEquals(3, HandheldGeometry.catalogColumns(handheld = true, touchscreen = true, widthDp = 1333, tvGuideList = false))
++        assertEquals(3, HandheldGeometry.catalogColumns(handheld = false, touchscreen = true, widthDp = 800, tvGuideList = false))
++        assertEquals(3, HandheldGeometry.catalogColumns(handheld = true, touchscreen = false, widthDp = 800, tvGuideList = false))
++        // the onn: no handheld choice, no touchscreen, 960 dp
++        assertEquals(3, HandheldGeometry.catalogColumns(handheld = false, touchscreen = false, widthDp = 960, tvGuideList = false))
++        assertEquals(1, HandheldGeometry.catalogColumns(handheld = true, touchscreen = true, widthDp = 800, tvGuideList = true))
++        assertEquals(1, HandheldGeometry.catalogColumns(handheld = false, touchscreen = false, widthDp = 960, tvGuideList = true))
++        assertEquals(960, HandheldGeometry.CATALOG_FULL_WIDTH_DP)
++    }
++}

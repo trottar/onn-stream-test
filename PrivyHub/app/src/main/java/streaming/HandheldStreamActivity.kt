@@ -19,30 +19,35 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.TextView
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * G6-HM3: the tablet's portrait handheld mode (design `docs/memory/evidence/g6_hm1_2026-11-19/`, hashed before code,
- * with the user's answers). The game's picture in a W x W·9/16 box at the top (every overlay inside it, unchanged);
- * the touch pad below. Launched only when the user picks "Handheld" in Settings on a device with a touchscreen; the
- * onn's NativeStreamActivity entry and paths are unchanged.
+ * G6-HM3 / G6-HM4: the tablet's portrait handheld mode (design `docs/memory/evidence/g6_hm1_2026-11-19/`, the amendment
+ * `…/g6_hm1a_2026-11-19/` and addendum B2, all hashed before code, with the user's answers). The game's picture in a
+ * W x W·9/16 box at the top (every overlay inside it, unchanged); the PS2 touch pad below. Launched only when the user
+ * picks "Handheld" in Settings on a device with a touchscreen; the onn's NativeStreamActivity entry and paths are
+ * unchanged.
  *
- * - Q5 (c): Back does nothing in a game (a key or an edge swipe); the **End** button ends to the paused picture.
- * - Q1 (c): when a real pad is P1, the lower region shows a status panel instead of the touch pad.
- * - [TOUCH_LIVE] false (G6-HM3): the pad is drawn and counts touches but takes no slot and writes nothing. G6-HM4 sets
- *   it true: D2's 5-s rule (Q3 (b)/(i)), the countdown (Q4 (b)), the 2-s takeover (Q2 (d)), the writes.
+ * - D5: the PS2 layout on every system: D-pad, four face buttons, L1 / L2 / R1 / R2 (side by side, B2), two absolute
+ *   sticks with L3 / R3, Select, Start, End.
+ * - D2 with Q3 (b)/(i) and Q4 (b): the touch pad becomes P1 5 s after the gameplay release unless a real pad holds P1;
+ *   a countdown in the pad region. Q2 (d): a real pad's unjoined hold kept 2 s takes P1 from the touch pad.
+ * - Q5 (c): Back does nothing in a game; **End** ends to the paused picture. Q1 (c): a real P1 -> the status panel.
  */
 class HandheldStreamActivity : NativeStreamActivity() {
 
     companion object {
-        const val TOUCH_LIVE = false
+        /** G6-HM4: live (G6-HM3 had it false: the pad drawn and inert). */
+        const val TOUCH_LIVE = true
         private const val TICK_MS = 100L
         private const val TEXT_PREVIEW = "Touch buttons: coming in the next update"
+        private val DIRECTIONS = arrayOf("up", "down", "left", "right")
     }
 
     private val ui = Handler(Looper.getMainLooper())
-    private val pad = TouchPadState()
+    private val pad = TouchPadState(TouchPadState.Kind.PS2)
     private val p1Rule = TouchP1Rule()
     private val takeover = TouchTakeover()
     private var padView: TouchPadView? = null
@@ -55,8 +60,14 @@ class HandheldStreamActivity : NativeStreamActivity() {
     private val exempted = AtomicLong(0)
     private val backSwallowed = AtomicLong(0)
     private val endPresses = AtomicLong(0)
+    private val takeovers = AtomicLong(0)
     @Volatile private var navMode = -1
     @Volatile private var density = 0f
+    @Volatile private var releaseAtMs: Long? = null
+    @Volatile private var p1JoinAfterReleaseMs: Long = -1
+    private val pressed = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
+    /** [left, right] stick x [up, down, left, right]: the largest deflection seen, 0..1. */
+    private val stickMax = Array(2) { FloatArray(4) }
 
     override val streamOrientation: Int get() = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
@@ -68,7 +79,18 @@ class HandheldStreamActivity : NativeStreamActivity() {
     }
 
     override fun wrapStreamLayer(streamLayer: FrameLayout): View {
-        val area = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        val end = Button(this).apply {
+            text = "End"
+            isAllCaps = false
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(0, 0, 0, 0)
+            // Q5 (c): the only way out of a game here (Back does nothing)
+            setOnClickListener { endPresses.incrementAndGet(); pressed.add("END"); endToPausedFrame() }
+        }
+        val area = PadArea(this, pad, end).apply { setBackgroundColor(Color.BLACK) }
         val pv = TouchPadView(this, pad, { touchEvents.incrementAndGet() }) { out -> onPadOutput(out) }
         padView = pv
         area.addView(pv, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
@@ -88,17 +110,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
             area.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
                 .apply { gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; bottomMargin = 24 })
         }
-        // Q5 (c): the only way out of a game here (Back does nothing)
-        Button(this).apply {
-            text = "End"
-            isAllCaps = false
-            minWidth = 0
-            minimumWidth = 0
-            setOnClickListener { endPresses.incrementAndGet(); endToPausedFrame() }
-        }.also {
-            area.addView(it, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT)
-                .apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; topMargin = 8 })
-        }
+        // End last: on top of the pad and the panel, so it stays reachable with the status panel shown (Q1 (c))
+        area.addView(end, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
         return HandheldLayout(this, streamLayer, area).also { frame = it }
     }
 
@@ -111,11 +124,14 @@ class HandheldStreamActivity : NativeStreamActivity() {
         if (TOUCH_LIVE) super.connectedPadDevices() + TouchPadDevice else super.connectedPadDevices()
 
     override fun onPlayersOpened(selfRestart: Boolean) {
-        ui.post { p1Rule.onStart(selfRestart); takeover.clear() }
+        ui.post { p1Rule.onStart(selfRestart); takeover.clear(); releaseAtMs = null }
     }
 
     override fun onGameplayReleased() {
-        p1Rule.onGameplayReleased(nowMs())
+        val now = nowMs()
+        val wasArmed = p1Rule.armed()
+        p1Rule.onGameplayReleased(now)
+        if (!wasArmed && p1Rule.armed()) releaseAtMs = now
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
@@ -153,8 +169,17 @@ class HandheldStreamActivity : NativeStreamActivity() {
     override fun putHandheldReport(report: JSONObject) {
         val w = frame?.width ?: 0
         val h = frame?.height ?: 0
+        val sticks = JSONObject()
+        synchronized(stickMax) {
+            for ((i, name) in arrayOf("left", "right").withIndex()) {
+                val o = JSONObject()
+                for ((j, dir) in DIRECTIONS.withIndex()) o.put(dir, Math.round(stickMax[i][j] * 1000.0) / 1000.0)
+                sticks.put(name, o)
+            }
+        }
         report.put("handheld", JSONObject()
             .put("mode", "portrait")
+            .put("layout", "ps2")
             .put("touch_live", TOUCH_LIVE)
             .put("video_box", "${w}x${HandheldGeometry.videoBoxHeight(w)}")
             .put("pad_region", "${w}x${HandheldGeometry.padRegionHeight(w, h)}")
@@ -164,6 +189,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
             .put("touch_events", touchEvents.get())
             .put("touch_writes", touchWrites.get())
             .put("touch_slot", streamSlots?.slotOf(TouchPadDevice) ?: -1)
+            .put("p1_join_after_release_ms", p1JoinAfterReleaseMs)
+            .put("takeovers", takeovers.get())
+            .put("controls_pressed", JSONArray(synchronized(pressed) { pressed.toList() }))
+            .put("stick_max_deflection", sticks)
             .put("pointer_exempted_events", exempted.get())
             .put("back_swallowed", backSwallowed.get())
             .put("end_presses", endPresses.get()))
@@ -176,8 +205,19 @@ class HandheldStreamActivity : NativeStreamActivity() {
         padView?.invalidate()
     }
 
-    /** The touch pad's fields into its own slot (none = nothing; before the release = neutral). */
+    /** What was touched (the report's keys), then the touch pad's fields into its own slot (none = nothing). */
     private fun onPadOutput(out: TouchPadState.Output) {
+        pad.heldControls().forEach { pressed.add(it.name) }
+        synchronized(stickMax) {
+            for ((i, c) in arrayOf(TouchPadState.Control.LSTICK, TouchPadState.Control.RSTICK).withIndex()) {
+                val (x, y) = pad.stickDeflection(c)
+                val m = stickMax[i]
+                if (y > m[0]) m[0] = y
+                if (-y > m[1]) m[1] = -y
+                if (-x > m[2]) m[2] = -x
+                if (x > m[3]) m[3] = x
+            }
+        }
         if (!TOUCH_LIVE) return
         val sender = streamSender ?: return
         val slot = streamSlots?.slotOf(TouchPadDevice) ?: return
@@ -194,19 +234,21 @@ class HandheldStreamActivity : NativeStreamActivity() {
             if (TOUCH_LIVE) {
                 val prompt = streamPrompt
                 if (p1Rule.tick(now, realP1) == TouchP1Rule.Action.JOIN_P1) {
-                    prompt?.joinAsP1WithoutHold(TouchPadDevice, now, connectedPadDevices())
+                    val s = prompt?.joinAsP1WithoutHold(TouchPadDevice, now, connectedPadDevices())
+                    if (s == 0) releaseAtMs?.let { p1JoinAfterReleaseMs = now - it }
                 }
                 takeover.due(now, p1 == TouchPadDevice.KEY)?.let { real ->
                     streamSender?.writePlayerState(0, 0, 0, 0, 0, 0, 0, 0)
                     pad.reset()
-                    prompt?.takeOverP1(real, TouchPadDevice.KEY, now)
+                    if (prompt?.takeOverP1(real, TouchPadDevice.KEY, now) == 0) takeovers.incrementAndGet()
                 }
                 onPadOutput(pad.output())
             }
-            // Q1 (c): a real pad as P1 -> the status panel instead of the pad
+            // Q1 (c): a real pad as P1 -> the status panel instead of the pad (End stays on top)
             padView?.let { v ->
                 val want = if (realP1) View.GONE else View.VISIBLE
                 if (v.visibility != want) v.visibility = want
+                v.invalidate()
             }
             panel?.let { t ->
                 t.visibility = if (realP1) View.VISIBLE else View.GONE
@@ -214,7 +256,11 @@ class HandheldStreamActivity : NativeStreamActivity() {
             }
             hint?.let { t ->
                 t.visibility = if (realP1) View.GONE else View.VISIBLE
-                t.text = if (!TOUCH_LIVE) TEXT_PREVIEW else p1Rule.secondsLeft(now)?.let { "Touch buttons: P1 in $it…" } ?: ""
+                t.text = when {
+                    !TOUCH_LIVE -> TEXT_PREVIEW
+                    p1 == TouchPadDevice.KEY -> "Touch buttons: Player 1"
+                    else -> p1Rule.secondsLeft(now)?.let { "Touch buttons: P1 in $it…" } ?: ""
+                }
             }
             ui.postDelayed(this, TICK_MS)
         }
@@ -250,6 +296,22 @@ class HandheldStreamActivity : NativeStreamActivity() {
         }
     }
 
+    /** The pad region: its children as a FrameLayout, then the End button put exactly on B2's End rectangle. */
+    private class PadArea(ctx: Context, private val state: TouchPadState, private val end: View) : FrameLayout(ctx) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            val r = state.endRect(measuredWidth, measuredHeight)
+            end.measure(MeasureSpec.makeMeasureSpec((r[2] - r[0]).toInt(), MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec((r[3] - r[1]).toInt(), MeasureSpec.EXACTLY))
+        }
+
+        override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+            super.onLayout(changed, left, top, right, bottom)
+            val r = state.endRect(right - left, bottom - top)
+            end.layout(r[0].toInt(), r[1].toInt(), r[0].toInt() + end.measuredWidth, r[1].toInt() + end.measuredHeight)
+        }
+    }
+
     /** Draws [TouchPadState]'s layout and feeds it the fingers; releases on cancel, hide and detach. */
     private class TouchPadView(
         ctx: Context,
@@ -268,38 +330,53 @@ class HandheldStreamActivity : NativeStreamActivity() {
             excludeEdgeGestures()
         }
 
-        /** Design §7: the D-pad's and the face buttons' bands kept from the side-edge gestures (200 dp per edge). */
+        /**
+         * Design §7: the side-edge back gesture kept off the shoulders, the controls nearest the edges (200 dp per edge
+         * at most; the band is the shoulders' press height). A swipe there would otherwise cancel a held L2 / R2.
+         */
         private fun excludeEdgeGestures() {
             if (Build.VERSION.SDK_INT < 29) return
             val maxPx = (200 * resources.displayMetrics.density).toInt()
-            val rects = state.drawn().filter { it.control == TouchPadState.Control.DPAD || it.control == TouchPadState.Control.CIRCLE }
-                .map { d ->
-                    val half = minOf((d.halfW * TouchPadState.DPAD_HIT).toInt(), maxPx / 2)
-                    if (d.control == TouchPadState.Control.DPAD) Rect(0, d.cy.toInt() - half, (d.cx + d.halfW).toInt(), d.cy.toInt() + half)
-                    else Rect((d.cx - d.halfW).toInt(), d.cy.toInt() - half, width, d.cy.toInt() + half)
-                }
+            val rects = state.drawn().filter {
+                it.control == TouchPadState.Control.L2 || it.control == TouchPadState.Control.L1 ||
+                    it.control == TouchPadState.Control.R1 || it.control == TouchPadState.Control.R2
+            }.map { d ->
+                val half = minOf(d.hitHalfH.toInt(), maxPx / 2)
+                Rect((d.cx - d.hitHalfW).toInt(), d.cy.toInt() - half, (d.cx + d.hitHalfW).toInt(), d.cy.toInt() + half)
+            }
             systemGestureExclusionRects = rects
         }
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             val alpha = if (TOUCH_LIVE) 255 else 110
+            val held = state.heldControls()
             for (d in state.drawn()) {
-                fill.color = 0xFF2A2A2A.toInt(); fill.alpha = alpha
+                val on = d.control in held
+                fill.color = if (on) 0xFF5A5A5A.toInt() else 0xFF2A2A2A.toInt(); fill.alpha = alpha
                 line.color = 0xFF888888.toInt(); line.alpha = alpha
                 label.alpha = alpha
                 if (d.halfH == 0f) {
                     canvas.drawCircle(d.cx, d.cy, d.halfW, fill)
                     canvas.drawCircle(d.cx, d.cy, d.halfW, line)
-                    if (d.control == TouchPadState.Control.DPAD) {
-                        canvas.drawLine(d.cx - d.halfW, d.cy, d.cx + d.halfW, d.cy, line)
-                        canvas.drawLine(d.cx, d.cy - d.halfW, d.cx, d.cy + d.halfW, line)
+                    when (d.control) {
+                        TouchPadState.Control.DPAD -> {
+                            canvas.drawLine(d.cx - d.halfW, d.cy, d.cx + d.halfW, d.cy, line)
+                            canvas.drawLine(d.cx, d.cy - d.halfW, d.cx, d.cy + d.halfW, line)
+                        }
+                        TouchPadState.Control.LSTICK, TouchPadState.Control.RSTICK -> {
+                            // the knob at the deflection (absolute: the base never moves)
+                            val (x, y) = state.stickDeflection(d.control)
+                            fill.color = 0xFF777777.toInt(); fill.alpha = alpha
+                            canvas.drawCircle(d.cx + x * d.halfW, d.cy - y * d.halfW, d.halfW * 0.45f, fill)
+                        }
+                        else -> {}
                     }
                     label.textSize = d.halfW * 0.8f
                 } else {
                     canvas.drawRoundRect(d.cx - d.halfW, d.cy - d.halfH, d.cx + d.halfW, d.cy + d.halfH, 16f, 16f, fill)
                     canvas.drawRoundRect(d.cx - d.halfW, d.cy - d.halfH, d.cx + d.halfW, d.cy + d.halfH, 16f, 16f, line)
-                    label.textSize = d.halfH * 0.9f
+                    label.textSize = minOf(d.halfH, d.halfW) * 0.8f
                 }
                 val text = labelOf(d.control)
                 if (text.isNotEmpty()) canvas.drawText(text, d.cx, d.cy + label.textSize / 3f, label)
@@ -307,7 +384,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
         }
 
         private fun labelOf(c: TouchPadState.Control): String = when (c) {
-            TouchPadState.Control.DPAD -> ""
+            TouchPadState.Control.DPAD, TouchPadState.Control.LSTICK, TouchPadState.Control.RSTICK -> ""
             TouchPadState.Control.TRIANGLE -> glyph("△", "T")
             TouchPadState.Control.CIRCLE -> glyph("○", "O")
             TouchPadState.Control.CROSS -> glyph("✕", "X")
@@ -334,6 +411,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
                 else -> state.output()
             }
             onOutput(out)
+            invalidate()
             return true
         }
 

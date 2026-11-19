@@ -1758,6 +1758,17 @@ class MainActivity : AppCompatActivity() {
                 3
             }
 
+        // G6-HM4: 2 columns upright, only behind the handheld choice (a touchscreen device; the onn never enters)
+        if (!tvGuideListPage && useHandheldGameScreen()) {
+            sourceGrid.columnCount =
+                com.safeiot.privyhub.streaming.HandheldGeometry.catalogColumns(
+                    handheld = true,
+                    touchscreen = true,
+                    widthDp = resources.configuration.screenWidthDp,
+                    tvGuideList = false
+                )
+        }
+
 
         val currentNodes =
             if (
