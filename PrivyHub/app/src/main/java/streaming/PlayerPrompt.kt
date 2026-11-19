@@ -317,6 +317,45 @@ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceS
         }
     }
 
+    /**
+     * G6-HM2 (D2): a device with no keys (the touch pad) joins as **P1** now, as a hold would (the badge, the stored
+     * count). Null = no join: the prompt not joining, the device already holding a slot, or P1 not open. Never asks
+     * for a relaunch. Only the handheld activity calls it (design `g6_hm1_2026-11-19` §5); no path above does.
+     */
+    fun joinAsP1WithoutHold(pad: PadDevice, nowMs: Long, connected: List<PadDevice>): Int? {
+        if (!PadSlots.eligible(pad)) return null
+        val k = PadSlots.key(pad)
+        synchronized(lock) {
+            if (phase != Phase.JOINING) return null
+            if (slots.slotOfKey(k) != null) return null
+            if (openSlot(connected) != 0) return null
+            join(pad, k, nowMs, connected)
+            return slots.slotOfKey(k)
+        }
+    }
+
+    /**
+     * G6-HM2 (the user's Q2 (d)): [pad] takes P1 from the device keyed [fromKey] (the touch pad), which lets go; the
+     * pad's own earlier slot, if any, is freed. Null = no change: P1 not held by [fromKey], or the prompt off. Only
+     * the handheld activity calls it, and only for the touch pad's key (a real pad never takes a real pad's P1).
+     */
+    fun takeOverP1(pad: PadDevice, fromKey: String, nowMs: Long): Int? {
+        if (!PadSlots.eligible(pad)) return null
+        val k = PadSlots.key(pad)
+        synchronized(lock) {
+            if (phase == Phase.NONE) return null
+            if (slots.holderOf(0) != fromKey || k == fromKey) return null
+            slots.slotOfKey(k)?.let { claimedBy.remove(it) }
+            slots.claim(pad, 0)
+            claimedBy[0] = PROMPT
+            holds.remove(k)
+            lastJoinAtMs = nowMs
+            badge("P1", nowMs)
+            PlayerPromptProcess.lastJoined = joinedLocked()
+            return 0
+        }
+    }
+
     /** The most players this title's ports can take now (1 for a 1-player title). */
     private fun cap(): Int = if (players == 1) 1 else ports.players
 

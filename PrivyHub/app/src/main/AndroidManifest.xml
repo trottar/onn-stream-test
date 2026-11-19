@@ -55,6 +55,12 @@
             android:exported="false"
             android:screenOrientation="landscape" />
 
+        <!-- G6-HM3: the tablet's portrait handheld mode (Settings: "Handheld game screen"; touchscreen devices only) -->
+        <activity
+            android:name=".streaming.HandheldStreamActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true">

@@ -744,4 +744,31 @@ class NativeControllerSender(
             }
         }
     }
+
+    /**
+     * G6-HM2: one player's whole state from a source with no InputDevice (the touch pad), under the lock. The touch
+     * pad is the only source for its player, so the state is overwritten (digital triggers and the hat cleared);
+     * `ly` / `ry` are positive up, as [handleMotionEvent] stores them. False, nothing written, outside 0..3. Only the
+     * handheld activity calls it (design `g6_hm1_2026-11-19` §3); the send loop is unchanged.
+     */
+    fun writePlayerState(
+        player: Int, buttons: Int, lx: Short, ly: Short, rx: Short, ry: Short, lt: Int, rt: Int
+    ): Boolean {
+        if (player !in 0 until PLAYER_COUNT) return false
+        synchronized(lock) {
+            val state = states[player]
+            state.buttons = buttons
+            state.lx = lx
+            state.ly = ly
+            state.rx = rx
+            state.ry = ry
+            state.lt = lt.coerceIn(0, 255)
+            state.rt = rt.coerceIn(0, 255)
+            state.digitalLt = false
+            state.digitalRt = false
+            state.hatX = 0
+            state.hatY = 0
+        }
+        return true
+    }
 }

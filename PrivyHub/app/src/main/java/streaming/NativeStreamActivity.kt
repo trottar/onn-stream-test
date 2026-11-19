@@ -30,7 +30,7 @@ import java.net.URL
 import java.net.URLEncoder
 import kotlin.concurrent.thread
 
-class NativeStreamActivity :
+open class NativeStreamActivity :
     Activity(),
     SurfaceHolder.Callback {
 
@@ -362,7 +362,7 @@ class NativeStreamActivity :
         )
 
         requestedOrientation =
-            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            streamOrientation
 
         window.addFlags(
             WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
@@ -529,7 +529,7 @@ class NativeStreamActivity :
         }
 
         setContentView(
-            root
+            wrapStreamLayer(root)
         )
 
         // B70: every view's pointer icon the null icon (guard on only)
@@ -792,7 +792,7 @@ class NativeStreamActivity :
                 port = INPUT_PORT
             ).also {
                 // B34: stable slots, gamepads only (null = today)
-                padSlots?.let { s -> it.padSlots = s; it.connectedPads = { AndroidPadDevice.connected() } }
+                padSlots?.let { s -> it.padSlots = s; it.connectedPads = { connectedPadDevices() } }
                 // B41: the prompt over the slots (null = today)
                 playerPrompt?.let { p -> it.playerPrompt = p }
                 it.start()
@@ -957,8 +957,10 @@ class NativeStreamActivity :
                     json.optInt("players", PlayerPrompt.DEFAULT_PLAYERS),
                     PortsSet.parse(json.optJSONObject("ports_set")),
                     PlayerPrompt.gameKey(json.optJSONObject("game_session")?.optJSONObject("game")?.optString("id")),
-                    AndroidPadDevice.connected()
+                    connectedPadDevices()
                 )
+                // G6-HM3: the handheld activity's start (a no-op here)
+                onPlayersOpened(restart != null)
                 // B67: the N64 layout once per onn (only with the prompt on: the card's view exists then)
                 n64CardView?.let { card ->
                     val prefs = getSharedPreferences(N64LayoutCard.PREFS, MODE_PRIVATE)
@@ -2539,6 +2541,9 @@ class NativeStreamActivity :
             root.put("wifi_lock_held", lock.heldAtFirstAcquire ?: false)
         }
 
+        // G6-HM3: the handheld activity's keys (a no-op here: no key added)
+        putHandheldReport(root)
+
         return root.toString()
     }
 
@@ -2709,7 +2714,7 @@ class NativeStreamActivity :
         override fun run() {
             playerPrompt?.let { p ->
                 val now = System.nanoTime() / 1_000_000L
-                val connected = AndroidPadDevice.connected()
+                val connected = connectedPadDevices()
                 p.tick(now, connected)
                 // B54: a hold that needs more ports: the multitap relaunch, at once
                 p.takeRelaunchRequest()?.let { n -> startRelaunch(n) }
@@ -2733,7 +2738,7 @@ class NativeStreamActivity :
         val p = playerPrompt ?: return
         val host = intent.getStringExtra(EXTRA_COMPANION_HOST)?.trim().orEmpty()
         if (host.isBlank()) {
-            p.onRelaunchResult(false, null, null, null, System.nanoTime() / 1_000_000L, AndroidPadDevice.connected())
+            p.onRelaunchResult(false, null, null, null, System.nanoTime() / 1_000_000L, connectedPadDevices())
             return
         }
         relaunchActive = true
@@ -2769,7 +2774,7 @@ class NativeStreamActivity :
                 ok = false
             }
             runOnUiThread {
-                p.onRelaunchResult(ok, ports, state, totalMs, System.nanoTime() / 1_000_000L, AndroidPadDevice.connected())
+                p.onRelaunchResult(ok, ports, state, totalMs, System.nanoTime() / 1_000_000L, connectedPadDevices())
                 relaunchActive = false
                 stabilizationStartedAtNs = System.nanoTime()
                 stabilizationBaselineSet = false
@@ -3493,6 +3498,8 @@ class NativeStreamActivity :
                         false
                     gameplayReleased =
                         true
+                    // G6-HM3: the handheld activity's 5-s rule (a no-op here)
+                    onGameplayReleased()
                     recoveryActive =
                         false
                     desyncPostedForEpisode =
@@ -4710,7 +4717,7 @@ class NativeStreamActivity :
 
     // B70: a touchpad / mouse press or click reaches no view
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (pointerGuard.consumeTouch(event.source)) {
+        if (!exemptFromPointerGuard(event) && pointerGuard.consumeTouch(event.source)) {
             return true
         }
         return super.dispatchTouchEvent(event)
@@ -4722,6 +4729,24 @@ class NativeStreamActivity :
         }
         return super.dispatchTrackballEvent(event)
     }
+
+    // G6-HM3: the handheld activity's hooks (design `docs/memory/evidence/g6_hm1_2026-11-19/`, hashed before code, §1).
+    // Each default is the code it replaced, so this activity (the onn's) runs as before; only HandheldStreamActivity
+    // overrides them.
+    protected open val streamOrientation: Int get() = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    protected open fun wrapStreamLayer(streamLayer: FrameLayout): View = streamLayer
+    protected open fun exemptFromPointerGuard(event: MotionEvent): Boolean = false
+    protected open fun connectedPadDevices(): List<PadDevice> = AndroidPadDevice.connected()
+    /** After the prompt's start response (the session's thread, not the UI's). */
+    protected open fun onPlayersOpened(selfRestart: Boolean) {}
+    /** On the UI thread, at each gameplay release. */
+    protected open fun onGameplayReleased() {}
+    protected open fun putHandheldReport(report: JSONObject) {}
+    protected val streamSender: NativeControllerSender? get() = controllerSender
+    protected val streamPrompt: PlayerPrompt? get() = playerPrompt
+    protected val streamSlots: PadSlots? get() = padSlots
+    protected val gameplayLive: Boolean get() = gameplayReleased
+    protected fun endToPausedFrame() = capturePausedFrameAndFinish()
 
     private fun httpPostJson(
         address: String,

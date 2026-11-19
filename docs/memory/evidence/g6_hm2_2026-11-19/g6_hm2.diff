@@ -1,0 +1,987 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+index 54e5cd93..0d25f9f2 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeControllerSender.kt
+@@ -744,4 +744,31 @@ class NativeControllerSender(
+             }
+         }
+     }
++
++    /**
++     * G6-HM2: one player's whole state from a source with no InputDevice (the touch pad), under the lock. The touch
++     * pad is the only source for its player, so the state is overwritten (digital triggers and the hat cleared);
++     * `ly` / `ry` are positive up, as [handleMotionEvent] stores them. False, nothing written, outside 0..3. Only the
++     * handheld activity calls it (design `g6_hm1_2026-11-19` §3); the send loop is unchanged.
++     */
++    fun writePlayerState(
++        player: Int, buttons: Int, lx: Short, ly: Short, rx: Short, ry: Short, lt: Int, rt: Int
++    ): Boolean {
++        if (player !in 0 until PLAYER_COUNT) return false
++        synchronized(lock) {
++            val state = states[player]
++            state.buttons = buttons
++            state.lx = lx
++            state.ly = ly
++            state.rx = rx
++            state.ry = ry
++            state.lt = lt.coerceIn(0, 255)
++            state.rt = rt.coerceIn(0, 255)
++            state.digitalLt = false
++            state.digitalRt = false
++            state.hatX = 0
++            state.hatY = 0
++        }
++        return true
++    }
+ }
+diff --git a/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt b/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
+index 9987b5a5..6e11f2bc 100644
+--- a/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
++++ b/PrivyHub/app/src/main/java/streaming/PlayerPrompt.kt
+@@ -317,6 +317,45 @@ class PlayerPrompt(private val slots: PadSlots, private val store: PlayerChoiceS
+         }
+     }
+ 
++    /**
++     * G6-HM2 (D2): a device with no keys (the touch pad) joins as **P1** now, as a hold would (the badge, the stored
++     * count). Null = no join: the prompt not joining, the device already holding a slot, or P1 not open. Never asks
++     * for a relaunch. Only the handheld activity calls it (design `g6_hm1_2026-11-19` §5); no path above does.
++     */
++    fun joinAsP1WithoutHold(pad: PadDevice, nowMs: Long, connected: List<PadDevice>): Int? {
++        if (!PadSlots.eligible(pad)) return null
++        val k = PadSlots.key(pad)
++        synchronized(lock) {
++            if (phase != Phase.JOINING) return null
++            if (slots.slotOfKey(k) != null) return null
++            if (openSlot(connected) != 0) return null
++            join(pad, k, nowMs, connected)
++            return slots.slotOfKey(k)
++        }
++    }
++
++    /**
++     * G6-HM2 (the user's Q2 (d)): [pad] takes P1 from the device keyed [fromKey] (the touch pad), which lets go; the
++     * pad's own earlier slot, if any, is freed. Null = no change: P1 not held by [fromKey], or the prompt off. Only
++     * the handheld activity calls it, and only for the touch pad's key (a real pad never takes a real pad's P1).
++     */
++    fun takeOverP1(pad: PadDevice, fromKey: String, nowMs: Long): Int? {
++        if (!PadSlots.eligible(pad)) return null
++        val k = PadSlots.key(pad)
++        synchronized(lock) {
++            if (phase == Phase.NONE) return null
++            if (slots.holderOf(0) != fromKey || k == fromKey) return null
++            slots.slotOfKey(k)?.let { claimedBy.remove(it) }
++            slots.claim(pad, 0)
++            claimedBy[0] = PROMPT
++            holds.remove(k)
++            lastJoinAtMs = nowMs
++            badge("P1", nowMs)
++            PlayerPromptProcess.lastJoined = joinedLocked()
++            return 0
++        }
++    }
++
+     /** The most players this title's ports can take now (1 for a 1-player title). */
+     private fun cap(): Int = if (players == 1) 1 else ports.players
+ 
+diff --git a/PrivyHub/app/src/main/java/streaming/HandheldInput.kt b/PrivyHub/app/src/main/java/streaming/HandheldInput.kt
+new file mode 100644
+index 00000000..60dde6cb
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/HandheldInput.kt
+@@ -0,0 +1,46 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * G6-HM2: the handheld mode's pure helpers (no Android types; JVM-tested). Design:
++ * `docs/memory/evidence/g6_hm1_2026-11-19/design_written_before_code.md` (hashed before this code), §2 and §6.
++ * Nothing on the onn calls these: they are used only by the handheld activity (G6-HM3).
++ */
++object HandheldInput {
++    /** android.view.InputDevice.SOURCE_TOUCHSCREEN (the test checks the other sources against it). */
++    const val SOURCE_TOUCHSCREEN = 0x00001002
++
++    /**
++     * The touchscreen, and nothing else of B70's pointer class: a mouse (0x2002), a touchpad (0x100008), a relative
++     * mouse (0x20004) and touch navigation (0x200000) stay consumed by [PointerGuard]. A stylus reported together with
++     * the screen (0x5002) passes: the S Pen acts as a finger (disclosed, design §6).
++     */
++    fun isTouchscreen(source: Int): Boolean = (source and SOURCE_TOUCHSCREEN) == SOURCE_TOUCHSCREEN
++}
++
++object HandheldGeometry {
++    /** The video box's height for the measured width: 16:9, integer (1200 -> 675). Never a constant (design §2). */
++    fun videoBoxHeight(widthPx: Int): Int = if (widthPx <= 0) 0 else widthPx * 9 / 16
++
++    /** The pad region's height under the box (never negative). */
++    fun padRegionHeight(widthPx: Int, heightPx: Int): Int = (heightPx - videoBoxHeight(widthPx)).coerceAtLeast(0)
++}
++
++/**
++ * G6-HM2: the touch pad as a [PadDevice] for the slots and the prompt (design §5). It passes [PadSlots.eligible]
++ * unchanged (GAMEPAD | JOYSTICK, a gamepad button, a face button, stick / hat, not virtual), so nothing in [PadSlots]
++ * changes. Its key is fixed: sha256("0:0:privyhub-touchpad"), 6 hex = `01097c`; its class is `gamepad`.
++ * It is never in AndroidPadDevice.connected(): the handheld activity adds it to its own connected list (hook H4),
++ * without which [PlayerPrompt]'s open-slot rule would count its P1 as free.
++ */
++object TouchPadDevice : PadDevice {
++    const val KEY = "01097c"
++    override val descriptor: String = "privyhub-touchpad"
++    override val vendorId: Int = 0
++    override val productId: Int = 0
++    override val sources: Int = 0x01000411          // SOURCE_GAMEPAD | SOURCE_JOYSTICK
++    override val controllerNumber: Int = 0
++    override val hasGamepadButton: Boolean = true
++    override val isVirtual: Boolean = false
++    override val hasFaceButton: Boolean = true
++    override val hasStickOrHat: Boolean = true
++}
+diff --git a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+new file mode 100644
+index 00000000..e0d48345
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+@@ -0,0 +1,190 @@
++package com.safeiot.privyhub.streaming
++
++import kotlin.math.atan2
++import kotlin.math.floor
++import kotlin.math.hypot
++import kotlin.math.roundToInt
++
++/**
++ * G6-HM2: the touch pad's state, pure Kotlin (no Android types; JVM-tested). Design:
++ * `docs/memory/evidence/g6_hm1_2026-11-19/design_written_before_code.md` (hashed before this code), §4.
++ *
++ * - A finger belongs to the control under it at its down event (hit areas larger than the drawing; overlapping hit
++ *   areas: the nearest centre) and keeps it until its up event, a cancel or a reset. Sliding off keeps the control;
++ *   sliding onto another presses nothing new.
++ * - The D-pad is 8-way by angle: eight 45° sectors, half-open `[k·45° − 22.5°, k·45° + 22.5°)`, re-read on every
++ *   move (a roll), nothing inside 0.25 r.
++ * - One finger, one button. L2 / R2 are digital (255). The output is the sender's state fields.
++ * - The PS1 layout (D3) in fractions of the pad region; G6-HM6 adds customization.
++ */
++class TouchPadState {
++
++    enum class Control { DPAD, CROSS, CIRCLE, SQUARE, TRIANGLE, L1, R1, L2, R2, SELECT, START }
++
++    /** The sender's fields (NativeControllerSender.writePlayerState). */
++    data class Output(
++        val buttons: Int = 0,
++        val lx: Short = 0,
++        val ly: Short = 0,
++        val rx: Short = 0,
++        val ry: Short = 0,
++        val lt: Int = 0,
++        val rt: Int = 0,
++    )
++
++    private sealed class Shape(val cx: Float, val cy: Float) {
++        abstract fun hit(x: Float, y: Float): Boolean
++        class Circle(cx: Float, cy: Float, val r: Float, val hitScale: Float) : Shape(cx, cy) {
++            override fun hit(x: Float, y: Float) = hypot(x - cx, y - cy) <= r * hitScale
++        }
++        class Rect(cx: Float, cy: Float, val halfW: Float, val halfH: Float, val hitScale: Float) : Shape(cx, cy) {
++            override fun hit(x: Float, y: Float) =
++                kotlin.math.abs(x - cx) <= halfW * hitScale && kotlin.math.abs(y - cy) <= halfH * hitScale
++        }
++    }
++
++    private class Finger(val control: Control, var x: Float, var y: Float)
++
++    private val shapes = LinkedHashMap<Control, Shape>()
++    private val fingers = HashMap<Int, Finger>()
++    private var dpadR = 0f
++
++    /** The geometry from the pad region's real size (design §4 fractions). */
++    fun layout(w: Int, h: Int) {
++        shapes.clear()
++        fingers.clear()
++        if (w <= 0 || h <= 0) return
++        val W = w.toFloat()
++        val H = h.toFloat()
++        fun band(x0: Float, x1: Float) =
++            Shape.Rect((x0 + x1) / 2 * W, 0.08f * H, (x1 - x0) / 2 * W, 0.05f * H, SHOULDER_HIT)
++        shapes[Control.L2] = band(0.03f, 0.22f)
++        shapes[Control.L1] = band(0.24f, 0.44f)
++        shapes[Control.R1] = band(0.56f, 0.76f)
++        shapes[Control.R2] = band(0.78f, 0.97f)
++        dpadR = 0.17f * W
++        shapes[Control.DPAD] = Shape.Circle(0.25f * W, 0.50f * H, dpadR, DPAD_HIT)
++        val fx = 0.75f * W
++        val fy = 0.50f * H
++        val d = 0.12f * W
++        val br = 0.07f * W
++        shapes[Control.TRIANGLE] = Shape.Circle(fx, fy - d, br, BUTTON_HIT)
++        shapes[Control.CIRCLE] = Shape.Circle(fx + d, fy, br, BUTTON_HIT)
++        shapes[Control.CROSS] = Shape.Circle(fx, fy + d, br, BUTTON_HIT)
++        shapes[Control.SQUARE] = Shape.Circle(fx - d, fy, br, BUTTON_HIT)
++        shapes[Control.SELECT] = Shape.Rect(0.40f * W, 0.82f * H, 0.07f * W, 0.03f * H, BUTTON_HIT)
++        shapes[Control.START] = Shape.Rect(0.60f * W, 0.82f * H, 0.07f * W, 0.03f * H, BUTTON_HIT)
++    }
++
++    /** The control whose hit area holds the point (the nearest centre among several), or null. */
++    fun controlAt(x: Float, y: Float): Control? =
++        shapes.entries.filter { it.value.hit(x, y) }.minByOrNull { hypot(x - it.value.cx, y - it.value.cy) }?.key
++
++    /** The control's drawn centre (for the view and the tests), or null before [layout]. */
++    fun centreOf(c: Control): Pair<Float, Float>? = shapes[c]?.let { it.cx to it.cy }
++
++    fun down(id: Int, x: Float, y: Float): Output {
++        if (id !in fingers) controlAt(x, y)?.let { fingers[id] = Finger(it, x, y) }
++        return output()
++    }
++
++    fun move(id: Int, x: Float, y: Float): Output {
++        fingers[id]?.let { it.x = x; it.y = y }
++        return output()
++    }
++
++    fun up(id: Int): Output {
++        fingers.remove(id)
++        return output()
++    }
++
++    fun cancel(): Output {
++        fingers.clear()
++        return output()
++    }
++
++    fun reset(): Output = cancel()
++
++    fun heldFingers(): Int = fingers.size
++
++    fun output(): Output {
++        var buttons = 0
++        var lt = 0
++        var rt = 0
++        for (f in fingers.values) {
++            when (f.control) {
++                Control.DPAD -> buttons = buttons or dpadBits(f.x, f.y)
++                Control.CROSS -> buttons = buttons or XUSB_A
++                Control.CIRCLE -> buttons = buttons or XUSB_B
++                Control.SQUARE -> buttons = buttons or XUSB_X
++                Control.TRIANGLE -> buttons = buttons or XUSB_Y
++                Control.L1 -> buttons = buttons or XUSB_LEFT_SHOULDER
++                Control.R1 -> buttons = buttons or XUSB_RIGHT_SHOULDER
++                Control.L2 -> lt = 255
++                Control.R2 -> rt = 255
++                Control.SELECT -> buttons = buttons or XUSB_BACK
++                Control.START -> buttons = buttons or XUSB_START
++            }
++        }
++        return Output(buttons = buttons, lt = lt, rt = rt)
++    }
++
++    private fun dpadBits(x: Float, y: Float): Int {
++        val c = shapes[Control.DPAD] ?: return 0
++        return dpadSector(x - c.cx, c.cy - y, dpadR)?.let { SECTOR_BITS[it] } ?: 0
++    }
++
++    companion object {
++        // The XUSB bits of the PHI1 packet (NativeControllerSender's private values; the test pins them)
++        const val XUSB_DPAD_UP = 0x0001
++        const val XUSB_DPAD_DOWN = 0x0002
++        const val XUSB_DPAD_LEFT = 0x0004
++        const val XUSB_DPAD_RIGHT = 0x0008
++        const val XUSB_START = 0x0010
++        const val XUSB_BACK = 0x0020
++        const val XUSB_LEFT_SHOULDER = 0x0100
++        const val XUSB_RIGHT_SHOULDER = 0x0200
++        const val XUSB_A = 0x1000
++        const val XUSB_B = 0x2000
++        const val XUSB_X = 0x4000
++        const val XUSB_Y = 0x8000
++
++        const val DPAD_HIT = 1.5f
++        const val BUTTON_HIT = 1.3f
++        const val SHOULDER_HIT = 1.15f
++        const val DPAD_DEAD = 0.25f
++
++        /** Sector k (0 = right, counter-clockwise in 45° steps) → its bits; a diagonal is two. */
++        private val SECTOR_BITS = intArrayOf(
++            XUSB_DPAD_RIGHT,
++            XUSB_DPAD_RIGHT or XUSB_DPAD_UP,
++            XUSB_DPAD_UP,
++            XUSB_DPAD_UP or XUSB_DPAD_LEFT,
++            XUSB_DPAD_LEFT,
++            XUSB_DPAD_LEFT or XUSB_DPAD_DOWN,
++            XUSB_DPAD_DOWN,
++            XUSB_DPAD_DOWN or XUSB_DPAD_RIGHT,
++        )
++
++        /**
++         * The D-pad's sector for an offset from its centre, `dy` positive **up** (screen y flipped); null inside the
++         * dead radius. Sector k covers `[k·45° − 22.5°, k·45° + 22.5°)`.
++         */
++        fun dpadSector(dx: Float, dyUp: Float, radius: Float): Int? {
++            if (hypot(dx, dyUp) < DPAD_DEAD * radius) return null
++            var a = Math.toDegrees(atan2(dyUp.toDouble(), dx.toDouble()))
++            if (a < 0) a += 360.0
++            return floor((a + 22.5) / 45.0).toInt() % 8
++        }
++
++        /**
++         * G6-HM5's stick, stubbed here for its sign: the sender's `ly` is positive **up** (it stores `-AXIS_Y`,
++         * NativeControllerSender `toStick(-ly)`), so a finger above the centre gives a positive value.
++         */
++        fun stickY(fingerY: Float, centreY: Float, radius: Float): Short {
++            if (radius <= 0f) return 0
++            val v = ((centreY - fingerY) / radius).coerceIn(-1f, 1f)
++            return (v * 32767f).roundToInt().coerceIn(-32768, 32767).toShort()
++        }
++    }
++}
+diff --git a/PrivyHub/app/src/main/java/streaming/TouchPlayerRules.kt b/PrivyHub/app/src/main/java/streaming/TouchPlayerRules.kt
+new file mode 100644
+index 00000000..10c1d594
+--- /dev/null
++++ b/PrivyHub/app/src/main/java/streaming/TouchPlayerRules.kt
+@@ -0,0 +1,102 @@
++package com.safeiot.privyhub.streaming
++
++/**
++ * G6-HM2: the touch pad's player rules, pure Kotlin (JVM-tested). Design:
++ * `docs/memory/evidence/g6_hm1_2026-11-19/design_written_before_code.md` §5 (hashed before this code) and the user's
++ * answers `…/g6_hm1_2026-11-19/user_answers_2026-11-19.md` (D2; Q2 (d); Q3 (b), (i); Q4 (b)). Used only by the
++ * handheld activity; nothing on the onn calls them.
++ */
++
++/**
++ * D2 with Q3 (b), (i): after every start that clears the slots (a game's start, every unpause; not a self-restart),
++ * the count starts at the first gameplay release, and at [WAIT_MS] the touch pad joins as P1 unless a real pad holds
++ * P1 by then. Q4 (b): [secondsLeft] is the pad region's countdown. A touch during the wait does not join early.
++ */
++class TouchP1Rule {
++    enum class Action { NONE, JOIN_P1, GIVE_UP }
++
++    private var waitingForRelease = false
++    private var armedAtMs: Long? = null
++
++    /** The prompt's start response: a cleared map arms the rule at the next release; a self-restart keeps the map. */
++    fun onStart(selfRestart: Boolean) {
++        armedAtMs = null
++        waitingForRelease = !selfRestart
++    }
++
++    /** The gameplay release (hook H6). Only the first release after a start arms it (a link recovery's does not). */
++    fun onGameplayReleased(nowMs: Long) {
++        if (waitingForRelease && armedAtMs == null) armedAtMs = nowMs
++    }
++
++    /** The pause, the end, the activity's destruction. */
++    fun cancel() {
++        waitingForRelease = false
++        armedAtMs = null
++    }
++
++    fun armed(): Boolean = armedAtMs != null
++
++    /** The countdown's whole seconds left (5 … 1), or null when nothing is counting. */
++    fun secondsLeft(nowMs: Long): Int? {
++        val t = armedAtMs ?: return null
++        val left = WAIT_MS - (nowMs - t)
++        return if (left <= 0) null else ((left + 999) / 1000).toInt()
++    }
++
++    /**
++     * The UI tick. [p1HeldByRealPad]: a real pad holds slot 0 now. A real P1 before the deadline ends the rule
++     * ([Action.GIVE_UP]; the lower region shows the status panel, Q1 (c)); at the deadline with P1 free, once,
++     * [Action.JOIN_P1].
++     */
++    fun tick(nowMs: Long, p1HeldByRealPad: Boolean): Action {
++        val t = armedAtMs ?: return Action.NONE
++        if (p1HeldByRealPad) { cancel(); return Action.GIVE_UP }
++        if (nowMs - t < WAIT_MS) return Action.NONE
++        cancel()
++        return Action.JOIN_P1
++    }
++
++    companion object {
++        const val WAIT_MS = 5_000L
++    }
++}
++
++/**
++ * Q2 (d), handheld only and only against the touch pad: a real pad's hold that began while the pad held no slot (the
++ * hold that joins it at 0.5 s, or that could not join) and lasts [TAKEOVER_MS] on the same key moves that pad to P1
++ * when the touch pad holds P1. A joined player holding a button in play never triggers it (its hold began joined).
++ */
++class TouchTakeover {
++    private class Hold(val pad: PadDevice, val keyCode: Int, val sinceMs: Long)
++
++    private val holds = LinkedHashMap<String, Hold>()
++
++    /** Every key of a real pad; [joinedAtDown]: the pad held a slot when this key went down. */
++    fun onKey(pad: PadDevice, keyCode: Int, down: Boolean, repeat: Int, nowMs: Long, joinedAtDown: Boolean) {
++        if (!PadSlots.eligible(pad)) return
++        val k = PadSlots.key(pad)
++        if (down) {
++            if (repeat == 0 && !joinedAtDown && keyCode in PlayerPrompt.CLAIM_KEYS && k !in holds) {
++                holds[k] = Hold(pad, keyCode, nowMs)
++            }
++        } else if (holds[k]?.keyCode == keyCode) {
++            holds.remove(k)
++        }
++    }
++
++    /** The pad due for P1 (the longest hold first), or null; [p1IsTouchPad]: slot 0's holder is the touch pad. */
++    fun due(nowMs: Long, p1IsTouchPad: Boolean): PadDevice? {
++        if (!p1IsTouchPad) return null
++        val e = holds.entries.filter { nowMs - it.value.sinceMs >= TAKEOVER_MS }.minByOrNull { it.value.sinceMs }
++            ?: return null
++        holds.remove(e.key)
++        return e.value.pad
++    }
++
++    fun clear() = holds.clear()
++
++    companion object {
++        const val TAKEOVER_MS = 2_000L
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/G6TouchPadStateTest.kt b/PrivyHub/app/src/test/java/streaming/G6TouchPadStateTest.kt
+new file mode 100644
+index 00000000..18105e97
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/G6TouchPadStateTest.kt
+@@ -0,0 +1,205 @@
++package com.safeiot.privyhub.streaming
++
++import com.safeiot.privyhub.streaming.TouchPadState.Control
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++
++/**
++ * G6-HM2: the touch pad's state, geometry and input helpers (design `g6_hm1_2026-11-19` §4 test list 1-12), on the
++ * tablet's portrait pad region 1200 x 1325.
++ */
++class G6TouchPadStateTest {
++
++    private val W = 1200
++    private val H = 1325
++    private lateinit var s: TouchPadState
++
++    @Before
++    fun setUp() {
++        s = TouchPadState().apply { layout(W, H) }
++    }
++
++    private fun c(control: Control) = s.centreOf(control)!!
++    private fun downOn(id: Int, control: Control) = c(control).let { (x, y) -> s.down(id, x, y) }
++
++    private val bits = mapOf(
++        Control.CROSS to TouchPadState.XUSB_A, Control.CIRCLE to TouchPadState.XUSB_B,
++        Control.SQUARE to TouchPadState.XUSB_X, Control.TRIANGLE to TouchPadState.XUSB_Y,
++        Control.L1 to TouchPadState.XUSB_LEFT_SHOULDER, Control.R1 to TouchPadState.XUSB_RIGHT_SHOULDER,
++        Control.SELECT to TouchPadState.XUSB_BACK, Control.START to TouchPadState.XUSB_START,
++    )
++
++    // 1. each control alone
++    @Test
++    fun eachButtonAloneSetsItsBitAndUpClearsIt() {
++        for ((control, bit) in bits) {
++            assertEquals(control.name, bit, downOn(1, control).buttons)
++            assertEquals(control.name, TouchPadState.Output(), s.up(1))
++        }
++        assertEquals(255, downOn(1, Control.L2).lt); assertEquals(0, s.output().rt); s.up(1)
++        assertEquals(255, downOn(1, Control.R2).rt); assertEquals(0, s.output().lt); s.up(1)
++        assertEquals(TouchPadState.Output(), s.output())
++    }
++
++    // 2. several fingers at once
++    @Test
++    fun severalFingersAtOnceAreIndependent() {
++        val (dx, dy) = c(Control.DPAD)
++        s.down(1, dx + 200f, dy)                  // right
++        downOn(2, Control.CROSS)
++        val all = downOn(3, Control.R2)
++        assertEquals(TouchPadState.XUSB_DPAD_RIGHT or TouchPadState.XUSB_A, all.buttons)
++        assertEquals(255, all.rt)
++        assertEquals(3, s.heldFingers())
++        assertEquals(TouchPadState.XUSB_DPAD_RIGHT or TouchPadState.XUSB_A, s.up(3).buttons.also { assertEquals(0, s.output().rt) })
++        assertEquals(TouchPadState.XUSB_A, s.up(1).buttons)
++        assertEquals(TouchPadState.Output(), s.up(2))
++    }
++
++    // 3. cancel
++    @Test
++    fun cancelWithThreeFingersReleasesEverything() {
++        downOn(1, Control.CROSS); downOn(2, Control.L2); downOn(3, Control.START)
++        assertEquals(TouchPadState.Output(), s.cancel())
++        assertEquals(0, s.heldFingers())
++    }
++
++    // 4. sliding off keeps the button; sliding onto another presses nothing
++    @Test
++    fun aFingerKeepsItsControlUntilItsUp() {
++        downOn(1, Control.CROSS)
++        assertEquals(TouchPadState.XUSB_A, s.move(1, 5f, 5f).buttons)                   // slid far off
++        val (cx, cy) = c(Control.CIRCLE)
++        assertEquals(TouchPadState.XUSB_A, s.move(1, cx, cy).buttons)                   // onto Circle: still Cross
++        assertEquals(0, s.up(1).buttons)
++        // a finger down on nothing stays on nothing
++        assertNull(s.controlAt(W / 2f, H * 0.97f))
++        assertEquals(0, s.down(2, W / 2f, H * 0.97f).buttons)
++        assertEquals(0, s.move(2, cx, cy).buttons)
++    }
++
++    // 5. the D-pad's angle edges, the dead zone, the roll
++    @Test
++    fun dpadSectorEdgesAreHalfOpen() {
++        fun at(deg: Double): Int? {
++            val r = Math.toRadians(deg)
++            return TouchPadState.dpadSector((100 * Math.cos(r)).toFloat(), (100 * Math.sin(r)).toFloat(), 100f)
++        }
++        val edges = listOf(22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5)
++        for ((k, e) in edges.withIndex()) {
++            assertEquals("just below $e", k % 8, at(e - 0.01))
++            assertEquals("at/above $e", (k + 1) % 8, at(e + 0.01))
++        }
++        assertEquals(0, at(0.0)); assertEquals(2, at(90.0)); assertEquals(4, at(180.0)); assertEquals(6, at(270.0))
++        assertNull(TouchPadState.dpadSector(10f, 10f, 100f))                // inside 0.25 r
++        assertEquals(0, TouchPadState.dpadSector(26f, 0f, 100f))
++    }
++
++    @Test
++    fun dpadRollsWithoutLifting() {
++        val (dx, dy) = c(Control.DPAD)
++        assertEquals(TouchPadState.XUSB_DPAD_RIGHT, s.down(1, dx + 150f, dy).buttons)
++        assertEquals(TouchPadState.XUSB_DPAD_RIGHT or TouchPadState.XUSB_DPAD_DOWN, s.move(1, dx + 150f, dy + 150f).buttons)
++        assertEquals(TouchPadState.XUSB_DPAD_DOWN, s.move(1, dx, dy + 150f).buttons)          // screen y down = down
++        assertEquals(TouchPadState.XUSB_DPAD_UP or TouchPadState.XUSB_DPAD_LEFT, s.move(1, dx - 150f, dy - 150f).buttons)
++        assertEquals(0, s.move(1, dx + 5f, dy).buttons)                                       // the dead centre
++        assertEquals(TouchPadState.XUSB_DPAD_RIGHT, s.move(1, dx + 400f, dy).buttons)         // beyond its hit area: kept
++    }
++
++    // 6. reset mid-press; an old pointer id is ignored
++    @Test
++    fun resetReleasesAndOldPointersAreIgnored() {
++        downOn(7, Control.TRIANGLE)
++        assertEquals(TouchPadState.Output(), s.reset())
++        val (x, y) = c(Control.TRIANGLE)
++        assertEquals(0, s.move(7, x, y).buttons)
++        assertEquals(0, s.up(7).buttons)
++    }
++
++    // 7. the hit-area margin
++    @Test
++    fun hitAreasAreLargerThanTheDrawing() {
++        val (x, y) = c(Control.CROSS)
++        val r = 0.07f * W
++        assertEquals(Control.CROSS, s.controlAt(x, y + r * 1.25f))        // outside the drawing, inside x1.3
++        assertNull(s.controlAt(x, y + r * 1.35f))                         // outside x1.3
++        val (dx, dy) = c(Control.DPAD)
++        assertEquals(Control.DPAD, s.controlAt(dx, dy - 0.17f * W * 1.45f))
++        assertNull(s.controlAt(dx, dy - 0.17f * W * 1.55f))
++    }
++
++    // 8. overlapping hit areas: the nearest centre
++    @Test
++    fun overlappingHitAreasGoToTheNearestCentre() {
++        val (tx, ty) = c(Control.TRIANGLE)
++        val (rx, ry) = c(Control.CIRCLE)
++        val mx = (tx + rx) / 2f
++        val my = (ty + ry) / 2f
++        assertEquals(Control.TRIANGLE, s.controlAt(mx - 2f, my - 2f))
++        assertEquals(Control.CIRCLE, s.controlAt(mx + 2f, my + 2f))
++        assertEquals(TouchPadState.XUSB_Y, s.down(1, mx - 2f, my - 2f).buttons)     // one finger, one button
++    }
++
++    @Test
++    fun theBottomTenthIsEmpty() {
++        for (x in 0 until W step 10) assertNull("x=$x", s.controlAt(x.toFloat(), H * 0.905f))
++    }
++
++    // 9. the XUSB values (NativeControllerSender's private constants)
++    @Test
++    fun xusbValuesArePinned() {
++        assertEquals(0x0001, TouchPadState.XUSB_DPAD_UP); assertEquals(0x0002, TouchPadState.XUSB_DPAD_DOWN)
++        assertEquals(0x0004, TouchPadState.XUSB_DPAD_LEFT); assertEquals(0x0008, TouchPadState.XUSB_DPAD_RIGHT)
++        assertEquals(0x0010, TouchPadState.XUSB_START); assertEquals(0x0020, TouchPadState.XUSB_BACK)
++        assertEquals(0x0100, TouchPadState.XUSB_LEFT_SHOULDER); assertEquals(0x0200, TouchPadState.XUSB_RIGHT_SHOULDER)
++        assertEquals(0x1000, TouchPadState.XUSB_A); assertEquals(0x2000, TouchPadState.XUSB_B)
++        assertEquals(0x4000, TouchPadState.XUSB_X); assertEquals(0x8000, TouchPadState.XUSB_Y)
++    }
++
++    // 10. the stick sign (HM5's stub): above the centre is positive, as the sender stores -AXIS_Y
++    @Test
++    fun stickSignIsPositiveUp() {
++        assertTrue(TouchPadState.stickY(fingerY = 400f, centreY = 500f, radius = 100f) > 0)
++        assertEquals(32767.toShort(), TouchPadState.stickY(300f, 500f, 100f))
++        assertEquals((-32767).toShort(), TouchPadState.stickY(700f, 500f, 100f))
++        assertEquals(0.toShort(), TouchPadState.stickY(500f, 500f, 100f))
++    }
++
++    // 11. the video box
++    @Test
++    fun videoBoxIsWidthTimesNineSixteenths() {
++        assertEquals(675, HandheldGeometry.videoBoxHeight(1200))
++        assertEquals(1325, HandheldGeometry.padRegionHeight(1200, 2000))
++        assertEquals(720, HandheldGeometry.videoBoxHeight(1280))
++        assertEquals(450, HandheldGeometry.videoBoxHeight(800))
++        assertEquals(0, HandheldGeometry.videoBoxHeight(0))
++        assertEquals(0, HandheldGeometry.padRegionHeight(1200, 600))
++    }
++
++    // 12. the touchscreen-only exemption
++    @Test
++    fun onlyTheTouchscreenIsExempt() {
++        assertTrue(HandheldInput.isTouchscreen(0x00001002))           // touchscreen
++        assertTrue(HandheldInput.isTouchscreen(0x00005002))           // stylus with the screen (the S Pen, disclosed)
++        assertFalse(HandheldInput.isTouchscreen(0x00002002))          // mouse
++        assertFalse(HandheldInput.isTouchscreen(0x00100008))          // touchpad
++        assertFalse(HandheldInput.isTouchscreen(0x00020004))          // mouse relative
++        assertFalse(HandheldInput.isTouchscreen(0x00200000))          // touch navigation
++        assertFalse(HandheldInput.isTouchscreen(0x00000401))          // gamepad
++        assertFalse(HandheldInput.isTouchscreen(0x01000010))          // joystick
++        assertFalse(HandheldInput.isTouchscreen(0x00004002))          // stylus alone
++        // B70's guard still takes every one of the consumed kinds
++        for (src in intArrayOf(0x2002, 0x100008, 0x20004, 0x200000)) assertTrue(PointerGuard.isPointerSource(src))
++    }
++
++    @Test
++    fun beforeLayoutNothingIsHeld() {
++        val fresh = TouchPadState()
++        assertEquals(TouchPadState.Output(), fresh.down(1, 100f, 100f))
++        assertEquals(0, fresh.heldFingers())
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/G6TouchSlotsTest.kt b/PrivyHub/app/src/test/java/streaming/G6TouchSlotsTest.kt
+new file mode 100644
+index 00000000..fe8193c2
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/G6TouchSlotsTest.kt
+@@ -0,0 +1,238 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++
++/**
++ * G6-HM2: the touch pad in the slots and the prompt (design `g6_hm1_2026-11-19` §5; the user's answers D2, Q2 (d),
++ * Q3 (b)/(i), Q4 (b)). The prompt's own paths (B54) are driven exactly as PlayerPromptTest drives them.
++ */
++class G6TouchSlotsTest {
++
++    private data class Dev(
++        override val descriptor: String,
++        override val controllerNumber: Int,
++        override val vendorId: Int = 0x054c,
++        override val productId: Int = 0x09cc,
++        override val sources: Int = 0x00000401 or 0x01000010,
++        override val hasGamepadButton: Boolean = true,
++        override val isVirtual: Boolean = false,
++        override val hasFaceButton: Boolean = true,
++        override val hasStickOrHat: Boolean = true,
++    ) : PadDevice
++
++    private val padA = Dev("pad-a", 2)
++    private val padB = Dev("pad-b", 3)
++    private val touch = TouchPadDevice
++    private val tablet = listOf<PadDevice>(padA, padB, touch)      // hook H4: the touch pad is "present"
++    private val A = PlayerPrompt.KEYCODE_BUTTON_A
++    private val X = PlayerPrompt.KEYCODE_BUTTON_X
++    private val TWO = PortsSet(2, multitap = false, multitapAvailable = false, source = "join")
++
++    @Before
++    fun clearProcess() { PlayerPromptProcess.lastJoined = null }
++
++    private fun fresh(hostPlayers: Int = 2, store: PlayerChoiceStore = MemoryPlayerChoiceStore(),
++                      connected: List<PadDevice> = tablet): Pair<PadSlots, PlayerPrompt> {
++        val s = PadSlots()
++        val p = PlayerPrompt(s, store)
++        p.beginStart(connected)
++        p.onStartResponse(false, hostPlayers, TWO, PlayerPrompt.gameKey("g6-title"), connected)
++        return s to p
++    }
++
++    private fun key(p: PlayerPrompt, d: PadDevice, code: Int, down: Boolean, now: Long, connected: List<PadDevice>): Int? =
++        if (p.onJoinKey(code, down, 0, d, now)) null else p.slotForKey(d, code, down, now, { connected }, 0)
++
++    /** A hold with the 50-ms tick running, without the release (the key stays down). */
++    private fun press(p: PlayerPrompt, d: PadDevice, code: Int, from: Long, ms: Long, connected: List<PadDevice>) {
++        key(p, d, code, true, from, connected)
++        var t = from
++        while (t < from + ms) { t += 50; p.tick(t, connected) }
++    }
++
++    @Test
++    fun theTouchPadIsEligibleWithAFixedKey() {
++        assertTrue(PadSlots.eligible(touch))
++        assertEquals(TouchPadDevice.KEY, PadSlots.key(touch))
++        assertEquals("01097c", PadSlots.key(touch))
++        assertEquals("gamepad", PadSlots.vendorClass(touch.vendorId))
++    }
++
++    @Test
++    fun theTouchPadJoinsAsP1WithoutAHold() {
++        val store = MemoryPlayerChoiceStore()
++        val (s, p) = fresh(store = store)
++        assertEquals(0, p.joinAsP1WithoutHold(touch, 6_000, tablet))
++        assertEquals(TouchPadDevice.KEY, s.holderOf(0))
++        assertEquals("P1", p.view(6_000, tablet).badge)
++        assertEquals(1, p.joined)
++        assertEquals(1, store.get(PlayerPrompt.gameKey("g6-title")!!))
++        assertNull(p.joinAsP1WithoutHold(touch, 6_100, tablet))          // already holds a slot
++    }
++
++    @Test
++    fun theTouchPadDoesNotJoinWhenARealPadIsP1() {
++        val (s, p) = fresh()
++        press(p, padA, A, 1_000, 600, tablet)
++        assertEquals(0, s.slotOf(padA))
++        assertNull(p.joinAsP1WithoutHold(touch, 6_000, tablet))
++        assertNull(s.slotOf(touch))
++    }
++
++    @Test
++    fun aLaterRealPadIsP2AndTheStoredCountIsTwo() {
++        val store = MemoryPlayerChoiceStore()
++        val (s, p) = fresh(store = store)
++        p.joinAsP1WithoutHold(touch, 6_000, tablet)
++        press(p, padA, A, 7_000, 600, tablet)
++        assertEquals(1, s.slotOf(padA))
++        assertEquals(TouchPadDevice.KEY, s.holderOf(0))
++        assertEquals(2, store.get(PlayerPrompt.gameKey("g6-title")!!))
++    }
++
++    /** Why hook H4 is needed: without the touch pad in the connected list its P1 counts as open (PP openSlot). */
++    @Test
++    fun withoutTheTouchPadPresentARealPadWouldTakeP1() {
++        val onnLike = listOf<PadDevice>(padA, padB)
++        val (s, p) = fresh(connected = onnLike)
++        p.joinAsP1WithoutHold(touch, 6_000, onnLike)
++        press(p, padA, A, 7_000, 600, onnLike)
++        assertEquals(0, s.slotOf(padA))
++    }
++
++    @Test
++    fun theJoinIsRefusedWhenThePromptIsNotJoining() {
++        val s = PadSlots()
++        val p = PlayerPrompt(s)
++        assertNull(p.joinAsP1WithoutHold(touch, 0, tablet))              // no start response yet: phase NONE
++        assertNull(p.takeOverP1(padA, TouchPadDevice.KEY, 0))
++    }
++
++    // Q2 (d): the hold that joined a pad at 0.5 s, kept to 2 s, takes P1 from the touch pad
++    @Test
++    fun aJoiningHoldKeptToTwoSecondsTakesP1FromTheTouchPad() {
++        val (s, p) = fresh()
++        val t = TouchTakeover()
++        p.joinAsP1WithoutHold(touch, 6_000, tablet)
++        t.onKey(padA, A, true, 0, 7_000, joinedAtDown = s.slotOf(padA) != null)
++        press(p, padA, A, 7_000, 600, tablet)
++        assertEquals(1, s.slotOf(padA))                                   // P2 at 0.5 s, as today
++        assertNull(t.due(8_900, p1IsTouchPad = s.holderOf(0) == TouchPadDevice.KEY))   // 1.9 s: not yet
++        val due = t.due(9_000, p1IsTouchPad = s.holderOf(0) == TouchPadDevice.KEY)
++        assertEquals(padA, due)
++        assertEquals(0, p.takeOverP1(due!!, TouchPadDevice.KEY, 9_000))
++        assertEquals(0, s.slotOf(padA))
++        assertNull(s.slotOf(touch))                                       // the touch pad has no slot: inert
++        assertNull(s.holderOf(1))                                         // P2 freed
++        assertEquals("P1", p.view(9_000, tablet).badge)
++        assertEquals(1, p.joined)
++        // the joining key is still not play until lifted (B54's rule)
++        assertNull(key(p, padA, A, true, 9_050, tablet))
++    }
++
++    @Test
++    fun aHoldLiftedBeforeTwoSecondsStaysP2() {
++        val (s, p) = fresh()
++        val t = TouchTakeover()
++        p.joinAsP1WithoutHold(touch, 6_000, tablet)
++        t.onKey(padA, A, true, 0, 7_000, joinedAtDown = false)
++        press(p, padA, A, 7_000, 600, tablet)
++        t.onKey(padA, A, false, 0, 8_900, joinedAtDown = true)
++        key(p, padA, A, false, 8_900, tablet)
++        assertNull(t.due(9_500, p1IsTouchPad = true))
++        assertEquals(1, s.slotOf(padA))
++        assertEquals(TouchPadDevice.KEY, s.holderOf(0))
++    }
++
++    @Test
++    fun aJoinedPlayerHoldingAButtonInPlayNeverTakesP1() {
++        val (s, p) = fresh()
++        val t = TouchTakeover()
++        p.joinAsP1WithoutHold(touch, 6_000, tablet)
++        press(p, padA, A, 7_000, 600, tablet); key(p, padA, A, false, 7_700, tablet)
++        assertEquals(1, s.slotOf(padA))
++        t.onKey(padA, X, true, 0, 10_000, joinedAtDown = true)             // X held 3 s in the game
++        assertNull(t.due(13_000, p1IsTouchPad = true))
++        assertEquals(TouchPadDevice.KEY, s.holderOf(0))
++    }
++
++    @Test
++    fun aRealPadNeverTakesARealPadsP1() {
++        val (s, p) = fresh()
++        press(p, padA, A, 1_000, 600, tablet); key(p, padA, A, false, 1_700, tablet)
++        val t = TouchTakeover()
++        t.onKey(padB, A, true, 0, 2_000, joinedAtDown = false)
++        press(p, padB, A, 2_000, 600, tablet)
++        assertNull(t.due(4_100, p1IsTouchPad = s.holderOf(0) == TouchPadDevice.KEY))
++        assertNull(p.takeOverP1(padB, TouchPadDevice.KEY, 4_100))         // P1 is not the touch pad's
++        assertEquals(0, s.slotOf(padA)); assertEquals(1, s.slotOf(padB))
++    }
++
++    /** A 1-player title: the pad cannot join at 0.5 s (closed after P1); its 2-s hold still takes P1. */
++    @Test
++    fun onAOnePlayerTitleTheTwoSecondHoldTakesP1() {
++        val (s, p) = fresh(hostPlayers = 1)
++        val t = TouchTakeover()
++        p.joinAsP1WithoutHold(touch, 6_000, tablet)
++        t.onKey(padA, A, true, 0, 7_000, joinedAtDown = false)
++        press(p, padA, A, 7_000, 600, tablet)
++        assertNull(s.slotOf(padA))                                         // the join is closed after P1
++        assertEquals(padA, t.due(9_000, p1IsTouchPad = true))
++        assertEquals(0, p.takeOverP1(padA, TouchPadDevice.KEY, 9_000))
++        assertEquals(0, s.slotOf(padA)); assertNull(s.slotOf(touch))
++    }
++
++    // D2 with Q3 (b), (i) and Q4 (b): the 5-s rule
++    @Test
++    fun theFiveSecondsCountFromTheGameplayRelease() {
++        val r = TouchP1Rule()
++        r.onStart(selfRestart = false)
++        assertEquals(TouchP1Rule.Action.NONE, r.tick(10_000, p1HeldByRealPad = false))   // not released yet
++        assertNull(r.secondsLeft(10_000))
++        r.onGameplayReleased(12_000)
++        assertEquals(5, r.secondsLeft(12_000)); assertEquals(5, r.secondsLeft(12_001)); assertEquals(1, r.secondsLeft(16_999))
++        assertEquals(TouchP1Rule.Action.NONE, r.tick(16_999, false))
++        assertEquals(TouchP1Rule.Action.JOIN_P1, r.tick(17_000, false))
++        assertEquals(TouchP1Rule.Action.NONE, r.tick(17_050, false))                     // once
++        assertNull(r.secondsLeft(17_050))
++    }
++
++    @Test
++    fun aRealP1WithinTheWaitEndsTheRule() {
++        val r = TouchP1Rule()
++        r.onStart(false); r.onGameplayReleased(0)
++        assertEquals(TouchP1Rule.Action.GIVE_UP, r.tick(3_000, p1HeldByRealPad = true))
++        assertEquals(TouchP1Rule.Action.NONE, r.tick(6_000, false))
++    }
++
++    @Test
++    fun everyUnpauseRunsTheRuleAgainButASelfRestartDoesNot() {
++        val r = TouchP1Rule()
++        r.onStart(false); r.onGameplayReleased(0)
++        assertEquals(TouchP1Rule.Action.JOIN_P1, r.tick(5_000, false))
++        r.onStart(false); r.onGameplayReleased(60_000)                    // an unpause
++        assertEquals(TouchP1Rule.Action.JOIN_P1, r.tick(65_000, false))
++        r.onStart(true); r.onGameplayReleased(90_000)                     // a self-restart keeps the map
++        assertEquals(TouchP1Rule.Action.NONE, r.tick(96_000, false))
++    }
++
++    @Test
++    fun aLinkRecoveryReleaseDoesNotRestartTheCount() {
++        val r = TouchP1Rule()
++        r.onStart(false); r.onGameplayReleased(0)
++        r.onGameplayReleased(3_000)                                        // a second release (link recovery)
++        assertEquals(TouchP1Rule.Action.JOIN_P1, r.tick(5_000, false))
++    }
++
++    @Test
++    fun cancelStopsTheCount() {
++        val r = TouchP1Rule()
++        r.onStart(false); r.onGameplayReleased(0); r.cancel()
++        assertEquals(TouchP1Rule.Action.NONE, r.tick(9_000, false))
++        assertNull(r.secondsLeft(1_000))
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/G6SenderWriteTest.kt b/PrivyHub/app/src/test/java/streaming/G6SenderWriteTest.kt
+new file mode 100644
+index 00000000..22d15e1d
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/G6SenderWriteTest.kt
+@@ -0,0 +1,84 @@
++package com.safeiot.privyhub.streaming
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import java.net.DatagramPacket
++import java.net.DatagramSocket
++import java.net.InetAddress
++import java.net.SocketTimeoutException
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++
++/**
++ * G6-HM2: NativeControllerSender.writePlayerState (design `g6_hm1_2026-11-19` §3), read back from the real send loop
++ * over loopback (the PHI1 packet as the hub reads it). The loop keeps sending every player whatever is written.
++ */
++class G6SenderWriteTest {
++
++    private data class Phi1(val player: Int, val buttons: Int, val lx: Int, val ly: Int, val rx: Int, val ry: Int,
++                            val lt: Int, val rt: Int)
++
++    private fun parse(b: ByteArray, n: Int): Phi1? {
++        if (n != 36 || b[0] != 'P'.code.toByte() || b[3] != '1'.code.toByte()) return null
++        val bb = ByteBuffer.wrap(b, 0, n).order(ByteOrder.LITTLE_ENDIAN)
++        val player = bb.get(5).toInt()
++        bb.position(20)
++        return Phi1(player, bb.int, bb.short.toInt(), bb.short.toInt(), bb.short.toInt(), bb.short.toInt(),
++            bb.short.toInt(), bb.short.toInt())
++    }
++
++    /** The next packets for [player] seen within [ms] (the newest last). */
++    private fun read(sock: DatagramSocket, player: Int, ms: Long): List<Phi1> {
++        val out = ArrayList<Phi1>()
++        val until = System.currentTimeMillis() + ms
++        val buf = ByteArray(64)
++        while (System.currentTimeMillis() < until) {
++            val p = DatagramPacket(buf, buf.size)
++            try { sock.receive(p) } catch (_: SocketTimeoutException) { continue }
++            parse(p.data, p.length)?.takeIf { it.player == player }?.let { out.add(it) }
++        }
++        return out
++    }
++
++    private fun withSender(block: (NativeControllerSender, DatagramSocket) -> Unit) {
++        DatagramSocket(0, InetAddress.getLoopbackAddress()).use { sock ->
++            sock.soTimeout = 50
++            val sender = NativeControllerSender(InetAddress.getLoopbackAddress().hostAddress!!, sock.localPort)
++            sender.start()
++            try { block(sender, sock) } finally { sender.stop() }
++        }
++    }
++
++    @Test
++    fun aWrittenStateIsSentForThatPlayerOnly() = withSender { sender, sock ->
++        assertTrue(sender.writePlayerState(1, TouchPadState.XUSB_A or TouchPadState.XUSB_DPAD_UP,
++            0, 1234, 0, -1234, 255, 300))
++        read(sock, 1, 150)                                                // let older packets pass
++        val p1 = read(sock, 1, 200).last()
++        assertEquals(TouchPadState.XUSB_A or TouchPadState.XUSB_DPAD_UP, p1.buttons)
++        assertEquals(1234, p1.ly); assertEquals(-1234, p1.ry)
++        assertEquals(255, p1.lt); assertEquals(255, p1.rt)               // clamped to 255
++        val p0 = read(sock, 0, 200).last()
++        assertEquals(Phi1(0, 0, 0, 0, 0, 0, 0, 0), p0)                   // the other players untouched
++    }
++
++    @Test
++    fun neutralizeClearsAWrittenStateAndTheLoopKeepsSending() = withSender { sender, sock ->
++        sender.writePlayerState(2, TouchPadState.XUSB_START, 0, 0, 0, 0, 0, 255)
++        read(sock, 2, 150)
++        assertEquals(TouchPadState.XUSB_START, read(sock, 2, 200).last().buttons)
++        sender.neutralize()
++        read(sock, 2, 100)
++        val after = read(sock, 2, 300)
++        assertTrue("the loop keeps sending (never silent): ${after.size}", after.size >= 10)
++        assertEquals(Phi1(2, 0, 0, 0, 0, 0, 0, 0), after.last())
++    }
++
++    @Test
++    fun aPlayerOutsideTheFourIsRefused() = withSender { sender, _ ->
++        assertFalse(sender.writePlayerState(-1, 1, 0, 0, 0, 0, 0, 0))
++        assertFalse(sender.writePlayerState(4, 1, 0, 0, 0, 0, 0, 0))
++    }
++}

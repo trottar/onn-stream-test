@@ -97,3 +97,9 @@ about 10 % per 30 min at 50 % brightness.
 | G6-HM6 | Live rotation, customization, the battery / heat comparison (feeds G6-S5) |
 
 Each stage starts only on the user's word, under the conflict rules in §3.
+
+**2026-11-19:** G6-HM1 design written, awaiting the user's approval (`../evidence/g6_hm1_2026-11-19/design_written_before_code.md`, sha256 `c38dbd82…` in `design.sha256`). The user's answers to its open questions: `../evidence/g6_hm1_2026-11-19/user_answers_2026-11-19.md` (all answered).
+
+**2026-11-19:** G6-HM2 done (bench): the touch pad's logic and its JVM tests, 346 / 346 pass; no APK; the onn's paths unchanged (`../evidence/G6_HM2_TOUCH_PAD_LOGIC_2026-11-19.md`). Next: G6-HM3 on the user's word.
+
+**2026-11-19:** G6-HM3 part 1 done: the portrait screen with an inert pad, candidate APK `1d658a3f…` for the tablet only; the tablet run is pre-registered (`../evidence/G6_HM3_PORTRAIT_SCREEN_2026-11-19.md`).

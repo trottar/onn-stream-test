@@ -1,0 +1,22 @@
+1 manifest NativeStreamActivity element: 4d36c0bbfc04341d 4d36c0bbfc04341d EQUAL
+  manifest deleted lines: 0
+  - class NativeStreamActivity : -> replaced as listed
+  - ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE -> replaced as listed
+  - root -> replaced as listed
+  - padSlots?.let { s -> it.padSlots = s; it.connectedPads = { AndroidPadD -> replaced as listed
+  - AndroidPadDevice.connected() -> replaced as listed
+  - val connected = AndroidPadDevice.connected() -> replaced as listed
+  - p.onRelaunchResult(false, null, null, null, System.nanoTime() / 1_000_ -> replaced as listed
+  - p.onRelaunchResult(ok, ports, state, totalMs, System.nanoTime() / 1_00 -> replaced as listed
+  - if (pointerGuard.consumeTouch(event.source)) { -> replaced as listed
+  default: protected open val streamOrientation: Int get() = ActivityInfo.SCREEN_ORIENTATIO OK
+  default: protected open fun wrapStreamLayer(streamLayer: FrameLayout): View = streamLayer OK
+  default: protected open fun exemptFromPointerGuard(event: MotionEvent): Boolean = false OK
+  default: protected open fun connectedPadDevices(): List<PadDevice> = AndroidPadDevice.con OK
+  default: protected open fun onPlayersOpened(selfRestart: Boolean) {} OK
+  default: protected open fun onGameplayReleased() {} OK
+  default: protected open fun putHandheldReport(report: JSONObject) {} OK
+2 NativeStreamActivity deleted lines: 9 all as listed
+3 PadSlots.kt unchanged
+3 PointerGuard.kt unchanged
+5 MainActivity deleted: ['NativeStreamActivity::class.java']

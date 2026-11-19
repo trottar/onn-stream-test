@@ -231,6 +231,8 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | G5-S2_WAN_ADAPTATION_RULES.md | g-track | APPLIED | `WAN_ADAPTATION=1`, not adopted; its live smoke G5-S2-L never ran |
 | G5-S3_REMOTE_LADDER.md | g-track | APPLIED | `REMOTE_LADDER`: one of G4-S4's four, under line 13 |
 | G5-S4_REMOTE_RUNG_CAP.md | g-track | APPLIED | `REMOTE_RUNG_CAP`: one of G4-S4's four, under line 13 |
+| G6_HM2_TOUCH_PAD_LOGIC.md | g-track | APPLIED | the touch pad's bench logic (G6-HM2): additions only, no existing path calls it; no APK |
+| G6_HM3_PORTRAIT_SCREEN.md | g-track | APPLIED | the portrait handheld screen, inert pad (G6-HM3); candidate APK `1d658a3f…` tablet only |
 | G8-P1_IMPAIRMENT_SHIM.md | g-track | APPLIED | test shim `PRIVYHUB_IMPAIRMENT`, not adopted |
 | G8-S1_SHIM_NONE_PROFILE.md | g-track | APPLIED | the shim's `none` profile |
 | G8-S2_START_RUNG.md | g-track | APPLIED | `START_RUNG`: one of G4-S4's four, under line 13 |

@@ -11,6 +11,7 @@ import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 
 import com.safeiot.privyhub.streaming.NativeStreamActivity
+import com.safeiot.privyhub.streaming.HandheldStreamActivity
 import com.safeiot.privyhub.streaming.GameStreamStatusUi
 import com.safeiot.privyhub.streaming.DiscChange
 import com.safeiot.privyhub.streaming.DiscSafe
@@ -1036,6 +1037,19 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    // G6-HM3: the game screen choice (design g6_hm1_2026-11-19 §8): "tv" (today's screen) unless chosen
+    private fun hasTouchscreen(): Boolean =
+        packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN)
+
+    private fun useHandheldGameScreen(): Boolean =
+        hasTouchscreen() &&
+            getSharedPreferences("privyhub_game_screen", MODE_PRIVATE).getString("mode", "tv") == "handheld"
+
+    private fun saveHandheldGameScreen(handheld: Boolean) {
+        getSharedPreferences("privyhub_game_screen", MODE_PRIVATE).edit()
+            .putString("mode", if (handheld) "handheld" else "tv").apply()
+    }
+
     private fun showCompanionSettings() {
 
         val input =
@@ -1137,6 +1151,21 @@ class MainActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
+
+        // G6-HM3: the game screen choice, only on a device with a touchscreen (off = the TV screen, as today)
+        val handheldCheckBox =
+            if (hasTouchscreen()) CheckBox(this).apply {
+                text = "Handheld game screen (portrait, touch buttons)"
+                isChecked = useHandheldGameScreen()
+            }.also {
+                container.addView(
+                    it,
+                    ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+                )
+            } else null
 
         // G3-S3: "Hub host" overrides the companion host while identity v2 is
         // on (the hub's tailnet name, off-site); empty = the companion host.
@@ -1290,6 +1319,9 @@ class MainActivity : AppCompatActivity() {
                     this,
                     hubHost
                 )
+
+                // G6-HM3: the game screen choice (absent without a touchscreen: nothing saved)
+                handheldCheckBox?.let { saveHandheldGameScreen(it.isChecked) }
 
                 dialog.dismiss()
 
@@ -9178,7 +9210,8 @@ class MainActivity : AppCompatActivity() {
         startActivity(
             Intent(
                 this,
-                NativeStreamActivity::class.java
+                // G6-HM3: the handheld screen only when chosen on a touchscreen device; otherwise today's
+                if (useHandheldGameScreen()) HandheldStreamActivity::class.java else NativeStreamActivity::class.java
             ).apply {
                 putExtra(
                     NativeStreamActivity.EXTRA_COMPANION_HOST,
