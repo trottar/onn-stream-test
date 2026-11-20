@@ -162,8 +162,10 @@ class Rehearse(unittest.TestCase):
         for e in ("end_P1", "end_P2", "end_p1_b"):
             self.assertTrue(c[f"{e}: the scratch rules read it as the real rules"]["met"], e)
         self.assertEqual(c["end_p1_b: the scratch rules read it as the real rules"]["read"][1][0], "end_P1")
-        self.assertEqual(v["recorded"]["roles"], {"begin": "begin.state", "end_P1": "end_p1.state",
+        # B167: a title already added rehearses from the begin its mini game starts from (the rules folder's)
+        self.assertEqual(v["recorded"]["roles"], {"begin": "the rules folder's begin", "end_P1": "end_p1.state",
                                                   "end_P2": "end_p2.state", "other": "slot 2"})
+        self.assertEqual(v["recorded"]["unused"], [])                    # the kept begin is the same bytes here
         self.assertEqual(v["recorded"]["missing"], [])
         self.assertEqual(self.slot2, hashlib.sha256((self.tmp / "proj/data/games/retroarch/states/Beetle PSX HW/"
                                                      "Made Up Three (USA).state2").read_bytes()).hexdigest())
@@ -212,6 +214,16 @@ class Rehearse(unittest.TestCase):
         self.assertEqual(before, self.rules_shas())
         self.assertTrue(c["the scratch removed"]["met"])
         self.assertIn("Missing: other", (self.tmp / "ev/T95/rehearse.md").read_text())
+
+    def test_6_a_kept_begin_not_the_rules_begin(self):
+        """B167: T88's kept begin was the plain one, not its setup's: the rules folder's is taken, the kept one listed."""
+        (self.tmp / "kept/t95/begin.state").write_text(state("start", 3))
+        self.added()
+        rc, text = _tool("rehearse", "T95", "--collect", "other=2")
+        v, c = self.verdict()
+        self.assertEqual(rc, 0, text)
+        self.assertEqual(v["recorded"]["roles"]["begin"], "the rules folder's begin")
+        self.assertEqual(v["recorded"]["unused"], ["begin.state (not the begin its mini game starts from)"])
 
     def test_5_collect_only_a_missing_role(self):
         self.added()

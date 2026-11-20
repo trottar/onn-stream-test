@@ -1,16 +1,133 @@
 {
  "cells": [
   {
-   "bar": "no error",
-   "cell": "learn ran in the scratch",
-   "met": false,
-   "read": "ProofError: RetroArch exited during startup"
+   "bar": true,
+   "cell": "learn: spec usable",
+   "met": true,
+   "read": true
   },
   {
-   "bar": "no error",
-   "cell": "rehearse ran in the scratch",
+   "bar": [],
+   "cell": "learn: every class separable",
    "met": false,
-   "read": "ProofError"
+   "read": [
+    "end_P1",
+    "end_P2"
+   ]
+  },
+  {
+   "bar": ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))",
+   "cell": "learn: margin_needed",
+   "met": false,
+   "read": 0.0164
+  },
+  {
+   "bar": 0,
+   "cell": "learn: held-out frames read as another class",
+   "met": true,
+   "read": 0
+  },
+  {
+   "bar": "<= 0.105",
+   "cell": "learn: held-out frames read unknown (share)",
+   "met": false,
+   "read": 0.6552
+  },
+  {
+   "bar": 0,
+   "cell": "learn: other read as a screen",
+   "met": true,
+   "read": 0
+  },
+  {
+   "bar": true,
+   "cell": "learn: begin: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": "<= 8.0 s",
+   "cell": "learn: begin: recognised within",
+   "met": true,
+   "read": 0.0
+  },
+  {
+   "bar": "end_P1",
+   "cell": "learn: end_P1: ended as itself",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "learn: end_P1: ended within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "end_P2",
+   "cell": "learn: end_P2: ended as itself",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "learn: end_P2: ended within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": true,
+   "cell": "learn: other: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": "PASS",
+   "cell": "learn's verdict in the scratch",
+   "met": false,
+   "read": "FAIL"
+  },
+  {
+   "bar": "the same, ended, its own ending",
+   "cell": "end_P1: the scratch rules read it as the real rules",
+   "met": false,
+   "read": [
+    null,
+    [
+     "end_P1",
+     null
+    ]
+   ]
+  },
+  {
+   "bar": "the same, ended, its own ending",
+   "cell": "end_P2: the scratch rules read it as the real rules",
+   "met": false,
+   "read": [
+    null,
+    [
+     "end_P2",
+     null
+    ]
+   ]
+  },
+  {
+   "bar": "the same, ended, its own ending",
+   "cell": "end_p1_b: the scratch rules read it as the real rules",
+   "met": false,
+   "read": [
+    null,
+    null
+   ]
+  },
+  {
+   "bar": "the same, ended, its own ending",
+   "cell": "end_p2_b: the scratch rules read it as the real rules",
+   "met": false,
+   "read": [
+    null,
+    null
+   ]
   },
   {
    "bar": "the same files, 0 changed",
@@ -38,13 +155,15 @@
   ],
   "missing": [],
   "roles": {
-   "begin": "begin.state",
+   "begin": "the rules folder's begin",
    "end_P1": "end_p1.state",
    "end_P2": "end_p2.state",
    "other": "slot 2"
   },
   "rows read by the real rules": {},
-  "unused": []
+  "unused": [
+   "begin.state (not the begin its mini game starts from)"
+  ]
  },
  "schema": 1,
  "stage": "rehearse",

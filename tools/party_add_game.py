@@ -465,6 +465,48 @@ def _role_class(role: str) -> str:
     return role
 
 
+class PicturesFailed(Exception):
+    """B167: the picture source did not give a run's pictures — its reason, name-free, and where its log is."""
+
+    def __init__(self, role: str, reason: str, words: str):
+        self.role, self.reason, self.words = role, reason, words
+        super().__init__(f"{reason}: {words}")
+
+    def read(self) -> str:
+        return (f"{self.role}: {self.reason}: {self.words} (RetroArch's own log: logs/{self.role}.retroarch.log in the "
+                "title's add_game folder)")
+
+
+def logs_folder(code: str) -> Path:
+    """B167: RetroArch's own logs (they name the game): the title's add_game folder, never the repo."""
+    return _env_path("PRIVYHUB_ADD_GAME_LOGS", home(code) / "logs")
+
+
+def _call_capture(cap, state: Path, b: dict, run: Path, role: str, code: str):
+    """The picture source for one run; any failure as PicturesFailed with the source's own reason (B167)."""
+    import inspect
+    kw = {}
+    try:
+        if "log_to" in inspect.signature(cap).parameters:
+            kw["log_to"] = logs_folder(code) / f"{role}.retroarch.log"
+    except (TypeError, ValueError):
+        pass
+    try:
+        return cap(state, b, run, CAPTURE_SECONDS, CAPTURE_EVERY, **kw)
+    except Exception as exc:
+        reason = getattr(exc, "reason", None)
+        words = getattr(exc, "words", None)
+        if not reason or not words:
+            reason, words = "exited", f"the picture source failed ({type(exc).__name__})"
+            try:                                             # its trace beside RetroArch's log, off the repo
+                import traceback
+                logs_folder(code).mkdir(parents=True, exist_ok=True)
+                (logs_folder(code) / f"{role}.picture_source_error.txt").write_text(traceback.format_exc())
+            except OSError:
+                pass
+        raise PicturesFailed(role, str(reason), str(words)) from None
+
+
 def _pictures(code: str, b: dict, kept: dict) -> Path:
     """Every kept state's run (made once for these kept states; again only if they change)."""
     pics = home(code) / "pictures"
@@ -477,7 +519,7 @@ def _pictures(code: str, b: dict, kept: dict) -> Path:
     for role in sorted(kept):
         run = pics / role
         run.mkdir(parents=True)
-        rows = cap(kept_folder(code) / f"{role}.state", b, run, CAPTURE_SECONDS, CAPTURE_EVERY)
+        rows = _call_capture(cap, kept_folder(code) / f"{role}.state", b, run, role, code)
         with (run / "index.csv").open("w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["seconds", "file"])
@@ -494,23 +536,29 @@ def _small(path: Path):
         return np.asarray(im.convert("L").resize((64, 48)), dtype=np.int16)
 
 
+def _near(a, b) -> bool:
+    """B140's measure: fewer than MOVED_SHARE of the 64x48 grey cells changed by more than MOVED_GREY."""
+    return float((abs(a - b) > MOVED_GREY).mean()) < MOVED_SHARE
+
+
 def _labels(pics: Path, kept: dict, es) -> dict:
-    """Labels from the state each picture came from — never by eye. A begin / end frame whose 64x48 grey copy has
-    MOVED_SHARE of its cells changed by more than MOVED_GREY from its run's first frame (B140's measure) is `ignore`
-    (the screen moved on). Consecutive frames of one label are one range (the learner halves each range)."""
+    """Labels from the state each picture came from — never by eye. B167: a begin / end run's screen is the frame most
+    of the run stays near (B140's measure; the earliest on a tie) — the screen that stays, whether the save was made a
+    moment before it settled or the game moves on later; a frame not near it is `ignore`. Consecutive frames of one
+    label are one range (the learner halves each range)."""
     runs, classes = {}, {}
     for role in sorted(kept):
         cls = _role_class(role)
         classes[cls] = cls
         rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((pics / role / "index.csv").open())]
-        first, spans = None, []
-        for t, f in rows:
-            lab = cls
-            if cls != "other":
-                v = _small(pics / role / f)
-                first = v if first is None else first
-                if float((abs(v - first) > MOVED_GREY).mean()) >= MOVED_SHARE:
-                    lab = "ignore"
+        labs = [cls] * len(rows)
+        if cls != "other" and rows:
+            small = [_small(pics / role / f) for _t, f in rows]
+            near = [[_near(a, b) for b in small] for a in small]
+            anchor = max(range(len(small)), key=lambda i: (sum(near[i]), -i))
+            labs = [cls if near[anchor][j] else "ignore" for j in range(len(small))]
+        spans = []
+        for (t, f), lab in zip(rows, labs):
             if spans and spans[-1]["label"] == lab:
                 spans[-1]["to"] = t
             else:
@@ -608,7 +656,11 @@ def cmd_learn(code: str, a: dict) -> int:
         return finish(code, "learn", cells, learn_inputs(code, b), write=not a["check"])
     kept = kept_states(code)
     require(code, "register", register_inputs(b, kept))
-    pics = _pictures(code, b, kept)
+    try:
+        pics = _pictures(code, b, kept)
+    except PicturesFailed as exc:                            # B167: said as a cell, never a trace
+        cells.add("pictures made", exc.read(), "every kept state's pictures", False)
+        return finish(code, "learn", cells, learn_inputs(code, b))
     labels = _labels(pics, kept, es)
     write_if_changed(pics / "labels.json", json.dumps(labels, sort_keys=True))
     r = rules_folder()
@@ -670,7 +722,7 @@ def learn_inputs(code: str, b: dict) -> str:
 
 
 # --- B163: rehearse — learn's whole real path on a title already added, into a scratch rules folder --------------------------
-SCRATCH_ENV = ("PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE")
+SCRATCH_ENV = ("PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE", "PRIVYHUB_ADD_GAME_LOGS")
 
 
 def kept_source(code: str) -> Path:
@@ -727,7 +779,7 @@ def _read_run(es, spec: dict, arrays: dict, run: Path):
 
 def _capture_run(state: Path, b: dict, run: Path) -> None:
     run.mkdir(parents=True, exist_ok=True)
-    rows = _capture_fn()(state, b, run, CAPTURE_SECONDS, CAPTURE_EVERY)
+    rows = _call_capture(_capture_fn(), state, b, run, run.name, b["code"])
     with (run / "index.csv").open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["seconds", "file"])
@@ -759,6 +811,7 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
         rows_ = [r[5:] for r in roles if r.startswith("end_r")]
         if not all({r[c] for r in rows_} == {str(i) for i in range(1, b["players"] + 1)} for c in range(b["players"])):
             missing.append("results rows with every place in every column (have " + (", ".join(sorted(rows_)) or "none") + ")")
+    os.environ.update({"PRIVYHUB_ADD_GAME_LOGS": str(logs_folder(code))})     # B167: beside the scratch, kept
     os.environ.update({"PRIVYHUB_H7_RULES": str(scratch / "rules"), "PRIVYHUB_ADD_GAME_HOME": str(scratch / "home"),
                        "PRIVYHUB_ADD_GAME_EVIDENCE": str(scratch / "evidence")})   # put back by the caller
     (scratch / "rules").mkdir()
@@ -791,10 +844,15 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
     for name, (run, want) in sorted(endings.items()):
         got_real = _read_run(es, rspec, rarr, run) if (run / "index.csv").is_file() else None
         got_scr = _read_run(es, sspec[0], sspec[1], run) if sspec and (run / "index.csv").is_file() else None
-        as_role = (got_real is not None and (want is None or got_real[0] == want or
-                                             (want.startswith("end_r") and got_real[1] == [int(c) for c in want[5:]])))
-        cells.add(f"{name}: the scratch rules read it as the real rules", [got_scr, got_real],
-                  "the same, ended, its own ending", got_scr is not None and got_scr == got_real and as_role)
+        own = (got_real is not None and (want is None or got_real[0] == want or
+                                         (want.startswith("end_r") and got_real[1] == [int(c) for c in want[5:]])))
+        if name in roles:                                    # a learning role: ended, the same, its own ending
+            cells.add(f"{name}: the scratch rules read it as the real rules", [got_scr, got_real],
+                      "the same, ended, its own ending", got_scr is not None and got_scr == got_real and own)
+        else:                                                # B167: a kept extra: exactly as the real rules read it
+            cells.add(f"{name}: the scratch rules read it as the real rules", [got_scr, got_real],
+                      "the same (an ending the real rules end on: its own)", sspec is not None and got_scr == got_real
+                      and (got_real is None or own))
 
 
 def cmd_rehearse(code: str, a: dict) -> int:
@@ -810,6 +868,12 @@ def cmd_rehearse(code: str, a: dict) -> int:
     if not rel:
         raise Refused("the hub did not give the game file for this title (is the companion up?)")
     shown = {r: p.name for r, p in found["roles"].items()}
+    rules_begin = rules_folder() / _begin_name(b)            # B167: the begin the title's mini game starts from
+    if rules_begin.is_file():
+        if "begin" in found["roles"] and sha(found["roles"]["begin"]) != sha(rules_begin):
+            found["unused"].append(f"{found['roles']['begin'].name} (not the begin its mini game starts from)")
+        found["roles"]["begin"] = rules_begin
+        shown["begin"] = "the rules folder's begin"
     for item in a.get("collect") or []:                     # a role the kept folder lacks: the user's slot, read only
         role, _, slot = item.partition("=")
         if not ROLE.match(role) or role in found["roles"] or slot not in ("1", "2", "3"):
@@ -834,6 +898,8 @@ def cmd_rehearse(code: str, a: dict) -> int:
     missing: list = []
     try:
         _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells)
+    except PicturesFailed as exc:                                  # B167: an ending's pictures, with its reason
+        cells.add("rehearse's pictures made", exc.read(), "every kept ending's pictures", False)
     except Exception as exc:                                       # anything else in the scratch: a cell, not a trace
         cells.add("rehearse ran in the scratch", type(exc).__name__, "no error", False)
     finally:
@@ -1320,6 +1386,11 @@ def cmd_solo(code: str, a: dict) -> int:
         mark["board_lines"] = _count(bl) if bl else 0
         mark["video_bytes"] = (project() / LOGS["video"]).stat().st_size if (project() / LOGS["video"]).is_file() else 0
         if not mark_path.is_file():
+            # B169: solo's first run writes the files' before bench writes (a title already added has no bench; a new
+            # title's bench before is kept), so close compares the users' files after every solo
+            fb = home(code) / "files_before.json"
+            if b.get("described") or not fb.is_file():
+                write_if_changed(fb, json.dumps(files_digest(b), sort_keys=True))
             write_if_changed(mark_path, json.dumps(mark, sort_keys=True))
         for ln in solo_lines(b, pad_words(pad_classes())):
             out(ln)
@@ -1403,6 +1474,9 @@ def cmd_solo(code: str, a: dict) -> int:
         seen.append(name if k is not None else f"{name}: missing")
         pos = (k + 1) if k is not None else pos
     cells.add("the board's lines in order", seen, [x for x, _ in order], seen == [x for x, _ in order])
+    card = next((re.match(r"^cards (\d+), chose", ln) for ln in blines if re.match(r"^cards (\d+), chose", ln)), None)
+    n_cards = int(card.group(1)) if card else None             # B169: the one-title setting, by the board's own line
+    cells.add("the board showed one card", n_cards, 1, n_cards == 1)
     ended = [x for x in rows if x.get("step") == "minigame_ended"]
     last = ended[-1] if ended else {}
     hub_winner = last.get("winner")

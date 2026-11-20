@@ -11,6 +11,10 @@ words the user gives to find it in the library are typed into one command at run
 tool decides every verdict; you never judge a picture, choose a threshold or edit a rule.** A stage that is not PASS
 stops the task.
 
+**First, once, in chat only (B170):** before anything else, ask the user — "YOU, now: which game is <code>? I will not
+write its name anywhere." Use the name the user gives **only in your replies to the user**, so every line you send
+about a save or a match names the game; never in a file, a command, a record or a page.
+
 ## Standing rules (all of them, as every A task)
 
 - **The window:** not between 04:30 and 05:30Z (the hub's nightly window), and not within 45 min before it — else
@@ -44,10 +48,21 @@ learner, the held-out score, the replays — on the title's kept states (`~/priv
 scratch rules folder, reads every kept ending with the scratch rules and the real ones, and checks the real rules
 folder's every file sha256 before = after; the scratch is removed. ~4-5 min, nobody at the TV. Its page names which
 kept state is which role and **what is missing**. **T88's and T89's kept folders have no mid-match state** (`other`),
-and the learner cannot learn without one: before `rehearse`, ask the user for that one save — "YOU, now: start this game
-from Games the way you always play it (with its Extras setup, if it has one), and in the middle of a match press SAVE
-to a slot you don't need (1, 2 or 3). Reply with the slot number." — then `rehearse <code> --collect other=<that slot>` (the
-slot is only read, copied into the scratch). T89 also lacks three of the four results rows `register` needs for a
+and the learner cannot learn without one: before `rehearse`, ask the user for that one save — "YOU, now: start <the
+game's name> from Games the way you always play it (with its Extras setup, if it has one), and in the middle of a match
+press SAVE to slot 2 or 3 — never slot 1 (with a setup, slot 1 is the game's own start). Reply with the slot number." —
+then `rehearse <code> --collect other=<that slot>` (the slot is only read, copied into the scratch). **The save stays
+usable until the user saves over that slot:** a later rehearse takes it again (`--collect other=<the same slot>`), no new
+save asked; ask again only if the user has saved over it.
+
+**rehearse as B167 leaves it:** the picture source starts as the hub starts the title (the hub's display, its own core
+and core options); the begin is the one the mini game starts from (the rules folder's own, read only); a capture that
+cannot start says why in a cell ("pictures made": busy, display, content not found, core missing, config, exited, not
+playing, state refused), and RetroArch's own log is in the title's add_game folder (`logs/`, never the repo). **For
+T88 today rehearse is FAIL on learn's own bars** (B167: from one still save per ending the learner cannot separate its
+two end screens, which differ only in a small win tally — the real rules were learnt from three sittings). So in §0,
+rehearse's cells are recorded and **it stops the task only when the real rules folder's sha256 cell is not met or a
+"pictures made" cell names a reason** (the picture source did not run); learn's bars there are the record, not a stop. T89 also lacks three of the four results rows `register` needs for a
 `places` title (its kept folder has one results screen): its rehearse names them missing; it needs the user's saves of
 the rows `2341`, `3412`, `4123` (`--collect end_r2341=<slot>` …) before it can be met.
 
@@ -59,7 +74,9 @@ only); **whether the game has things to unlock** (→ a setup: `--setup slot1`, 
 every save below made inside it; nothing to unlock → `--setup none`); **the words to find it in the library**.
 
 Then the saves, three at a time (the onn's SAVE, slots 1-3; slot 9 and slot 0 are the hub's), each round followed by
-`register … --collect role=slot …` (the tool copies them; the user may then save over them):
+`register … --collect role=slot …` (the tool copies them; the user may then save over them). **With a setup, never
+slot 1 for anything but the begin** (a setup's slot 1 is the title's own start): the other saves go to slots 2 and 3,
+two at a time:
 
 - **The match, shortest:** one round or one life, items off, the shortest time the game offers — the same settings
   for every save.
@@ -74,7 +91,7 @@ Then the saves, three at a time (the onn's SAVE, slots 1-3; slot 9 and slot 0 ar
 Line for the user (two players, `winner`, round 1): "YOU, now: set the game to its shortest match (one round, items
 off). Save to slot 1 on the select screen before anyone picks; start a match and save to slot 2 in the middle of it;
 let P1 win and save to slot 3 on the screen after the match that shows P1 won. Reply ok." Round 2: "YOU, now: play a
-match P2 wins and save to slot 1 on the screen after it. Reply ok." (Four players and `places`: the rounds as the
+match P2 wins and save to slot 2 (never slot 1 when it has a setup) on the screen after it. Reply ok." (Four players and `places`: the rounds as the
 roles above; four people, or the user with four pads.)
 
 ## 2. The stages — one command each, the verdict read from its last line
@@ -101,8 +118,10 @@ python3 tools/party_add_game.py close <code>                                    
   buttons are named for the pads the onn last reported). **If the user says the board showed two cards for the mini
   game, stop — the setting failed** (one plain sentence, then `close`, then "YOU, now: commit"). When the user says who
   won, run the read with that seat: it clears the setting first, then reads — among its cells, **the mini game played
-  was this title** (the launches since the lines, compared in memory), and S over every switch whose next began 4 s or
-  more after it (a quicker one is listed, not read; at least four read).
+  was this title** (the launches since the lines, compared in memory), **the board showed one card** (the board's own
+  `cards 1` line, B169), and S over every switch whose next began 4 s or more after it (a quicker one is listed, not
+  read; at least four read). **solo's first run writes the users' files' before** when bench left none (a title
+  already added: always, B169), so close compares them after every solo.
 - **close** always, last — also after any stop. It clears the one-title setting too (as does any restart), and records
   the title's own in-game saves before and after as changed or not — never a cell.
 

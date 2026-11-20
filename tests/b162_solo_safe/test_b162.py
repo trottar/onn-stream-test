@@ -118,7 +118,10 @@ class Harness(unittest.TestCase):
     def test_5_cleared_by_close_and_by_a_restart(self):
         s = self.s
         self.assertEqual(s["before_close"], ["Juliet Run (USA)"])
-        self.assertEqual(s["close"]["rc"], 0, (s["close"], s["close_v"]))
+        # B169: solo now writes a title already added its files' before, so close compares them — and this harness
+        # rewrote one made-up sidecar in the rules folder (three two-player titles) after T90's solo: exactly that cell
+        self.assertEqual(s["close_v"]["bad"], ["every file = bench's before"], (s["close"], s["close_v"]))
+        self.assertEqual(s["close_v"]["cells"]["every file = bench's before"], 1)
         self.assertEqual(s["after_close"], s["three_before"])
         self.assertEqual([r.get("on") for r in s["only_rows_close"]], [False])
         self.assertEqual(s["before_restart"], ["Juliet Run (USA)"])
