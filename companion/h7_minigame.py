@@ -237,7 +237,7 @@ class MiniGame:
             return out
         with self._lock:
             w = self._watch
-            if w is not None and w["game"] == game and w["state"] in ("watching", "ended"):
+            if w is not None and w["game"] == game and w["state"] in ("watching", "ended", "unreadable"):   # B182
                 out = {k: v for k, v in w.items() if k not in ("t0", "token") and not k.startswith("_")}
                 out["since_s"] = round(self._clock() - w["t0"], 1)
                 return {"ok": True, **json.loads(json.dumps(out))}
@@ -509,6 +509,7 @@ class MiniGame:
     def _run(self, token, game: str, reader, ended, spec: dict) -> None:
         t0 = self._clock()
         k = 1
+        unread_run = 0                                              # B182: final-screen reads with a number not read
         last_class = None
         start_class = spec["start_class"]
         thresholds = endscreen().thresholds(spec) if hasattr(endscreen(), "thresholds") else None
@@ -571,6 +572,11 @@ class MiniGame:
                             self._settle(w, True, since, r)
                         elif w["loaded"] and since >= w.get("_recognise_s", self.recognise_s):
                             self._settle(w, False, since, r)
+                    unread_run = unread_run + 1 if (r.get("end_unread") and not done) else 0
+                    if unread_run >= int(getattr(ended, "k", 3)):   # B182: the final screen, a number not read, K
+                        w.update(state="unreadable", unreadable_after_s=since)   # times: no result, never a guess
+                        self._row({"step": "final_unreadable", "game": game, "after_s": since, "reads": reads})
+                        return
                     if done:
                         w.update(state="ended", **{"class": done}, ended_after_s=since)
                         if getattr(ended, "places", None):              # B123: a version-3 spec's row of places

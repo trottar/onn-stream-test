@@ -38,8 +38,11 @@ sys.path[:0] = [str(ROOT / "tools"), str(HERE)]
 for sub in ("b114_party_minigame_hang", "b124_party_four_seats", "b123_h7_n64_start", "b157_add_game"):
     sys.path.insert(0, str(ROOT / "tests" / sub))
 import score_capture as sc  # noqa: E402
+sys.path.insert(0, str(ROOT / "tests" / "b181_every_digit"))
+import line_capture as lc  # noqa: E402  (B181: the harness's title shows every digit twice)
 
 BASELINE = "b243dd63"
+EVERY = "every digit 0-9 read by a reader learnt without each save that shows it"
 A = {"begin": {"kind": "begin"}, "other": {"kind": "other"},
      "end_P1": {"kind": "end", "s": [21, 14], "look": 1}, "end_P1_2": {"kind": "end", "s": [42, 12], "look": 2},
      "end_P2": {"kind": "end", "s": [14, 24], "look": 3}, "end_P2_2": {"kind": "end", "s": [12, 41], "look": 4}}
@@ -112,7 +115,13 @@ class Made(unittest.TestCase):
         args = [f"{r}={rd(st['s'])}" for r, st in sorted(saves.items()) if r.startswith("end_")]
         for r, val in (wrong or {}).items():
             args = [a for a in args if not a.startswith(r + "=")] + [f"{r}={val}"]
-        return self.tool("label", code, *args)
+        return self.looked(code, *self.tool("label", code, *args))
+
+    def looked(self, code: str, rc: int, out: str) -> tuple[int, str]:
+        """B183: when the label stage asks for the last look, the session's answer (every glyph is its digit)."""
+        if rc == 1 and "Look at label/digits.png" in out:
+            return self.tool("label", code, "look=all")
+        return rc, out
 
 
 class Learn(Made):
@@ -128,13 +137,12 @@ class Learn(Made):
         self.assertTrue(any(p.name.endswith(".P1.png") for p in self.pag.label_folder("T91").iterdir()))   # crops
         rc, out = self.tool("learn", "T91")
         v = self.verdict("T91", "learn")
-        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
+        # B181: every save read by a spec learnt without it — and, finals alone, digits 1, 2, 4 only: not every digit
+        self.assertEqual((rc, v["bad"]), (1, [EVERY]), out)
         for r in ("end_P1", "end_P1_2", "end_P2", "end_P2_2"):
             self.assertEqual(v["cells"][f"{r}: ended as itself"], A[r]["s"])
-            self.assertEqual(v["cells"][f"left out: {r}"][0], A[r]["s"])
-        rules = Path(os.environ["PRIVYHUB_H7_RULES"])
-        self.assertEqual(json.loads((rules / "madeupt91.party.json").read_text()), {"players": 2, "result": "score"})
-        self.assertEqual(json.loads((rules / "madeupt91.endscreen.json").read_text())["version"], 4)
+            self.assertEqual(v["cells"][f"left out: {r}"][0], rd(A[r]["s"]).split(",")[0])
+        self.assertFalse((Path(os.environ["PRIVYHUB_H7_RULES"]) / "madeupt91.party.json").exists())
         self.assertEqual(v["recorded"]["digits"]["never"], ["0", "3", "5", "6", "7", "8", "9"])
 
     def test_2_t90_shape_names_the_digits_then_passes(self):
@@ -143,21 +151,21 @@ class Learn(Made):
         lv = self.verdict("T92", "label")
         self.assertEqual(rc, 0, out + json.dumps(lv["bad"]))
         self.assertEqual(lv["cells"]["end_P1: read back by a reader learnt without it"], "not read (shown only here: 1)")
-        self.assertEqual(lv["cells"]["end_P2: read back by a reader learnt without it"], [0, 22])
+        self.assertEqual(lv["cells"]["end_P2: read back by a reader learnt without it"], "0-22")
         rc, out = self.tool("learn", "T92")
         v = self.verdict("T92", "learn")
         self.assertEqual(rc, 1)
-        self.assertEqual(sorted(v["bad"]), ["left out: end_P1", "left out: end_P1_2", "left out: end_P2_2"])
-        self.assertIn("whose final score shows 1, 3, 8 or 9", out)
+        self.assertEqual(sorted(v["bad"]), [EVERY, "left out: end_P1", "left out: end_P1_2", "left out: end_P2_2"])
+        self.assertIn("whose final score shows 1, 3, 4, 6, 7, 8 or 9", out)    # B181: also the digits never shown
         self.assertIn("end_P1_3 if P1 won, end_P2_3 if P2 won", out)
         self.assertEqual(v["recorded"]["digits"]["in one save"], ["1", "3", "8", "9"])
         self.assertFalse((Path(os.environ["PRIVYHUB_H7_RULES"]) / "madeupt92.party.json").exists())
         more = {"end_P1_3": {"kind": "end", "s": [39, 18], "look": 7}}
         self.put("T92", more)
-        rc, out = self.tool("label", "T92", f"end_P1_3={rd([39, 18])}")
+        rc, out = self.looked("T92", *self.tool("label", "T92", f"end_P1_3={rd([39, 18])}"))
         self.assertEqual(rc, 0, out)
-        rc, out = self.tool("learn", "T92")
-        self.assertEqual(rc, 0, out + json.dumps(self.verdict("T92", "learn")["bad"]))
+        rc, out = self.tool("learn", "T92")                    # every save read without it; 4, 6, 7 still never
+        self.assertEqual((rc, self.verdict("T92", "learn")["bad"]), (1, [EVERY]), out)
 
     def test_3_learn_needs_label(self):
         self.put("T93", A)
@@ -173,11 +181,12 @@ class Reads(Made):
         t = cls("run")
         t.put("T94", A)
         t.label_all("T94", A)
-        rc, out = t.tool("learn", "T94")
-        assert rc == 0, out
+        rc, out = t.tool("learn", "T94")                       # B181: FAIL on the every-digit cell alone; the reads
+        assert t.verdict("T94", "learn")["bad"] == [EVERY], out   # below use the spec it learnt (the learner's call)
         import h7_endscreen as es
         cls.es = es
-        cls.spec, cls.arrays = es.load_spec(Path(os.environ["PRIVYHUB_H7_RULES"]) / "madeupt94.endscreen.json")
+        pics = t.pag.home("T94") / "pictures"
+        cls.spec, cls.arrays, _rep = es.learn(pics, pics / "labels.json", "first", name="madeupt94")
 
     def run_of(self, st: dict, seconds: float = 20.0):
         import numpy as np
@@ -220,7 +229,7 @@ class LabelChecks(Made):
         self.assertIn("Read again: end_P1 (its two readings differ)", out)
         rc, out = self.tool("label", "T95", f"end_P1={rd([21, 14], [21, 11])}")
         self.assertIn("Ask the user for end_P1's numbers", out)
-        rc, out = self.tool("label", "T95", "end_P1=21-14,user")
+        rc, out = self.looked("T95", *self.tool("label", "T95", "end_P1=21-14,user"))
         self.assertEqual(rc, 0, out)
 
     def test_role_and_swapped_sides(self):
@@ -270,10 +279,10 @@ class LabelChecks(Made):
         """The residual, said in the record: one glyph misread the same way in every save that shows it."""
         self.put("T89", A)
         nine = {r: rd([int(str(x).replace("4", "9")) for x in st["s"]]) for r, st in A.items() if r.startswith("end_")}
-        rc, out = self.label_all("T89", A, nine)
+        rc, out = self.label_all("T89", A, nine)               # the session's look missing it (look=all)
         self.assertEqual(rc, 0, out)
-        rc, out = self.tool("learn", "T89")
-        self.assertEqual(rc, 0, out)
+        rc, out = self.tool("learn", "T89")                    # every save read back: only the every-digit cell
+        self.assertEqual(self.verdict("T89", "learn")["bad"], [EVERY], out)   # (B183's look is where it is caught)
 
 
 class Hub(unittest.TestCase):
@@ -288,8 +297,9 @@ class Hub(unittest.TestCase):
             b124.IDS.update(ids)
 
             def extra(work, frames):
-                sc.frames(frames)
-                return {"tools": str(ROOT / "tools"), "b178_dir": str(HERE)}
+                lc.frames(frames)                             # B181: the line-score title (every digit twice)
+                return {"tools": str(ROOT / "tools"), "b178_dir": str(HERE),
+                        "b181_dir": str(ROOT / "tests" / "b181_every_digit")}
             cls.s = b114.run(root, b114.BOTH, ids, "b178", extra=extra, timeout=1200)["steps"]
         finally:
             shutil.rmtree(root, ignore_errors=True)
@@ -309,7 +319,7 @@ class Hub(unittest.TestCase):
         self.assertEqual((s["s_sidecar"], s["s_spec_version"]), ({"players": 2, "result": "score"}, 4))
         self.assertEqual(s["s_bench_v"]["verdict"], "PASS", s["s_bench_v"]["bad"])
         for role, code in (("end_P1", 310), ("end_P1_2", 311), ("end_P2", 312), ("end_P2_2", 313)):
-            self.assertEqual(s["s_bench_v"]["cells"][f"{role}: scores"], sc.SCORES[code])
+            self.assertEqual(s["s_bench_v"]["cells"][f"{role}: scores"], lc.SCORES[code])
             self.assertEqual(s["s_bench_v"]["cells"][f"{role}: ended with its class"], ["ended", "end"])
         self.assertEqual(s["s_close_v"]["verdict"], "PASS", s["s_close_v"]["bad"])
 
@@ -322,17 +332,23 @@ class Hub(unittest.TestCase):
         s = self.s
         self.assertEqual(s["h_list"], [2])
         a, b, tie = s["h_a"], s["h_b"], s["h_tie"]
-        self.assertEqual((a["state"], a["scores"], a.get("winner")), ("ended", [21, 14], 1), a)
-        self.assertEqual((b["state"], b["scores"], b.get("winner")), ("ended", [21, 14], 2), b)    # port 1 = seat 2
+        self.assertEqual((a["state"], a["scores"], a.get("winner")), ("ended", [10, 6], 1), a)
+        self.assertEqual((b["state"], b["scores"], b.get("winner")), ("ended", [10, 6], 2), b)    # port 1 = seat 2
         self.assertEqual((tie["state"], tie["scores"], tie.get("winner")), ("ended", [14, 14], None), tie)
-        self.assertEqual(s["h_a_ended_rows"], [{"class": "end", "scores": [21, 14], "winner": 1}])
+        self.assertEqual(s["h_a_ended_rows"], [{"class": "end", "scores": [10, 6], "winner": 1}])
         self.assertEqual(s["h_tie_ended_rows"], [{"class": "end", "scores": [14, 14], "winner": None}])
 
     def test_4_unreadable_is_no_result(self):
-        u = self.s["h_unread"]
-        self.assertEqual(u["state"], "given_up", u)
-        self.assertIn("unknown screen", u["why"])
-        self.assertEqual(self.s["h_unread_rows"], ["minigame_given_up"])
+        """B182: the final screen read K times with a number not read -> given up then, no scores, no winner; also when
+        the game moves on after it (no 900-s wait)."""
+        why = "the final screen was seen and a number on it was not read"
+        for tag in ("h_unread", "h_unread_moves"):
+            u = self.s[tag]
+            self.assertEqual((u["state"], u["why"], u["scores"], u.get("winner")), ("given_up", why, None, None), u)
+            self.assertLess(u["since_s"], 30.0, u)
+            self.assertEqual([{k: v for k, v in r.items() if k != "step"} for r in self.s[tag + "_rows"]],
+                             [{"why": why}], self.s[tag + "_rows"])
+            self.assertIn("final_unreadable", self.s[tag + "_h7"])
 
     def test_5_not_listed(self):
         self.assertEqual((self.s["h_list_with_scores"], self.s["h_list_four"]), ([], []))

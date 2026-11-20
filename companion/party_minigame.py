@@ -72,6 +72,9 @@ B178 — a sidecar's `"result": "score"` with a version-4 spec of n sides (B178'
 final screen): at `ended` the numbers read, port by port, as the scores (the real numbers), `"winner"` the seat of the
 one side strictly ahead, null on a tie (the board's draw); a read without n whole numbers → given up; an unreadable
 screen is `unknown` as today. Without the key: today.
+B182 — a version-4 watch that sees the final screen K times with a number on it not read ends `unreadable`; the
+mini game is given up then (why: "the final screen was seen and a number on it was not read"), no scores, no winner —
+never the 900-s wait. Versions 2 / 3 never end so: today.
 B162 — `POST party-minigame-only?game=<id>` (loopback; `?clear=1` clears): the add-a-game tool's solo setting, kept in
 memory only (any restart clears it) — while set, `party-minigames` lists that title alone for its player count. Never
 set: today.
@@ -1231,6 +1234,9 @@ class PartyMinigames:
                     won = {"winner": mg["seats"][port - 1]} if port is not None else {}
                     self._final(mg, "ended", **{"class": cls, "scores": list(scores), **won})
                 continue
+            if r.get("state") == "unreadable":                      # B182: the final screen seen, a number on it
+                self._final(mg, "given_up", why="the final screen was seen and a number on it was not read")
+                continue                                              # not read: given up now, no result
             if r.get("state") in ("no_game", "idle", "no_spec"):
                 self._final(mg, "given_up", why="the watch stopped")
                 continue

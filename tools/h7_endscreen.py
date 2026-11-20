@@ -118,7 +118,8 @@ PLACE_REFINE = 3                                  # each column's cell refined w
 PLACE_SEARCH = 1                                  # a read's cell searched within +/- this many px
 # B178: each side's score (spec version 4)
 VERSION_SCORE = 4
-SCORE_LABEL = re.compile(r"^end_s(\d{1,4}(?:-\d{1,4}){1,3})$")   # end_s15-2: P1's number 15, P2's 2 (2-4 sides)
+SCORE_SIDE = r"(?:(?:\d{1,4}|_)(?:\+(?:\d{1,4}|_))*=)?\d{1,4}"     # B181: 15, or the line score 9+2+2+2+_+_=15
+SCORE_LABEL = re.compile(rf"^end_s({SCORE_SIDE}(?:-{SCORE_SIDE}){{1,3}})$")   # end_s15-2: P1's 15, P2's 2 (2-4 sides)
 SCORE_SIZE = (640, 480)          # the picture the numbers are read on (the game's area)
 SCORE_RS = (8, 16)               # px: the local mean's radius tried for the ink
 SCORE_INK = 0.12                 # ink: off its local mean by this share of the picture's own 2nd-98th percentile spread
@@ -723,7 +724,17 @@ def score_sides(classes) -> int | None:
 
 
 def score_numbers(label: str) -> list[int]:
-    return [int(x) for x in SCORE_LABEL.match(label).group(1).split("-")]
+    """Each side's final (the result), P1 first."""
+    return [int(side.rpartition("=")[2]) for side in SCORE_LABEL.match(label).group(1).split("-")]
+
+
+def score_cells(label: str) -> list[list]:
+    """B181: each side's line-score cells left to right (an int, or None for a blank cell); [] for a final alone."""
+    out = []
+    for side in SCORE_LABEL.match(label).group(1).split("-"):
+        cells, eq, _fin = side.rpartition("=")
+        out.append([None if x == "_" else int(x) for x in cells.split("+")] if eq else [])
+    return out
 
 
 def score_picture(img: Image.Image, align=IDENTITY) -> np.ndarray:
@@ -1024,14 +1035,162 @@ def read_scores(a: np.ndarray, score: dict, refs: np.ndarray) -> dict:
             "margin": round(least, 4) if least is not None else None}
 
 
+def _digit_stats(cells: dict, shown: dict) -> tuple:
+    """B178's templates, thresholds and margin from {key: [cells]} -> (keys, refs, gaps, need, noise, smallest)."""
+    empty = np.zeros((0, SCORE_CELL[0] + 2, SCORE_CELL[1] + 2), np.float32)
+    keys = sorted(cells)
+    refs = np.stack([np.mean(cells[k], axis=0) for k in keys]).astype(np.float32) if keys else empty
+    own_of = {k: max(float(cell_dists(c, refs[i:i + 1])[0]) for c in cells[k]) for i, k in enumerate(keys)}
+    noise = max([own_of[k] for k in keys if shown.get(k, 0) >= 2] or [0.0])     # one digit from save to save
+    gaps, margins = {}, []
+    for i, k in enumerate(keys):
+        grp = k[:-1]
+        same = [j for j, k2 in enumerate(keys) if k2[:-1] == grp]
+        own = max(own_of[k], noise)
+        foreign = [float(cell_dists(c, refs[i:i + 1])[0]) for j in same if j != i for c in cells[keys[j]]]
+        gaps[k] = _gap(own, min(foreign), MIN_GAP) if foreign else {
+            "worst_own": round(own, 4), "best_foreign": None, "gap": None, "threshold": None,
+            "verdict": "no other digit to tell it from"}
+        for c in cells[k]:
+            d = cell_dists(c, refs[same])
+            order = np.argsort(d, kind="stable")
+            if same[int(order[0])] == i and len(same) > 1:
+                margins.append(float(d[order[1]] - d[order[0]]))
+    need = round(SAFETY * min(margins), 4) if margins else None
+    return keys, refs, gaps, need, noise, (round(min(margins), 4) if margins else None)
+
+
+def _stat_score(keys, gaps, need) -> dict:
+    return {"keys": keys, "thresholds": {k: gaps[k]["threshold"] for k in keys},
+            "separable": {k: gaps[k]["verdict"] == "separable" for k in keys}, "margin_needed": need}
+
+
+def _read_digits(a: np.ndarray, gl: list, place: dict, score: dict, refs: np.ndarray) -> str:
+    """The glyphs at a place read as digits ('?' for one not read) — B178's rule."""
+    keys = list(score["keys"])
+    idx = [i for i, k in enumerate(keys) if k.startswith(place["group"])]
+    need = score.get("margin_needed")
+    digs = ""
+    for g in gl:
+        if not idx:
+            digs += "?"
+            continue
+        d = cell_dists(glyph_cell(a, g, place), refs[idx])
+        order = np.argsort(d, kind="stable")
+        best = keys[idx[int(order[0])]]
+        margin = float(d[order[1]] - d[order[0]]) if len(idx) > 1 else float("inf")
+        thr = score["thresholds"].get(best)
+        ok = (score["separable"].get(best) and thr is not None and float(d[order[0]]) <= thr and need is not None
+              and margin >= need)
+        digs += best[len(place["group"]):] if ok else "?"
+    return digs
+
+
+def read_columns(a: np.ndarray, score: dict, refs: np.ndarray) -> list[list]:
+    """B181: every learnt line-score column, per side: its number read, "_" when the cell is blank, "?"-holding text
+    when a glyph is not read, None for a column with no place."""
+    contrast = _contrast(a)
+    out = []
+    for k, cols in enumerate(score.get("columns") or []):
+        row = []
+        for pl in cols:
+            if pl is None:
+                row.append(None)
+                continue
+            gl = place_glyphs(a, pl, contrast)
+            if gl is None:
+                row.append("_")
+                continue
+            digs = _read_digits(a, gl, pl, score, refs)
+            row.append(int(digs) if "?" not in digs else digs)
+        out.append(row)
+    return out
+
+
+def _clusters(points: list) -> list:
+    """Anchors within 2 x SCORE_TOL of a cluster's first are one cluster; left to right."""
+    out: list = []
+    for x, item in sorted(points, key=lambda t: t[0]):
+        if out and x - out[-1][0] <= 2 * SCORE_TOL:
+            out[-1][1].append(item)
+        else:
+            out.append([x, [item]])
+    return out
+
+
+def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, refs1: np.ndarray) -> tuple:
+    """B181: side k's line-score columns, left to right, on its final's line (section B181 of the design). ->
+    ([place or None per column], {column: the saves where it breaks} for a labelled column with no place)."""
+    runs = sorted(first)
+    ncol = len(saves[runs[0]][1][k])
+    row = {r: [s_ for s_ in score_strings(first[r]) if s_["pol"] == fin["pol"] and s_["r"] == fin["r"]
+               and abs(s_["top"] - fin["top"]) <= SCORE_TOL and abs(s_["bot"] - fin["bot"]) <= SCORE_TOL
+               and s_["x1"] < fin["x0"]] for r in runs}
+    clusters = _clusters([((s_["x0"] + s_["x1"]) / 2.0, (r, s_)) for r in runs for s_ in row[r]])
+    need = score1.get("margin_needed")
+    cols, broken, prev = [], {}, None
+    for c in range(ncol):
+        want = {r: saves[r][1][k][c] for r in runs}
+        if all(v is None for v in want.values()):
+            cols.append(None)
+            continue
+        valid, cover = [], (-1, runs)
+        for cx, members in clusters:
+            if prev is not None and cx <= prev or cx >= fin["x0"]:
+                continue
+            by = {}
+            for r, s_ in members:
+                by.setdefault(r, []).append(s_)
+            miss = [r for r in runs if (want[r] is None) != (r not in by)
+                    or (want[r] is not None and not any(s_["n"] == len(str(want[r])) for s_ in by[r]))]
+            if miss:
+                if len(runs) - len(miss) > cover[0]:
+                    cover = (len(runs) - len(miss), miss)
+                continue
+            got = [s_ for r in runs if want[r] is not None for s_ in by[r] if s_["n"] == len(str(want[r]))]
+            pl = {"pol": fin["pol"], "r": fin["r"], "align": "centre", "group": fin["group"], "top": fin["top"],
+                  "bot": fin["bot"], "x0": int(min(g["x0"] for g in got)), "x1": int(max(g["x1"] for g in got))}
+            glyphs, agree, ok = [], 0, True
+            for r in runs:
+                if want[r] is None:
+                    continue
+                gl = place_glyphs(first[r], pl)
+                if gl is None or len(gl) != len(str(want[r])):
+                    ok = False
+                    break
+                read = _read_digits(first[r], gl, pl, score1, refs1) if len(refs1) else ""
+                agree += sum(1 for a_, b_ in zip(read, str(want[r])) if a_ == b_)
+                glyphs += [(ch, glyph_cell(first[r], g, pl)) for ch, g in zip(str(want[r]), gl)]
+            if ok and need is not None:                       # a separator: the same glyph whatever the label
+                ok = not any(a_[0] != b_[0] and float(cell_dists(a_[1], b_[1][None])[0]) < need
+                             for i, a_ in enumerate(glyphs) for b_ in glyphs[i + 1:])
+            if ok:
+                valid.append((cx, agree, pl))
+        if not valid:
+            broken[str(c + 1)] = [Path(r).name for r in cover[1]]
+            cols.append(None)
+            continue
+        done = [((p_["x0"] + p_["x1"]) / 2.0, i) for i, p_ in enumerate(cols) if p_ is not None]
+        if len(done) >= 2:                                    # the place the other columns' spacing predicts
+            (x_a, i_a), (x_b, i_b) = done[-2], done[-1]
+            guess = x_b + (x_b - x_a) / (i_b - i_a) * (c - i_b)
+        else:
+            guess = None
+        best = min(valid, key=lambda v: (-v[1], abs(v[0] - guess) if guess is not None else 0.0, v[0]))
+        cols.append(best[2])
+        prev = best[0]
+    return cols, broken
+
+
 def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
-    """From {save: (its numbers, [its pictures])} -> (the spec's `score`, its arrays, a report): each side's place
-    (the same in every save), each digit's template, threshold and the margin needed (section B178 of the docstring)."""
+    """From {save: (its finals, its line-score cells per side, [its pictures])} -> (the spec's `score`, its arrays, a
+    report): each side's final's place (the same in every save), B181's line-score columns, each digit's template,
+    threshold and the margin needed (section B178 of the docstring)."""
     runs = sorted(saves)
     n = len(saves[runs[0]][0])
     first = {}
     for r in runs:
-        with Image.open(saves[r][1][0]) as im:
+        with Image.open(saves[r][2][0]) as im:
             first[r] = score_picture(im)
     strs = {r: score_strings(first[r]) for r in runs}
     cands, broken = [], {}
@@ -1043,59 +1202,69 @@ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
     places = [] if broken else _choose_places(cands, first, {r: saves[r][0] for r in runs})
     if not broken and not places:
         broken = {"all": ["the sides' places overlap"]}
+    ncols = {k: {len(saves[r][1][k]) for r in runs} for k in range(n)}
+    for k, sizes in ncols.items():                            # B181: every save the same columns per side
+        if len(sizes) > 1:
+            most = max(sizes, key=lambda z: (sum(1 for r in runs if len(saves[r][1][k]) == z), z))
+            broken[f"{k + 1}.cells"] = [Path(r).name for r in runs if len(saves[r][1][k]) != most]
     empty = np.zeros((0, SCORE_CELL[0] + 2, SCORE_CELL[1] + 2), np.float32)
+    base = {"sides": n, "places": places, "keys": [], "thresholds": {}, "separable": {}, "margin_needed": None,
+            "pooled": False, "cell": list(SCORE_CELL), "columns": []}
     if broken:
-        score = {"sides": n, "found": False, "not_found": broken, "places": places, "keys": [], "thresholds": {},
-                 "separable": {}, "margin_needed": None, "pooled": False, "cell": list(SCORE_CELL)}
-        return score, {"digit_refs": empty}, {"found": False, "not_found": broken}
+        return {**base, "found": False, "not_found": broken}, {"digit_refs": empty}, {"found": False, "not_found": broken}
     heights = [p["bot"] - p["top"] for p in places]
     pooled = max(heights) - min(heights) <= SCORE_TOL
     for k, p in enumerate(places):
         p["group"] = "" if pooled else f"{k + 1}:"
-    cells: dict[str, list] = {}
-    unfit: dict = {}
-    for r in runs:
-        nums = saves[r][0]
-        for path in saves[r][1]:
-            with Image.open(path) as im:
-                a = score_picture(im)
-            contrast = _contrast(a)
-            for k, p in enumerate(places):
-                gl = place_glyphs(a, p, contrast)
-                if gl is None or len(gl) != len(str(nums[k])):
-                    unfit.setdefault(Path(r).name, set()).add(k + 1)
-                    continue
-                for ch, g in zip(str(nums[k]), gl):
-                    cells.setdefault(p["group"] + ch, []).append(glyph_cell(a, g, p))
-    keys = sorted(cells)
-    refs = np.stack([np.mean(cells[k], axis=0) for k in keys]).astype(np.float32) if keys else empty
-    shown = {k: sum(1 for r in runs for kk, num in enumerate(saves[r][0])
-                    if places[kk]["group"] == k[:-1] and k[-1] in str(num)) for k in keys}
-    own_of = {k: max(float(cell_dists(c, refs[i:i + 1])[0]) for c in cells[k]) for i, k in enumerate(keys)}
-    noise = max([own_of[k] for k in keys if shown[k] >= 2] or [0.0])     # one digit from save to save (addendum)
-    gaps, margins = {}, []
-    for i, k in enumerate(keys):
-        grp = k[:-1]
-        same = [j for j, k2 in enumerate(keys) if k2[:-1] == grp]
-        own = max(own_of[k], noise)
-        foreign = [float(cell_dists(c, refs[i:i + 1])[0]) for j in same if j != i for c in cells[keys[j]]]
-        g = _gap(own, min(foreign), MIN_GAP) if foreign else {"worst_own": round(own, 4), "best_foreign": None,
-                                                              "gap": None, "threshold": None,
-                                                              "verdict": "no other digit to tell it from"}
-        gaps[k] = g
-        for c in cells[k]:
-            d = cell_dists(c, refs[same])
-            order = np.argsort(d, kind="stable")
-            if same[int(order[0])] == i and len(same) > 1:
-                margins.append(float(d[order[1]] - d[order[0]]))
-    need = round(SAFETY * min(margins), 4) if margins else None
-    score = {"sides": n, "found": True, "places": places, "pooled": pooled, "keys": keys, "cell": list(SCORE_CELL),
-             "thresholds": {k: gaps[k]["threshold"] for k in keys},
-             "separable": {k: gaps[k]["verdict"] == "separable" for k in keys}, "margin_needed": need,
+
+    def gather(cols: list) -> tuple[dict, dict, dict]:
+        cells: dict[str, list] = {}
+        unfit: dict = {}
+        for r in runs:
+            nums, lines, paths = saves[r]
+            for path in paths:
+                with Image.open(path) as im:
+                    a = score_picture(im)
+                contrast = _contrast(a)
+                spots = [(p, nums[k], f"{k + 1}") for k, p in enumerate(places)]
+                spots += [(pl, lines[k][c], f"{k + 1}.{c + 1}") for k, row in enumerate(cols)
+                          for c, pl in enumerate(row) if pl is not None and lines[k][c] is not None]
+                for pl, v, where in spots:
+                    gl = place_glyphs(a, pl, contrast)
+                    if gl is None or len(gl) != len(str(v)):
+                        unfit.setdefault(Path(r).name, set()).add(where)
+                        continue
+                    for ch, g in zip(str(v), gl):
+                        cells.setdefault(pl["group"] + ch, []).append(glyph_cell(a, g, pl))
+        shown = {}
+        for r in runs:
+            nums, lines, _paths = saves[r]
+            digs = {places[k]["group"] + ch for k in range(n)
+                    for v in [nums[k]] + [x for x in lines[k] if x is not None] for ch in str(v)}
+            for key in digs:
+                shown[key] = shown.get(key, 0) + 1
+        return cells, unfit, shown
+
+    cells, unfit, shown = gather([])                          # the finals alone first (B178)
+    keys, refs, gaps, need, noise, small = _digit_stats(cells, shown)
+    columns, cbroken = [], {}
+    if any(saves[r][1][k] for r in runs for k in range(n)):   # B181: the line score's columns
+        score1 = _stat_score(keys, gaps, need)
+        for k in range(n):
+            cols, br = _find_columns(first, saves, k, places[k], score1, refs)
+            columns.append(cols)
+            for c, who in br.items():
+                cbroken[f"{k + 1}.{c}"] = who
+        if cbroken:
+            return ({**base, "found": False, "not_found": cbroken, "pooled": pooled, "columns": columns},
+                    {"digit_refs": empty}, {"found": False, "not_found": cbroken})
+        cells, unfit, shown = gather(columns)                 # then every labelled number
+        keys, refs, gaps, need, noise, small = _digit_stats(cells, shown)
+    score = {**base, "found": True, "pooled": pooled, **_stat_score(keys, gaps, need), "columns": columns,
              "glyphs": {k: len(cells[k]) for k in keys}, "saves_showing": shown, "noise": round(noise, 4),
              "unfit": {r: sorted(v) for r, v in sorted(unfit.items())}}
-    report = {"found": True, "places": places, "digits": gaps, "margin_needed": need,
-              "smallest_margin_seen": round(min(margins), 4) if margins else None, "unfit": score["unfit"]}
+    report = {"found": True, "places": places, "columns": columns, "digits": gaps, "margin_needed": need,
+              "smallest_margin_seen": small, "unfit": score["unfit"]}
     return score, {"digit_refs": refs}, report
 
 
@@ -1111,7 +1280,7 @@ def _learn_v4(paths, ids, per_source, aspect, start_class, name, n, t0):
             with Image.open(p) as im:
                 frames[key].append(_final(mid(im)))
             if key == END:
-                saves.setdefault(str(Path(p).parent), (score_numbers(c), []))[1].append(p)
+                saves.setdefault(str(Path(p).parent), (score_numbers(c), score_cells(c), []))[2].append(p)
     for c in (start_class, END, OTHER):
         if not frames.get(c):
             raise ValueError(f"the labels name no {c} frames")
@@ -1441,6 +1610,7 @@ class ReaderScore(ReaderPlaces):
             out.update(score_read=sr["read"], margin=sr["margin"])
             if sr["scores"] is None:
                 out["class"] = UNKNOWN
+                out["end_unread"] = True                  # B182: the final screen, a number on it not read
             else:
                 out["scores"] = sr["scores"]
         return out

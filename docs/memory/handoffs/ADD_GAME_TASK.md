@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
 
 # ADD-GAME — one title, by its code, through the tool's five stages
@@ -9,8 +9,9 @@ status: FIXED TASK (session A, hardware) — add one party mini game by its code
 The code (`T` + two digits) is the only name of the title in anything written. The user knows which game it is; the
 words the user gives to find it in the library are typed into one command at run time and never written down. **The
 tool decides every verdict; you never judge a picture, choose a threshold or edit a rule.** A stage that is not PASS
-stops the task. **The one exception (B178): a `score` title's `label` stage (§2)** — there you read each end save's
-final score from the pictures the tool puts out, and pass the numbers in; the tool checks every reading and decides.
+stops the task. **The one exception (B178, B183): a `score` title's `label` stage (§2)** — there you read each end
+save's numbers from the pictures the tool puts out and pass them in, and give its last look at the digit sheet; the
+tool checks every reading and decides.
 
 **First, once, in chat only (B170):** before anything else, ask the user — "YOU, now: which game is <code>? I will not
 write its name anywhere." Use the name the user gives **only in your replies to the user**, so every line you send
@@ -199,11 +200,28 @@ python3 tools/party_add_game.py close <code>                                    
   each side's number cut out, `<role>.P1.png`, `<role>.P2.png`). Open each with your own vision; read each side's
   number, P1 first, from `.1` and then, separately, from `.2`; pass both:
   `label <code> end_P1=<P1>-<P2>,<P1>-<P2> end_P1_2=… end_P2=… end_P2_2=…`. Never a picture in the repo or a reply.
-  **The tool checks every reading:** the two the same; the role's player ahead (an `end_P<k>` save has P<k> ahead);
-  the numbers at one place in every save; each save read back by a reader learnt without it. Its last line is one of:
+  **B181 — when the final screen shows a line score** (a number for each quarter, period, round or overtime, then the
+  final): read **every number of it** for each side, left to right, `_` for a blank cell, `=` before the final, sides
+  joined by `-`, P1 first. T90's first save, for instance: `end_P1=9+2+2+2+_+_=15-0+0+2+0+_+_=2,9+2+2+2+_+_=15-0+0+2+0+_+_=2`.
+  The final is still the result; the other numbers teach the tool every digit.
+  **The tool checks every reading:**
+  - the two the same;
+  - the role's player ahead (an `end_P<k>` save has P<k> ahead);
+  - each side's cells add up to its final;
+  - the numbers at one place in every save;
+  - every number of each save read back by a reader learnt without it;
+  - **the last look** (B183).
+  Its last line is one of:
   - "Read the final score on each end save's two pictures …" → read them, run the line's command.
+  - **"Look at label/digits.png …"** (B183, once every reading is checked) → open `label/digits.png`: a row for each
+    digit, every glyph read as that digit, numbered under it. Look at every tile. If every tile in every row is its
+    row's digit: `label <code> look=all`. Else, for each row holding a tile that is not its digit: `label <code>
+    look=<the row's digit>:<the tile numbers joined by '.'>` (e.g. `look=9:2.5`). The tool then names the saves those
+    tiles came from: read them again as below. Nothing to the user.
   - **"Read again: <role> (<why>) …"** → open that save's pictures again (and its cut-out numbers), read them afresh,
-    run `label <code> <role>=<P1>-<P2>,<P1>-<P2>`. Nothing to the user.
+    run `label <code> <role>=<P1>-<P2>,<P1>-<P2>` (with a line score, every number as above). The whys include "P<k>'s
+    cells add up to <s>, not its final <f>" (a misread cell or final) and "a glyph read as <d> is not one, at the last
+    look". Nothing to the user.
   - **"Ask the user for <role>'s numbers …"** (the same save named a second time) → say, word for word: "YOU, now: I
     couldn't read one final score of <the game> for sure. In the match P<k> won that you saved for me, what was the
     final score — P1's number, then P2's? Reply like 21-14." Then `label <code> <role>=<their numbers>,user`.
@@ -213,13 +231,18 @@ python3 tools/party_add_game.py close <code>                                    
 - **learn** → PASS; or its page's last line is one of §1's four — a save in the wrong role, the same match saved twice,
   one more save (each: §1's line to the user, then register's `--collect` and learn again), or the cap (§1: say it,
   stop). Any other FAIL → stop.
-  - **A `score` title's own line (B178): "One more save: a match either player won whose final score shows <digits> …"**
-    → say, word for word: "YOU, now: play one more match of <the game>, with other teams (or characters) than any match
-    saved so far, and try to end it with a <digit> in either side's final score (<the digits> — any one helps). Save to
-    slot <2 or 3> on the screen after the match that shows the final score, then tell me who won." Then `register
-    <code> … --collect end_P<the winner>_<n>=<slot>` (the role the line names for that winner), `label <code>`, read
-    the new save's pictures, `label <code> <role>=…`, `learn <code>`. **bench** → PASS or stop (it ends every
-  kept save, each save of an ending as that ending); it needs nobody: no pad, no TV.
+  - **A `score` title's own line (B178, B181): "One more save: a match either player won whose line score shows
+    <digits> (in any quarter, overtime or final, either side) …"** (a title with only the final: "whose final score
+    shows <digits> …") → say, word for word: "YOU, now: play one more match of <the game>, with other teams (or
+    characters) than any match saved so far, and try to get a <the digits, joined by 'or'> into the score — any
+    quarter or the final, either side (<the digits> — the more of them the better). Save to slot <2 or 3> on the screen
+    after the match that shows the final score, then tell me who won." (With only the final: "… try to end it with a
+    <digit> in either side's final score ….") Then `register <code> … --collect end_P<the winner>_<n>=<slot>` (the role
+    the line names for that winner), `label <code>`, read the new save's pictures, `label <code> <role>=…`, the last
+    look, `learn <code>`. **learn passes only when every digit 0-9 is shown by two saves or more** (B181): the hub can
+    then read any final score.
+- **bench** → PASS or stop (it ends every kept save, each save of an ending as that ending); it needs nobody: no pad,
+  no TV.
 - **rehearse** (§0 only) → as §0 says.
 - **solo:** it first sets the hub's **one-title setting** (B162): while it is set the board offers only this title for
   its player count, so its card is the only one shown. It refuses (nothing asked of the user) if the hub did not take
@@ -247,11 +270,18 @@ both bench flags are on, as T88 and T89 are; adoption is the user's own go.
 
 ## 4. The user's part, as it now is (B177; B178 for `score`) — two players, `winner` or `score`
 
-**`score` (B178):** the same saves, rounds and lines; the user says only who won each match. The numbers on the final
-screen are read by you in the label stage. **The user is asked one match's final score only when your readings of
-it disagree twice.** Every digit a save shows must also be shown by another save, so learn may ask for one more match
-whose final score shows a digit it names. The least is 6 saves, when the four final scores share their digits; in
-practice 7 or 8; at most 10.
+**`score` (B178, B181):** the same saves, rounds and lines; the user says only who won each match. The numbers on the
+final screen — the whole line score when it shows one — are read by you in the label stage. **The user is asked one
+match's final score only when your readings of it disagree twice.**
+- **Every digit 0-9 must be shown by two saves or more** (B181), so learn may ask for one more match showing the
+  digits it names.
+- **The least:** 6 saves, when the four end saves' line scores show every digit twice.
+- **A line score:** in practice 7-8.
+- **Only the final on its screen:** at least 7 (5 end saves at the very best), often the cap; a game whose scores
+  never reach some digit cannot be added this way.
+- **At most 10.**
+- **On the board (B182):** a match whose final score the hub cannot read is given up at once (no result, the board's
+  draw); it never waits.
 
 **Saves: 6 at the least** (the begin, a mid-match save, two wins for each player — enough when the two players' end
 screens look clearly different), **in practice 8 for a game whose end screens look nearly alike** (three wins for each

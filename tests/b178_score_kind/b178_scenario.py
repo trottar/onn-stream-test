@@ -6,8 +6,8 @@
 # Part 2 — the hub with the rules learn wrote: listed; ended with the real numbers and the winner's seat (seats 1,2
 # and 2,1); a tie -> winner null; numbers with digits never learnt -> no result (given up by the unknown rule), never
 # a guess; a sidecar `score` with another spec or with `scores` -> not listed.
-sys.path.insert(0, args["tools"]); sys.path.insert(0, args["b178_dir"])
-import score_capture as sc
+sys.path.insert(0, args["tools"]); sys.path.insert(0, args["b178_dir"]); sys.path.insert(0, args["b181_dir"])
+import line_capture as sc                                   # B181: a line-score title showing every digit twice
 try:
     agw = root / "ag"
     (agw / "dropins").mkdir(parents=True, exist_ok=True)
@@ -21,7 +21,7 @@ try:
     os.environ.update({"PRIVYHUB_ADD_GAME_HUB": f"http://127.0.0.1:{port}", "PRIVYHUB_ADD_GAME_HOME": str(agw / "home"),
                        "PRIVYHUB_ADD_GAME_EVIDENCE": str(agw / "evidence"), "PRIVYHUB_ADD_GAME_PROJECT": str(root),
                        "PRIVYHUB_ADD_GAME_DROPINS": str(agw / "dropins"), "PRIVYHUB_ADD_GAME_SYSTEMCTL": str(ctl),
-                       "PARTY_ADD_GAME_CAPTURE": "score_capture:capture_codes",
+                       "PARTY_ADD_GAME_CAPTURE": "line_capture:capture_codes",
                        "PRIVYHUB_ADD_GAME_KEPT_ROOT": str(agw / "kept")})
     (agw / "kept").mkdir(parents=True, exist_ok=True)
     import party_add_game as pag
@@ -74,9 +74,11 @@ try:
     S["s_learn_before_label"] = tool("learn", "T90")
     S["s_label_first"] = tool("label", "T90")
     S["s_label_pictures"] = sorted(p_.name for p_ in (agw / "home" / "T90" / "label").iterdir())
-    readings = [f"{r_}={'-'.join(map(str, sc.SCORES[c_]))},{'-'.join(map(str, sc.SCORES[c_]))}"
+    readings = [f"{r_}={sc.text_of(c_)},{sc.text_of(c_)}"
                 for r_, c_ in (("end_P1", 310), ("end_P1_2", 311), ("end_P2", 312), ("end_P2_2", 313))]
     S["s_label"] = tool("label", "T90", *readings)
+    if "Look at label/digits.png" in S["s_label"]["out"]:     # B183: the last look, as the session answers it
+        S["s_label"] = tool("label", "T90", "look=all")
     S["s_label_v"] = verdict("T90", "label")
     S["s_learn"] = tool("learn", "T90")
     S["s_learn_v"] = verdict("T90", "learn")
@@ -108,11 +110,15 @@ try:
         one(tag, seats, lead + [end_tok] * 40, tok=tok)
         S[tag + "_ended_rows"] = [{k_: v_ for k_, v_ in r_.items() if k_ in ("class", "scores", "winner")}
                                   for r_ in rows()[r0:] if r_["step"] == "minigame_ended"]
-    layer.unknown_limit_s = 2.0                              # an unreadable final screen: no result, never a guess
-    r0 = len(rows())
-    one("h_unread", "1,2", lead + ["sc321"] * 400, tok=tok)
-    S["h_unread_rows"] = [r_["step"] for r_ in rows()[r0:] if r_["step"] in ("minigame_ended", "minigame_given_up")]
-    layer.unknown_limit_s = 30.0
+    h7log = root / "logs/games/h7_results.jsonl"            # B182: an unreadable final screen given up at once
+    for tag, script in (("h_unread", lead + ["sc321"] * 400),                # held (the 30-s rule as it is)
+                        ("h_unread_moves", lead + ["sc321"] * 4 + ["sc301"] * 400)):   # then the game moves on
+        r0 = len(rows())
+        h0 = len(h7log.read_text().splitlines()) if h7log.is_file() else 0
+        one(tag, "1,2", script, tok=tok)
+        S[tag + "_rows"] = [{k_: v_ for k_, v_ in r_.items() if k_ not in ("time_unix",)}
+                            for r_ in rows()[r0:] if r_["step"] in ("minigame_ended", "minigame_given_up")]
+        S[tag + "_h7"] = [json.loads(x).get("step") for x in h7log.read_text().splitlines()[h0:]] if h7log.is_file() else []
     side_ = json.loads((rules_ / f"{title}.party.json").read_text())
     for tag, side2 in (("with_scores", {**side_, "scores": {"end": [1, 0]}}), ("four", {**side_, "players": 4})):
         (rules_ / f"{title}.party.json").write_text(json.dumps(side2))
