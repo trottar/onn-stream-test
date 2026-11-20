@@ -85,7 +85,10 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
 
     /**
      * G6-HM4: addendum B2's numbers exactly (`docs/memory/evidence/g6_hm1a_2026-11-19/layout_check_b.py`, B2), in px of
-     * the 1200 x 1325 reference region, scaled to the measured size (x and radii by the width, y by the height).
+     * the reference region, scaled to the measured size (x and radii by the width, y by the height).
+     * G6-SCREEN1: the region is 1200 x 1100 under the 4:3 box. Every control but SELECT / START keeps its on-screen
+     * place: its y is B2's minus 225 (the box grew by 225 px). SELECT and START stay at y 70 of the region, so they
+     * move down 225 px on the screen, toward the controls (`layout_check_screen1.py`).
      */
     private fun layoutPs2(w: Int, h: Int) {
         val sx = w / Ps2TouchLayout.REF_W
@@ -96,16 +99,16 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
         fun rect(c: Control, x: Float, y: Float, hw: Float, hh: Float, hit: Float) {
             shapes[c] = Shape.Rect(x * sx, y * sy, hw * sx, hh * sy, hit)
         }
-        circle(Control.LSTICK, 300f, 1030f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
-        circle(Control.DPAD, 300f, 520f, Ps2TouchLayout.DPAD_R, Ps2TouchLayout.DPAD_HIT)
+        circle(Control.LSTICK, 300f, 805f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
+        circle(Control.DPAD, 300f, 295f, Ps2TouchLayout.DPAD_R, Ps2TouchLayout.DPAD_HIT)
         dpadR = Ps2TouchLayout.DPAD_R * sx
-        circle(Control.L3, 540f, 1040f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.TRIANGLE, 900f, 940f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.CIRCLE, 990f, 1030f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.CROSS, 900f, 1120f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.SQUARE, 810f, 1030f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.RSTICK, 900f, 520f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
-        circle(Control.R3, 690f, 790f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.L3, 540f, 815f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.TRIANGLE, 900f, 715f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.CIRCLE, 990f, 805f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.CROSS, 900f, 895f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.SQUARE, 810f, 805f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.RSTICK, 900f, 295f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
+        circle(Control.R3, 690f, 565f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
         rect(Control.SELECT, 400f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
         rect(Control.START, 600f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
         rect(Control.L2, 56f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
@@ -114,11 +117,16 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
         rect(Control.R2, 1144f, Ps2TouchLayout.SHOULDER_Y, Ps2TouchLayout.SHOULDER_HW, Ps2TouchLayout.SHOULDER_HH, Ps2TouchLayout.SHOULDER_HIT)
     }
 
-    /** G6-HM4: the End button's place in the PS2 layout (a separate view; reserved here so nothing overlaps it). */
+    /**
+     * G6-HM4: the End button's place in the PS2 layout (a separate view; reserved here so nothing overlaps it).
+     * G6-SCREEN1: at x [Ps2TouchLayout.END_X] (was 960), y 70: the smallest x keeping >= 0.5 cm from the right stick's
+     * press area now that the stick is 225 px nearer the top of the region.
+     */
     fun endRect(w: Int, h: Int): FloatArray {
         val sx = w / Ps2TouchLayout.REF_W
         val sy = h / Ps2TouchLayout.REF_H
-        return floatArrayOf((960f - Ps2TouchLayout.SMALL_HW) * sx, (70f - Ps2TouchLayout.SMALL_HH) * sy, (960f + Ps2TouchLayout.SMALL_HW) * sx, (70f + Ps2TouchLayout.SMALL_HH) * sy)
+        val x = Ps2TouchLayout.END_X
+        return floatArrayOf((x - Ps2TouchLayout.SMALL_HW) * sx, (70f - Ps2TouchLayout.SMALL_HH) * sy, (x + Ps2TouchLayout.SMALL_HW) * sx, (70f + Ps2TouchLayout.SMALL_HH) * sy)
     }
 
     /** The controls held now (a stick or the D-pad counts as held while a finger owns it). */
@@ -280,10 +288,20 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
     }
 }
 
-/** G6-HM4: addendum B2's reference numbers (px of the 1200 x 1325 region; `layout_check_b.py`, B2), exactly. */
+/**
+ * G6-HM4: addendum B2's reference numbers (px of the region; `layout_check_b.py`, B2), exactly.
+ * G6-SCREEN1: the region 1200 x 1100 (was 1325) under the 4:3 box; the cluster's y 225 less, so it stays put on the
+ * screen; End at x 1080.
+ */
 object Ps2TouchLayout {
     const val REF_W = 1200f
-    const val REF_H = 1325f
+    const val REF_H = 1100f
+    /** G6-HM4's region height (B2's numbers were in px of 1200 x 1325). */
+    const val REF_H_HM4 = 1325f
+    /** G6-SCREEN1: how far the box grew, so how far every cluster y moved up in the region: 1325 - 1100. */
+    const val BOX_GROWTH = REF_H_HM4 - REF_H
+    /** G6-SCREEN1: End's x (G6-HM4: 960). */
+    const val END_X = 1080f
     /** G6-HM4's stick radius (drawn ring = full throw). */
     const val STICK_R_HM4 = 132f
     /** G6-HM4b: the throw shortened to 0.875 x (the user: "10-15% smaller"); the drawn ring matches it. */
@@ -299,7 +317,7 @@ object Ps2TouchLayout {
     const val BUTTON_HIT = 1.2f
     const val SMALL_HW = 75.5f
     const val SMALL_HH = 47.5f
-    const val SHOULDER_Y = 774f
+    const val SHOULDER_Y = 549f                          // G6-SCREEN1: B2's 774 - 225
     const val SHOULDER_HW = 50f
     const val SHOULDER_HH = 100f
     const val SHOULDER_HIT = 1.1f

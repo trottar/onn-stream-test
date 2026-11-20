@@ -169,13 +169,14 @@ class G6TouchPadStateTest {
         assertEquals(0.toShort(), TouchPadState.stickY(500f, 500f, 100f))
     }
 
-    // 11. the video box
+    // 11. the video box (G6-SCREEN1: 4:3, was 16:9; G6-HM3's 16:9 stays as videoBoxHeight16x9 and the fallback)
     @Test
     fun videoBoxIsWidthTimesNineSixteenths() {
-        assertEquals(675, HandheldGeometry.videoBoxHeight(1200))
-        assertEquals(1325, HandheldGeometry.padRegionHeight(1200, 2000))
-        assertEquals(720, HandheldGeometry.videoBoxHeight(1280))
-        assertEquals(450, HandheldGeometry.videoBoxHeight(800))
+        assertEquals(675, HandheldGeometry.videoBoxHeight16x9(1200))
+        assertEquals(900, HandheldGeometry.videoBoxHeight(1200))
+        assertEquals(1100, HandheldGeometry.padRegionHeight(1200, 2000))
+        assertEquals(720, HandheldGeometry.videoBoxHeight16x9(1280))
+        assertEquals(450, HandheldGeometry.videoBoxHeight16x9(800))
         assertEquals(0, HandheldGeometry.videoBoxHeight(0))
         assertEquals(0, HandheldGeometry.padRegionHeight(1200, 600))
     }

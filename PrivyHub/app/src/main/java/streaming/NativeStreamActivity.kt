@@ -961,6 +961,8 @@ open class NativeStreamActivity :
                 )
                 // G6-HM3: the handheld activity's start (a no-op here)
                 onPlayersOpened(restart != null)
+                // G6-SCREEN1: the launched game's system, from its catalog entry in the reply (a no-op here)
+                onGameSystem(json.optJSONObject("game_session")?.optJSONObject("game")?.optString("system"))
                 // B67: the N64 layout once per onn (only with the prompt on: the card's view exists then)
                 n64CardView?.let { card ->
                     val prefs = getSharedPreferences(N64LayoutCard.PREFS, MODE_PRIVATE)
@@ -4262,12 +4264,10 @@ open class NativeStreamActivity :
                 target.name + ".tmp"
             )
 
+        // G6-SCREEN1: hook H11, its default today's scaled copy
         val preview =
-            Bitmap.createScaledBitmap(
-                source,
-                480,
-                270,
-                true
+            pausedFramePreview(
+                source
             )
 
         try {
@@ -4742,6 +4742,18 @@ open class NativeStreamActivity :
     /** On the UI thread, at each gameplay release. */
     protected open fun onGameplayReleased() {}
     protected open fun putHandheldReport(report: JSONObject) {}
+    // G6-SCREEN1 (H10, H11): each default is the code it replaced or nothing, as H1-H7.
+    /** H10: the launched game's catalog `system` from the start reply (the session's thread). */
+    protected open fun onGameSystem(system: String?) {}
+    /** H11: the paused picture's stored preview from the surface's copy; the default is the expression it replaced. */
+    protected open fun pausedFramePreview(source: Bitmap): Bitmap =
+        Bitmap.createScaledBitmap(
+            source,
+            480,
+            270,
+            true
+        )
+    protected val streamSurface: View get() = surfaceView
     protected val streamSender: NativeControllerSender? get() = controllerSender
     protected val streamPrompt: PlayerPrompt? get() = playerPrompt
     protected val streamSlots: PadSlots? get() = padSlots

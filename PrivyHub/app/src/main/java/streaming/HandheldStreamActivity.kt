@@ -2,8 +2,10 @@ package com.safeiot.privyhub.streaming
 
 import android.content.Context
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Rect
 import android.os.Build
@@ -26,8 +28,9 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * G6-HM3 / G6-HM4: the tablet's portrait handheld mode (design `docs/memory/evidence/g6_hm1_2026-11-19/`, the amendment
  * `…/g6_hm1a_2026-11-19/` and addendum B2, all hashed before code, with the user's answers). The game's picture in a
- * W x W·9/16 box at the top (every overlay inside it, unchanged); the PS2 touch pad below. Launched only when the user
- * picks "Handheld" in Settings on a device with a touchscreen; the onn's NativeStreamActivity entry and paths are
+ * W x W·3/4 box at the top (G6-SCREEN1; G6-HM3's was W·9/16; every overlay inside it, unchanged); the PS2 touch pad
+ * below. A system proven 4:3 is cropped to fill the box; any other keeps its 16:9 picture at the box's top.
+ * Launched only when the user picks "Handheld" in Settings on a device with a touchscreen; the onn's NativeStreamActivity entry and paths are
  * unchanged.
  *
  * - D5: the PS2 layout on every system: D-pad, four face buttons, L1 / L2 / R1 / R2 (side by side, B2), two absolute
@@ -44,6 +47,9 @@ class HandheldStreamActivity : NativeStreamActivity() {
         private const val TICK_MS = 100L
         private const val TEXT_PREVIEW = "Touch buttons: coming in the next update"
         private val DIRECTIONS = arrayOf("up", "down", "left", "right")
+        /** G6-SCREEN1: a cropped paused picture: 4:3 at the stored preview's height (today's preview: 480 x 270). */
+        private const val PAUSED_W_4X3 = 360f
+        private const val PAUSED_H = 270f
     }
 
     private val ui = Handler(Looper.getMainLooper())
@@ -65,6 +71,9 @@ class HandheldStreamActivity : NativeStreamActivity() {
     @Volatile private var density = 0f
     @Volatile private var releaseAtMs: Long? = null
     @Volatile private var p1JoinAfterReleaseMs: Long = -1
+    /** G6-SCREEN1: the catalog entry's system (H10), and whether the picture is cropped now. */
+    @Volatile private var gameSystem: String? = null
+    @Volatile private var cropShown = false
     private val pressed = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
     /** [left, right] stick x [up, down, left, right]: the largest deflection seen, 0..1. */
     private val stickMax = Array(2) { FloatArray(4) }
@@ -112,7 +121,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
         }
         // End last: on top of the pad and the panel, so it stays reachable with the status panel shown (Q1 (c))
         area.addView(end, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
-        return HandheldLayout(this, streamLayer, area).also { frame = it }
+        return HandheldLayout(this, streamLayer, area, streamSurface, { gameSystem }) { cropShown = it }.also { frame = it }
     }
 
     // B70: the touchscreen only, in this activity only; mice, touchpads and a pad's touchpad stay consumed
@@ -122,6 +131,23 @@ class HandheldStreamActivity : NativeStreamActivity() {
     // design §5 / hook H4: the touch pad is "present" (only once it can hold a slot)
     override fun connectedPadDevices(): List<PadDevice> =
         if (TOUCH_LIVE) super.connectedPadDevices() + TouchPadDevice else super.connectedPadDevices()
+
+    // G6-SCREEN1 (H10): the system decides the crop; the box re-lays its surface (before the first frame, normally)
+    override fun onGameSystem(system: String?) {
+        gameSystem = system
+        // on the surface itself: its parents re-measure with it, so the box's placeSurface runs before the layer's measure
+        ui.post { streamSurface.requestLayout() }
+    }
+
+    // G6-SCREEN1 (H11): a cropped picture's paused copy is the shown 4:3 (the centre of the surface), 360 x 270
+    override fun pausedFramePreview(source: Bitmap): Bitmap {
+        if (!cropShown) return super.pausedFramePreview(source)
+        val ch = source.height
+        val cw = minOf(source.width, ch * 4 / 3)
+        if (cw <= 0 || ch <= 0) return super.pausedFramePreview(source)
+        val m = Matrix().apply { setScale(PAUSED_W_4X3 / cw, PAUSED_H / ch) }
+        return Bitmap.createBitmap(source, (source.width - cw) / 2, 0, cw, ch, m, true)
+    }
 
     override fun onPlayersOpened(selfRestart: Boolean) {
         ui.post { p1Rule.onStart(selfRestart); takeover.clear(); releaseAtMs = null }
@@ -181,8 +207,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
             .put("mode", "portrait")
             .put("layout", "ps2")
             .put("touch_live", TOUCH_LIVE)
-            .put("video_box", "${w}x${HandheldGeometry.videoBoxHeight(w)}")
+            .put("video_box", "${w}x${HandheldGeometry.videoBoxHeight(w, h)}")
             .put("pad_region", "${w}x${HandheldGeometry.padRegionHeight(w, h)}")
+            .put("video_crop", HandheldGeometry.videoCrop(cropShown))
+            .put("video_source_rect", HandheldGeometry.videoSourceRect(cropShown))
             .put("density", density.toDouble())
             .put("nav_mode", navMode)
             .put("sdk", Build.VERSION.SDK_INT)
@@ -271,8 +299,19 @@ class HandheldStreamActivity : NativeStreamActivity() {
         return "Players joined: $joined\n\nA controller is Player 1,\nso the touch buttons are off."
     }
 
-    /** The video box on top (W x W·9/16, from the measured width), the pad region below. */
-    private class HandheldLayout(ctx: Context, private val video: View, private val area: View) : ViewGroup(ctx) {
+    /**
+     * The video box on top (G6-SCREEN1: W x W·3/4, or G6-HM3's W·9/16 where the pad region would be too short), the pad
+     * region below. The video surface inside the box (G6-SCREEN1): cropped, 16:9 of the box's height centred, its side
+     * bars off the screen; not cropped, the 16:9 picture full width at the box's top.
+     */
+    private class HandheldLayout(
+        ctx: Context,
+        private val video: View,
+        private val area: View,
+        private val surface: View,
+        private val system: () -> String?,
+        private val onCrop: (Boolean) -> Unit,
+    ) : ViewGroup(ctx) {
         init {
             addView(video)
             addView(area)
@@ -281,16 +320,29 @@ class HandheldStreamActivity : NativeStreamActivity() {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val w = MeasureSpec.getSize(widthMeasureSpec)
             val h = MeasureSpec.getSize(heightMeasureSpec)
+            val box = HandheldGeometry.videoBoxHeight(w, h)
+            placeSurface(w, box)
             video.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(HandheldGeometry.videoBoxHeight(w), MeasureSpec.EXACTLY))
+                MeasureSpec.makeMeasureSpec(box, MeasureSpec.EXACTLY))
             area.measure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(HandheldGeometry.padRegionHeight(w, h), MeasureSpec.EXACTLY))
             setMeasuredDimension(w, h)
         }
 
+        /** The surface's size and gravity in the stream layer (a FrameLayout), set before the layer is measured. */
+        private fun placeSurface(w: Int, box: Int) {
+            val lp = surface.layoutParams as? FrameLayout.LayoutParams ?: return
+            val crop = HandheldGeometry.crop43(system(), w, box)
+            val r = HandheldGeometry.surfaceRect(w, box, crop)
+            lp.width = r[2]
+            lp.height = r[3]
+            lp.gravity = if (crop) Gravity.TOP or Gravity.CENTER_HORIZONTAL else Gravity.TOP or Gravity.START
+            onCrop(crop)
+        }
+
         override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
             val w = r - l
-            val box = HandheldGeometry.videoBoxHeight(w)
+            val box = HandheldGeometry.videoBoxHeight(w, b - t)
             video.layout(0, 0, w, box)
             area.layout(0, box, w, b - t)
         }

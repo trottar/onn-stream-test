@@ -13,13 +13,15 @@ import kotlin.math.max
 
 /**
  * G6-HM4: the PS2 touch layout (the amendment G6-HM1a; the shoulders as addendum B2, settled by the ergonomics chat)
- * on the tablet's 1200 x 1325 pad region, the sticks, L3 / R3, and the main app's 2-column rule.
+ * on the tablet's pad region, the sticks, L3 / R3, and the main app's 2-column rule.
  * B2's numbers are `docs/memory/evidence/g6_hm1a_2026-11-19/layout_check_b.py`'s, exactly.
+ * G6-SCREEN1: the region is 1200 x 1100 under the 4:3 box; every y but SELECT / START's is B2's minus 225 (the same
+ * place on the screen), End at x 1080 (`G6Screen1Test` pins the on-screen places against G6-HM4b's).
  */
 class G6TouchPs2Test {
 
     private val W = 1200
-    private val H = 1325
+    private val H = 1100                                    // G6-SCREEN1 (G6-HM4: 1325)
     private lateinit var s: TouchPadState
 
     @Before
@@ -31,20 +33,20 @@ class G6TouchPs2Test {
     private val MAX = 32767.toShort()
     private val MIN = (-32767).toShort()
 
-    // B2's centres, exactly as layout_check_b.py
+    // B2's centres, exactly as layout_check_b.py; G6-SCREEN1: each y but SELECT / START's 225 less
     @Test
     fun theLayoutIsAddendumB2() {
         val b2 = mapOf(
-            Control.LSTICK to (300f to 1030f), Control.DPAD to (300f to 520f), Control.L3 to (540f to 1040f),
-            Control.TRIANGLE to (900f to 940f), Control.CIRCLE to (990f to 1030f), Control.CROSS to (900f to 1120f),
-            Control.SQUARE to (810f to 1030f), Control.RSTICK to (900f to 520f), Control.R3 to (690f to 790f),
+            Control.LSTICK to (300f to 805f), Control.DPAD to (300f to 295f), Control.L3 to (540f to 815f),
+            Control.TRIANGLE to (900f to 715f), Control.CIRCLE to (990f to 805f), Control.CROSS to (900f to 895f),
+            Control.SQUARE to (810f to 805f), Control.RSTICK to (900f to 295f), Control.R3 to (690f to 565f),
             Control.SELECT to (400f to 70f), Control.START to (600f to 70f),
-            Control.L2 to (56f to 774f), Control.L1 to (170f to 774f), Control.R1 to (1030f to 774f), Control.R2 to (1144f to 774f),
+            Control.L2 to (56f to 549f), Control.L1 to (170f to 549f), Control.R1 to (1030f to 549f), Control.R2 to (1144f to 549f),
         )
         assertEquals(15, s.drawn().size)
         for ((control, xy) in b2) assertEquals(control.name, xy, c(control))
         val e = s.endRect(W, H)
-        assertEquals(listOf(884.5f, 22.5f, 1035.5f, 117.5f), e.toList())   // End at (960, 70), 151 x 95
+        assertEquals(listOf(1004.5f, 22.5f, 1155.5f, 117.5f), e.toList())   // G6-SCREEN1: End at (1080, 70), 151 x 95
     }
 
     // each stick's four directions and the sign (up and right positive; the sender stores -AXIS_Y)
@@ -145,7 +147,7 @@ class G6TouchPs2Test {
         data class Hit(val name: String, val circle: Boolean, val x: Double, val y: Double, val a: Double, val b: Double)
         val hits = s.drawn().map { Hit(it.control.name, it.halfH == 0f, it.cx.toDouble(), it.cy.toDouble(), it.hitHalfW.toDouble(),
             if (it.halfH == 0f) it.hitHalfW.toDouble() else it.hitHalfH.toDouble()) } +
-            Hit("END", false, 960.0, 70.0, 75.5 * 1.2, 47.5 * 1.2)
+            Hit("END", false, 1080.0, 70.0, 75.5 * 1.2, 47.5 * 1.2)
         fun overlap(p: Hit, q: Hit): Boolean = when {
             p.circle && q.circle -> hypot(p.x - q.x, p.y - q.y) < p.a + q.a
             !p.circle && !q.circle -> abs(p.x - q.x) < p.a + q.a && abs(p.y - q.y) < p.b + q.b
@@ -193,9 +195,9 @@ class G6TouchPs2Test {
 
     @Test
     fun theLayoutScalesWithTheMeasuredSize() {
-        val t = TouchPadState(TouchPadState.Kind.PS2).apply { layout(600, 662) }
+        val t = TouchPadState(TouchPadState.Kind.PS2).apply { layout(600, 550) }
         val (x, y) = t.centreOf(Control.L1)!!
-        assertEquals(85f, x, 0.01f); assertEquals(774f * 662 / 1325, y, 0.01f)
+        assertEquals(85f, x, 0.01f); assertEquals(549f * 550 / 1100, y, 0.01f)
     }
 
     @Test

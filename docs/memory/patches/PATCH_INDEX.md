@@ -235,6 +235,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | G6_HM3_PORTRAIT_SCREEN.md | g-track | APPLIED | the portrait handheld screen, inert pad (G6-HM3); candidate APK `1d658a3f…` tablet only |
 | G6_HM4_TOUCH_LIVE.md | g-track | APPLIED | the PS2 touch controls live (B2 shoulders), 2 catalog columns upright in handheld mode (G6-HM4); candidate APK `12bb09e7…` tablet only |
 | G6_HM4B_SHORTER_STICKS.md | g-track | APPLIED | the sticks' throw 0.875 × (G6-HM4b, the user's "10-15% smaller"); candidate APK `965d4f19…` tablet only |
+| G6_SCREEN1_4X3_PICTURE.md | g-track | APPLIED | the portrait video box 4:3 (1200 x 900), SNES / N64 cropped to fill it, SELECT / START / End moved down, the cluster unchanged on the screen (G6-SCREEN1); candidate APK `e4263fd9…` tablet only |
 | G8-P1_IMPAIRMENT_SHIM.md | g-track | APPLIED | test shim `PRIVYHUB_IMPAIRMENT`, not adopted |
 | G8-S1_SHIM_NONE_PROFILE.md | g-track | APPLIED | the shim's `none` profile |
 | G8-S2_START_RUNG.md | g-track | APPLIED | `START_RUNG`: one of G4-S4's four, under line 13 |

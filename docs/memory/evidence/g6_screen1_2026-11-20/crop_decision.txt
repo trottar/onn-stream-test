@@ -1,0 +1,44 @@
+G6-SCREEN1 B2: which systems are cropped to 4:3 (read only, 2026-11-20 ~06:12-06:18Z; nothing edited)
+Rule (the task): crop a system only where every game the hub can launch for it is shown 4:3; not proven, or any
+widescreen game -> not cropped. The client keys on the catalog entry's `system` (the start reply's
+game_session.game.system, the hub's own catalog object; no hub field added).
+
+The capture path, every system: companion/native_stream.py scales the captured window into the stream with
+force_original_aspect_ratio=decrease and pads it centred ((ow-iw)/2) with black -> a 4:3 picture is the centre
+960x720 of 1280x720.
+The launchable systems: companion/games/config/emulators.json (nes, snes, genesis, ps1 on RetroArch; Linux cores
+fceumm, bsnes -> snes9x by the snes-core.conf drop-in PRIVYHUB_SNES_CORE=snes9x, blastem, mednafen_psx_hw) and the
+plugins behind the companion drop-ins: ps2 (PRIVYHUB_PS2=1), n64 (PRIVYHUB_N64=1), gamecube (PRIVYHUB_GAMECUBE=1),
+party. RetroArch runs on the generated data/games/retroarch/config/privyhub-session.cfg: no aspect_ratio_index, no
+video_aspect_ratio_auto, no video_scale_integer (RetroArch defaults: the core-provided aspect), video_force_aspect
+true, game_specific_options true; overrides and core options under ~/.config/retroarch/config/.
+
+snes      CROP 4:3. snes9x (snes-core.conf); ~/.config/retroarch/config/Snes9x/Snes9x.opt snes9x_aspect = "4:3"; no
+          per-game .opt or .cfg in config/Snes9x/; every snes9x launch log (69 of logs/games/*game_snes_*.log,
+          2026-10-07 on) reports "Aspect: 1.3333". (The 30 older bsnes launches reported 1.3061; bsnes is not the
+          core in force.)
+n64       CROP 4:3. companion/n64_session.py OPTIONS "mupen64plus-aspect": "4:3" (with 43screensize 320x240), the
+          core file ~/.config/retroarch/config/Mupen64Plus-Next/Mupen64Plus-Next.opt mupen64plus-aspect = "4:3"; no
+          per-game .opt or .cfg; every N64 launch log (30 of logs/games/*game_n64_*.log) reports "320x240, Aspect:
+          1.3333".
+ps1       NOT CROPPED (not 4:3). Beetle PSX HW: Beetle PSX HW.opt and all 13 per-game .opt files have
+          beetle_psx_hw_aspect_ratio = "corrected", crop_overscan "smart", widescreen_hack "disabled"; but the core
+          reports aspect 1.2190, not 1.3333, in every PS1 launch log (825 of logs/games/*game_ps1_*.log: 4417
+          SET_SYSTEM_AV_INFO + 825 Core Geometry rows, all "320x240, Aspect: 1.2190"); C5-M4's record measured the
+          content area 876x720 in the 1280x720 stream. A 4:3 crop would cut none of the picture but leave ~42 px
+          (stream) black at each side: not "shown 4:3", so not cropped. Cowork's to decide.
+ps2       NOT CROPPED (widescreen games). data/games/ps2/config/PCSX2/inis/PCSX2.ini AspectRatio = Auto 4:3/3:2
+          (FMVAspectRatioSwitch Off); B80's patches are on (PRIVYHUB_PS2_PATCHES unset = on) and
+          data/games/ps2/patch_toggles.json has "ws": true for 4 titles, whose gamesettings/*.ini (8 files, 4 CRCs)
+          carry EnableWideScreenPatches = true. Those 4 launch 16:9.
+gamecube  NOT CROPPED (not proven). data/games/gamecube/user/Config/GFX.ini (companion/gamecube_session.py
+          gfx_ini()) sets no AspectRatio: Dolphin's default (Auto) follows each game's own 16:9 flag. No launch
+          log with a geometry line.
+party     NOT CROPPED (not proven: a Godot game; no 4:3 setting found).
+nes       NOT CROPPED (not proven: fceumm has no .opt on the hub, its default aspect is the 8:7 pixel shape, not
+          4:3; no NES launch logged).
+genesis   NOT CROPPED (not proven: blastem, no .opt, no launch logged).
+
+Result: HandheldGeometry.CROP_4X3_SYSTEMS = {"snes", "n64"}. The pre-registered run is a PS2 game: video_crop "none",
+video_source_rect "0,0,1280x720", the 16:9 picture full width at the top of the 4:3 box.
+No game title, address or device id in this file.

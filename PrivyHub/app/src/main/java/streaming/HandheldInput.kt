@@ -18,11 +18,69 @@ object HandheldInput {
 }
 
 object HandheldGeometry {
-    /** The video box's height for the measured width: 16:9, integer (1200 -> 675). Never a constant (design §2). */
-    fun videoBoxHeight(widthPx: Int): Int = if (widthPx <= 0) 0 else widthPx * 9 / 16
+    /**
+     * G6-SCREEN1: the video box's height for the measured width: **4:3**, integer (1200 -> 900; G6-HM3's was 16:9,
+     * 675). Never a constant (design §2).
+     */
+    fun videoBoxHeight(widthPx: Int): Int = if (widthPx <= 0) 0 else widthPx * 3 / 4
+
+    /** G6-HM3's 16:9 box (1200 -> 675): the fallback below, and the picture's height when it is not cropped. */
+    fun videoBoxHeight16x9(widthPx: Int): Int = if (widthPx <= 0) 0 else widthPx * 9 / 16
+
+    /**
+     * G6-SCREEN1: the box on a real screen: 4:3 when the pad region left under it keeps at least the PS2 layout's
+     * reference shape ([Ps2TouchLayout.REF_H] / [Ps2TouchLayout.REF_W] of the width, so the cluster is never squeezed
+     * vertically); otherwise G6-HM3's 16:9. The tablet (1200 x 2000): 900, leaving 1100 = exactly the reference.
+     */
+    fun videoBoxHeight(widthPx: Int, heightPx: Int): Int {
+        val box = videoBoxHeight(widthPx)
+        val refW = Ps2TouchLayout.REF_W.toInt()
+        val need = (widthPx * Ps2TouchLayout.REF_H.toInt() + refW - 1) / refW     // whole px, rounded up (1200 -> 1100)
+        return if (widthPx > 0 && heightPx - box >= need) box else videoBoxHeight16x9(widthPx)
+    }
 
     /** The pad region's height under the box (never negative). */
-    fun padRegionHeight(widthPx: Int, heightPx: Int): Int = (heightPx - videoBoxHeight(widthPx)).coerceAtLeast(0)
+    fun padRegionHeight(widthPx: Int, heightPx: Int): Int = (heightPx - videoBoxHeight(widthPx, heightPx)).coerceAtLeast(0)
+
+    /**
+     * G6-SCREEN1: the systems whose every game the hub shows 4:3 (proved from the hub's files, read only:
+     * `docs/memory/evidence/G6_SCREEN1_4X3_PICTURE_2026-11-20.md` §1.2). The catalog entry's `system` id. Any other
+     * system, an unknown one, or none is not cropped.
+     */
+    val CROP_4X3_SYSTEMS: Set<String> = setOf("snes", "n64")
+
+    /** The hub's stream, in stream pixels (1280 x 720; the picture is scaled, so any 16:9 size crops the same). */
+    const val STREAM_W = 1280
+    const val STREAM_H = 720
+
+    /** Crop this session's picture to 4:3: a proven system, and a 4:3 box (the 16:9 fallback never crops). */
+    fun crop43(system: String?, boxW: Int, boxH: Int): Boolean =
+        boxW > 0 && boxH == videoBoxHeight(boxW) && system?.trim()?.lowercase() in CROP_4X3_SYSTEMS
+
+    /** The handheld report's `video_crop`. */
+    fun videoCrop(crop: Boolean): String = if (crop) "4:3" else "none"
+
+    /** The shown rectangle of the stream, `x,y,WxH` in stream pixels: the centre 4:3 (`160,0,960x720`) or all of it. */
+    fun videoSourceRect(crop: Boolean, streamW: Int = STREAM_W, streamH: Int = STREAM_H): String =
+        if (crop) {
+            val w = streamH * 4 / 3
+            "${(streamW - w) / 2},0,${w}x$streamH"
+        } else {
+            "0,0,${streamW}x$streamH"
+        }
+
+    /**
+     * The video surface in the box: `[left, top, width, height]`. Cropped: 16:9 of the box's height, centred (1600 x
+     * 900 at x −200 on the tablet), so the stream's side bars fall off the screen's edges. Not cropped: the 16:9
+     * picture full width at the top of the box (1200 x 675); the rest of the box is the background.
+     */
+    fun surfaceRect(boxW: Int, boxH: Int, crop: Boolean): IntArray =
+        if (crop) {
+            val w = boxH * 16 / 9
+            intArrayOf((boxW - w) / 2, 0, w, boxH)
+        } else {
+            intArrayOf(0, 0, boxW, videoBoxHeight16x9(boxW))
+        }
 
     /** G6-HM4: a catalog row of 3 cards (3 x (300 + 12) dp + 24 dp of padding): the onn's width exactly. */
     const val CATALOG_FULL_WIDTH_DP = 960
