@@ -201,11 +201,18 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
 
     fun heldFingers(): Int = fingers.size
 
-    fun output(): Output {
+    fun output(): Output = output(emptySet())
+
+    /**
+     * G6-JOIN1: the output with the fingers on [skip] left out (a touch hold's joining control is not sent until it is
+     * lifted, as a real pad's joining key). An empty set is [output].
+     */
+    fun output(skip: Set<Control>): Output {
         var buttons = 0
         var lt = 0
         var rt = 0
         for (f in fingers.values) {
+            if (f.control in skip) continue
             when (f.control) {
                 Control.DPAD -> buttons = buttons or dpadBits(f.x, f.y)
                 Control.CROSS -> buttons = buttons or XUSB_A
@@ -225,8 +232,8 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
         }
         // G6-STICK1: the sticks' sent values through the DualShock 2 mapping ([Ds2Stick]); the knob and the report's
         // deflection keep [stickDeflection]
-        val (lx, ly) = stickSent(Control.LSTICK)
-        val (rx, ry) = stickSent(Control.RSTICK)
+        val (lx, ly) = if (Control.LSTICK in skip) 0.toShort() to 0.toShort() else stickSent(Control.LSTICK)
+        val (rx, ry) = if (Control.RSTICK in skip) 0.toShort() to 0.toShort() else stickSent(Control.RSTICK)
         return Output(buttons = buttons, lx = lx, ly = ly, rx = rx, ry = ry,
             lt = lt, rt = rt)
     }

@@ -55,6 +55,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
     private val ui = Handler(Looper.getMainLooper())
     private val pad = TouchPadState(TouchPadState.Kind.PS2)
     private val p1Rule = TouchP1Rule()
+    /** G6-JOIN1: a touch hold joins P1 during the countdown; the joining controls are not sent until lifted. */
+    private val holdJoin = TouchHoldJoin()
+    private val joinSuppressed = LinkedHashSet<TouchPadState.Control>()
+    @Volatile private var joinVia = "none"
     private val takeover = TouchTakeover()
     private var padView: TouchPadView? = null
     private var panel: TextView? = null
@@ -166,7 +170,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
     }
 
     override fun onPlayersOpened(selfRestart: Boolean) {
-        ui.post { p1Rule.onStart(selfRestart); takeover.clear(); releaseAtMs = null }
+        ui.post { p1Rule.onStart(selfRestart); takeover.clear(); releaseAtMs = null; holdJoin.reset() }
     }
 
     override fun onGameplayReleased() {
@@ -251,6 +255,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
             .put("touch_writes", touchWrites.get())
             .put("touch_slot", streamSlots?.slotOf(TouchPadDevice) ?: -1)
             .put("p1_join_after_release_ms", p1JoinAfterReleaseMs)
+            .put("p1_join_via", joinVia)
+            .put("p1_join_hold_ms", PlayerPrompt.HOLD_MS)
             .put("takeovers", takeovers.get())
             .put("controls_pressed", JSONArray(synchronized(pressed) { pressed.toList() }))
             .put("stick_max_deflection", sticks)
@@ -273,7 +279,9 @@ class HandheldStreamActivity : NativeStreamActivity() {
 
     /** What was touched (the report's keys), then the touch pad's fields into its own slot (none = nothing). */
     private fun onPadOutput(out: TouchPadState.Output) {
-        pad.heldControls().forEach { pressed.add(it.name) }
+        val held = pad.heldControls()
+        held.forEach { pressed.add(it.name) }
+        holdJoin.observe(held, nowMs())
         stickStats[0].onSent(out.lx, out.ly)
         stickStats[1].onSent(out.rx, out.ry)
         synchronized(stickMax) {
@@ -289,7 +297,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
         if (!TOUCH_LIVE) return
         val sender = streamSender ?: return
         val slot = streamSlots?.slotOf(TouchPadDevice) ?: return
-        val o = if (gameplayLive) out else TouchPadState.Output()
+        // G6-JOIN1: the joining controls stay out until lifted (as a real pad's joining key)
+        if (joinSuppressed.isNotEmpty()) joinSuppressed.retainAll(held)
+        val sent = if (joinSuppressed.isEmpty()) out else pad.output(joinSuppressed)
+        val o = if (gameplayLive) sent else TouchPadState.Output()
         if (sender.writePlayerState(slot, o.buttons, o.lx, o.ly, o.rx, o.ry, o.lt, o.rt)) touchWrites.incrementAndGet()
     }
 
@@ -306,9 +317,16 @@ class HandheldStreamActivity : NativeStreamActivity() {
             val realP1 = p1 != null && p1 != TouchPadDevice.KEY
             if (TOUCH_LIVE) {
                 val prompt = streamPrompt
-                if (p1Rule.tick(now, realP1) == TouchP1Rule.Action.JOIN_P1) {
+                // G6-JOIN1: a touch hold during the countdown joins at once; else the countdown at 5 s as before
+                val via = holdJoin.step(now, p1Rule, p1 == null, realP1)
+                if (via != null) {
+                    val held = pad.heldControls()
                     val s = prompt?.joinAsP1WithoutHold(TouchPadDevice, now, connectedPadDevices())
-                    if (s == 0) releaseAtMs?.let { p1JoinAfterReleaseMs = now - it }
+                    if (s == 0) {
+                        releaseAtMs?.let { p1JoinAfterReleaseMs = now - it }
+                        joinVia = via.report
+                        if (via == TouchHoldJoin.Via.HOLD) joinSuppressed.addAll(held)
+                    }
                 }
                 takeover.due(now, p1 == TouchPadDevice.KEY)?.let { real ->
                     streamSender?.writePlayerState(0, 0, 0, 0, 0, 0, 0, 0)
@@ -332,7 +350,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
                 t.text = when {
                     !TOUCH_LIVE -> TEXT_PREVIEW
                     p1 == TouchPadDevice.KEY -> "Touch buttons: Player 1"
-                    else -> p1Rule.secondsLeft(now)?.let { "Touch buttons: P1 in $it…" } ?: ""
+                    else -> p1Rule.secondsLeft(now)?.let { "Hold any button to join · P1 in $it…" } ?: ""
                 }
             }
             ui.postDelayed(this, TICK_MS)

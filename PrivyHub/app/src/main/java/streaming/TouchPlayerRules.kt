@@ -10,7 +10,8 @@ package com.safeiot.privyhub.streaming
 /**
  * D2 with Q3 (b), (i): after every start that clears the slots (a game's start, every unpause; not a self-restart),
  * the count starts at the first gameplay release, and at [WAIT_MS] the touch pad joins as P1 unless a real pad holds
- * P1 by then. Q4 (b): [secondsLeft] is the pad region's countdown. A touch during the wait does not join early.
+ * P1 by then. Q4 (b): [secondsLeft] is the pad region's countdown. G6-JOIN1: a touch hold during the wait joins at
+ * once ([TouchHoldJoin]); a shorter touch does not.
  */
 class TouchP1Rule {
     enum class Action { NONE, JOIN_P1, GIVE_UP }
@@ -98,5 +99,40 @@ class TouchTakeover {
 
     companion object {
         const val TAKEOVER_MS = 2_000L
+    }
+}
+
+/**
+ * G6-JOIN1 (the user, 2026-11-20: "if I hold a virtual button that registers P1"): while the countdown runs and P1 is
+ * free, any touch control (a button, the D-pad, a shoulder, a stick, Select, Start; End is its own view, never here)
+ * held for a real pad's join hold ([PlayerPrompt.HOLD_MS], 500 ms) makes the touch pad P1 at once and stops the
+ * countdown. Shorter: nothing; the countdown goes on. P1 taken or no countdown: nothing (today). No hold: the countdown
+ * joins at its deadline as before.
+ */
+class TouchHoldJoin(private val holdMs: Long = PlayerPrompt.HOLD_MS) {
+    enum class Via(val report: String) { HOLD("hold"), TIMER("timer") }
+
+    private val since = HashMap<TouchPadState.Control, Long>()
+
+    /** The controls held now (each touch event and each tick): a control's hold starts when first seen held. */
+    fun observe(held: Set<TouchPadState.Control>, nowMs: Long) {
+        since.keys.retainAll(held)
+        for (c in held) if (c !in since) since[c] = nowMs
+    }
+
+    fun reset() = since.clear()
+
+    /**
+     * The UI tick: [p1Free] no device holds slot 0; [p1HeldByRealPad] a real pad does. A due hold (the countdown
+     * running, P1 free) -> [Via.HOLD] and the countdown stopped; otherwise the countdown's own tick ([Via.TIMER] at its
+     * deadline). Null: no join now.
+     */
+    fun step(nowMs: Long, rule: TouchP1Rule, p1Free: Boolean, p1HeldByRealPad: Boolean): Via? {
+        if (rule.armed() && p1Free && !p1HeldByRealPad && since.values.any { nowMs - it >= holdMs }) {
+            rule.cancel()
+            since.clear()
+            return Via.HOLD
+        }
+        return if (rule.tick(nowMs, p1HeldByRealPad) == TouchP1Rule.Action.JOIN_P1) Via.TIMER else null
     }
 }

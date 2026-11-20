@@ -1,0 +1,288 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+index d3be1737..b227b35e 100644
+--- a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+@@ -55,6 +55,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     private val ui = Handler(Looper.getMainLooper())
+     private val pad = TouchPadState(TouchPadState.Kind.PS2)
+     private val p1Rule = TouchP1Rule()
++    /** G6-JOIN1: a touch hold joins P1 during the countdown; the joining controls are not sent until lifted. */
++    private val holdJoin = TouchHoldJoin()
++    private val joinSuppressed = LinkedHashSet<TouchPadState.Control>()
++    @Volatile private var joinVia = "none"
+     private val takeover = TouchTakeover()
+     private var padView: TouchPadView? = null
+     private var panel: TextView? = null
+@@ -166,7 +170,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     }
+ 
+     override fun onPlayersOpened(selfRestart: Boolean) {
+-        ui.post { p1Rule.onStart(selfRestart); takeover.clear(); releaseAtMs = null }
++        ui.post { p1Rule.onStart(selfRestart); takeover.clear(); releaseAtMs = null; holdJoin.reset() }
+     }
+ 
+     override fun onGameplayReleased() {
+@@ -251,6 +255,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             .put("touch_writes", touchWrites.get())
+             .put("touch_slot", streamSlots?.slotOf(TouchPadDevice) ?: -1)
+             .put("p1_join_after_release_ms", p1JoinAfterReleaseMs)
++            .put("p1_join_via", joinVia)
++            .put("p1_join_hold_ms", PlayerPrompt.HOLD_MS)
+             .put("takeovers", takeovers.get())
+             .put("controls_pressed", JSONArray(synchronized(pressed) { pressed.toList() }))
+             .put("stick_max_deflection", sticks)
+@@ -273,7 +279,9 @@ class HandheldStreamActivity : NativeStreamActivity() {
+ 
+     /** What was touched (the report's keys), then the touch pad's fields into its own slot (none = nothing). */
+     private fun onPadOutput(out: TouchPadState.Output) {
+-        pad.heldControls().forEach { pressed.add(it.name) }
++        val held = pad.heldControls()
++        held.forEach { pressed.add(it.name) }
++        holdJoin.observe(held, nowMs())
+         stickStats[0].onSent(out.lx, out.ly)
+         stickStats[1].onSent(out.rx, out.ry)
+         synchronized(stickMax) {
+@@ -289,7 +297,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         if (!TOUCH_LIVE) return
+         val sender = streamSender ?: return
+         val slot = streamSlots?.slotOf(TouchPadDevice) ?: return
+-        val o = if (gameplayLive) out else TouchPadState.Output()
++        // G6-JOIN1: the joining controls stay out until lifted (as a real pad's joining key)
++        if (joinSuppressed.isNotEmpty()) joinSuppressed.retainAll(held)
++        val sent = if (joinSuppressed.isEmpty()) out else pad.output(joinSuppressed)
++        val o = if (gameplayLive) sent else TouchPadState.Output()
+         if (sender.writePlayerState(slot, o.buttons, o.lx, o.ly, o.rx, o.ry, o.lt, o.rt)) touchWrites.incrementAndGet()
+     }
+ 
+@@ -306,9 +317,16 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             val realP1 = p1 != null && p1 != TouchPadDevice.KEY
+             if (TOUCH_LIVE) {
+                 val prompt = streamPrompt
+-                if (p1Rule.tick(now, realP1) == TouchP1Rule.Action.JOIN_P1) {
++                // G6-JOIN1: a touch hold during the countdown joins at once; else the countdown at 5 s as before
++                val via = holdJoin.step(now, p1Rule, p1 == null, realP1)
++                if (via != null) {
++                    val held = pad.heldControls()
+                     val s = prompt?.joinAsP1WithoutHold(TouchPadDevice, now, connectedPadDevices())
+-                    if (s == 0) releaseAtMs?.let { p1JoinAfterReleaseMs = now - it }
++                    if (s == 0) {
++                        releaseAtMs?.let { p1JoinAfterReleaseMs = now - it }
++                        joinVia = via.report
++                        if (via == TouchHoldJoin.Via.HOLD) joinSuppressed.addAll(held)
++                    }
+                 }
+                 takeover.due(now, p1 == TouchPadDevice.KEY)?.let { real ->
+                     streamSender?.writePlayerState(0, 0, 0, 0, 0, 0, 0, 0)
+@@ -332,7 +350,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
+                 t.text = when {
+                     !TOUCH_LIVE -> TEXT_PREVIEW
+                     p1 == TouchPadDevice.KEY -> "Touch buttons: Player 1"
+-                    else -> p1Rule.secondsLeft(now)?.let { "Touch buttons: P1 in $it…" } ?: ""
++                    else -> p1Rule.secondsLeft(now)?.let { "Hold any button to join · P1 in $it…" } ?: ""
+                 }
+             }
+             ui.postDelayed(this, TICK_MS)
+diff --git a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+index cbbbcd38..5ebda140 100644
+--- a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
++++ b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+@@ -201,11 +201,18 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
+ 
+     fun heldFingers(): Int = fingers.size
+ 
+-    fun output(): Output {
++    fun output(): Output = output(emptySet())
++
++    /**
++     * G6-JOIN1: the output with the fingers on [skip] left out (a touch hold's joining control is not sent until it is
++     * lifted, as a real pad's joining key). An empty set is [output].
++     */
++    fun output(skip: Set<Control>): Output {
+         var buttons = 0
+         var lt = 0
+         var rt = 0
+         for (f in fingers.values) {
++            if (f.control in skip) continue
+             when (f.control) {
+                 Control.DPAD -> buttons = buttons or dpadBits(f.x, f.y)
+                 Control.CROSS -> buttons = buttons or XUSB_A
+@@ -225,8 +232,8 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
+         }
+         // G6-STICK1: the sticks' sent values through the DualShock 2 mapping ([Ds2Stick]); the knob and the report's
+         // deflection keep [stickDeflection]
+-        val (lx, ly) = stickSent(Control.LSTICK)
+-        val (rx, ry) = stickSent(Control.RSTICK)
++        val (lx, ly) = if (Control.LSTICK in skip) 0.toShort() to 0.toShort() else stickSent(Control.LSTICK)
++        val (rx, ry) = if (Control.RSTICK in skip) 0.toShort() to 0.toShort() else stickSent(Control.RSTICK)
+         return Output(buttons = buttons, lx = lx, ly = ly, rx = rx, ry = ry,
+             lt = lt, rt = rt)
+     }
+diff --git a/PrivyHub/app/src/main/java/streaming/TouchPlayerRules.kt b/PrivyHub/app/src/main/java/streaming/TouchPlayerRules.kt
+index 10c1d594..529a7f66 100644
+--- a/PrivyHub/app/src/main/java/streaming/TouchPlayerRules.kt
++++ b/PrivyHub/app/src/main/java/streaming/TouchPlayerRules.kt
+@@ -10,7 +10,8 @@ package com.safeiot.privyhub.streaming
+ /**
+  * D2 with Q3 (b), (i): after every start that clears the slots (a game's start, every unpause; not a self-restart),
+  * the count starts at the first gameplay release, and at [WAIT_MS] the touch pad joins as P1 unless a real pad holds
+- * P1 by then. Q4 (b): [secondsLeft] is the pad region's countdown. A touch during the wait does not join early.
++ * P1 by then. Q4 (b): [secondsLeft] is the pad region's countdown. G6-JOIN1: a touch hold during the wait joins at
++ * once ([TouchHoldJoin]); a shorter touch does not.
+  */
+ class TouchP1Rule {
+     enum class Action { NONE, JOIN_P1, GIVE_UP }
+@@ -100,3 +101,38 @@ class TouchTakeover {
+         const val TAKEOVER_MS = 2_000L
+     }
+ }
++
++/**
++ * G6-JOIN1 (the user, 2026-11-20: "if I hold a virtual button that registers P1"): while the countdown runs and P1 is
++ * free, any touch control (a button, the D-pad, a shoulder, a stick, Select, Start; End is its own view, never here)
++ * held for a real pad's join hold ([PlayerPrompt.HOLD_MS], 500 ms) makes the touch pad P1 at once and stops the
++ * countdown. Shorter: nothing; the countdown goes on. P1 taken or no countdown: nothing (today). No hold: the countdown
++ * joins at its deadline as before.
++ */
++class TouchHoldJoin(private val holdMs: Long = PlayerPrompt.HOLD_MS) {
++    enum class Via(val report: String) { HOLD("hold"), TIMER("timer") }
++
++    private val since = HashMap<TouchPadState.Control, Long>()
++
++    /** The controls held now (each touch event and each tick): a control's hold starts when first seen held. */
++    fun observe(held: Set<TouchPadState.Control>, nowMs: Long) {
++        since.keys.retainAll(held)
++        for (c in held) if (c !in since) since[c] = nowMs
++    }
++
++    fun reset() = since.clear()
++
++    /**
++     * The UI tick: [p1Free] no device holds slot 0; [p1HeldByRealPad] a real pad does. A due hold (the countdown
++     * running, P1 free) -> [Via.HOLD] and the countdown stopped; otherwise the countdown's own tick ([Via.TIMER] at its
++     * deadline). Null: no join now.
++     */
++    fun step(nowMs: Long, rule: TouchP1Rule, p1Free: Boolean, p1HeldByRealPad: Boolean): Via? {
++        if (rule.armed() && p1Free && !p1HeldByRealPad && since.values.any { nowMs - it >= holdMs }) {
++            rule.cancel()
++            since.clear()
++            return Via.HOLD
++        }
++        return if (rule.tick(nowMs, p1HeldByRealPad) == TouchP1Rule.Action.JOIN_P1) Via.TIMER else null
++    }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/G6Join1Test.kt b/PrivyHub/app/src/test/java/streaming/G6Join1Test.kt
+new file mode 100644
+index 00000000..1fb84126
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/G6Join1Test.kt
+@@ -0,0 +1,110 @@
++package com.safeiot.privyhub.streaming
++
++import com.safeiot.privyhub.streaming.TouchPadState.Control
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * G6-JOIN1: holding any touch control for a real pad's join hold (500 ms) during the countdown makes the touch pad P1
++ * at once ("hold"); shorter does nothing; no hold -> the countdown at 5 s ("timer"); the joining press is not sent;
++ * P1 taken -> nothing new; End is never a pad control.
++ */
++class G6Join1Test {
++
++    private fun armed(at: Long = 1_000L) = TouchP1Rule().apply { onStart(false); onGameplayReleased(at) }
++
++    @Test
++    fun theHoldTimeIsTheRealPadsHold() {
++        assertEquals(500L, PlayerPrompt.HOLD_MS)
++    }
++
++    @Test
++    fun aHoldOfTheRealPadsTimeOnAnyControlJoinsAtOnce() {
++        for (c in Control.values()) {
++            val rule = armed()
++            val j = TouchHoldJoin()
++            j.observe(setOf(c), 1_200L)
++            assertNull(c.name, j.step(1_699L, rule, p1Free = true, p1HeldByRealPad = false))
++            assertEquals(c.name, TouchHoldJoin.Via.HOLD, j.step(1_700L, rule, p1Free = true, p1HeldByRealPad = false))
++            assertEquals("hold", TouchHoldJoin.Via.HOLD.report)
++            // the countdown stopped: no timer join later, no countdown text
++            assertFalse(rule.armed()); assertNull(rule.secondsLeft(2_000L))
++            assertNull(j.step(6_100L, rule, p1Free = true, p1HeldByRealPad = false))
++        }
++    }
++
++    @Test
++    fun aShorterHoldDoesNothingAndTheCountdownGoesOn() {
++        val rule = armed()
++        val j = TouchHoldJoin()
++        j.observe(setOf(Control.CROSS), 1_200L)
++        j.observe(emptySet(), 1_650L)                                   // lifted after 450 ms
++        assertNull(j.step(1_700L, rule, true, false))
++        assertNull(j.step(3_000L, rule, true, false))
++        assertTrue(rule.armed())
++        assertEquals(4, rule.secondsLeft(2_100L))
++        // a new hold starts again from its own down
++        j.observe(setOf(Control.CROSS), 3_000L)
++        assertNull(j.step(3_499L, rule, true, false))
++        assertEquals(TouchHoldJoin.Via.HOLD, j.step(3_500L, rule, true, false))
++    }
++
++    @Test
++    fun noHoldTheTimerJoinsAtFiveSecondsAsToday() {
++        val rule = armed()
++        val j = TouchHoldJoin()
++        assertNull(j.step(5_999L, rule, true, false))
++        assertEquals(TouchHoldJoin.Via.TIMER, j.step(6_000L, rule, true, false))
++        assertEquals("timer", TouchHoldJoin.Via.TIMER.report)
++        assertNull(j.step(7_000L, rule, true, false))                   // once
++    }
++
++    @Test
++    fun withP1TakenOrNoCountdownAHoldChangesNothing() {
++        // a real pad holds P1: the rule gives up as today, the hold joins nothing
++        val rule = armed()
++        val j = TouchHoldJoin()
++        j.observe(setOf(Control.START), 1_100L)
++        assertNull(j.step(2_000L, rule, p1Free = false, p1HeldByRealPad = true))
++        assertFalse(rule.armed())
++        // P1 already the touch pad's (the countdown finished): nothing new
++        val done = armed(); val j2 = TouchHoldJoin()
++        assertEquals(TouchHoldJoin.Via.TIMER, j2.step(6_000L, done, true, false))
++        j2.observe(setOf(Control.CROSS), 6_100L)
++        assertNull(j2.step(7_000L, done, p1Free = false, p1HeldByRealPad = false))
++        // before the gameplay release (no countdown yet): nothing
++        val waiting = TouchP1Rule().apply { onStart(false) }
++        val j3 = TouchHoldJoin()
++        j3.observe(setOf(Control.CROSS), 0L)
++        assertNull(j3.step(2_000L, waiting, true, false))
++    }
++
++    // the joining press is not sent until it is lifted; other controls are
++    @Test
++    fun theJoiningPressIsNotSent() {
++        val s = TouchPadState(TouchPadState.Kind.PS2).apply { layout(1200, 1100) }
++        val (cx, cy) = s.centreOf(Control.CROSS)!!
++        val (lx, ly) = s.centreOf(Control.LSTICK)!!
++        assertEquals(TouchPadState.XUSB_A, s.down(1, cx, cy).buttons)
++        assertEquals(0, s.output(setOf(Control.CROSS)).buttons)
++        s.down(2, lx, ly); s.move(2, lx + 200f, ly)
++        val skipStick = s.output(setOf(Control.CROSS, Control.LSTICK))
++        assertEquals(0.toShort(), skipStick.lx)
++        assertEquals(32767.toShort(), s.output(setOf(Control.CROSS)).lx)   // the stick not skipped: sent
++        assertEquals(s.output(), s.output(emptySet()))
++    }
++
++    // End is its own view: never a pad control, so never a joining hold, and nothing of the pad claims its place
++    @Test
++    fun endIsNeverAPadControl() {
++        assertFalse(Control.values().any { it.name == "END" })
++        val s = TouchPadState(TouchPadState.Kind.PS2).apply { layout(1200, 1100) }
++        val e = s.endRect(1200, 1100)
++        assertNull(s.controlAt((e[0] + e[2]) / 2, (e[1] + e[3]) / 2))
++        assertEquals(0, s.down(9, (e[0] + e[2]) / 2, (e[1] + e[3]) / 2).buttons)
++        assertTrue(s.heldControls().isEmpty())
++    }
++}

@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: RECORD — G6-STICK1 part 1 done: the touch sticks as a DualShock 2 end to end (dead zone 0.1, full at 0.75 of the throw — the user's choice, first 0.9 — the circle to the square, PCSX2's AxisScale 1.33 compensated on the tablet); candidate 786cb2f8… tablet only; the run pre-registered as preregistration_v2.md (3cb6fe05…, 16:56:07Z), superseding b297729d… before any run. No hub change, no restart. The onn keeps ca53df0d…. Nothing adopted. Part 2 after the run.
+status: RECORD — G6-STICK1 NOT MET as pre-registered, on c4 alone (max_rx_to_decode_ms 126 > 100; every other cell met; the user: "Done, it feels a lot better. Much more smooth and responsive" — §7). Part 1: the touch sticks as a DualShock 2 end to end (dead zone 0.1, full at 0.75 of the throw — the user's choice, first 0.9 — the circle to the square, PCSX2's AxisScale 1.33 compensated on the tablet); candidate 786cb2f8… tablet only; the run pre-registered as preregistration_v2.md (3cb6fe05…, 16:56:07Z), superseding b297729d… before any run. No hub change, no restart. The onn keeps ca53df0d…. Nothing adopted. Part 2 after the run.
 ---
 
 # G6-STICK1 — DualShock 2 stick feel (part 1: the trace, the mapping, build, pre-registration; 2026-11-20)
@@ -169,6 +169,81 @@ The first pre-registration, as recorded then:
   - c13: `stick_mapping` = `"ds2-square-0.9-c1.33"`;
   - three remarks: the diagonals, DualShock 2 feel, anything too twitchy.
 
-## 7. Part 2 — the run (after it)
+## 7. Part 2 — the run, scored (G6-STICK1S, 2026-11-20; read only)
 
-Not run yet.
+Figures as extracted: `g6_join1_2026-11-20/stick1_part2_figures.txt`.
+
+**Pre-registration intact:** `preregistration_v2.md` sha256 `3cb6fe05…` checks OK; hashed at 16:56:07Z.
+
+**The session** (its "Which session" rule): the first tablet PS2 handheld session after the hash whose report shows
+`stick_mapping` `"ds2-square-0.75-c1.33"`.
+- No session came between the hash and it.
+- Launch 17:11:25Z (class `remote-direct`); `session_started` 17:11:42.363Z → `session_end_bye` 17:15:54.413Z
+  (**252.05 s PLAYING**).
+- Report `native_decoder_20261120_171554_547.json` (`2d312bf8…`, 265 s).
+
+| Cell | Value | Bound | Verdict |
+|---|---|---|---|
+| c1 decode | `OMX.Exynos.avc.dec`, hardware true, low latency true | hardware, low latency | **MET** |
+| c2 rate | `recent_fps` 60.12 | ≥ 58 | **MET** |
+| c3 drops | decoder 51 / 15885 = 0.32 %; video 0 / 15885 | each ≤ 1 % | **MET** |
+| c4 latency | `max_rx_to_decode_ms` **126**; `max_output_gap_ms` 148 | ≤ 100; ≤ 250 | **NOT MET** |
+| c5 the join | `touch_slot` 0; `p1_join_after_release_ms` 5021 | 0; 5000–5300 | **MET** |
+| c6 every control | `controls_pressed` 16 of 16 | all 16 | **MET** |
+| c7 sticks | left 1, 1, 1, 1; right 1, 1, 0.999, 1 | each ≥ 0.9 | **MET** |
+| c8 End | `end_presses` 1; one bye after 252.05 s PLAYING | 1; ≥ 60 s | **MET** |
+| c9 the box | `1200x900`; `1200x1100` | as bound | **MET** |
+| c10 the crop (PS2) | `"4:3"`; `"160,0,960x720"` | as bound | **MET** |
+| c11 the hub's handheld launch | `20261120-121123-ps2.log` 17:11:23.423Z: `PS2 handheld: widescreen patch off for this launch only (the title's setting: off)` | present | **MET** |
+| c12 the diagonals | `stick_diag_max` left 0.992 (sent 24609), right 1.0 (sent 32767), end to end | each ≥ 0.95 | **MET** |
+| c13 the mapping | `"ds2-square-0.75-c1.33"` | equal | **MET** |
+
+**Verdict by the pre-registered rule: G6-STICK1 NOT MET, on c4 alone** (`max_rx_to_decode_ms` 126 > 100). No
+threshold changes after the hash.
+
+**c4's slow rows, as the report has them** (`slow_events_top_latency`: elapsed ms, rx-to-decode, feed delay, codec,
+codec in flight, queue depth, output gap), every row ≥ 100 ms:
+
+| Elapsed | rx→decode | feed delay | codec | in flight | queue | output gap |
+|---|---|---|---|---|---|---|
+| 3277 | 126 | 73 | 52 | 2 | 3 | 42 |
+| 3306 | 110 | 44 | 65 | 1 | 3 | 28 |
+| 3332 | 107 | 83 | 24 | 2 | 1 | 25 |
+| 3343 | 107 | 85 | 21 | 1 | 1 | 11 |
+| 4561 | 104 | 4 | **100** | 1 | 2 | 47 |
+| 7312 | 112 | 98 | 14 | 1 | 2 | 93 |
+| 7376 | 117 | 108 | 8 | 1 | 0 | 48 |
+| 7392 | 112 | 94 | 17 | 0 | 0 | 15 |
+
+They sit in the first 8 s of the session, mostly feed delay (73–108 ms). One, at 4.56 s, is codec time (100 ms):
+Cowork's preview did not list it. Nothing is read into them beyond what the files show.
+
+**c4 compared** (`max_rx_to_decode_ms`, with `max_output_gap_ms`, figures only):
+
+| Session | rx→decode | output gap |
+|---|---|---|
+| G6-HM3 (`154811_583`) | 74 | 936 |
+| G6-PLACE P1 (`170414_871`) | 56 | 64 |
+| G6-PLACE P2 (`170835_621`) | 90 | 918 |
+| G6-HM4 (`193238_516`) | 60 | 173 |
+| G6-HM4b (`221003_090`) | 55 | 75 |
+| G6-SCREEN1b scored (`081452_382`) | 50 | 538 |
+| 2026-11-20 free play, 38 handheld reports 04:20–16:26Z | 26–117 (117 at `161940_868`; every other ≤ 91) | — |
+| **G6-STICK1 scored (`171554_547`)** | **126** | 148 |
+| after it, the same candidate (`172025_181`, `172510_613`, `172604_123`) | 53, 31, 38 | 61, 73, 51 |
+
+**G6-STICK1 changed no decode code.** Its diff (`g6_stick1.diff`, `6cfdb746`) touches `TouchPadState.kt`,
+`HandheldStreamActivity.kt` (the touch mapping and the report) and two tests only: no decoder, `NativeStreamActivity`
+or stream file.
+
+**Context, not cells:**
+- `touch_writes` 7556, `takeovers` 0, `back_swallowed` 0;
+- 0 lost packets, 0 resyncs, no link notice;
+- `stick_edge_frac` left 0.657 / right 0.668;
+- `stick_mag_hist` left `[0.01, 0.022, 0.052, 0.059, 0.059, 0.045, 0.063, 0.07, 0.049, 0.571]`, right `[0.031,
+  0.031, 0.043, 0.062, 0.018, 0.018, 0.104, 0.074, 0.086, 0.533]`.
+
+**The user's remark, verbatim (2026-11-20):** "Done, it feels a lot better. Much more smooth and responsive".
+- **Not given** (recorded as not given; the user was not asked): the reach of each control without moving the grip,
+  the countdown, the status panel, the main app's 2 columns and Settings, the bigger picture, End's place, the optional
+  PS1 session, turning through the diagonals, DualShock 2 feel, anything too twitchy.
