@@ -566,6 +566,8 @@ if args["mode"] == "winner158":
     finish()
 if args["mode"] == "b157":                              # B157: its own file (tests/b157_add_game)
     exec(compile(Path(args["fake_dir"], "b157_scenario.py").read_text(), "b157_scenario.py", "exec"))
+if args["mode"] == "b178":                              # B178: its own file (tests/b178_score_kind)
+    exec(compile(Path(args["b178_dir"], "b178_scenario.py").read_text(), "b178_scenario.py", "exec"))
 if args["mode"] == "b162":                              # B162: its own file (tests/b162_solo_safe)
     exec(compile(Path(args["b162_dir"], "b162_scenario.py").read_text(), "b162_scenario.py", "exec"))
 if args["mode"] == "cheat":

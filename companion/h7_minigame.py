@@ -552,7 +552,8 @@ class MiniGame:
                     continue
                 r = reader.read(img)
                 seen_before = ended.seen_start
-                done = ended.feed(r["class"], r.get("places"))         # B123: version 3 ends on the whole row
+                done = ended.feed(r["class"], r["scores"] if "scores" in r else r.get("places"))   # B123 / B178:
+                # version 3 ends on the whole row, version 4 on every side's number (versions 2 / 3: no "scores" key)
                 with self._lock:
                     w = self._current(token)
                     if w is None:
@@ -574,6 +575,8 @@ class MiniGame:
                         w.update(state="ended", **{"class": done}, ended_after_s=since)
                         if getattr(ended, "places", None):              # B123: a version-3 spec's row of places
                             w["places"] = list(ended.places)
+                        if getattr(ended, "scores", None) is not None:  # B178: a version-4 spec's numbers, port 1 first
+                            w["scores"] = list(ended.scores)
                     if ended.seen_start and not seen_before:
                         self._row({"step": "start_seen", "game": game, "after_s": since, "reads": reads})
                     if r["class"] == endscreen().UNKNOWN and last_class != endscreen().UNKNOWN:
@@ -581,7 +584,9 @@ class MiniGame:
                                    "distances": r["distances"], "margin": r["margin"]})
                     if done:
                         self._row({"step": "ended", "game": game, "class": done, "after_s": since, "reads": reads,
-                                   **({"places": list(ended.places)} if getattr(ended, "places", None) else {})})
+                                   **({"places": list(ended.places)} if getattr(ended, "places", None) else {}),
+                                   **({"scores": list(ended.scores)} if getattr(ended, "scores", None) is not None
+                                      else {})})
                 last_class = r["class"]
                 if keep_dir is not None:
                     self._keep(token, keep_dir, img, since, r)

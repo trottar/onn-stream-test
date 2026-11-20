@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """B157: add a party mini game by one scripted path — one command per stage, for a title known only by its code.
 
-    python3 tools/party_add_game.py register <code> --players N --system ps1|n64|snes --result winner|places
+    python3 tools/party_add_game.py register <code> --players N --system ps1|n64|snes --result winner|places|score
                                              (--find <words> | --rules-players N) [--setup none|slot1]
                                              [--collect role=slot ...] [--check]
+    python3 tools/party_add_game.py label <code> [<role>=<P1>-<P2>,<P1>-<P2> ...] [<role>=<P1>-<P2>,user]
+                                             (B178: a `score` title — the session reads each end save's final score
+                                             from <role>.1.png / <role>.2.png in the title's add_game folder, label/;
+                                             the tool checks every reading)
     python3 tools/party_add_game.py learn <code> [--check]
     python3 tools/party_add_game.py rehearse <code> [--collect role=slot ...]   (B163: a title already in the rules
                                              folder; a role its kept folder lacks taken from the user's slot, read only)
@@ -25,6 +29,16 @@ separable / margin / unknown / replay cells are not met, its page says in one pl
 at four saves an ending, that the end screens cannot be told apart this way) — the same bars every time. rehearse
 takes a kept extra ending the real rules end on as one more source, and keeps the saves it collects. B172: close (and
 register) end the solo mark and the befores.
+
+B178: `--result score` — a title whose final screen shows each side's number (points, a count) and the winner is the
+side with more. The `label` stage puts two pictures of every end save's final screen (two ticks apart; and the crop of
+each side's number once the places are known) in the title's add_game folder, label/ (off the repo); the session
+reads them with its own vision and passes the numbers in; the tool checks every reading (the two readings the same,
+the role's player ahead, the numbers at one place in every save, read back by a reader learnt without that save) and
+names a save to read again, or, the second time, asks for the user's numbers. learn learns each side's number's place
+and the title's own digits (h7_endscreen's spec version 4), reads every save with a spec learnt without it, and asks
+for a save showing a digit the others do not. The sidecar `{"players": n, "result": "score"}`; the hub passes the real
+numbers, the winner the side ahead, a tie a draw.
 
 Run-time places (each replaceable, for the tests): PRIVYHUB_H7_RULES (the rules folder), PRIVYHUB_ADD_GAME_HOME
 (~/privyhub_h7/add_game), PRIVYHUB_ADD_GAME_EVIDENCE (the repo's docs/memory/evidence/add_game),
@@ -56,7 +70,7 @@ from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
-STAGES = ("register", "learn", "rehearse", "bench", "solo", "close")
+STAGES = ("register", "label", "learn", "rehearse", "bench", "solo", "close")
 CODE = re.compile(r"^T\d\d$")
 SYSTEMS = {"ps1", "n64", "snes"}                       # h7-start's systems (B103 / B123)
 NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B159)",
@@ -370,7 +384,7 @@ def ps1_four_on(game: str) -> bool:
 def _roles_needed(players: int, result: str, per_ending: int = 2) -> list[str]:
     """B171: two saves of every ending from the start (`winner`), each from a different match; rehearse asks one for
     learn to run at all (per_ending=1). `places`: the rows that cover every place (each row another match already)."""
-    if result != "winner":
+    if result not in ("winner", "score"):                    # B178: a score title's saves as a winner title's
         return ["begin", "other"]
     return ["begin", "other"] + [f"end_P{k}" + ("" if n == 1 else f"_{n}") for k in range(1, players + 1)
                                  for n in range(1, per_ending + 1)]
@@ -424,7 +438,7 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
     if system in NOT_YET:
         cells.add("why not", NOT_YET[system], "-", False)
     cells.add("players", players, "2 or 4 (the board has no three-player hub game)", players in (2, 4))
-    cells.add("result kind", result, ["winner", "places"], result in ("winner", "places"))
+    cells.add("result kind", result, ["winner", "places", "score"], result in ("winner", "places", "score"))
     if system == "ps1" and players == 4 and not b.get("described"):
         on = ps1_four_on(b["game"])
         cells.add("four-player PS1: the title's four-player setting on", on, True, on)
@@ -463,7 +477,7 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
             cells.add("results rows: every place in every column", sorted(ok_rows), "each column sees 1..n",
                       bool(ok_rows) and len(ok_rows) == len(rows) and cover)
         ends = {f"end_P{i}" for i in range(1, players + 1)}                       # B171: a third / fourth save allowed
-        extra = [k for k in kept if k.startswith("end_") and _role_class(k) not in ends and result == "winner"]
+        extra = [k for k in kept if k.startswith("end_") and _role_class(k) not in ends and result in ("winner", "score")]
         cells.add("no ending of another kind", extra, [], not extra)
     flag_lines = _companion_lines()
     b["found_lines"] = digest(flag_lines)
@@ -622,14 +636,15 @@ def _matches(pics: Path, kept) -> tuple[dict, list]:
     return group, pairs
 
 
-def _labels(pics: Path, kept: dict, es) -> dict:
-    """Labels from the state each picture came from — never by eye. B167: a begin / end run's screen is the frame most
+def _labels(pics: Path, kept: dict, es, cls_of: dict | None = None) -> dict:
+    """Labels from the state each picture came from — never by eye (B178: a `score` title's end saves by the numbers
+    the label stage checked, `cls_of`). B167: a begin / end run's screen is the frame most
     of the run stays near (B140's measure; the earliest on a tie) — the screen that stays, whether the save was made a
     moment before it settled or the game moves on later; a frame not near it is `ignore`. Consecutive frames of one
     label are one range (the learner halves each range)."""
     runs, classes = {}, {}
     for role in sorted(kept):
-        cls = _role_class(role)
+        cls = (cls_of or {}).get(role) or _role_class(role)
         classes[cls] = cls
         rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((pics / role / "index.csv").open())]
         labs = [cls] * len(rows)
@@ -649,6 +664,9 @@ def _labels(pics: Path, kept: dict, es) -> dict:
 
 
 def _spec_cells(cells: Cells, spec: dict) -> None:
+    if spec.get("version") == SCORE_VERSION:                 # B178: the score kind's own cells
+        _score_spec_cells(cells, spec)
+        return
     sep = spec.get("separable") or ((spec.get("places") or {}).get("separable") or {})
     cells.add("spec usable", bool(spec.get("usable", True)), True, bool(spec.get("usable", True)))
     cells.add("every class separable", sorted(k for k, v in sep.items() if not v), [],
@@ -871,6 +889,8 @@ def _sidecar(b: dict, spec: dict) -> dict:
     side: dict = {"players": b["players"]}
     if b["result"] == "winner":
         side["result"] = "winner"                            # B158
+    if b["result"] == "score":
+        side["result"] = "score"                             # B178
     if b.get("cheat"):
         side["cheat"] = b["cheat"]
     return side
@@ -905,16 +925,21 @@ def cmd_learn(code: str, a: dict) -> int:
         side = read_json(r / f"{b['game']}.party.json", {})
         n = side.get("players")
         ok = (n == b["players"] and (("scores" in side and sorted(side["scores"]) == sorted(spec["end_classes"]))
-                                     or spec.get("version") == es.VERSION_PLACES or side.get("result") == "winner"))
+                                     or spec.get("version") == es.VERSION_PLACES or side.get("result") == "winner"
+                                     or (side.get("result") == "score" and spec.get("version") == SCORE_VERSION)))
         cells.add("sidecar as the listing needs it", ok, True, ok)
         return finish(code, "learn", cells, learn_inputs(code, b), write=not a["check"])
     kept = kept_states(code)
     require(code, "register", register_inputs(b, kept))
+    if b["result"] == "score":                               # B178: the label stage's PASS for these readings
+        require(code, "label", label_inputs(code, b))
     try:
         pics = _pictures(code, b, kept)
     except PicturesFailed as exc:                            # B167: said as a cell, never a trace
         cells.add("pictures made", exc.read(), "every kept state's pictures", False)
         return finish(code, "learn", cells, learn_inputs(code, b))
+    if b["result"] == "score":                               # B178: each side's number
+        return _learn_score(code, b, kept, pics, es)
     labels = _labels(pics, kept, es)
     write_if_changed(pics / "labels.json", json.dumps(labels, sort_keys=True))
     r = rules_folder()
@@ -995,7 +1020,450 @@ def cmd_learn(code: str, a: dict) -> int:
 def learn_inputs(code: str, b: dict) -> str:
     if b.get("described"):
         return digest({"register": b["register_inputs"], "described": True})
+    if b.get("result") == "score":                           # B178: the readings the label stage checked
+        return digest({"register": b["register_inputs"], "kept": kept_states(code), "labels": readings(code)})
     return digest({"register": b["register_inputs"], "kept": kept_states(code)})
+
+
+# --- B178: label — the session reads each end save's final score; the tool checks every reading -----------------------
+SCORE_VERSION = 4                                            # h7_endscreen's version-4 spec (each side's number)
+READING = re.compile(r"^\d{1,4}(-\d{1,4}){1,3}$")
+LEFT_OUT_TRIES = 2                                           # a save named this often after the session read it again:
+                                                             # the user is asked for its numbers (not a bar)
+
+
+def label_path(code: str) -> Path:
+    return home(code) / "label.json"
+
+
+def label_folder(code: str) -> Path:
+    """The pictures the session reads (off the repo, in the title's add_game folder)."""
+    return home(code) / "label"
+
+
+def label_record(code: str) -> dict:
+    rec = read_json(label_path(code), {}) or {}
+    rec.setdefault("saves", {})
+    return rec
+
+
+def readings(code: str) -> dict:
+    """{role: [its readings]} as checked (with the state each was read from), for the stages' inputs."""
+    return {r: {"sha": v.get("sha"), "readings": v.get("readings"), "by": v.get("by")}
+            for r, v in sorted(label_record(code)["saves"].items())}
+
+
+def label_inputs(code: str, b: dict) -> str:
+    return digest({"register": b["register_inputs"], "kept": kept_states(code), "labels": readings(code)})
+
+
+def _numbers(code: str, role: str) -> list[int] | None:
+    v = label_record(code)["saves"].get(role)
+    return list(v["readings"][0]) if v and v.get("readings") else None
+
+
+def _score_class(nums) -> str:
+    return "end_s" + "-".join(str(int(x)) for x in nums)
+
+
+def _side_words(n: int) -> str:
+    return "-".join(f"<P{i}>" for i in range(1, n + 1))
+
+
+def parse_readings(items: list[str], players: int) -> dict:
+    """role=<P1>-<P2>,<P1>-<P2> (the session's two readings, from <role>_1 and <role>_2) or role=<P1>-<P2>,user."""
+    got = {}
+    for item in items:
+        role, _, val = item.partition("=")
+        parts = val.split(",")
+        if not (ROLE.match(role) and role.startswith("end_P")) or len(parts) != 2:
+            raise Usage(f"label <code> <role>=<P1>-<P2>,<P1>-<P2> (or ,user): {item}")
+        if not READING.match(parts[0]) or not (parts[1] == "user" or READING.match(parts[1])):
+            raise Usage(f"a reading is the numbers, P1 first, joined by '-': {item}")
+        rd = [[int(x) for x in parts[0].split("-")]] + ([] if parts[1] == "user" else [[int(x) for x in parts[1].split("-")]])
+        if any(len(x) != players for x in rd):
+            raise Usage(f"a reading names {players} numbers: {item}")
+        got[role] = {"readings": rd, "by": "user" if parts[1] == "user" else "session"}
+    return got
+
+
+def _two_pictures(pics: Path, role: str) -> list[str]:
+    """The screen that stays (learn's own anchor) and the picture two ticks later still on it (else the nearest one on
+    it two ticks away, else the next)."""
+    rows = [r["file"] for r in csv.DictReader((pics / role / "index.csv").open())]
+    if not rows:
+        return []
+    small = [_small(pics / role / f) for f in rows]
+    i = _anchor(small)
+    near = [j for j in range(len(rows)) if _near(small[i], small[j])]
+    later = [j for j in near if j >= i + 2] or [j for j in near if abs(j - i) >= 2] or [j for j in near if j != i] or [i]
+    return [rows[i], rows[later[0]]]
+
+
+def _crops(es, pics: Path, role: str, first: str, places: list, out: Path) -> list[str]:
+    """Each side's number, cut from the picture at its learnt place, four times larger."""
+    from PIL import Image
+    with Image.open(pics / role / first) as im:
+        a = es.score_picture(im)
+    made = []
+    for k, pl in enumerate(places, 1):
+        h = pl["bot"] - pl["top"] + 1
+        pad = h
+        box = (max(0, pl["x0"] - pad), max(0, pl["top"] - h // 2), min(a.shape[1], pl["x1"] + pad + 1),
+               min(a.shape[0], pl["bot"] + h // 2 + 1))
+        crop = Image.fromarray(a.astype("uint8")).crop(box)
+        crop.resize((crop.width * 4, crop.height * 4), Image.BICUBIC).save(out / f"{role}.P{k}.png")
+        made.append(f"{role}.P{k}.png")
+    return made
+
+
+def _replay_scores(es, spec: dict, arrays: dict, run: Path) -> list:
+    """B178: a save's pictures through one Reader and Ended (the begin loaded first): every end it says —
+    [(seconds from its first picture, class, the numbers)]."""
+    from PIL import Image
+    rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((run / "index.csv").open())]
+    now = [0.0]
+    reader = es.Reader(spec, arrays, clock=lambda: now[0])
+    ended = es.Ended(spec)
+    ended.start_loaded()
+    said = []
+    for t, f in rows:
+        now[0] = t
+        with Image.open(run / f) as im:
+            r = reader.read(im.convert("L"), now=t)
+        done = ended.feed(r["class"], r.get("scores"))
+        if done:
+            said.append((round(t - rows[0][0], 2), done, list(ended.scores) if ended.scores is not None else None))
+            break
+    return said
+
+
+def _digits_of(nums) -> set:
+    return {c for x in nums for c in str(int(x))}
+
+
+def _only_here(role: str, members, nums_of: dict) -> list[str]:
+    """The digits this save's numbers show that no other end save's (outside its match) do."""
+    others = set().union(*[_digits_of(v) for r, v in nums_of.items() if r not in members] or [set()])
+    return sorted(_digits_of(nums_of[role]) - others)
+
+
+def _learn_without(es, b: dict, pics: Path, labels: dict, members) -> tuple:
+    """The spec learnt without these saves (learn's own call). -> (spec, arrays, why not or None)."""
+    runs = {r: v for r, v in labels["runs"].items() if r not in members}
+    still = {x["label"] for v in runs.values() for x in v} | {"ignore"}
+    lab = {"classes": {c: t for c, t in labels["classes"].items() if c in still}, "runs": runs}
+    tmp = pics / "left_out_labels.json"
+    try:
+        write_if_changed(tmp, json.dumps(lab, sort_keys=True))
+        spec, arrays, _rep = es.learn(pics, tmp, "first", name=b["game"])
+    except ValueError as exc:
+        return None, None, f"not learnt without it: {str(exc)[:80]}"
+    finally:
+        tmp.unlink(missing_ok=True)
+    if not spec.get("usable") or not (spec.get("score") or {}).get("found"):
+        return spec, arrays, "not learnt without it: the score places or the digits not found"
+    return spec, arrays, None
+
+
+def _read_back(es, b: dict, pics: Path, labels: dict, role: str):
+    """The numbers a reader learnt without this save ends with on its pictures, or None."""
+    spec, arrays, why = _learn_without(es, b, pics, labels, [role])
+    said = _replay_scores(es, spec, arrays, pics / role) if spec is not None and not why else []
+    return said[0][2] if said else None
+
+
+def _culprit(es, b: dict, pics: Path, kept: dict, ends: list, nums_of: dict, contradicted: dict) -> str | None:
+    """The one contradicted save whose reading, replaced by what the others' reader read, lets every other contradicted
+    save read back as labelled; None when no single one does."""
+    for x in sorted(contradicted):
+        nums2 = {**nums_of, x: contradicted[x]}
+        labels2 = _labels(pics, kept, es, {r: _score_class(nums2[r]) for r in ends})
+        if all(_read_back(es, b, pics, labels2, y) == nums2[y] for y in sorted(contradicted) if y != x):
+            return x
+    return None
+
+
+def cmd_label(code: str, a: dict) -> int:
+    b = load_binding(code)
+    if b.get("result") != "score":
+        raise Refused("label is for a title registered with --result score")
+    kept = kept_states(code)
+    require(code, "register", register_inputs(b, kept))
+    _private_paths()
+    es = _endscreen()
+    rec = label_record(code)
+    ends = sorted(r for r in kept if r.startswith("end_P"))
+    given = parse_readings(a.get("readings") or [], b["players"])
+    for role in given:
+        if role not in kept:
+            raise Usage(f"{role} is not a kept end save")
+    for role in list(rec["saves"]):                          # a save changed or gone: its readings and counts end
+        if rec["saves"][role].get("sha") != kept.get(role):
+            del rec["saves"][role]
+    for role, v in given.items():
+        old = rec["saves"].get(role) or {}
+        rec["saves"][role] = {"sha": kept[role], "readings": v["readings"], "by": v["by"],
+                              "named": old.get("named", 0), "again": bool(old.get("named"))}
+    cells = Cells()
+    try:
+        pics = _pictures(code, b, kept)
+    except PicturesFailed as exc:
+        cells.add("pictures made", exc.read(), "every kept state's pictures", False)
+        return finish(code, "label", cells, label_inputs(code, b))
+    folder = label_folder(code)                              # the pictures the session reads (off the repo)
+    folder.mkdir(parents=True, exist_ok=True)
+    shown = {}
+    for role in ends:
+        two = _two_pictures(pics, role)
+        for i, f in enumerate(two, 1):
+            from PIL import Image
+            with Image.open(pics / role / f) as im:
+                im.convert("RGB").save(folder / f"{role}.{i}.png")
+        shown[role] = two
+        if rec.get("places"):
+            _crops(es, pics, role, two[0], rec["places"], folder)
+    missing = [r for r in ends if r not in rec["saves"]]
+    cells.add("every end save read", missing, [], not missing)
+    named: dict = {}
+    n = b["players"]
+    for role in ends:
+        v = rec["saves"].get(role)
+        if not v:
+            continue
+        rd = v["readings"]
+        same = v["by"] == "user" or (len(rd) == 2 and rd[0] == rd[1])
+        if not cells.add(f"{role}: the two readings the same", rd, "the same numbers from both pictures", same):
+            named.setdefault(role, "its two readings differ")
+        k = int(role[5])
+        nums = rd[0]
+        ahead = all(nums[k - 1] > x for j, x in enumerate(nums) if j != k - 1)
+        if not cells.add(f"{role}: the role's player ahead", nums, f"P{k} more than every other side", ahead):
+            named.setdefault(role, f"P{k} is not ahead in it")
+    nums_of = {r: rec["saves"][r]["readings"][0] for r in ends if r in rec["saves"]}
+    recorded: dict = {"pictures": {r: [f"{r}.1.png", f"{r}.2.png"] for r in ends}}
+    if not missing:
+        cls_of = {r: _score_class(nums_of[r]) for r in ends}
+        labels = _labels(pics, kept, es, cls_of)
+        spec, arrays, why = _learn_without(es, b, pics, labels, [])
+        found = bool(spec) and bool((spec.get("score") or {}).get("found"))
+        broken = (spec or {}).get("score", {}).get("not_found") or {}
+        cells.add("the numbers at one place in every save", "found" if found else broken, "found", found)
+        for side, saves in sorted(broken.items()):
+            for role in saves:
+                named.setdefault(role, f"P{side}'s number does not fit where the other saves have it")
+        if found:
+            rec["places"] = spec["score"]["places"]
+            for role in ends:
+                _crops(es, pics, role, shown[role][0], rec["places"], folder)
+            contradicted, unread = {}, []
+            for role in ends:                                # 4: read back by a reader learnt without it
+                got = _read_back(es, b, pics, labels, role)
+                only = _only_here(role, [role], nums_of)
+                if got == nums_of[role]:
+                    cells.add(f"{role}: read back by a reader learnt without it", got, nums_of[role], True)
+                elif got is not None:
+                    cells.add(f"{role}: read back by a reader learnt without it", got, nums_of[role], False)
+                    contradicted[role] = got
+                else:
+                    cells.add(f"{role}: read back by a reader learnt without it",
+                              "not read" + (f" (shown only here: {', '.join(only)})" if only else ""),
+                              f"{nums_of[role]}, or not read for a digit no other save shows", bool(only))
+                    if not only:
+                        unread.append(role)
+                    else:
+                        recorded.setdefault("shown only here", {})[role] = only
+            # one misread label spoils the other saves' readers too: name the save whose own reading, put right,
+            # clears the rest; a save not read is named only when nothing else is
+            culprit = _culprit(es, b, pics, kept, ends, nums_of, contradicted) if len(contradicted) > 1 else None
+            for role, got in sorted(contradicted.items()):
+                if culprit is None or role == culprit:
+                    named.setdefault(role, "a reader learnt from the other saves reads it as "
+                                     + "-".join(str(x) for x in got))
+            if not named:
+                for role in unread:
+                    named.setdefault(role, "a reader learnt from the other saves does not read it")
+    line = ""
+    for role in ends:                                        # how often each save was named after a reading again
+        v = rec["saves"].get(role)
+        if v is not None and role in named and role in given:
+            v["named"] = v.get("named", 0) + 1
+        if v is not None:
+            v.pop("again", None)
+    write_if_changed(label_path(code), json.dumps(rec, indent=1, sort_keys=True) + "\n")
+    words = _side_words(n)
+    if missing:
+        line = (f"Read the final score on each end save's two pictures in the title's add_game folder, label/ "
+                f"(<role>.1.png and <role>.2.png), each side's number, P1 first; then label {code} "
+                + " ".join(f"{r}={words},{words}" for r in missing) + " (the first reading from .1, the second from .2).")
+        recorded["read"] = missing
+    elif named:
+        user = [r for r in sorted(named) if rec["saves"][r]["by"] == "user"]
+        twice = [r for r in sorted(named) if rec["saves"][r].get("named", 0) >= LEFT_OUT_TRIES and r not in user]
+        if user:
+            r = user[0]
+            line = (f"{r} cannot be read as the user says ({named[r]}): collect it again from another match "
+                    f"P{r[5]} won, then register {code} … --collect {r}=<slot>, label {code} and learn {code} again.")
+            recorded["collect again"] = r
+        elif twice:
+            r = twice[0]
+            line = (f"Ask the user for {r}'s numbers ({named[r]}, after it was read again): the final score of that "
+                    f"match, P1's first; then label {code} {r}={words},user.")
+            recorded["ask the user"] = r
+        else:
+            crops = bool(rec.get("places"))
+            line = ("Read again: " + "; ".join(f"{r} ({named[r]})" for r in sorted(named)) + ". Their pictures in "
+                    "label/ (<role>.1.png, <role>.2.png" + (", and each side's number cut out: <role>.P1.png, <role>.P2.png" if crops
+                                                    else "") + f"); then label {code} "
+                    + " ".join(f"{r}={words},{words}" for r in sorted(named)) + ".")
+            recorded["read again"] = sorted(named)
+    if line:
+        recorded["line"] = line
+    rc = finish(code, "label", cells, label_inputs(code, b), note=line, recorded=recorded)
+    if line:
+        out(line)
+    return rc
+
+
+# --- B178: learn for a `score` title ------------------------------------------------------------------------------------
+def _score_spec_cells(cells: Cells, spec: dict) -> None:
+    sc = spec.get("score") or {}
+    cells.add("spec usable", bool(spec.get("usable")), True, bool(spec.get("usable")))
+    cells.add("the score places found", "found" if sc.get("found") else sc.get("not_found"), "found", bool(sc.get("found")))
+    bad = sorted(k for k, v in (sc.get("separable") or {}).items() if not v)
+    cells.add("every digit separable", bad, [], bool(sc.get("keys")) and not bad)
+    m = sc.get("margin_needed")
+    cells.add("digit margin_needed", m, f">= {BARS['margin_needed_min'][0]} ({BARS['margin_needed_min'][1]})",
+              m is not None and float(m) >= BARS["margin_needed_min"][0])
+
+
+def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
+    cells = Cells()
+    ends = sorted(r for r in kept if r.startswith("end_P"))
+    nums_of = {r: _numbers(code, r) for r in ends}
+    labels = _labels(pics, kept, es, {r: _score_class(v) for r, v in nums_of.items()})
+    write_if_changed(pics / "labels.json", json.dumps(labels, sort_keys=True))
+    r = rules_folder()
+    spec_path = r / f"{b['game']}.endscreen.json"
+    made = b.get("learnt") or {}
+    key = digest({"kept": kept, "labels": readings(code)})
+    if made.get("from") == key and spec_path.is_file() and sha(spec_path) == made.get("spec"):
+        spec, arrays = es.load_spec(spec_path)
+    else:
+        spec, arrays, _rep = es.learn(pics, pics / "labels.json", "first", name=b["game"])
+    _score_spec_cells(cells, spec)
+    sc = es.score_scores(pics, pics / "labels.json", spec, arrays, "second")
+    held = {c: row for c, row in sc["rows"].items() if c != "other"}
+    wrong = sum(row["wrong"] for row in held.values())
+    unknown = sum(row["unknown"] + row["other"] for row in held.values())
+    n = sum(row["n"] for row in held.values()) or 1
+    cells.add("held-out frames read as another class", wrong, BARS["wrong_class_max"][0], wrong <= BARS["wrong_class_max"][0])
+    cells.add("held-out frames read unknown (share)", round(unknown / n, 4), f"<= {BARS['unknown_share_max'][0]}",
+              unknown / n <= BARS["unknown_share_max"][0])
+    cells.add("other read as a screen", sc.get("other_read_as_screen"), BARS["other_as_screen_max"][0],
+              (sc.get("other_read_as_screen") or 0) <= BARS["other_as_screen_max"][0])
+    for role in sorted(kept):                                # the replays (the begin, other, every end save)
+        cls = _role_class(role)
+        said = _replay_scores(es, spec, arrays, pics / role) if cls not in ("start",) else []
+        if cls == "start":
+            from PIL import Image
+            rows = [(float(x["seconds"]), x["file"]) for x in csv.DictReader((pics / role / "index.csv").open())]
+            now = [0.0]
+            reader, ended = es.Reader(spec, arrays, clock=lambda: now[0]), es.Ended(spec)
+            got, first = None, None
+            for t, f in rows:
+                now[0] = t
+                with Image.open(pics / role / f) as im:
+                    rd = reader.read(im.convert("L"), now=t)
+                first = t if rd["class"] == "start" and first is None else first
+                if ended.feed(rd["class"], rd.get("scores")) and got is None:
+                    got = t
+            cells.add(f"{role}: never ended", got is None, True, got is None)
+            cells.add(f"{role}: recognised within", first, f"<= {BARS['start_within_s'][0]} s",
+                      first is not None and first <= BARS["start_within_s"][0])
+        elif cls == "other":
+            cells.add(f"{role}: never ended", not said, True, not said)
+        else:
+            want = nums_of[role]
+            got = said[0] if said else None
+            cells.add(f"{role}: ended as itself", None if got is None else got[2], want,
+                      got is not None and got[2] == want)
+            cells.add(f"{role}: ended within", None if got is None else got[0], f"<= {BARS['ended_within_s'][0]} s",
+                      got is not None and got[0] <= BARS["ended_within_s"][0])
+    group, pairs = _matches(pics, kept)                      # B176: saves that are the same picture are one match
+    cells.add("no two saves of one ending the same picture", pairs,
+              f">= {SAME_PICTURE[0]} grey ({SAME_PICTURE[1]})", not pairs)
+    only: dict = {}
+    bar = BARS["ended_within_s"][0]
+    for gid in sorted(set(group.values())):                  # B175 for numbers: every save read by a spec without it
+        members = sorted(x for x in group if group[x] == gid)
+        lo_spec, lo_arr, why = _learn_without(es, b, pics, labels, members)
+        for role in members:
+            want = nums_of[role]
+            name = f"left out: {role}"
+            bar_words = f"{'-'.join(map(str, want))} within <= {bar} s, never other numbers"
+            here = _only_here(role, members, nums_of)
+            if why:
+                cells.add(name, why, bar_words, False)
+                only[role] = here
+                continue
+            said = _replay_scores(es, lo_spec, lo_arr, pics / role)
+            got = said[0] if said else None
+            ok = got is not None and got[2] == want and got[0] <= bar
+            cells.add(name, None if got is None else [got[2], got[0]], bar_words, ok)
+            if not ok:
+                only[role] = here
+    learnt = sorted(k[-1] for k in (spec.get("score") or {}).get("keys") or [])
+    shows = {d: sum(1 for v in nums_of.values() if d in _digits_of(v)) for d in "0123456789"}
+    recorded = {"digits": {"in two saves or more": [d for d in "0123456789" if shows[d] >= 2],
+                           "in one save": [d for d in "0123456789" if shows[d] == 1],
+                           "never": [d for d in "0123456789" if shows[d] == 0]},
+                "digits learnt": learnt}
+    inputs = learn_inputs(code, b)
+    if cells.passed:                                         # only a passing title reaches the rules folder
+        begin = r / _begin_name(b)
+        side_path = r / f"{b['game']}.party.json"
+        side = json.dumps(_sidecar(b, spec), indent=1, sort_keys=True) + "\n"
+        for p_, want in ((begin, (kept_folder(code) / "begin.state").read_bytes()), (side_path, side.encode())):
+            if p_.exists() and p_.read_bytes() != want and not made:
+                cells.add("rules folder: no other title's file overwritten", False, True, False)
+                return finish(code, "learn", cells, inputs, recorded=recorded)
+        if not (made.get("from") == key and spec_path.is_file() and sha(spec_path) == made.get("spec")):
+            es.save_spec(spec, arrays, spec_path)
+        write_if_changed(begin, (kept_folder(code) / "begin.state").read_bytes())
+        write_if_changed(side_path, side)
+        b["learnt"] = {"from": key, "spec": sha(spec_path)}
+        write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
+        return finish(code, "learn", cells, inputs, recorded=recorded)
+    ask = _score_line(b, cells, kept, only, group, pairs)
+    if ask:
+        recorded.update(ask[1])
+    rc = finish(code, "learn", cells, inputs, note=ask[0] if ask else "", recorded=recorded)
+    if ask:
+        out(ask[0])
+    return rc
+
+
+def _score_line(b: dict, cells: Cells, kept, only: dict, group: dict, pairs: list) -> tuple[str, dict] | None:
+    """B178: the line for one more save — a digit that only one save shows (named), else B171's line."""
+    code = b["code"]
+    for a_, b_, _d in pairs or []:                           # B176: the same match saved twice first
+        line = f"{a_} and {b_} look like the same match saved twice: save {b_} again from another match."
+        return line, {"same match twice": [a_, b_], "line": line}
+    digits = sorted(set().union(*[set(v) for v in only.values()] or [set()]))
+    if digits:
+        endings = [f"end_P{k}" for k in range(1, b["players"] + 1)]
+        roles = [x for x in (next_role(e, kept) for e in endings) if x]
+        if not roles:
+            return _cannot(code, endings, SAVES_PER_ENDING_MAX)
+        words = ", ".join(digits[:-1]) + (" or " if len(digits) > 1 else "") + digits[-1]
+        line = (f"One more save: a match either player won whose final score shows {words} (either side's number; "
+                f"the more of them the better) — save the screen after it to a free slot, then register {code} … "
+                f"--collect <role>=<slot> with the role of the player who won ("
+                + ", ".join(f"{x} if P{x[5]} won" for x in roles) + f"), label {code} and learn {code} again.")
+        return line, {"one more save": roles, "digits asked": digits, "line": line}
+    return one_more_save(b, cells, kept, None, group=group, pairs=pairs)
+
 
 
 # --- B163: rehearse — learn's whole real path on a title already added, into a scratch rules folder --------------------------
@@ -1072,6 +1540,7 @@ def _rules_shas() -> dict:
 def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells,
                  promoted=None, not_end=None, rec_learn=None) -> None:
     """rehearse's work inside the scratch (the environment pointed at it and put back by the caller)."""
+    label_rec = read_json(label_path(code)) if b["result"] == "score" else None     # B178: read before the switch
     for name, (p, want) in sorted(extra.items()):          # B171: a kept extra ending the real rules end on as its own
         if not want or not want.startswith("end_P"):        # is one more source; one they do not stays read, not a role
             continue
@@ -1115,6 +1584,14 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
     write_if_changed(binding_path(code), json.dumps(sb, indent=1, sort_keys=True) + "\n")
     write_if_changed(verdict_path(code, "register"),
                      json.dumps({"verdict": "PASS", "inputs": sb["register_inputs"]}) + "\n")
+    if b["result"] == "score" and label_rec is not None:     # B178: the readings the title's label stage checked
+        kept_now = kept_states(code)
+        rec = {"saves": {r: v for r, v in (label_rec.get("saves") or {}).items() if kept_now.get(r) == v.get("sha")},
+               "places": label_rec.get("places")}
+        write_if_changed(label_path(code), json.dumps(rec, indent=1, sort_keys=True) + "\n")
+        if all(r in rec["saves"] for r in kept_now if r.startswith("end_P")):
+            write_if_changed(verdict_path(code, "label"),
+                             json.dumps({"verdict": "PASS", "inputs": label_inputs(code, sb)}) + "\n")
     buf = io.StringIO()
     try:
         with contextlib.redirect_stdout(buf):
@@ -1556,12 +2033,18 @@ def cmd_bench(code: str, a: dict) -> int:
         took = round(time.monotonic() - t_load, 2)
         if scratch is not None:
             scratch.unlink(missing_ok=True)
-        want_cls = _role_class(ending) if ending.startswith("end_P") else "end"      # B171: end_P1_2 ends as end_P1
-        exp_scores, exp_winner = _expected(b, side, _role_class(ending))
+        want_cls = (_role_class(ending) if ending.startswith("end_P") and side.get("result") != "score"
+                    else "end")                              # B171: end_P1_2 ends as end_P1; B178: a score title, end
+        if side.get("result") == "score":                    # B178: the numbers the label stage checked, the winner
+            exp_scores = _numbers(code, ending)              # the seat of the side ahead (seats 1..n: port k = seat k)
+            top = max(exp_scores)
+            exp_winner = exp_scores.index(top) + 1 if exp_scores.count(top) == 1 else None
+        else:
+            exp_scores, exp_winner = _expected(b, side, _role_class(ending))
         cells.add(f"{ending}: ended with its class", [got.get("state"), got.get("class")], ["ended", want_cls],
                   got.get("state") == "ended" and got.get("class") == want_cls)
         cells.add(f"{ending}: scores", got.get("scores"), exp_scores, got.get("scores") == exp_scores)
-        if exp_winner is not None:
+        if exp_winner is not None or side.get("result") == "score":
             cells.add(f"{ending}: winner", got.get("winner"), exp_winner, got.get("winner") == exp_winner)
         cells.add(f"{ending}: ended within (s)", took, f"<= {BARS['ended_after_load_s'][0]}",
                   took <= BARS["ended_after_load_s"][0])
@@ -1724,7 +2207,12 @@ def cmd_solo(code: str, a: dict) -> int:
     mark = read_json(mark_path)
     if not mark:
         raise Refused("solo's lines were not given yet: run solo first")
-    winner = int(a["winner"])
+    if str(a["winner"]).strip().lower() == "draw":            # B178: a score title's tie (the board's draw)
+        if b.get("result") != "score":
+            raise Usage("--winner draw is for a score title")
+        winner = None
+    else:
+        winner = int(a["winner"])
     cells = Cells()
     ids = launched_since(float(mark.get("since_unix") or 0))  # B162: compared in memory, neither id written
     this = sum(1 for g in ids if g == str(b["game"])[:80])
@@ -1878,10 +2366,14 @@ def parse(argv: list[str]) -> tuple[str, str, dict]:
     if len(argv) < 2 or argv[0] not in STAGES or not CODE.match(argv[1]):
         raise Usage(__doc__.split("\n\n")[1])
     stage, code, rest = argv[0], argv[1], argv[2:]
-    a: dict = {"check": False, "collect": [], "read": False}
+    a: dict = {"check": False, "collect": [], "read": False, "readings": []}
     i = 0
     while i < len(rest):
         k = rest[i]
+        if stage == "label" and "=" in k and not k.startswith("--"):     # B178: the session's readings
+            a["readings"].append(k)
+            i += 1
+            continue
         if k in ("--check", "--read"):
             a[k[2:]] = True
             i += 1
@@ -1911,8 +2403,8 @@ def main(argv: list[str]) -> int:
         _private_paths()
         if stage == "register":
             return cmd_register(code, a)
-        return {"learn": cmd_learn, "rehearse": cmd_rehearse, "bench": cmd_bench, "solo": cmd_solo,
-                "close": cmd_close}[stage](code, a)
+        return {"label": cmd_label, "learn": cmd_learn, "rehearse": cmd_rehearse, "bench": cmd_bench,
+                "solo": cmd_solo, "close": cmd_close}[stage](code, a)
     except Usage as exc:
         print(f"usage: {exc}", file=sys.stderr)
         return 2

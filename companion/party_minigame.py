@@ -68,6 +68,10 @@ B155 — the `minigame_launch` row carries "keys_written": the session config re
 both PARTY_SESSION_SETTINGS keys in it once each with their values.
 B158 — a sidecar's `"result": "winner"`: the scores one-hot for the winner (version 2: end_Pk = port k won; version 3:
 place 1), the ended row and the result carry `"winner"` (that port's seat). Without the key: today.
+B178 — a sidecar's `"result": "score"` with a version-4 spec of n sides (B178's learner: each side's number read on the
+final screen): at `ended` the numbers read, port by port, as the scores (the real numbers), `"winner"` the seat of the
+one side strictly ahead, null on a tie (the board's draw); a read without n whole numbers → given up; an unreadable
+screen is `unknown` as today. Without the key: today.
 B162 — `POST party-minigame-only?game=<id>` (loopback; `?clear=1` clears): the add-a-game tool's solo setting, kept in
 memory only (any restart clears it) — while set, `party-minigames` lists that title alone for its player count. Never
 set: today.
@@ -107,6 +111,7 @@ MANAGER_BOUND_S = 10.0      # the end's manager calls: give up the wait after th
 PLANNED_GRACE_S = 3.0       # the planned-switch window stays open this long after the switch's start returns
 # the onn's calls taken while a mini game is on (route → kind)
 PLACES_VERSION = 3          # B123: an end-screen spec with a place for every player (B122)
+SCORE_VERSION = 4           # B178: an end-screen spec with each side's number (B178)
 TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
          "stop": "end"}
 # B127
@@ -269,7 +274,8 @@ class PartyMinigames:
                 n = int(side["players"])
                 more = {"cheat": cheat} if cheat is not None else {}
                 if "result" in side:                                    # B158: winner-only (absent: today)
-                    entry = self._winner_entry(spec, side, n)
+                    entry = (self._score_entry(spec, side, n) if side.get("result") == "score"     # B178
+                             else self._winner_entry(spec, side, n))
                     record = self.p._find_game_by_id(game) if entry is not None else None
                     if entry is None or record is None:
                         continue
@@ -347,6 +353,16 @@ class PartyMinigames:
             return None
         return {"players": n, "scores": {c: [1 if j == k else 0 for j in range(n)] for k, c in enumerate(ends)},
                 "winner_of": {c: k + 1 for k, c in enumerate(ends)}, **start}
+
+    @staticmethod
+    def _score_entry(spec: dict, side: dict, n: int) -> dict | None:
+        """B178: `{"players": n, "result": "score"}` with a version-4 spec of n sides -> the entry (each side's number
+        read at the end; the winner the side strictly ahead, a tie a draw), else None (not listed)."""
+        if side.get("result") != "score" or "scores" in side or "places_to_scores" in side or not 2 <= n <= 4:
+            return None
+        if spec.get("version") != SCORE_VERSION or int((spec.get("score") or {}).get("sides", 0)) != n:
+            return None
+        return {"players": n, "scores": None, "score_read": True, "start_class": spec["start_class"]}
 
     def listing(self) -> dict:
         entries = self._entries()
@@ -1184,6 +1200,17 @@ class PartyMinigames:
                 continue
             if r.get("state") == "ended":
                 cls = r.get("class")
+                if mg["entry"].get("score_read"):                         # B178: each side's number, read
+                    got = r.get("scores")
+                    n = mg["entry"]["players"]
+                    if (not isinstance(got, list) or len(got) != n
+                            or not all(type(x) is int and x >= 0 for x in got)):
+                        self._final(mg, "given_up", why="an end the scores do not name")
+                    else:
+                        top = max(got)                                    # a tie: no winner (the board's draw)
+                        won = mg["seats"][got.index(top)] if got.count(top) == 1 else None
+                        self._final(mg, "ended", **{"class": cls, "scores": list(got), "winner": won})
+                    continue
                 if mg["entry"].get("places_to_scores") is not None:      # B123: the row of places -> the seats' scores
                     places = r.get("places")
                     n = mg["entry"]["players"]
@@ -1233,7 +1260,8 @@ class PartyMinigames:
                 out["practices"] = mg["practices"]
             if mg["entry"].get("places_to_scores") is not None:   # B123: the places read, port by port
                 out["places"] = mg["places"]
-            if mg["entry"].get("winner_of") is not None or mg["entry"].get("winner_places"):   # B158
+            if (mg["entry"].get("winner_of") is not None or mg["entry"].get("winner_places")   # B158
+                    or mg["entry"].get("score_read")):                                        # B178
                 out["winner"] = mg.get("winner")
             return out
 

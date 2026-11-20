@@ -1,0 +1,217 @@
+{
+ "cells": [
+  {
+   "bar": true,
+   "cell": "spec usable",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": "found",
+   "cell": "the score places found",
+   "met": true,
+   "read": "found"
+  },
+  {
+   "bar": [],
+   "cell": "every digit separable",
+   "met": true,
+   "read": []
+  },
+  {
+   "bar": ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))",
+   "cell": "digit margin_needed",
+   "met": true,
+   "read": 0.2794
+  },
+  {
+   "bar": 0,
+   "cell": "held-out frames read as another class",
+   "met": true,
+   "read": 0
+  },
+  {
+   "bar": "<= 0.105",
+   "cell": "held-out frames read unknown (share)",
+   "met": true,
+   "read": 0.0
+  },
+  {
+   "bar": 0,
+   "cell": "other read as a screen",
+   "met": true,
+   "read": 0
+  },
+  {
+   "bar": true,
+   "cell": "begin: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": "<= 8.0 s",
+   "cell": "begin: recognised within",
+   "met": true,
+   "read": 0.0
+  },
+  {
+   "bar": [
+    15,
+    2
+   ],
+   "cell": "end_P1: ended as itself",
+   "met": true,
+   "read": [
+    15,
+    2
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P1: ended within",
+   "met": true,
+   "read": 1.5
+  },
+  {
+   "bar": [
+    35,
+    28
+   ],
+   "cell": "end_P1_2: ended as itself",
+   "met": true,
+   "read": [
+    35,
+    28
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P1_2: ended within",
+   "met": true,
+   "read": 2.0
+  },
+  {
+   "bar": [
+    0,
+    22
+   ],
+   "cell": "end_P2: ended as itself",
+   "met": true,
+   "read": [
+    0,
+    22
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2: ended within",
+   "met": true,
+   "read": 2.0
+  },
+  {
+   "bar": [
+    0,
+    29
+   ],
+   "cell": "end_P2_2: ended as itself",
+   "met": true,
+   "read": [
+    0,
+    29
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2_2: ended within",
+   "met": true,
+   "read": 2.0
+  },
+  {
+   "bar": true,
+   "cell": "other: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": ">= 1.0 grey (64 x 48 grey, mean |difference| of the screens that stay; H7-V1: one state run twice, 391 of 400 frames under 1.0)",
+   "cell": "no two saves of one ending the same picture",
+   "met": true,
+   "read": []
+  },
+  {
+   "bar": "15-2 within <= 2.0 s, never other numbers",
+   "cell": "left out: end_P1",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "35-28 within <= 2.0 s, never other numbers",
+   "cell": "left out: end_P1_2",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "0-22 within <= 2.0 s, never other numbers",
+   "cell": "left out: end_P2",
+   "met": true,
+   "read": [
+    [
+     0,
+     22
+    ],
+    2.0
+   ]
+  },
+  {
+   "bar": "0-29 within <= 2.0 s, never other numbers",
+   "cell": "left out: end_P2_2",
+   "met": false,
+   "read": null
+  }
+ ],
+ "code": "T90",
+ "inputs": "6650f5986579578d9e1a5206d65da3113211fcd146914aa6fdc2f2a01364c37b",
+ "recorded": {
+  "digits": {
+   "in one save": [
+    "1",
+    "3",
+    "8",
+    "9"
+   ],
+   "in two saves or more": [
+    "0",
+    "2",
+    "5"
+   ],
+   "never": [
+    "4",
+    "6",
+    "7"
+   ]
+  },
+  "digits asked": [
+   "1",
+   "3",
+   "8",
+   "9"
+  ],
+  "digits learnt": [
+   "0",
+   "1",
+   "2",
+   "3",
+   "5",
+   "8",
+   "9"
+  ],
+  "line": "One more save: a match either player won whose final score shows 1, 3, 8 or 9 (either side's number; the more of them the better) \u2014 save the screen after it to a free slot, then register T90 \u2026 --collect <role>=<slot> with the role of the player who won (end_P1_3 if P1 won, end_P2_3 if P2 won), label T90 and learn T90 again.",
+  "one more save": [
+   "end_P1_3",
+   "end_P2_3"
+  ]
+ },
+ "schema": 1,
+ "stage": "learn",
+ "verdict": "FAIL"
+}

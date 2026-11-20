@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
 
 # ADD-GAME — one title, by its code, through the tool's five stages
@@ -9,7 +9,8 @@ status: FIXED TASK (session A, hardware) — add one party mini game by its code
 The code (`T` + two digits) is the only name of the title in anything written. The user knows which game it is; the
 words the user gives to find it in the library are typed into one command at run time and never written down. **The
 tool decides every verdict; you never judge a picture, choose a threshold or edit a rule.** A stage that is not PASS
-stops the task.
+stops the task. **The one exception (B178): a `score` title's `label` stage (§2)** — there you read each end save's
+final score from the pictures the tool puts out, and pass the numbers in; the tool checks every reading and decides.
 
 **First, once, in chat only (B170):** before anything else, ask the user — "YOU, now: which game is <code>? I will not
 write its name anywhere." Use the name the user gives **only in your replies to the user**, so every line you send
@@ -76,8 +77,19 @@ the rows `2341`, `3412`, `4123` (`--collect end_r2341=<slot>` …) before it can
 
 Ask once, in this order, what the user already knows: **two players or four; who wins is shown how** — a screen that
 says which player won (→ `winner`), or a results screen with every player's place in a row (→ `places`; four players
-only); **whether the game has things to unlock** (→ a setup: `--setup slot1`, made by the user in Extras → Cheats, and
-every save below made inside it; nothing to unlock → `--setup none`); **the words to find it in the library**.
+only), or **the scores (or points, a count) of each side, the winner the side with more** (→ `score`, B178: its saves
+are `winner`'s, and the label stage after register), or **some other way (a time, a distance, only a team's or
+character's name)** → **stop here, before any save is asked** (below); **whether the game has things to unlock** (→ a
+setup: `--setup slot1`, made by the user in Extras → Cheats, and every save below made inside it; nothing to unlock →
+`--setup none`); **the words to find it in the library**.
+
+**The stop at the questions (B179) — when the answer to "who wins is shown how" is none of the three kinds** (a time, a
+distance, a lap count read as a time, only a team's or a character's name, two numbers where the smaller wins, or
+anything else the tool has no kind for): ask for no save and run no stage but close. Say, word for word: "YOU, now:
+<the game> shows who won in a way the hub can't read yet (<the way, in the user's words>). I've stopped before asking
+for any saves; it goes back to Cowork." Record the user's words in your page, then `close <code>` (if register ran),
+then "YOU, now: commit". **The same stop for any answer the tool has no kind for**, and when you are not sure which of
+the three the answer is: stop and ask Cowork, never fit a title to the nearest kind.
 
 Then the saves, three at a time (the onn's SAVE, slots 1-3; slot 9 and slot 0 are the hub's), each round followed by
 `register … --collect role=slot …` (the tool copies them; the user may then save over them). **With a setup, never
@@ -97,7 +109,14 @@ two at a time:
 - **`places`, four players:** four matches finished in set orders so every player takes every place — rows `1234`,
   `2341`, `3412`, `4123` (P1's place first) — each saved on its results screen: `end_r1234` …
 
-**The rounds, two players, `winner` (B171): begin, other, `end_P1`, `end_P1_2`, `end_P2`, `end_P2_2`.**
+- **`score` (B178), n players: the same saves as `winner`** — two wins for each player from the start, each from a
+  different match, saved on the screen after the match that shows each side's number (the final score, the stats
+  screen). The user says only who won; the numbers are read later by you in the label stage, never typed by the user
+  unless the tool asks for one save's numbers. **Saves already kept under the code** (T90's six, taken under `winner`
+  on 2026-11-20) stay: run `register <code> … --result score` with no `--collect` first and ask only for what its page
+  names missing; then `label <code>`.
+
+**The rounds, two players, `winner` or `score` (B171): begin, other, `end_P1`, `end_P1_2`, `end_P2`, `end_P2_2`.**
 
 - **No setup — rounds of three slots:** round 1 `--collect begin=1 --collect other=2 --collect end_P1=3`; round 2
   `--collect end_P2=1 --collect end_P1_2=2 --collect end_P2_2=3`.
@@ -159,9 +178,11 @@ end_r<its row>_<n> when that row is kept already".)
 ## 2. The stages — one command each, the verdict read from its last line
 
 ```
-python3 tools/party_add_game.py register <code> --players <2|4> --system <ps1|n64|snes> --result <winner|places> \
+python3 tools/party_add_game.py register <code> --players <2|4> --system <ps1|n64|snes> --result <winner|places|score> \
         --find "<the user's words>" --setup <none|slot1> --collect begin=1 --collect other=2 --collect end_P1=3
 python3 tools/party_add_game.py register <code> … --collect end_P2=1 --collect end_P1_2=2 --collect end_P2_2=3  # round 2
+python3 tools/party_add_game.py label <code>                                    # score only (B178): the pictures
+python3 tools/party_add_game.py label <code> end_P1=<P1>-<P2>,<P1>-<P2> …      # score only: your two readings each
 python3 tools/party_add_game.py learn <code>
 python3 tools/party_add_game.py rehearse <code> [--collect <role>=<slot>]      # §0 only: a title already added
 python3 tools/party_add_game.py bench <code>                                    # unattended, ~5 min, flags on
@@ -172,9 +193,32 @@ python3 tools/party_add_game.py close <code>                                    
 
 - **register** FAIL "missing: …" → ask the user for exactly those saves (the role's line above), collect, run again.
   Any other FAIL → stop (below).
+- **label** (B178, `--result score` only; after register's PASS, before learn) — **the one picture you read.** Run
+  `label <code>`: it puts two pictures of every end save's final screen, two ticks apart, in the title's add_game folder
+  (`~/privyhub_h7/add_game/<code>/label/`, off the repo: `<role>.1.png`, `<role>.2.png`; once the places are known,
+  each side's number cut out, `<role>.P1.png`, `<role>.P2.png`). Open each with your own vision; read each side's
+  number, P1 first, from `.1` and then, separately, from `.2`; pass both:
+  `label <code> end_P1=<P1>-<P2>,<P1>-<P2> end_P1_2=… end_P2=… end_P2_2=…`. Never a picture in the repo or a reply.
+  **The tool checks every reading:** the two the same; the role's player ahead (an `end_P<k>` save has P<k> ahead);
+  the numbers at one place in every save; each save read back by a reader learnt without it. Its last line is one of:
+  - "Read the final score on each end save's two pictures …" → read them, run the line's command.
+  - **"Read again: <role> (<why>) …"** → open that save's pictures again (and its cut-out numbers), read them afresh,
+    run `label <code> <role>=<P1>-<P2>,<P1>-<P2>`. Nothing to the user.
+  - **"Ask the user for <role>'s numbers …"** (the same save named a second time) → say, word for word: "YOU, now: I
+    couldn't read one final score of <the game> for sure. In the match P<k> won that you saved for me, what was the
+    final score — P1's number, then P2's? Reply like 21-14." Then `label <code> <role>=<their numbers>,user`.
+  - "<role> cannot be read as the user says … collect it again from another match …" → §1's line for one more save for
+    P<k>, `register <code> … --collect <role>=<slot>`, `label <code>` (its pictures), read, label, learn.
+  - none (PASS) → learn. Any other FAIL → stop.
 - **learn** → PASS; or its page's last line is one of §1's four — a save in the wrong role, the same match saved twice,
   one more save (each: §1's line to the user, then register's `--collect` and learn again), or the cap (§1: say it,
-  stop). Any other FAIL → stop. **bench** → PASS or stop (it ends every
+  stop). Any other FAIL → stop.
+  - **A `score` title's own line (B178): "One more save: a match either player won whose final score shows <digits> …"**
+    → say, word for word: "YOU, now: play one more match of <the game>, with other teams (or characters) than any match
+    saved so far, and try to end it with a <digit> in either side's final score (<the digits> — any one helps). Save to
+    slot <2 or 3> on the screen after the match that shows the final score, then tell me who won." Then `register
+    <code> … --collect end_P<the winner>_<n>=<slot>` (the role the line names for that winner), `label <code>`, read
+    the new save's pictures, `label <code> <role>=…`, `learn <code>`. **bench** → PASS or stop (it ends every
   kept save, each save of an ending as that ending); it needs nobody: no pad, no TV.
 - **rehearse** (§0 only) → as §0 says.
 - **solo:** it first sets the hub's **one-title setting** (B162): while it is set the board offers only this title for
@@ -201,7 +245,13 @@ The tool's `docs/memory/evidence/add_game/<code>/` (verdicts and pages) and your
 by the code), what was disclosed. Then "YOU, now: commit". Nothing adopted: the title is offered by the board only while
 both bench flags are on, as T88 and T89 are; adoption is the user's own go.
 
-## 4. The user's part, as it now is (B177) — two players, `winner`
+## 4. The user's part, as it now is (B177; B178 for `score`) — two players, `winner` or `score`
+
+**`score` (B178):** the same saves, rounds and lines; the user says only who won each match. The numbers on the final
+screen are read by you in the label stage. **The user is asked one match's final score only when your readings of
+it disagree twice.** Every digit a save shows must also be shown by another save, so learn may ask for one more match
+whose final score shows a digit it names. The least is 6 saves, when the four final scores share their digits; in
+practice 7 or 8; at most 10.
 
 **Saves: 6 at the least** (the begin, a mid-match save, two wins for each player — enough when the two players' end
 screens look clearly different), **in practice 8 for a game whose end screens look nearly alike** (three wins for each
