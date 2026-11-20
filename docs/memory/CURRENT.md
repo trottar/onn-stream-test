@@ -93,7 +93,7 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
    load screen. For B: the sound ~15 s after the onn's Home. PrivyParty's adoption only on the user's own go.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
-3. G6 (secondary): G6-SCREEN1b part 1 done: handheld PS2 launches without the widescreen patch (hub, opt-in) and cropped, PS1 stretched; candidate `adcb1222…` tablet only; the run pre-registered (`evidence/G6_SCREEN1B_…`); next: the user's commit, companion restart, then the run; never beside another run; the stale pairing's removal. (SCREEN1's run superseded.)
+3. G6 (secondary): G6-SCREEN1b NOT MET as scored (wrong app / companion not yet restarted, by the user's sequence; free play after showed the 4:3 crop); G6-STICK1 part 1 done: DualShock 2 stick feel (full at 0.75, the user's choice), candidate `786cb2f8…` tablet only, its run pre-registered (v2) with SCREEN1b's screen cells (`evidence/G6_STICK1_…`); next: the user's run; never beside another run; the stale pairing's removal.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

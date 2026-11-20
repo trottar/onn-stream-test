@@ -1,0 +1,392 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+index 8bdb7285..d3be1737 100644
+--- a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+@@ -80,6 +80,9 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     private val pressed = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
+     /** [left, right] stick x [up, down, left, right]: the largest deflection seen, 0..1. */
+     private val stickMax = Array(2) { FloatArray(4) }
++    /** G6-STICK1: [left, right]: the sent values and owned time by magnitude. */
++    private val stickStats = arrayOf(StickStats(), StickStats())
++    @Volatile private var lastTickMs = -1L
+ 
+     override val streamOrientation: Int get() = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+ 
+@@ -209,6 +212,23 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         val w = frame?.width ?: 0
+         val h = frame?.height ?: 0
+         val sticks = JSONObject()
++        // G6-STICK1: the sent values (int16) per direction, the diagonal, owned time at the edge and by magnitude
++        val outMax = JSONObject()
++        val diagMax = JSONObject()
++        val edgeFrac = JSONObject()
++        val magHist = JSONObject()
++        for ((i, name) in arrayOf("left", "right").withIndex()) {
++            val st = stickStats[i]
++            val o = JSONObject()
++            synchronized(st) {
++                for ((j, dir) in DIRECTIONS.withIndex()) o.put(dir, st.outMax[j])
++                diagMax.put(name, JSONObject().put("sent", st.diagMax)
++                    .put("end_to_end", Math.round(Ds2Stick.endToEnd(st.diagMax.toShort()) * 1000.0) / 1000.0))
++            }
++            outMax.put(name, o)
++            edgeFrac.put(name, st.edgeFrac())
++            magHist.put(name, JSONArray(st.histFracs()))
++        }
+         synchronized(stickMax) {
+             for ((i, name) in arrayOf("left", "right").withIndex()) {
+                 val o = JSONObject()
+@@ -234,6 +254,11 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             .put("takeovers", takeovers.get())
+             .put("controls_pressed", JSONArray(synchronized(pressed) { pressed.toList() }))
+             .put("stick_max_deflection", sticks)
++            .put("stick_out_max", outMax)
++            .put("stick_diag_max", diagMax)
++            .put("stick_edge_frac", edgeFrac)
++            .put("stick_mag_hist", magHist)
++            .put("stick_mapping", Ds2Stick.MAPPING)
+             .put("pointer_exempted_events", exempted.get())
+             .put("back_swallowed", backSwallowed.get())
+             .put("end_presses", endPresses.get()))
+@@ -249,6 +274,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     /** What was touched (the report's keys), then the touch pad's fields into its own slot (none = nothing). */
+     private fun onPadOutput(out: TouchPadState.Output) {
+         pad.heldControls().forEach { pressed.add(it.name) }
++        stickStats[0].onSent(out.lx, out.ly)
++        stickStats[1].onSent(out.rx, out.ry)
+         synchronized(stickMax) {
+             for ((i, c) in arrayOf(TouchPadState.Control.LSTICK, TouchPadState.Control.RSTICK).withIndex()) {
+                 val (x, y) = pad.stickDeflection(c)
+@@ -269,6 +296,11 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     private val tick = object : Runnable {
+         override fun run() {
+             val now = nowMs()
++            // G6-STICK1: owned time by magnitude, sampled at each tick (100 ms)
++            val dt = if (lastTickMs < 0) 0L else now - lastTickMs
++            lastTickMs = now
++            stickStats[0].sample(pad.stickMagnitude(TouchPadState.Control.LSTICK), dt)
++            stickStats[1].sample(pad.stickMagnitude(TouchPadState.Control.RSTICK), dt)
+             val slots = streamSlots
+             val p1 = slots?.holderOf(0)
+             val realP1 = p1 != null && p1 != TouchPadDevice.KEY
+diff --git a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+index 1bfb5b1d..cbbbcd38 100644
+--- a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
++++ b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+@@ -142,6 +142,23 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
+         return stickVector(f.x - s.cx, s.cy - f.y, s.r)
+     }
+ 
++    /**
++     * G6-STICK1: a stick's magnitude now as a fraction of its throw (not clamped; > 1 past the ring), or null when no
++     * finger owns it.
++     */
++    fun stickMagnitude(c: Control): Float? {
++        val s = shapes[c] as? Shape.Circle ?: return null
++        val f = fingers.values.lastOrNull { it.control == c } ?: return null
++        return if (s.r <= 0f) null else hypot(f.x - s.cx, s.cy - f.y) / s.r
++    }
++
++    /** G6-STICK1: the stick's sent (x right, y up) values: [Ds2Stick.send] of the finger's offset; (0, 0) unowned. */
++    fun stickSent(c: Control): Pair<Short, Short> {
++        val s = shapes[c] as? Shape.Circle ?: return 0.toShort() to 0.toShort()
++        val f = fingers.values.lastOrNull { it.control == c } ?: return 0.toShort() to 0.toShort()
++        return Ds2Stick.send(f.x - s.cx, s.cy - f.y, s.r)
++    }
++
+     /** The control whose hit area holds the point (the nearest centre among several), or null. */
+     fun controlAt(x: Float, y: Float): Control? =
+         shapes.entries.filter { it.value.hit(x, y) }.minByOrNull { hypot(x - it.value.cx, y - it.value.cy) }?.key
+@@ -206,9 +223,11 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
+                 Control.LSTICK, Control.RSTICK -> {}
+             }
+         }
+-        val (lxf, lyf) = stickDeflection(Control.LSTICK)
+-        val (rxf, ryf) = stickDeflection(Control.RSTICK)
+-        return Output(buttons = buttons, lx = toShort(lxf), ly = toShort(lyf), rx = toShort(rxf), ry = toShort(ryf),
++        // G6-STICK1: the sticks' sent values through the DualShock 2 mapping ([Ds2Stick]); the knob and the report's
++        // deflection keep [stickDeflection]
++        val (lx, ly) = stickSent(Control.LSTICK)
++        val (rx, ry) = stickSent(Control.RSTICK)
++        return Output(buttons = buttons, lx = lx, ly = ly, rx = rx, ry = ry,
+             lt = lt, rt = rt)
+     }
+ 
+@@ -267,7 +286,6 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
+             return x to y
+         }
+ 
+-        private fun toShort(v: Float): Short = (v.coerceIn(-1f, 1f) * 32767f).roundToInt().coerceIn(-32768, 32767).toShort()
+ 
+         fun dpadSector(dx: Float, dyUp: Float, radius: Float): Int? {
+             if (hypot(dx, dyUp) < DPAD_DEAD * radius) return null
+@@ -322,3 +340,107 @@ object Ps2TouchLayout {
+     const val SHOULDER_HH = 100f
+     const val SHOULDER_HIT = 1.1f
+ }
++
++/**
++ * G6-STICK1: the touch sticks made to feel like a real DualShock 2 **end to end** (what the PS2 game receives, after
++ * PCSX2's own stick scale). The chain (`docs/memory/evidence/G6_STICK1_DUALSHOCK2_FEEL_2026-11-20.md` §1): the sent
++ * int16 -> the hub's uinput axis unchanged (y sign-flipped) -> SDL -> PCSX2's DualShock 2 pad, `AxisScale = 1.33`,
++ * `Deadzone = 0` (`data/games/ps2/config/PCSX2/inis/PCSX2.ini` [Pad1], the hub's as launched): per direction
++ * `clamp(v x 1.33 x 255, 0, 255)` truncated, merged around 127 (as PCSX2 2.x is understood; not read from its source).
++ *
++ * 1. dead zone 0.1 of the throw; 2. linear past it, full at 0.75 of the throw (the user's choice, 2026-11-20: where
++ * PCSX2's 1.33 made a straight push full before; the outer quarter full); 3. the circle
++ * mapped to the square (x 1 / max(|cos|, |sin|)): a full 45-degree push is full on both axes, a cardinal one unchanged;
++ * 4. the target divided by PCSX2's 1.33 on the tablet, so the end-to-end value is the target and does not saturate
++ * early; a full target is sent as full (PCSX2 clamps it). Touch sticks only: real pads and the onn never come here.
++ */
++object Ds2Stick {
++    const val DEAD = 0.1f
++    const val FULL_AT = 0.75f
++    /** PCSX2's DualShock 2 `AxisScale` as the hub launches it (PCSX2.ini [Pad1]; PCSX2's default). */
++    const val PCSX2_AXIS_SCALE = 1.33f
++    const val MAPPING = "ds2-square-0.75-c1.33"
++
++    /** The end-to-end target per axis (-1..1) for an offset (dx right, dyUp up) over the throw radius. */
++    fun target(dx: Float, dyUp: Float, radius: Float): Pair<Float, Float> {
++        if (radius <= 0f) return 0f to 0f
++        val len = hypot(dx, dyUp)
++        val m = len / radius
++        if (m < DEAD || len <= 0f) return 0f to 0f
++        val eff = ((m - DEAD) / (FULL_AT - DEAD)).coerceIn(0f, 1f)
++        val c = dx / len
++        val sn = dyUp / len
++        val k = 1f / maxOf(kotlin.math.abs(c), kotlin.math.abs(sn))
++        return (eff * c * k).coerceIn(-1f, 1f) to (eff * sn * k).coerceIn(-1f, 1f)
++    }
++
++    /** Within this of full is full (float rounding at 45 degrees gives 0.99999994; PCSX2's step is 1/128). */
++    const val FULL_EPS = 1e-4f
++
++    /** One axis's sent value for an end-to-end target: full as full; otherwise the target / 1.33. */
++    fun sendAxis(t: Float): Short {
++        val a = kotlin.math.abs(t)
++        val v = if (a >= 1f - FULL_EPS) 32767 else (a / PCSX2_AXIS_SCALE * 32767f).roundToInt().coerceIn(0, 32767)
++        return (if (t < 0f) -v else v).toShort()
++    }
++
++    fun send(dx: Float, dyUp: Float, radius: Float): Pair<Short, Short> =
++        target(dx, dyUp, radius).let { (x, y) -> sendAxis(x) to sendAxis(y) }
++
++    /**
++     * PCSX2's value for a sent axis, as a fraction of full (0..1 of one direction), by the model above: the
++     * direction's 0..255 (`v x 1.33 x 255`, clamped, truncated), merged as `127 + (raw + 1) / 2` (positive) or
++     * `127 - raw / 2` (negative).
++     */
++    fun endToEnd(sent: Short, scale: Float = PCSX2_AXIS_SCALE): Float {
++        val s = sent.toInt()
++        if (s == 0) return 0f
++        val v = kotlin.math.abs(s) / (if (s < 0) 32768f else 32767f)
++        val raw = minOf(255, kotlin.math.floor(v * scale * 255f).toInt())
++        return if (s > 0) ((raw + 1) / 2) / 128f else (raw / 2) / 127f
++    }
++}
++
++/**
++ * G6-STICK1: one stick's report figures. The largest sent value per direction, the largest min(|x|, |y|) sent (the
++ * diagonal), and owned time by magnitude (10 bins of 0..1 of the throw; past the ring in the last) and at >= 0.75
++ * ([Ds2Stick.FULL_AT], where the output is full).
++ */
++class StickStats {
++    /** up, down, left, right: the largest sent magnitude. */
++    val outMax = IntArray(4)
++    var diagMax = 0
++        private set
++    val hist = LongArray(10)
++    var ownedMs = 0L
++        private set
++    var edgeMs = 0L
++        private set
++
++    @Synchronized
++    fun onSent(x: Short, yUp: Short) {
++        val xi = x.toInt()
++        val yi = yUp.toInt()
++        if (yi > outMax[0]) outMax[0] = yi
++        if (-yi > outMax[1]) outMax[1] = -yi
++        if (-xi > outMax[2]) outMax[2] = -xi
++        if (xi > outMax[3]) outMax[3] = xi
++        val d = minOf(kotlin.math.abs(xi), kotlin.math.abs(yi))
++        if (d > diagMax) diagMax = d
++    }
++
++    /** A sample of [dtMs] of a stick: its magnitude (fraction of the throw) when owned, or null. */
++    @Synchronized
++    fun sample(magnitude: Float?, dtMs: Long) {
++        if (magnitude == null || dtMs <= 0) return
++        ownedMs += dtMs
++        if (magnitude >= Ds2Stick.FULL_AT) edgeMs += dtMs
++        hist[minOf(9, maxOf(0, (magnitude * 10f).toInt()))] += dtMs
++    }
++
++    @Synchronized
++    fun edgeFrac(): Double = if (ownedMs <= 0) 0.0 else Math.round(edgeMs * 1000.0 / ownedMs) / 1000.0
++
++    @Synchronized
++    fun histFracs(): List<Double> = hist.map { if (ownedMs <= 0) 0.0 else Math.round(it * 1000.0 / ownedMs) / 1000.0 }
++}
+diff --git a/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt b/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
+index 873d7e9b..7a6fc59e 100644
+--- a/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
++++ b/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
+@@ -79,8 +79,9 @@ class G6TouchPs2Test {
+         val (lx, ly) = c(Control.LSTICK)
+         s.down(1, lx, ly)
+         assertEquals(MAX, s.move(1, lx + 3 * r, ly).lx)                         // clamped at 1
+-        val diag = s.move(1, lx + 3 * r, ly - 3 * r)                             // clamped to the unit circle
+-        assertEquals(23170.0, diag.lx.toDouble(), 2.0); assertEquals(23170.0, diag.ly.toDouble(), 2.0)
++        val diag = s.move(1, lx + 3 * r, ly - 3 * r)
++        // G6-STICK1: the DualShock 2 square: a full diagonal is full on both axes (G6-HM4: the unit circle, 23170 each)
++        assertEquals(MAX, diag.lx); assertEquals(MAX, diag.ly)
+         assertEquals(TouchPadState.Output(), s.move(1, lx + 0.09f * r, ly))     // inside 0.1 r
+         assertTrue(s.move(1, lx + 0.11f * r, ly).lx > 0)                         // just outside
+         assertEquals(0f to 0f, TouchPadState.stickVector(5f, 5f, r))
+@@ -121,10 +122,11 @@ class G6TouchPs2Test {
+         val (lx, ly) = c(Control.LSTICK)
+         s.down(1, lx, ly)
+         assertEquals(MAX, s.move(1, lx + 0.875f * 132f, ly).lx)                  // full at 115.5 px
++        // G6-STICK1: half of the throw is (0.5 - 0.1) / 0.65 end to end (G6-HM4b: half sent, 16384); 91 % of it is now
++        // full (>= 0.75)
+         val g6hm4Half = s.move(1, lx + 0.5f * 0.875f * 132f, ly).lx                // half of the new throw
+-        assertEquals(16384.0, g6hm4Half.toDouble(), 2.0)
+-        assertTrue(s.move(1, lx + 0.8f * 132f, ly).lx < MAX)                      // G6-HM4's 80 % is now ~91 %
+-        assertEquals(0.914, s.output().lx / 32767.0, 0.001)
++        assertEquals(0.4 / 0.65, Ds2Stick.endToEnd(g6hm4Half).toDouble(), 1.0 / 128)
++        assertEquals(MAX, s.move(1, lx + 0.8f * 132f, ly).lx)                     // G6-HM4's 80 % = 91 % of the throw
+         s.up(1)
+         // a touch 150 px from the centre (outside the new ring, inside the unchanged 158.4 px press area) lands on it
+         assertEquals(Control.LSTICK, s.controlAt(lx - 150f, ly))
+diff --git a/PrivyHub/app/src/test/java/streaming/G6Stick1Test.kt b/PrivyHub/app/src/test/java/streaming/G6Stick1Test.kt
+new file mode 100644
+index 00000000..163e3434
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/G6Stick1Test.kt
+@@ -0,0 +1,125 @@
++package com.safeiot.privyhub.streaming
++
++import com.safeiot.privyhub.streaming.TouchPadState.Control
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import kotlin.math.abs
++import kotlin.math.cos
++import kotlin.math.sin
++
++/**
++ * G6-STICK1: the touch sticks as a DualShock 2 end to end (after PCSX2's AxisScale 1.33): dead zone 0.1, full at 0.75
++ * of the throw (the user's choice; first 0.9), the circle mapped to the square, the 1.33 compensated on the tablet; the report's figures.
++ */
++class G6Stick1Test {
++
++    private val r = Ps2TouchLayout.STICK_R
++    private fun e2e(v: Short) = Ds2Stick.endToEnd(v).toDouble()
++    private fun push(frac: Float, deg: Double): Pair<Short, Short> {
++        val a = Math.toRadians(deg)
++        return Ds2Stick.send((frac * r * cos(a)).toFloat(), (frac * r * sin(a)).toFloat(), r)
++    }
++
++    @Test
++    fun theDeadZoneIsATenthOfTheThrow() {
++        assertEquals(0.toShort() to 0.toShort(), push(0.099f, 0.0))
++        assertEquals(0.toShort() to 0.toShort(), push(0.099f, 45.0))
++        assertTrue(push(0.11f, 0.0).first > 0)
++        assertEquals(0.0, e2e(push(0.1f, 0.0).first), 1.0 / 128)                     // the ramp starts at 0
++    }
++
++    @Test
++    fun fullAt75PercentOfTheThrowAndNeverBeyond() {
++        assertEquals(0.75f, Ds2Stick.FULL_AT, 0f)
++        for (f in listOf(0.75f, 0.8f, 0.9f, 1f, 1.5f, 3f)) {
++            val (x, y) = push(f, 0.0)
++            assertEquals("$f", 32767.toShort(), x); assertEquals(0.toShort(), y)
++            assertEquals(1.0, e2e(x), 0.0)
++        }
++        assertTrue(e2e(push(0.74f, 0.0).first) < 1.0)                                // not saturated early
++        assertEquals(-32767, push(1f, 180.0).first.toInt())                          // no output beyond full
++    }
++
++    @Test
++    fun aFull45DegreePushIsFullOnBothAxesEndToEnd() {
++        for (deg in listOf(45.0, 135.0, 225.0, 315.0)) {
++            val (x, y) = push(1f, deg)
++            assertEquals("$deg", 1.0, e2e(x), 0.0); assertEquals("$deg", 1.0, e2e(y), 0.0)
++        }
++        // at 0.75 of the throw too; and a 45-degree push half way up the ramp (0.425) is half on both axes
++        val (x9, y9) = push(0.75f, 45.0)
++        assertEquals(1.0, e2e(x9), 0.0); assertEquals(1.0, e2e(y9), 0.0)
++        assertTrue(e2e(push(0.74f, 45.0).first) < 1.0)
++        val (xh, yh) = push(0.425f, 45.0)
++        assertEquals(0.5, e2e(xh), 1.0 / 128); assertEquals(0.5, e2e(yh), 1.0 / 128)
++    }
++
++    @Test
++    fun cardinalValuesKeepTheirDirectionAndAreMonotonic() {
++        var last = -1.0
++        for (i in 10..100) {
++            val f = i / 100f
++            val (x, y) = push(f, 90.0)
++            assertEquals(0.toShort(), x)
++            assertTrue(y >= 0)
++            val v = e2e(y)
++            assertTrue("$f", v >= last)
++            last = v
++            assertEquals("$f", ((f - 0.1) / 0.65).coerceIn(0.0, 1.0), v, 1.0 / 128 + 1e-6)  // the target, end to end
++        }
++        // the sign rules: up / right positive, down / left negative
++        assertTrue(push(0.5f, 270.0).second < 0 && push(0.5f, 180.0).first < 0)
++    }
++
++    // the 1.33 compensated: what is sent is the target / 1.33, so PCSX2's x 1.33 gives the target (residual <= 1/128)
++    @Test
++    fun pcsx2sScaleIsCompensated() {
++        assertEquals(1.33f, Ds2Stick.PCSX2_AXIS_SCALE, 0f)
++        var worst = 0.0
++        for (i in 0..999) {
++            val t = i / 1000f
++            val sent = Ds2Stick.sendAxis(t)
++            assertEquals((t / 1.33f * 32767f).toDouble(), sent.toDouble(), 1.0)
++            worst = maxOf(worst, abs(e2e(sent) - t))
++            val neg = Ds2Stick.sendAxis(-t)
++            worst = maxOf(worst, abs(e2e(neg) - t))
++        }
++        assertTrue("residual $worst", worst <= 1.0 / 127 + 1e-6)
++        // without the compensation, 0.8 of full would already be full in PCSX2
++        assertEquals(1.0, Ds2Stick.endToEnd((0.8f * 32767).toInt().toShort()).toDouble(), 0.0)
++        assertEquals("ds2-square-0.75-c1.33", Ds2Stick.MAPPING)
++    }
++
++    // the touch pad sends the mapping; the knob and the report's deflection keep the circle
++    @Test
++    fun theTouchPadSendsTheMapping() {
++        val s = TouchPadState(TouchPadState.Kind.PS2).apply { layout(1200, 1100) }
++        val (lx, ly) = s.centreOf(Control.LSTICK)!!
++        s.down(1, lx, ly)
++        val d = 0.95f * r / Math.sqrt(2.0).toFloat()
++        val out = s.move(1, lx + d, ly - d)                                          // up-right, 95 % of the throw
++        assertEquals(32767.toShort(), out.lx); assertEquals(32767.toShort(), out.ly)
++        assertEquals(0.95f, s.stickMagnitude(Control.LSTICK)!!, 1e-3f)
++        assertEquals(0.672f, s.stickDeflection(Control.LSTICK).first, 1e-3f)       // the circle, unchanged
++        s.up(1)
++        assertEquals(null, s.stickMagnitude(Control.LSTICK))
++    }
++
++    // the report's figures
++    @Test
++    fun theStickStats() {
++        val st = StickStats()
++        st.onSent(32767, 0); st.onSent(-12000, -20000); st.onSent(25000, 26000)
++        assertEquals(listOf(26000, 20000, 12000, 32767), st.outMax.toList())        // up, down, left, right
++        assertEquals(25000, st.diagMax)
++        st.sample(null, 100)                                                         // unowned: not counted
++        st.sample(0.95f, 200); st.sample(0.76f, 100); st.sample(0.74f, 100); st.sample(1.4f, 100)
++        assertEquals(0.8, st.edgeFrac(), 1e-9)                                       // at >= 0.75 of the throw
++        val h = st.histFracs()
++        assertEquals(10, h.size)
++        assertEquals(0.4, h[7], 1e-9); assertEquals(0.6, h[9], 1e-9)
++        assertEquals(1.0, h.sum(), 1e-9)
++        assertEquals(1.0, Ds2Stick.endToEnd(32767).toDouble(), 0.0)
++    }
++}

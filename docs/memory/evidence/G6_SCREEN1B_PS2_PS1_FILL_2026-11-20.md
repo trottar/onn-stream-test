@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: RECORD — G6-SCREEN1b part 1 done: a handheld launch (`display=handheld`) runs PS2 without its widescreen patch for that launch only (opt-in hub change; every launch without the field identical); the tablet crops PS2 to 4:3 on the reply's `widescreen: false` and stretches PS1 to the 4:3 box; candidate adcb1222… tablet only; the run pre-registered. G6-SCREEN1's run superseded, not run. The onn keeps ca53df0d…. Nothing adopted; the companion not restarted.
+status: RECORD — G6-SCREEN1b NOT MET as pre-registered (c4, c6, c7, c9, c10, c11; the scored session ran the previous app and the companion before its restart, by the user's sequence — §7). Part 1: a handheld launch (`display=handheld`) runs PS2 without its widescreen patch for that launch only (opt-in hub change; every launch without the field identical); the tablet crops PS2 to 4:3 on the reply's `widescreen: false` and stretches PS1 to the 4:3 box; candidate adcb1222… tablet only; the run pre-registered. G6-SCREEN1's run superseded, not run. The onn keeps ca53df0d…. Nothing adopted; the companion not restarted.
 ---
 
 # G6-SCREEN1b — PS2 and PS1 fill the 4:3 handheld box (part 1: hub change, client, build, pre-registration)
@@ -202,6 +202,54 @@ sha256 **`31a8832b7e513536b7503848fd20dcfd439aff88319635b7fe59f16b97aaf43a`**, h
 
 The commands are in the session's final reply and in `../patches/G6_SCREEN1B_PS2_PS1_FILL.md`.
 
-## 7. Part 2 — the run (after it)
+## 7. Part 2 — the run, scored (2026-11-20; written by G6-STICK1's session)
 
-Not run yet.
+Figures as extracted: `g6_stick1_2026-11-20/screen1b_part2_figures.txt`.
+
+**Pre-registration intact:** `preregistration.md` sha256 `31a8832b…` checks OK; hashed at 08:05:31Z.
+
+**The session** (by its "Which session" rule): the first tablet PS2 handheld session that started after the hash,
+not a false start.
+- The 08:10:29Z report's session started at 07:55:41Z, before the hash, so it is not counted.
+- **Scored:** launch 08:11:56Z, `session_started` 08:12:13.067Z → `session_end_bye` 08:14:52.277Z (**159.2 s
+  PLAYING**), class `remote-direct`.
+- Decoder report `native_decoder_20261120_081452_382.json` (`c9588368…`, 166 s), `handheld` block, `layout` `ps2`.
+
+| Cell | Value | Bound | Verdict |
+|---|---|---|---|
+| c1 decode | `OMX.Exynos.avc.dec`, hardware true, low latency true | hardware, low latency | **MET** |
+| c2 rate | `recent_fps` 60.07 | ≥ 58 | **MET** |
+| c3 drops | decoder 4 / 9515 = 0.04 %; video 44 / 9515 = 0.46 % | each ≤ 1 % | **MET** |
+| c4 latency | `max_rx_to_decode_ms` 50; `max_output_gap_ms` **538** | ≤ 100; ≤ 250 | **NOT MET** |
+| c5 the join | `touch_slot` 0; `p1_join_after_release_ms` 5077 | 0; 5000–5300 | **MET** |
+| c6 every control | `controls_pressed` **5 of 16**: LSTICK, SQUARE, CROSS, CIRCLE, END | all 16 | **NOT MET** |
+| c7 sticks | left: up 1, down 0.991, left 1, right 1; right: **0, 0, 0, 0** | each ≥ 0.9 | **NOT MET** |
+| c8 End | `end_presses` 1; one bye after 159.2 s PLAYING | 1; ≥ 60 s | **MET** |
+| c9 the box | `video_box` **1200x675**; `pad_region` 1200x1325 | `1200x900`; `1200x1100` | **NOT MET** |
+| c10 the crop (PS2) | `video_crop` and `video_source_rect` **absent** | `"4:3"`; `"160,0,960x720"` | **NOT MET** |
+| c11 the hub's handheld launch | that launch's game log (`20261120-031154-ps2.log`): **no** `PS2 handheld` line | the line present | **NOT MET** |
+
+**Verdict by the pre-registered rule: G6-SCREEN1b NOT MET** (c4, c6, c7, c9, c10, c11).
+- **Its conditions were not in place, by the user's own sequence, not a fault found in the code.** The session ran
+  the previous app (`video_box` 1200x675, no `video_crop` key) and the companion before its restart (the unit active
+  since 08:19:07Z).
+- The verdict stands as scored.
+- Context: 557 lost video packets, 2 sequence resyncs, 26 FEC groups unrecoverable, no link notice.
+
+**Context, not cells (the user's free play after the restart):**
+- The 08:19:42Z launch's game log holds `PS2 handheld: widescreen patch off for this launch only (the title's setting:
+  off)`.
+- The four sessions 08:20:05Z → 08:46:09Z (`…082739_617`, `…082844_726`, `…083314_250`, `…084609_156`; 458, 57, 260
+  and 768 s) each show `video_box` `1200x900`, `pad_region` `1200x1100`, `video_crop` `"4:3"`, `video_source_rect`
+  `"160,0,960x720"`.
+- Later the same day (16:15–16:26Z) two more launches' logs hold the handheld line, and six sessions show the same
+  four figures.
+
+**The user's words, verbatim (2026-11-20):**
+- "I played a long time last night. It ran super well. I think the analog could use a little fine tuning, but that's
+  a small thing."
+- "Left analog movement on rotations would be too slow sometimes."
+- Asked whether to make the sticks behave like a real DualShock 2: "Yep, making feel like true dualshock 2 is a good
+  idea"
+
+The analog tuning follows as G6-STICK1 (`G6_STICK1_DUALSHOCK2_FEEL_2026-11-20.md`).

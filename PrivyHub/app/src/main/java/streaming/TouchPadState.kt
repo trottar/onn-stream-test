@@ -142,6 +142,23 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
         return stickVector(f.x - s.cx, s.cy - f.y, s.r)
     }
 
+    /**
+     * G6-STICK1: a stick's magnitude now as a fraction of its throw (not clamped; > 1 past the ring), or null when no
+     * finger owns it.
+     */
+    fun stickMagnitude(c: Control): Float? {
+        val s = shapes[c] as? Shape.Circle ?: return null
+        val f = fingers.values.lastOrNull { it.control == c } ?: return null
+        return if (s.r <= 0f) null else hypot(f.x - s.cx, s.cy - f.y) / s.r
+    }
+
+    /** G6-STICK1: the stick's sent (x right, y up) values: [Ds2Stick.send] of the finger's offset; (0, 0) unowned. */
+    fun stickSent(c: Control): Pair<Short, Short> {
+        val s = shapes[c] as? Shape.Circle ?: return 0.toShort() to 0.toShort()
+        val f = fingers.values.lastOrNull { it.control == c } ?: return 0.toShort() to 0.toShort()
+        return Ds2Stick.send(f.x - s.cx, s.cy - f.y, s.r)
+    }
+
     /** The control whose hit area holds the point (the nearest centre among several), or null. */
     fun controlAt(x: Float, y: Float): Control? =
         shapes.entries.filter { it.value.hit(x, y) }.minByOrNull { hypot(x - it.value.cx, y - it.value.cy) }?.key
@@ -206,9 +223,11 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
                 Control.LSTICK, Control.RSTICK -> {}
             }
         }
-        val (lxf, lyf) = stickDeflection(Control.LSTICK)
-        val (rxf, ryf) = stickDeflection(Control.RSTICK)
-        return Output(buttons = buttons, lx = toShort(lxf), ly = toShort(lyf), rx = toShort(rxf), ry = toShort(ryf),
+        // G6-STICK1: the sticks' sent values through the DualShock 2 mapping ([Ds2Stick]); the knob and the report's
+        // deflection keep [stickDeflection]
+        val (lx, ly) = stickSent(Control.LSTICK)
+        val (rx, ry) = stickSent(Control.RSTICK)
+        return Output(buttons = buttons, lx = lx, ly = ly, rx = rx, ry = ry,
             lt = lt, rt = rt)
     }
 
@@ -267,7 +286,6 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
             return x to y
         }
 
-        private fun toShort(v: Float): Short = (v.coerceIn(-1f, 1f) * 32767f).roundToInt().coerceIn(-32768, 32767).toShort()
 
         fun dpadSector(dx: Float, dyUp: Float, radius: Float): Int? {
             if (hypot(dx, dyUp) < DPAD_DEAD * radius) return null
@@ -321,4 +339,108 @@ object Ps2TouchLayout {
     const val SHOULDER_HW = 50f
     const val SHOULDER_HH = 100f
     const val SHOULDER_HIT = 1.1f
+}
+
+/**
+ * G6-STICK1: the touch sticks made to feel like a real DualShock 2 **end to end** (what the PS2 game receives, after
+ * PCSX2's own stick scale). The chain (`docs/memory/evidence/G6_STICK1_DUALSHOCK2_FEEL_2026-11-20.md` §1): the sent
+ * int16 -> the hub's uinput axis unchanged (y sign-flipped) -> SDL -> PCSX2's DualShock 2 pad, `AxisScale = 1.33`,
+ * `Deadzone = 0` (`data/games/ps2/config/PCSX2/inis/PCSX2.ini` [Pad1], the hub's as launched): per direction
+ * `clamp(v x 1.33 x 255, 0, 255)` truncated, merged around 127 (as PCSX2 2.x is understood; not read from its source).
+ *
+ * 1. dead zone 0.1 of the throw; 2. linear past it, full at 0.75 of the throw (the user's choice, 2026-11-20: where
+ * PCSX2's 1.33 made a straight push full before; the outer quarter full); 3. the circle
+ * mapped to the square (x 1 / max(|cos|, |sin|)): a full 45-degree push is full on both axes, a cardinal one unchanged;
+ * 4. the target divided by PCSX2's 1.33 on the tablet, so the end-to-end value is the target and does not saturate
+ * early; a full target is sent as full (PCSX2 clamps it). Touch sticks only: real pads and the onn never come here.
+ */
+object Ds2Stick {
+    const val DEAD = 0.1f
+    const val FULL_AT = 0.75f
+    /** PCSX2's DualShock 2 `AxisScale` as the hub launches it (PCSX2.ini [Pad1]; PCSX2's default). */
+    const val PCSX2_AXIS_SCALE = 1.33f
+    const val MAPPING = "ds2-square-0.75-c1.33"
+
+    /** The end-to-end target per axis (-1..1) for an offset (dx right, dyUp up) over the throw radius. */
+    fun target(dx: Float, dyUp: Float, radius: Float): Pair<Float, Float> {
+        if (radius <= 0f) return 0f to 0f
+        val len = hypot(dx, dyUp)
+        val m = len / radius
+        if (m < DEAD || len <= 0f) return 0f to 0f
+        val eff = ((m - DEAD) / (FULL_AT - DEAD)).coerceIn(0f, 1f)
+        val c = dx / len
+        val sn = dyUp / len
+        val k = 1f / maxOf(kotlin.math.abs(c), kotlin.math.abs(sn))
+        return (eff * c * k).coerceIn(-1f, 1f) to (eff * sn * k).coerceIn(-1f, 1f)
+    }
+
+    /** Within this of full is full (float rounding at 45 degrees gives 0.99999994; PCSX2's step is 1/128). */
+    const val FULL_EPS = 1e-4f
+
+    /** One axis's sent value for an end-to-end target: full as full; otherwise the target / 1.33. */
+    fun sendAxis(t: Float): Short {
+        val a = kotlin.math.abs(t)
+        val v = if (a >= 1f - FULL_EPS) 32767 else (a / PCSX2_AXIS_SCALE * 32767f).roundToInt().coerceIn(0, 32767)
+        return (if (t < 0f) -v else v).toShort()
+    }
+
+    fun send(dx: Float, dyUp: Float, radius: Float): Pair<Short, Short> =
+        target(dx, dyUp, radius).let { (x, y) -> sendAxis(x) to sendAxis(y) }
+
+    /**
+     * PCSX2's value for a sent axis, as a fraction of full (0..1 of one direction), by the model above: the
+     * direction's 0..255 (`v x 1.33 x 255`, clamped, truncated), merged as `127 + (raw + 1) / 2` (positive) or
+     * `127 - raw / 2` (negative).
+     */
+    fun endToEnd(sent: Short, scale: Float = PCSX2_AXIS_SCALE): Float {
+        val s = sent.toInt()
+        if (s == 0) return 0f
+        val v = kotlin.math.abs(s) / (if (s < 0) 32768f else 32767f)
+        val raw = minOf(255, kotlin.math.floor(v * scale * 255f).toInt())
+        return if (s > 0) ((raw + 1) / 2) / 128f else (raw / 2) / 127f
+    }
+}
+
+/**
+ * G6-STICK1: one stick's report figures. The largest sent value per direction, the largest min(|x|, |y|) sent (the
+ * diagonal), and owned time by magnitude (10 bins of 0..1 of the throw; past the ring in the last) and at >= 0.75
+ * ([Ds2Stick.FULL_AT], where the output is full).
+ */
+class StickStats {
+    /** up, down, left, right: the largest sent magnitude. */
+    val outMax = IntArray(4)
+    var diagMax = 0
+        private set
+    val hist = LongArray(10)
+    var ownedMs = 0L
+        private set
+    var edgeMs = 0L
+        private set
+
+    @Synchronized
+    fun onSent(x: Short, yUp: Short) {
+        val xi = x.toInt()
+        val yi = yUp.toInt()
+        if (yi > outMax[0]) outMax[0] = yi
+        if (-yi > outMax[1]) outMax[1] = -yi
+        if (-xi > outMax[2]) outMax[2] = -xi
+        if (xi > outMax[3]) outMax[3] = xi
+        val d = minOf(kotlin.math.abs(xi), kotlin.math.abs(yi))
+        if (d > diagMax) diagMax = d
+    }
+
+    /** A sample of [dtMs] of a stick: its magnitude (fraction of the throw) when owned, or null. */
+    @Synchronized
+    fun sample(magnitude: Float?, dtMs: Long) {
+        if (magnitude == null || dtMs <= 0) return
+        ownedMs += dtMs
+        if (magnitude >= Ds2Stick.FULL_AT) edgeMs += dtMs
+        hist[minOf(9, maxOf(0, (magnitude * 10f).toInt()))] += dtMs
+    }
+
+    @Synchronized
+    fun edgeFrac(): Double = if (ownedMs <= 0) 0.0 else Math.round(edgeMs * 1000.0 / ownedMs) / 1000.0
+
+    @Synchronized
+    fun histFracs(): List<Double> = hist.map { if (ownedMs <= 0) 0.0 else Math.round(it * 1000.0 / ownedMs) / 1000.0 }
 }

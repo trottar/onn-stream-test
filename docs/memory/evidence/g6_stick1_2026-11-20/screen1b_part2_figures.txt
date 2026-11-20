@@ -1,0 +1,20 @@
+G6-SCREEN1b part 2 -- the figures as extracted (read only, 2026-11-20 ~16:29Z)
+pre-registration: g6_screen1b_2026-11-20/preregistration.md sha256 31a8832b... checks OK; hashed 08:05:31Z
+reports after the hash (logs/games/decoder_sessions): 081029_723 (session started 07:55:41Z, before the hash: not counted);
+  081452_382 = the scored session; then 081820_283, 082739_617, 082844_726, 083314_250, 084609_156, 161940_868 ... 162649_991
+the scored session (logs/games/stream_log_archive/native_stream_recovery.log.1): launch_ports ps2 08:11:56.160Z;
+  remote_config remote-direct; session_started 08:12:13.067Z; session_end_bye 08:14:52.277Z (client_frame 9513): 159.2 s PLAYING
+  decoder report native_decoder_20261120_081452_382.json (sha256 c95883685bfcf88f...), received 08:14:52.382Z, duration_ms 165828
+  c1 OMX.Exynos.avc.dec hardware true low_latency true | c2 recent_fps 60.07 | c3 decoder 4/9515, video 44/9515
+  c4 max_rx_to_decode_ms 50, max_output_gap_ms 538 | c5 touch_slot 0, p1_join_after_release_ms 5077
+  c6 controls_pressed 5: LSTICK SQUARE CROSS CIRCLE END | c7 left up 1 down 0.991 left 1 right 1; right 0 0 0 0
+  c8 end_presses 1; bye after 159.2 s | c9 video_box 1200x675, pad_region 1200x1325 | c10 video_crop / video_source_rect absent
+  c11 its launch's game log 20261120-031154-ps2.log (08:11:54Z): no "PS2 handheld" line
+  context: touch_writes 7010, takeovers 0, back_swallowed 0, lost_packets 557, sequence_resyncs 2, fec_unrecoverable_groups 26,
+  link_notice_shown 0; class remote-direct
+the companion: unit active since 08:19:07Z (G6-SCREEN1b committed 08:18:57Z): the scored session ran on the code before it
+context after the restart (not cells): 20261120-031942-ps2.log (08:19:42Z) holds "PS2 handheld: widescreen patch off for this
+  launch only (the title's setting: off)"; reports 082739_617 (458 s), 082844_726 (57 s), 083314_250 (260 s), 084609_156 (768 s):
+  each video_box 1200x900, pad_region 1200x1100, video_crop 4:3, video_source_rect 160,0,960x720
+  later (16:15-16:26Z): 20261120-111513-ps2.log and -112150-ps2.log each hold the handheld line (setting: off); reports
+  161940_868 ... 162649_991 (6 sessions, 13-231 s) each 1200x900, 1200x1100, 4:3, 160,0,960x720

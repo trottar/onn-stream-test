@@ -80,6 +80,9 @@ class HandheldStreamActivity : NativeStreamActivity() {
     private val pressed = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
     /** [left, right] stick x [up, down, left, right]: the largest deflection seen, 0..1. */
     private val stickMax = Array(2) { FloatArray(4) }
+    /** G6-STICK1: [left, right]: the sent values and owned time by magnitude. */
+    private val stickStats = arrayOf(StickStats(), StickStats())
+    @Volatile private var lastTickMs = -1L
 
     override val streamOrientation: Int get() = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
@@ -209,6 +212,23 @@ class HandheldStreamActivity : NativeStreamActivity() {
         val w = frame?.width ?: 0
         val h = frame?.height ?: 0
         val sticks = JSONObject()
+        // G6-STICK1: the sent values (int16) per direction, the diagonal, owned time at the edge and by magnitude
+        val outMax = JSONObject()
+        val diagMax = JSONObject()
+        val edgeFrac = JSONObject()
+        val magHist = JSONObject()
+        for ((i, name) in arrayOf("left", "right").withIndex()) {
+            val st = stickStats[i]
+            val o = JSONObject()
+            synchronized(st) {
+                for ((j, dir) in DIRECTIONS.withIndex()) o.put(dir, st.outMax[j])
+                diagMax.put(name, JSONObject().put("sent", st.diagMax)
+                    .put("end_to_end", Math.round(Ds2Stick.endToEnd(st.diagMax.toShort()) * 1000.0) / 1000.0))
+            }
+            outMax.put(name, o)
+            edgeFrac.put(name, st.edgeFrac())
+            magHist.put(name, JSONArray(st.histFracs()))
+        }
         synchronized(stickMax) {
             for ((i, name) in arrayOf("left", "right").withIndex()) {
                 val o = JSONObject()
@@ -234,6 +254,11 @@ class HandheldStreamActivity : NativeStreamActivity() {
             .put("takeovers", takeovers.get())
             .put("controls_pressed", JSONArray(synchronized(pressed) { pressed.toList() }))
             .put("stick_max_deflection", sticks)
+            .put("stick_out_max", outMax)
+            .put("stick_diag_max", diagMax)
+            .put("stick_edge_frac", edgeFrac)
+            .put("stick_mag_hist", magHist)
+            .put("stick_mapping", Ds2Stick.MAPPING)
             .put("pointer_exempted_events", exempted.get())
             .put("back_swallowed", backSwallowed.get())
             .put("end_presses", endPresses.get()))
@@ -249,6 +274,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
     /** What was touched (the report's keys), then the touch pad's fields into its own slot (none = nothing). */
     private fun onPadOutput(out: TouchPadState.Output) {
         pad.heldControls().forEach { pressed.add(it.name) }
+        stickStats[0].onSent(out.lx, out.ly)
+        stickStats[1].onSent(out.rx, out.ry)
         synchronized(stickMax) {
             for ((i, c) in arrayOf(TouchPadState.Control.LSTICK, TouchPadState.Control.RSTICK).withIndex()) {
                 val (x, y) = pad.stickDeflection(c)
@@ -269,6 +296,11 @@ class HandheldStreamActivity : NativeStreamActivity() {
     private val tick = object : Runnable {
         override fun run() {
             val now = nowMs()
+            // G6-STICK1: owned time by magnitude, sampled at each tick (100 ms)
+            val dt = if (lastTickMs < 0) 0L else now - lastTickMs
+            lastTickMs = now
+            stickStats[0].sample(pad.stickMagnitude(TouchPadState.Control.LSTICK), dt)
+            stickStats[1].sample(pad.stickMagnitude(TouchPadState.Control.RSTICK), dt)
             val slots = streamSlots
             val p1 = slots?.holderOf(0)
             val realP1 = p1 != null && p1 != TouchPadDevice.KEY

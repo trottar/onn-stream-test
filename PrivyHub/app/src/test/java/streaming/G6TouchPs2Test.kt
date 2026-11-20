@@ -79,8 +79,9 @@ class G6TouchPs2Test {
         val (lx, ly) = c(Control.LSTICK)
         s.down(1, lx, ly)
         assertEquals(MAX, s.move(1, lx + 3 * r, ly).lx)                         // clamped at 1
-        val diag = s.move(1, lx + 3 * r, ly - 3 * r)                             // clamped to the unit circle
-        assertEquals(23170.0, diag.lx.toDouble(), 2.0); assertEquals(23170.0, diag.ly.toDouble(), 2.0)
+        val diag = s.move(1, lx + 3 * r, ly - 3 * r)
+        // G6-STICK1: the DualShock 2 square: a full diagonal is full on both axes (G6-HM4: the unit circle, 23170 each)
+        assertEquals(MAX, diag.lx); assertEquals(MAX, diag.ly)
         assertEquals(TouchPadState.Output(), s.move(1, lx + 0.09f * r, ly))     // inside 0.1 r
         assertTrue(s.move(1, lx + 0.11f * r, ly).lx > 0)                         // just outside
         assertEquals(0f to 0f, TouchPadState.stickVector(5f, 5f, r))
@@ -121,10 +122,11 @@ class G6TouchPs2Test {
         val (lx, ly) = c(Control.LSTICK)
         s.down(1, lx, ly)
         assertEquals(MAX, s.move(1, lx + 0.875f * 132f, ly).lx)                  // full at 115.5 px
+        // G6-STICK1: half of the throw is (0.5 - 0.1) / 0.65 end to end (G6-HM4b: half sent, 16384); 91 % of it is now
+        // full (>= 0.75)
         val g6hm4Half = s.move(1, lx + 0.5f * 0.875f * 132f, ly).lx                // half of the new throw
-        assertEquals(16384.0, g6hm4Half.toDouble(), 2.0)
-        assertTrue(s.move(1, lx + 0.8f * 132f, ly).lx < MAX)                      // G6-HM4's 80 % is now ~91 %
-        assertEquals(0.914, s.output().lx / 32767.0, 0.001)
+        assertEquals(0.4 / 0.65, Ds2Stick.endToEnd(g6hm4Half).toDouble(), 1.0 / 128)
+        assertEquals(MAX, s.move(1, lx + 0.8f * 132f, ly).lx)                     // G6-HM4's 80 % = 91 % of the throw
         s.up(1)
         // a touch 150 px from the centre (outside the new ring, inside the unchanged 158.4 px press area) lands on it
         assertEquals(Control.LSTICK, s.controlAt(lx - 150f, ly))
