@@ -40,7 +40,7 @@ def _digit(d, x, y, ch, s=2):
         d.rectangle(boxes[k], fill=235)
 
 
-def screen(kind: str, look: int, rng, far: bool = False) -> Image.Image:
+def screen(kind: str, look: int, rng, far: bool = False, cur=None, mark: int = 0) -> Image.Image:
     im = Image.fromarray(BACK.copy(), "L")
     d = ImageDraw.Draw(im)
     d.rectangle((120, 90, 200, 125), fill=90)                     # the tally's panel
@@ -52,11 +52,13 @@ def screen(kind: str, look: int, rng, far: bool = False) -> Image.Image:
         d.rectangle((x0, 40, x0 + 80, 180), fill=int(m.integers(20, 230)))
         d.ellipse((x0 + 10, 60, x0 + 70, 120), fill=int(m.integers(20, 230)))
         d.rectangle((x0 + 20, 130, x0 + 60, 170), fill=int(m.integers(20, 230)))
-    cx = int(m.integers(0, 4))                                    # the cursor
+    cx = int(m.integers(0, 4)) if cur is None else int(cur)      # the cursor (`cur`: placed by hand)
     d.rectangle((110 + 25 * cx, 190, 130 + 25 * cx, 210), fill=200)
     t = TALLY[kind]
     _digit(d, 140, 100, t[0])
     _digit(d, 170, 100, t[1])
+    if mark and kind == "start":                                  # a large mark the begin alone shows (B175)
+        d.rectangle((0, 0, mark, 34), fill=250)
     if far and kind in ("end_P1", "end_P2"):
         x = 100 if kind == "end_P1" else 160
         d.rectangle((x, 30, x + 60, 90), fill=250)
@@ -82,7 +84,7 @@ def capture(state_path, binding, out_dir, seconds, every):
         if k % 2:
             continue
         name = f"f{k:04d}.png"
-        pic = other(k, rng) if s["kind"] in ("other", "mid") else screen(s["kind"], s["look"], rng, s.get("far", False))
+        pic = other(k, rng) if s["kind"] in ("other", "mid") else screen(s["kind"], s["look"], rng, s.get("far", False), s.get("cur"), s.get("mark", 0))
         pic.save(Path(out_dir) / name)
         rows.append((round(k * every, 2), name))
     return rows

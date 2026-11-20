@@ -5,9 +5,9 @@ the user's made-up slots (the slot index as the hub keeps it). Nothing of the hu
 
 - **register asks for two saves per ending:** one per ending → FAIL, `end_P1_2`, `end_P2_2` missing; a role past the
   cap (`end_P1_5`) refused; an ending of a player the title has not → "another kind".
-- **near-alike, two per ending of the same look** (the same characters in every match) → learn FAIL on its own bars
-  and **one plain line naming the save to add**; each named save collected from a match with other characters → learn
-  again on **the same bars** → PASS, no line; only the added save captured each time.
+- **near-alike, two per ending, other characters in every match** → learn FAIL (B175: a save left out not read as its
+  own) and **one plain line naming the save to add**; each named save collected from a match with other characters →
+  learn again on **the same bars** → PASS, no line; only the added save captured each time.
 - **far-apart screens pass on two saves per ending.**
 - **the cap:** two endings whose screens look the same → asked up to `_4` each, then "cannot be told apart this way",
   no role named, FAIL.
@@ -150,11 +150,13 @@ class Base(unittest.TestCase):
         for n in (GAME, WORDS, "Near Alike", str(self.tmp)):
             self.assertNotIn(n.casefold(), text.casefold())
 
-    def two_per_ending(self, look1=1, look2=1, far=False) -> None:
+    def two_per_ending(self, look1=1, look2=1, far=False, p2=None) -> None:
+        """P1's two saves of looks look1, look2; P2's of the looks p2 (the same two when not given)."""
+        q1, q2 = p2 or (look1, look2)
         rc, text = self.collect([("begin", "start", 0, False), ("other", "other", 0, False),
                                  ("end_P1", "end_P1", look1, far)])
-        rc, text = self.collect([("end_P2", "end_P2", look1, far), ("end_P1_2", "end_P1", look2, far),
-                                 ("end_P2_2", "end_P2", look2, far)])
+        rc, text = self.collect([("end_P2", "end_P2", q1, far), ("end_P1_2", "end_P1", look2, far),
+                                 ("end_P2_2", "end_P2", q2, far)])
         self.assertEqual(rc, 0, text)
 
     def follow_asks(self, kinds: dict, looks, most: int = 6) -> tuple[list, int, str]:
@@ -197,19 +199,19 @@ class Register(Base):
 
 class Learn(Base):
     def test_near_alike_asks_then_passes_on_the_same_bars(self):
-        self.two_per_ending(1, 1)                                          # the same characters in every match
+        self.two_per_ending(1, 2, p2=(3, 4))      # B175: other characters in every match; each save read when left out
         rc, out = _tool("learn", "T80")
         v, c, page = self.verdict("learn")
         self.assertEqual(rc, 1, out)
         bad = [k for k, x in c.items() if not x["met"]]
-        self.assertTrue({"every class separable", "margin_needed"} & set(bad), bad)
-        self.assertEqual(v["recorded"], {"one more save": "end_P1_3"})
+        self.assertTrue(bad and all(k.startswith("left out: ") for k in bad), bad)
+        self.assertEqual(v["recorded"]["one more save"], "end_P1_3")
         line = ("One more save: end_P1_3 — the screen after a match player 1 won, from a match not saved yet (other "
                 "characters or another stage than its saves kept); save it to a free slot, then register T80 … "
                 "--collect end_P1_3=<slot> and learn T80 again.")
         self.assertIn(line, page)
         self.assertIn(line, out)
-        asked, rc, out = self.follow_asks({"end_P1": "end_P1", "end_P2": "end_P2"}, looks=[2, 3, 4, 5])
+        asked, rc, out = self.follow_asks({"end_P1": "end_P1", "end_P2": "end_P2"}, looks=[5, 6, 7, 8])
         v, c, page = self.verdict("learn")
         self.assertEqual(rc, 0, out + page)
         self.assertEqual(asked, ASKED_NEAR)
@@ -225,7 +227,7 @@ class Learn(Base):
         self.assertEqual(before, {p.name: p.read_bytes() for p in (self.tmp / "ev/T80").iterdir()})
 
     def test_far_apart_pass_on_two(self):
-        self.two_per_ending(1, 1, far=True)
+        self.two_per_ending(1, 2, far=True, p2=(3, 4))
         rc, out = _tool("learn", "T80")
         v, c, page = self.verdict("learn")
         self.assertEqual(rc, 0, out + page)
@@ -239,7 +241,7 @@ class Learn(Base):
         v, c, page = self.verdict("learn")
         self.assertEqual(rc, 1)
         self.assertEqual(asked, ["end_P1_3", "end_P2_3", "end_P1_4", "end_P2_4"])
-        self.assertEqual(v["recorded"], {"cannot be told apart": ["end_P1", "end_P2"]})
+        self.assertEqual(v["recorded"]["cannot be told apart"], ["end_P1", "end_P2"])
         self.assertIn("The end screens cannot be told apart this way: end_P1, end_P2 have 4 saves each from different "
                       "matches and learn still does not meet its bars. Instead: another mode whose end screen shows who "
                       "won by player, or save each ending on another screen that shows it, and start the title's saves "
@@ -248,7 +250,7 @@ class Learn(Base):
         self.assertFalse((self.tmp / f"rules/{GAME}.endscreen.json").exists())
 
     def test_no_line_when_the_pictures_fail(self):
-        self.two_per_ending(1, 1)
+        self.two_per_ending(1, 2)
         os.environ["PARTY_ADD_GAME_CAPTURE"] = "near_capture:fails"
         rc, out = _tool("learn", "T80")
         v, c, page = self.verdict("learn")
@@ -316,8 +318,8 @@ class Rehearse(Base):
         self.assertIn("then rehearse T85 --collect end_P1_2=<slot>.", out)
         self.assertTrue(c["the real rules folder: every file's sha256 before = after"]["met"])
         asked = ["end_P1_2"]
-        looks = iter([2, 3, 4, 5])
-        for _ in range(4):
+        looks = iter([2, 3, 4, 5, 6, 7])
+        for _ in range(6):
             role = v["recorded"].get("one more save")
             if rc == 0 or not role:
                 break
@@ -346,8 +348,8 @@ class Rehearse(Base):
         self.assertTrue(c["end_P2_2: the scratch rules read it as the real rules"]["read"][1][0] == "end_P2")
 
 
-ASKED_NEAR = ["end_P1_3", "end_P2_3"]   # as the first run gave them (the learner decides; the bars never change)
-ASKED_REHEARSE = ["end_P1_2", "end_P2_2"]
+ASKED_NEAR = ["end_P1_3", "end_P2_3", "end_P2_4"]   # as the run gives them (B175: each save read when left out)
+ASKED_REHEARSE = ["end_P1_2", "end_P2_2", "end_P1_3", "end_P2_3"]   # B175: three per ending
 
 
 if __name__ == "__main__":

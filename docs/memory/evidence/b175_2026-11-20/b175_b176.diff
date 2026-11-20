@@ -1,0 +1,737 @@
+diff --git a/tests/b157_add_game/fake_capture.py b/tests/b157_add_game/fake_capture.py
+index 2268edb1..352ff961 100644
+--- a/tests/b157_add_game/fake_capture.py
++++ b/tests/b157_add_game/fake_capture.py
+@@ -43,7 +43,8 @@ def picture(token: str, k: int, rng):
+ 
+ def capture(state, binding, out_dir, seconds, every):
+     token = token_of(state)
+-    rng = np.random.default_rng(157 + sum(map(ord, token)))
++    again = int(json.loads(Path(state).read_text()).get("P2") or 0)    # B175: another save of a screen, other pictures
++    rng = np.random.default_rng(157 + sum(map(ord, token)) + 1009 * again)
+     rows = []
+     for k in range(int(seconds / every) + 1):
+         name = f"f{k:04d}.png"
+diff --git a/tests/b163_rehearse/test_b163.py b/tests/b163_rehearse/test_b163.py
+index aa4a82b5..23a220e4 100644
+--- a/tests/b163_rehearse/test_b163.py
++++ b/tests/b163_rehearse/test_b163.py
+@@ -97,6 +97,7 @@ class Rehearse(unittest.TestCase):
+         (k / "end_p1.state").write_text(state("end_P1"))
+         (k / "end_p2.state").write_text(state("end_P2"))
+         (k / "end_p1_b.state").write_text(state("end_P1", 7))
++        (k / "end_p2_c.state").write_text(state("end_P2", 8))     # B175: a second save of each ending (one can't be left out)
+         (k / "SHA256SUMS").write_text("made-up\n")
+         # the user's own slot 2 (a mid-match save), as the hub's slot index keeps it — read only by rehearse
+         ra = self.tmp / "proj/data/games/retroarch"
+@@ -159,20 +160,20 @@ class Rehearse(unittest.TestCase):
+         self.assertEqual([p.name for p in (self.tmp / "home/T95").iterdir() if p.name.startswith("rehearse_")], [])
+         self.assertTrue(any(k.startswith("learn: ") for k in c))
+         self.assertEqual(c["learn's verdict in the scratch"]["read"], "PASS")
+-        for e in ("end_P1", "end_P2", "end_P1_2"):
++        for e in ("end_P1", "end_P2", "end_P1_2", "end_P2_2"):
+             self.assertTrue(c[f"{e}: the scratch rules read it as the real rules"]["met"], e)
+         # B171: the kept extra the real rules end on as its own ending is one more source (end_P1_2)
+         self.assertEqual(c["end_P1_2: the scratch rules read it as the real rules"]["read"][1][0], "end_P1")
+         # B167: a title already added rehearses from the begin its mini game starts from (the rules folder's)
+         self.assertEqual(v["recorded"]["roles"], {"begin": "the rules folder's begin", "end_P1": "end_p1.state",
+                                                   "end_P1_2": "end_p1_b.state", "end_P2": "end_p2.state",
+-                                                  "other": "slot 2"})
++                                                  "end_P2_2": "end_p2_c.state", "other": "slot 2"})
+         self.assertEqual(v["recorded"]["unused"], [])                    # the kept begin is the same bytes here
+         self.assertEqual(v["recorded"]["missing"], [])
+         self.assertEqual(self.slot2, hashlib.sha256((self.tmp / "proj/data/games/retroarch/states/Beetle PSX HW/"
+                                                      "Made Up Three (USA).state2").read_bytes()).hexdigest())
+         self.assertEqual(v["recorded"]["endings read, not a role"], [])
+-        self.assertEqual(v["recorded"]["below two saves per ending"], ["end_P2_2"])      # B171
++        self.assertEqual(v["recorded"]["below two saves per ending"], [])      # B171 (B175: its second save kept)
+         page = (self.tmp / "ev/T95/rehearse.md").read_text()
+         self.assertIn("Missing: none", page)
+         self.assertIn("slot 2 -> other", page)
+diff --git a/tests/b171_more_saves/near_capture.py b/tests/b171_more_saves/near_capture.py
+index e6124894..c5fba849 100644
+--- a/tests/b171_more_saves/near_capture.py
++++ b/tests/b171_more_saves/near_capture.py
+@@ -40,7 +40,7 @@ def _digit(d, x, y, ch, s=2):
+         d.rectangle(boxes[k], fill=235)
+ 
+ 
+-def screen(kind: str, look: int, rng, far: bool = False) -> Image.Image:
++def screen(kind: str, look: int, rng, far: bool = False, cur=None, mark: int = 0) -> Image.Image:
+     im = Image.fromarray(BACK.copy(), "L")
+     d = ImageDraw.Draw(im)
+     d.rectangle((120, 90, 200, 125), fill=90)                     # the tally's panel
+@@ -52,11 +52,13 @@ def screen(kind: str, look: int, rng, far: bool = False) -> Image.Image:
+         d.rectangle((x0, 40, x0 + 80, 180), fill=int(m.integers(20, 230)))
+         d.ellipse((x0 + 10, 60, x0 + 70, 120), fill=int(m.integers(20, 230)))
+         d.rectangle((x0 + 20, 130, x0 + 60, 170), fill=int(m.integers(20, 230)))
+-    cx = int(m.integers(0, 4))                                    # the cursor
++    cx = int(m.integers(0, 4)) if cur is None else int(cur)      # the cursor (`cur`: placed by hand)
+     d.rectangle((110 + 25 * cx, 190, 130 + 25 * cx, 210), fill=200)
+     t = TALLY[kind]
+     _digit(d, 140, 100, t[0])
+     _digit(d, 170, 100, t[1])
++    if mark and kind == "start":                                  # a large mark the begin alone shows (B175)
++        d.rectangle((0, 0, mark, 34), fill=250)
+     if far and kind in ("end_P1", "end_P2"):
+         x = 100 if kind == "end_P1" else 160
+         d.rectangle((x, 30, x + 60, 90), fill=250)
+@@ -82,7 +84,7 @@ def capture(state_path, binding, out_dir, seconds, every):
+         if k % 2:
+             continue
+         name = f"f{k:04d}.png"
+-        pic = other(k, rng) if s["kind"] in ("other", "mid") else screen(s["kind"], s["look"], rng, s.get("far", False))
++        pic = other(k, rng) if s["kind"] in ("other", "mid") else screen(s["kind"], s["look"], rng, s.get("far", False), s.get("cur"), s.get("mark", 0))
+         pic.save(Path(out_dir) / name)
+         rows.append((round(k * every, 2), name))
+     return rows
+diff --git a/tests/b171_more_saves/test_b171.py b/tests/b171_more_saves/test_b171.py
+index f13e0d9f..3d977a5b 100644
+--- a/tests/b171_more_saves/test_b171.py
++++ b/tests/b171_more_saves/test_b171.py
+@@ -5,9 +5,9 @@ the user's made-up slots (the slot index as the hub keeps it). Nothing of the hu
+ 
+ - **register asks for two saves per ending:** one per ending → FAIL, `end_P1_2`, `end_P2_2` missing; a role past the
+   cap (`end_P1_5`) refused; an ending of a player the title has not → "another kind".
+-- **near-alike, two per ending of the same look** (the same characters in every match) → learn FAIL on its own bars
+-  and **one plain line naming the save to add**; each named save collected from a match with other characters → learn
+-  again on **the same bars** → PASS, no line; only the added save captured each time.
++- **near-alike, two per ending, other characters in every match** → learn FAIL (B175: a save left out not read as its
++  own) and **one plain line naming the save to add**; each named save collected from a match with other characters →
++  learn again on **the same bars** → PASS, no line; only the added save captured each time.
+ - **far-apart screens pass on two saves per ending.**
+ - **the cap:** two endings whose screens look the same → asked up to `_4` each, then "cannot be told apart this way",
+   no role named, FAIL.
+@@ -150,11 +150,13 @@ class Base(unittest.TestCase):
+         for n in (GAME, WORDS, "Near Alike", str(self.tmp)):
+             self.assertNotIn(n.casefold(), text.casefold())
+ 
+-    def two_per_ending(self, look1=1, look2=1, far=False) -> None:
++    def two_per_ending(self, look1=1, look2=1, far=False, p2=None) -> None:
++        """P1's two saves of looks look1, look2; P2's of the looks p2 (the same two when not given)."""
++        q1, q2 = p2 or (look1, look2)
+         rc, text = self.collect([("begin", "start", 0, False), ("other", "other", 0, False),
+                                  ("end_P1", "end_P1", look1, far)])
+-        rc, text = self.collect([("end_P2", "end_P2", look1, far), ("end_P1_2", "end_P1", look2, far),
+-                                 ("end_P2_2", "end_P2", look2, far)])
++        rc, text = self.collect([("end_P2", "end_P2", q1, far), ("end_P1_2", "end_P1", look2, far),
++                                 ("end_P2_2", "end_P2", q2, far)])
+         self.assertEqual(rc, 0, text)
+ 
+     def follow_asks(self, kinds: dict, looks, most: int = 6) -> tuple[list, int, str]:
+@@ -197,19 +199,19 @@ class Register(Base):
+ 
+ class Learn(Base):
+     def test_near_alike_asks_then_passes_on_the_same_bars(self):
+-        self.two_per_ending(1, 1)                                          # the same characters in every match
++        self.two_per_ending(1, 2, p2=(3, 4))      # B175: other characters in every match; each save read when left out
+         rc, out = _tool("learn", "T80")
+         v, c, page = self.verdict("learn")
+         self.assertEqual(rc, 1, out)
+         bad = [k for k, x in c.items() if not x["met"]]
+-        self.assertTrue({"every class separable", "margin_needed"} & set(bad), bad)
+-        self.assertEqual(v["recorded"], {"one more save": "end_P1_3"})
++        self.assertTrue(bad and all(k.startswith("left out: ") for k in bad), bad)
++        self.assertEqual(v["recorded"]["one more save"], "end_P1_3")
+         line = ("One more save: end_P1_3 — the screen after a match player 1 won, from a match not saved yet (other "
+                 "characters or another stage than its saves kept); save it to a free slot, then register T80 … "
+                 "--collect end_P1_3=<slot> and learn T80 again.")
+         self.assertIn(line, page)
+         self.assertIn(line, out)
+-        asked, rc, out = self.follow_asks({"end_P1": "end_P1", "end_P2": "end_P2"}, looks=[2, 3, 4, 5])
++        asked, rc, out = self.follow_asks({"end_P1": "end_P1", "end_P2": "end_P2"}, looks=[5, 6, 7, 8])
+         v, c, page = self.verdict("learn")
+         self.assertEqual(rc, 0, out + page)
+         self.assertEqual(asked, ASKED_NEAR)
+@@ -225,7 +227,7 @@ class Learn(Base):
+         self.assertEqual(before, {p.name: p.read_bytes() for p in (self.tmp / "ev/T80").iterdir()})
+ 
+     def test_far_apart_pass_on_two(self):
+-        self.two_per_ending(1, 1, far=True)
++        self.two_per_ending(1, 2, far=True, p2=(3, 4))
+         rc, out = _tool("learn", "T80")
+         v, c, page = self.verdict("learn")
+         self.assertEqual(rc, 0, out + page)
+@@ -239,7 +241,7 @@ class Learn(Base):
+         v, c, page = self.verdict("learn")
+         self.assertEqual(rc, 1)
+         self.assertEqual(asked, ["end_P1_3", "end_P2_3", "end_P1_4", "end_P2_4"])
+-        self.assertEqual(v["recorded"], {"cannot be told apart": ["end_P1", "end_P2"]})
++        self.assertEqual(v["recorded"]["cannot be told apart"], ["end_P1", "end_P2"])
+         self.assertIn("The end screens cannot be told apart this way: end_P1, end_P2 have 4 saves each from different "
+                       "matches and learn still does not meet its bars. Instead: another mode whose end screen shows who "
+                       "won by player, or save each ending on another screen that shows it, and start the title's saves "
+@@ -248,7 +250,7 @@ class Learn(Base):
+         self.assertFalse((self.tmp / f"rules/{GAME}.endscreen.json").exists())
+ 
+     def test_no_line_when_the_pictures_fail(self):
+-        self.two_per_ending(1, 1)
++        self.two_per_ending(1, 2)
+         os.environ["PARTY_ADD_GAME_CAPTURE"] = "near_capture:fails"
+         rc, out = _tool("learn", "T80")
+         v, c, page = self.verdict("learn")
+@@ -316,8 +318,8 @@ class Rehearse(Base):
+         self.assertIn("then rehearse T85 --collect end_P1_2=<slot>.", out)
+         self.assertTrue(c["the real rules folder: every file's sha256 before = after"]["met"])
+         asked = ["end_P1_2"]
+-        looks = iter([2, 3, 4, 5])
+-        for _ in range(4):
++        looks = iter([2, 3, 4, 5, 6, 7])
++        for _ in range(6):
+             role = v["recorded"].get("one more save")
+             if rc == 0 or not role:
+                 break
+@@ -346,8 +348,8 @@ class Rehearse(Base):
+         self.assertTrue(c["end_P2_2: the scratch rules read it as the real rules"]["read"][1][0] == "end_P2")
+ 
+ 
+-ASKED_NEAR = ["end_P1_3", "end_P2_3"]   # as the first run gave them (the learner decides; the bars never change)
+-ASKED_REHEARSE = ["end_P1_2", "end_P2_2"]
++ASKED_NEAR = ["end_P1_3", "end_P2_3", "end_P2_4"]   # as the run gives them (B175: each save read when left out)
++ASKED_REHEARSE = ["end_P1_2", "end_P2_2", "end_P1_3", "end_P2_3"]   # B175: three per ending
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/tools/party_add_game.py b/tools/party_add_game.py
+index e0fbb781..82afc66b 100644
+--- a/tools/party_add_game.py
++++ b/tools/party_add_game.py
+@@ -64,6 +64,8 @@ NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B
+ SAVES_PER_ENDING_MAX = 4      # B171: the most saves of one ending the tool asks for (T88's three sittings, plus one); not a bar
+ ROLE = re.compile(r"^(begin|other\d*|end_P[1-4](_[2-4])?|end_r[1-4]{2,4}(_[2-4])?)$")     # B171: end_P1_2 ... end_P1_4
+ SUFFIX = re.compile(r"_([2-4])$")
++SAME_PICTURE = (1.0, "64 x 48 grey, mean |difference| of the screens that stay; H7-V1: one state run twice, 391 of 400 "
++                     "frames under 1.0")          # B176: under this, two saves of one ending are one match (not a bar)
+ FLAG_FILES = {"h7.conf": "PRIVYHUB_H7=1", "party.conf": "PRIVYHUB_PARTY=1"}
+ UNIT = "privyhub-companion.service"
+ 
+@@ -587,6 +589,39 @@ def _near(a, b) -> bool:
+     return float((abs(a - b) > MOVED_GREY).mean()) < MOVED_SHARE
+ 
+ 
++def _anchor(small: list) -> int:
++    """The frame most of a run stays near (B140's measure; the earliest on a tie): the screen that stays (B167)."""
++    near = [[_near(a, b) for b in small] for a in small]
++    return max(range(len(small)), key=lambda i: (sum(near[i]), -i))
++
++
++def _matches(pics: Path, kept) -> tuple[dict, list]:
++    """B176: each ending's saves grouped by match — two saves whose screens that stay are the same picture (under
++    SAME_PICTURE) are one match. -> ({role: the first role of its match}, [[a, b, mean difference] for each such pair])."""
++    import numpy as np
++    shot = {}
++    for role in sorted(r for r in kept if r.startswith("end_")):
++        rows = [r["file"] for r in csv.DictReader((pics / role / "index.csv").open())]
++        if rows:
++            small = [_small(pics / role / f) for f in rows]
++            shot[role] = small[_anchor(small)]
++    group = {r: r for r in shot}
++    pairs = []
++    roles = sorted(shot, key=lambda r: (_role_class(r), r != _role_class(r), r))
++    for i, a in enumerate(roles):
++        for b_ in roles[i + 1:]:
++            if _role_class(a) != _role_class(b_):
++                continue
++            d = float(np.abs(shot[a] - shot[b_]).mean())
++            if d < SAME_PICTURE[0]:
++                pairs.append([a, b_, round(d, 2)])
++                ga, gb = group[a], group[b_]
++                for r in group:
++                    if group[r] == gb:
++                        group[r] = ga
++    return group, pairs
++
++
+ def _labels(pics: Path, kept: dict, es) -> dict:
+     """Labels from the state each picture came from — never by eye. B167: a begin / end run's screen is the frame most
+     of the run stays near (B140's measure; the earliest on a tie) — the screen that stays, whether the save was made a
+@@ -600,9 +635,8 @@ def _labels(pics: Path, kept: dict, es) -> dict:
+         labs = [cls] * len(rows)
+         if cls != "other" and rows:
+             small = [_small(pics / role / f) for _t, f in rows]
+-            near = [[_near(a, b) for b in small] for a in small]
+-            anchor = max(range(len(small)), key=lambda i: (sum(near[i]), -i))
+-            labs = [cls if near[anchor][j] else "ignore" for j in range(len(small))]
++            anchor = _anchor(small)
++            labs = [cls if _near(small[anchor], small[j]) else "ignore" for j in range(len(small))]
+         spans = []
+         for (t, f), lab in zip(rows, labs):
+             if spans and spans[-1]["label"] == lab:
+@@ -659,26 +693,146 @@ def _replay_cells(cells: Cells, es, spec: dict, arrays: dict, pics: Path, kept:
+                       got is not None and got[0] - rows[0][0] <= BARS["ended_within_s"][0])
+ 
+ 
++def _replay_all(es, spec: dict, arrays: dict, run: Path) -> list:
++    """B175: a save's pictures through one Reader and Ended as learn's replays read them (the begin loaded first):
++    every end it says — [(seconds from its first picture, class, places)]."""
++    from PIL import Image
++    rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((run / "index.csv").open())]
++    now = [0.0]
++    reader = es.Reader(spec, arrays, clock=lambda: now[0])
++    ended = es.Ended(spec)
++    ended.start_loaded()
++    said = []
++    for t, f in rows:
++        now[0] = t
++        with Image.open(run / f) as im:
++            r = reader.read(im.convert("L"), now=t)
++        done = ended.feed(r["class"], r.get("places"))
++        if done:
++            said.append((round(t - rows[0][0], 2), done, list(ended.places) if ended.places else None))
++    return said
++
++
++def _left_out_cells(cells: Cells, es, b: dict, pics: Path, kept, labels: dict, group: dict) -> dict:
++    """B175: every ending's every save — the spec learnt without its match's saves (learn's own call), then each of
++    them replayed through it: met when it ends as its own ending within ended_within_s and never as another. One cell
++    per save. -> {role: {"other": another ending it ended as, or None; "others": the ending's other matches}}."""
++    out: dict = {}
++    tmp = pics / "left_out_labels.json"
++    bar = BARS["ended_within_s"][0]
++    for gid in sorted(set(group.values())):
++        members = sorted(r for r in group if group[r] == gid)
++        cls = _role_class(gid)
++        others = len({group[r] for r in group if _role_class(r) == cls and group[r] != gid})
++        if b["result"] == "places":
++            others = len({group[r] for r in group if group[r] != gid})
++        runs = {r: v for r, v in labels["runs"].items() if r not in members}
++        still = {x["label"] for v in runs.values() for x in v} | {"ignore"}      # a row with no save left: not a class
++        lab = {"classes": {c: t for c, t in labels["classes"].items() if c in still}, "runs": runs}
++        spec = arrays = None
++        why = None
++        if others == 0:
++            why = "its ending's only match"
++        else:
++            try:
++                write_if_changed(tmp, json.dumps(lab, sort_keys=True))
++                spec, arrays, _rep = es.learn(pics, tmp, "first", name=b["game"])
++            except ValueError as exc:                           # the learner's own refusal, said as the read
++                why = f"not learnt without it: {str(exc)[:80]}"
++            finally:
++                tmp.unlink(missing_ok=True)
++        for role in members:
++            want = f"{_role_class(role)} within <= {bar} s, never another"
++            if why:
++                cells.add(f"left out: {role}", why, want, False)
++                out[role] = {"other": None, "others": others}
++                continue
++            said = _replay_all(es, spec, arrays, pics / role)
++            row = [int(c) for c in cls[5:]] if cls.startswith("end_r") else None
++            own = [x for x in said if (x[1] == cls if row is None else x[2] == row)]
++            wrong = [x for x in said if x not in own]
++            first = said[0] if said else None
++            ok = bool(said) and not wrong and said[0][0] <= bar
++            read = None if first is None else ([first[1], first[0]] if row is None else [first[2], first[0]])
++            cells.add(f"left out: {role}", read, want, ok)
++            other = next((x[1] for x in wrong if row is None and x[1] not in ("start", "other")), None)
++            out[role] = {"other": other, "others": others}
++    return out
++
++
++def _held_out_wrong(es, spec: dict, arrays: dict, pics: Path, labels: dict, kept) -> dict:
++    """B176: {role: another ending} for a save whose held-out frames (second halves) the full spec reads as another
++    ending (not unknown)."""
++    from PIL import Image
++    out = {}
++    ends = set(spec.get("end_classes") or [])
++    for role in sorted(r for r in kept if r.startswith("end_P")):
++        cls = _role_class(role)
++        lab = {"classes": labels["classes"], "runs": {role: labels["runs"][role]}}
++        for c, fs in es.labelled_frames(pics, lab, "second").items():
++            for f in fs:
++                with Image.open(f) as im:
++                    got = es.read(spec, arrays, im.convert("L"))["class"]
++                if got in ends and got != cls:
++                    out.setdefault(role, got)
++    return out
++
++
++def _relabel_fixes(es, b: dict, pics: Path, labels: dict, role: str, other: str) -> bool:
++    """B176: the spec learnt from every save with `role` labelled `other` instead meets learn's own bars (every class
++    separable, margin_needed, held-out unknown, nothing read as another class) — the mark of a save in the wrong role."""
++    lab = json.loads(json.dumps(labels))
++    for x in lab["runs"][role]:
++        if x["label"] != "ignore":
++            x["label"] = other
++    tmp = pics / "relabel_labels.json"
++    try:
++        write_if_changed(tmp, json.dumps(lab, sort_keys=True))
++        spec, arrays, _rep = es.learn(pics, tmp, "first", name=b["game"])
++        sc = es.score(pics, tmp, spec, arrays, "second")
++    except ValueError:
++        return False
++    finally:
++        tmp.unlink(missing_ok=True)
++    m = spec.get("margin_needed")
++    held = {c: row for c, row in (sc.get("confusion") or {}).items() if c not in ("other", "ignore")}
++    n = sum(sum(row.values()) for row in held.values()) or 1
++    unknown = sum(row.get("unknown", 0) + row.get("other", 0) for row in held.values())
++    wrong = sum(cnt for c, row in held.items() for k, cnt in row.items() if k not in (c, "unknown", "other"))
++    sep = spec.get("separable") or {}
++    return (bool(sep) and all(sep.values()) and m is not None and m >= BARS["margin_needed_min"][0]
++            and unknown / n <= BARS["unknown_share_max"][0] and wrong <= BARS["wrong_class_max"][0])
++
++
+ ASK_CELLS = ("every class separable", "margin_needed", "held-out frames read unknown (share)")
+ ASK_REPLAY = (": ended as itself", ": ended within", ": never ended", ": recognised within")
+ 
+ 
+ def one_more_save(b: dict, cells: Cells, kept, conf: dict | None = None,
+-                  then: str = "register <code> … --collect <role>=<slot> and learn <code> again") -> tuple[str, dict] | None:
++                  then: str = "register <code> … --collect <role>=<slot> and learn <code> again",
++                  group: dict | None = None, pairs: list | None = None, wrong: dict | None = None) -> tuple[str, dict] | None:
+     """B171: when learn's separable / margin / unknown / replay cells are not met — one plain line: the ending that
+     needs one more save from a different match (its next role), or, at the cap, that the end screens cannot be told
+     apart this way. None when none of those cells failed. The bars are the same every time."""
+-    asked = [r for r in cells.rows if not r["met"] and (r["cell"] in ASK_CELLS or r["cell"].endswith(ASK_REPLAY))]
++    code = b["code"]
++    for role, other in sorted((wrong or {}).items()):        # B176: first, a save in the wrong role — nothing asked
++        line = (f"A save may be in the wrong role: {role} reads as {other}. Check which player won that match; "
++                "collect it again under the right role.")
++        return line, {"wrong role": [role, other], "line": line}
++    for a, b_, _d in pairs or []:                            # B176: then the same match saved twice
++        line = f"{a} and {b_} look like the same match saved twice: save {b_} again from another match."
++        return line, {"same match twice": [a, b_], "line": line}
++    asked = [r for r in cells.rows if not r["met"] and (r["cell"] in ASK_CELLS or r["cell"].endswith(ASK_REPLAY)
++                                                         or r["cell"].startswith("left out: "))]
+     if not asked:
+         return None
+-    code = b["code"]
+     if b["result"] == "places":
+         n = sum(1 for k in kept if k.startswith("end_r"))
+         if n >= SAVES_PER_ENDING_MAX * b["players"]:
+             return _cannot(code, ["every results row"], n)
+-        return (f"One more save: a results screen from a match not saved yet; collect it as end_r<its row>, or "
+-                f"end_r<its row>_<n> when that row is kept already, then learn {code} again.",
+-                {"one more save": "end_r<its row>"})
++        line = (f"One more save: a results screen from a match not saved yet; collect it as end_r<its row>, or "
++                f"end_r<its row>_<n> when that row is kept already, then learn {code} again.")
++        return line, {"one more save": "end_r<its row>", "line": line}
+     endings = sorted({_role_class(k) for k in kept if k.startswith("end_P")})
+     named: set = set()
+     for r in asked:
+@@ -688,10 +842,13 @@ def one_more_save(b: dict, cells: Cells, kept, conf: dict | None = None,
+         elif c == "held-out frames read unknown (share)":
+             named |= {x for x, row in (conf or {}).items()
+                       if x in endings and (row.get("unknown", 0) + row.get("other", 0)) > 0}
++        elif c.startswith("left out: "):                    # B175: the ending of a save not read when left out
++            named |= {x for x in [_role_class(c[len("left out: "):])] if x in endings}
+         elif c.endswith(ASK_REPLAY):
+             named |= {x for x in [_role_class(c.split(": ", 1)[0])] if x in endings}
+     named = named or set(endings)                            # margin alone, or only the start: every ending
+-    count = {e: sum(1 for k in kept if k.startswith("end_P") and _role_class(k) == e) for e in named}
++    g = group or {}
++    count = {e: len({g.get(k, k) for k in kept if k.startswith("end_P") and _role_class(k) == e}) for e in named}
+     open_ = sorted((count[e], e) for e in named if count[e] < SAVES_PER_ENDING_MAX)
+     if not open_:
+         return _cannot(code, sorted(named), SAVES_PER_ENDING_MAX)
+@@ -700,14 +857,14 @@ def one_more_save(b: dict, cells: Cells, kept, conf: dict | None = None,
+     line = (f"One more save: {role} — the screen after a match player {ending[5:]} won, from a match not saved yet "
+             f"(other characters or another stage than its saves kept); save it to a free slot, then "
+             + then.replace("<code>", code).replace("<role>", role) + ".")
+-    return line, {"one more save": role}
++    return line, {"one more save": role, "line": line}
+ 
+ 
+ def _cannot(code: str, endings: list, n: int) -> tuple[str, dict]:
+     line = (f"The end screens cannot be told apart this way: {', '.join(endings)} have {n} saves each from different "
+             "matches and learn still does not meet its bars. Instead: another mode whose end screen shows who won by "
+             "player, or save each ending on another screen that shows it, and start the title's saves again.")
+-    return line, {"cannot be told apart": endings}
++    return line, {"cannot be told apart": endings, "line": line}
+ 
+ 
+ def _sidecar(b: dict, spec: dict) -> dict:
+@@ -790,6 +947,23 @@ def cmd_learn(code: str, a: dict) -> int:
+     cells.add("other read as a screen", sc.get("other_read_as_screen"), BARS["other_as_screen_max"][0],
+               (sc.get("other_read_as_screen") or 0) <= BARS["other_as_screen_max"][0])
+     _replay_cells(cells, es, spec, arrays, pics, kept, labels)
++    group, pairs = _matches(pics, kept)                      # B176: saves that are the same picture are one match
++    cells.add("no two saves of one ending the same picture", pairs,
++              f">= {SAME_PICTURE[0]} grey ({SAME_PICTURE[1]})", not pairs)
++    left = _left_out_cells(cells, es, b, pics, kept, labels, group)     # B175: a match the spec did not learn from
++    wrong: dict = {}
++    if b["result"] == "winner" and spec.get("version") != es.VERSION_PLACES:
++        wrong = _held_out_wrong(es, spec, arrays, pics, labels, kept)
++        full_ok = all(r["met"] for r in cells.rows if r["cell"] in ASK_CELLS)  # the spec from every save sound
++        met = {r["cell"]: r["met"] for r in cells.rows}
++        ends = sorted({_role_class(k) for k in kept if k.startswith("end_P")})
++        for role, info in sorted(left.items()):             # B176: a left-out save not read as its own, its ending
++            if wrong or full_ok or info["others"] < 2 or met.get(f"left out: {role}", True):   # two other matches,
++                continue                                    # the spec from every save not sound (a mislabel spoils it)
++            for other in [info["other"]] if info["other"] else [e for e in ends if e != _role_class(role)]:
++                if _relabel_fixes(es, b, pics, labels, role, other):   # and only that save's other label mends it
++                    wrong[role] = other
++                    break
+     if b["result"] == "winner" and spec.get("version") == es.VERSION_PLACES:
+         pass                                                 # winner read from a row of places (B158)
+     elif b["result"] == "places":
+@@ -811,7 +985,7 @@ def cmd_learn(code: str, a: dict) -> int:
+         b["learnt"] = {"from": digest(kept), "spec": sha(spec_path)}
+         write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
+         return finish(code, "learn", cells, inputs)
+-    ask = one_more_save(b, cells, kept, conf)                # B171: which save to add, in one plain line
++    ask = one_more_save(b, cells, kept, conf, group=group, pairs=pairs, wrong=wrong)   # B171 / B175 / B176: one line
+     rc = finish(code, "learn", cells, inputs, note=ask[0] if ask else "", recorded=ask[1] if ask else None)
+     if ask:
+         out(ask[0])
+@@ -948,8 +1122,7 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
+         learnt = load_verdict(code, "learn") or {}
+         if rec_learn is not None:                            # B171: learn's line, said as rehearse takes the save
+             rec_learn["v"] = learnt
+-            page = (evidence(code) / "learn.md").read_text() if (evidence(code) / "learn.md").is_file() else ""
+-            line = next((ln for ln in page.splitlines() if ln.startswith(("One more save:", "The end screens cannot"))), "")
++            line = str((learnt.get("recorded") or {}).get("line") or "")      # B175: the line learn recorded
+             rec_learn["line"] = re.sub(r"then (register \S+ … --collect (\S+)=<slot> and )?learn (\S+) again",
+                                        lambda m: f"then rehearse {m.group(3)} --collect "
+                                                  f"{m.group(2) or 'end_r<its row>'}=<slot>", line)
+@@ -1064,7 +1237,8 @@ def cmd_rehearse(code: str, a: dict) -> int:
+     asked = (rec_learn.get("v") or {}).get("recorded") or {}
+     line = rec_learn.get("line") or ""
+     if line:                                                 # B171: learn's line, as rehearse takes the save
+-        rec.update({k: asked[k] for k in ("one more save", "cannot be told apart") if k in asked})
++        rec.update({k: asked[k] for k in ("one more save", "cannot be told apart", "wrong role", "same match twice")
++                    if k in asked})
+         note += "\n\n" + line
+     rc = finish(code, "rehearse", cells, inputs, note=note, recorded=rec)
+     if line:
+diff --git a/tests/b175_left_out/test_b175.py b/tests/b175_left_out/test_b175.py
+new file mode 100644
+index 00000000..84f77433
+--- /dev/null
++++ b/tests/b175_left_out/test_b175.py
+@@ -0,0 +1,234 @@
++#!/usr/bin/env python3
++"""B175 + B176 (host): a cell for a match the spec did not learn from; two plain hints — the add-a-game tool's learn on
++made-up titles (B171's near-alike screens, `tests/b171_more_saves/near_capture.py`), nothing of the hub's read.
++
++Each row of the record's table, through learn (the kept saves written as register writes them, register's PASS beside
++them, as rehearse's scratch does; one row through rehearse):
++- **the weak pass** (one save per ending, other characters in each): today's cells all met, **the left-out cells not
++  met** ("its ending's only match"), the line names the next save;
++- **two per ending, other characters in every match:** a left-out save ends as the other ending → the line asks that
++  ending a third save (no accusation: two saves cannot tell a wrong role from a thin ending); asked saves → PASS;
++- **near-alike, two per ending** → asks; **three per ending** → PASS; **far apart on two** → PASS;
++- **the same characters within an ending** (only the cursor moved) → "look like the same match saved twice";
++- **a save in the wrong role:** with two per ending → a save is asked; with three → "A save may be in the wrong role",
++  nothing asked;
++- **only the margin cell fails** (a large mark the begin alone shows) → FAIL on `margin_needed` alone;
++- the spec written to the rules folder is the one learnt from every save; rehearse carries the cell; nothing named;
++  no bar changed. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b175_left_out -v
++"""
++from __future__ import annotations
++
++import json
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(ROOT / "tests" / "b171_more_saves"))
++sys.path.insert(0, str(ROOT / "tools"))
++import near_capture as nc  # noqa: E402
++import test_b171 as b171  # noqa: E402  (its made-up hub, its fixture, its rehearse title)
++
++_tool = b171._tool
++
++
++def st(kind, look=0, far=False, cur=None, mark=0):
++    d = {"kind": kind, "look": look, "far": far, "mark": mark}
++    if cur is not None:
++        d["cur"] = cur
++    return d
++
++
++B, O = st("start"), st("other")
++
++
++class Rows(b171.Base):
++    def put(self, code: str, saves: dict) -> None:
++        """The kept saves as register keeps them, and register's PASS for them (as rehearse's scratch writes it)."""
++        pag = self.pag
++        kf = self.tmp / "home" / code / "kept"
++        kf.mkdir(parents=True, exist_ok=True)
++        for role, s in saves.items():
++            self.n += 1
++            (kf / f"{role}.state").write_text(json.dumps({**s, "n": self.n}))
++        b = {"code": code, "game": f"madeupnear{code.lower()}", "players": 2, "system": "ps1", "result": "winner",
++             "cheat": None, "relative_path": "", "title": "", "content": ""}
++        bp = self.tmp / "home" / code / "binding.json"
++        if bp.is_file():
++            b = json.loads(bp.read_text())
++        b["register_inputs"] = pag.register_inputs(b, pag.kept_states(code))
++        bp.write_text(json.dumps(b, indent=1, sort_keys=True) + "\n")
++        ev = self.tmp / "ev" / code
++        ev.mkdir(parents=True, exist_ok=True)
++        (ev / "register.json").write_text(json.dumps({"verdict": "PASS", "inputs": b["register_inputs"]}) + "\n")
++
++    def learn(self, code: str):
++        rc, out = _tool("learn", code)
++        v, c, page = self.verdict("learn", code)
++        return rc, v, c, page, out
++
++    def follow(self, code: str, looks, kinds=None, most: int = 6) -> tuple[list, int]:
++        """learn; while its line names a save: that save (another look), learn again — the same bars."""
++        asked, looks = [], iter(looks)
++        rc, v, c, page, out = self.learn(code)
++        while rc != 0 and len(asked) < most:
++            role = (v.get("recorded") or {}).get("one more save")
++            if not role:
++                break
++            asked.append(role)
++            ending = self.pag._role_class(role)
++            self.put(code, {role: st((kinds or {}).get(ending, ending), next(looks))})
++            rc, v, c, page, out = self.learn(code)
++        return asked, rc
++
++    def bad(self, c: dict) -> list:
++        return [k for k, x in c.items() if not x["met"]]
++
++    # --- the rows --------------------------------------------------------------------------------------------------
++    def test_1_the_weak_pass_now_not_met(self):
++        self.put("T71", {"begin": B, "other": O, "end_P1": st("end_P1", 1), "end_P2": st("end_P2", 2)})
++        rc, v, c, page, out = self.learn("T71")
++        self.assertEqual(rc, 1, out)
++        self.assertEqual(self.bad(c), ["left out: end_P1", "left out: end_P2"])     # every cell of today's met
++        self.assertEqual(c["left out: end_P1"]["read"], "its ending's only match")
++        self.assertEqual(c["left out: end_P1"]["bar"], "end_P1 within <= 2.0 s, never another")
++        self.assertEqual(v["recorded"]["one more save"], "end_P1_2")
++        self.assertIn("One more save: end_P1_2 — the screen after a match player 1 won", page)
++        self.assertFalse(list((self.tmp / "rules").glob("*.endscreen.json")))   # only a pass reaches the rules
++
++    def test_2_two_per_ending_other_characters_asks_a_third(self):
++        self.put("T72", {"begin": B, "other": O, "end_P1": st("end_P1", 1), "end_P1_2": st("end_P1", 2),
++                         "end_P2": st("end_P2", 3), "end_P2_2": st("end_P2", 4)})
++        rc, v, c, page, out = self.learn("T72")
++        self.assertEqual(rc, 1, out)
++        self.assertFalse(c["left out: end_P2"]["met"])               # read as the other ending
++        self.assertNotIn("wrong role", v["recorded"])                             # two saves: no accusation
++        self.assertNotIn("A save may be in the wrong role", page)
++        self.assertEqual(v["recorded"]["one more save"], ASKED["T72"][0])
++        asked, rc = self.follow("T72", looks=[5, 6, 7, 8])
++        self.assertEqual(rc, 0)
++        self.assertEqual(asked, ASKED["T72"])
++
++    def test_3_near_alike_two_asks_three_pass(self):
++        """Near-alike, two per ending, P2's first match with P1's characters: asked to the cap; three per ending with
++        other characters in each: PASS."""
++        self.put("T73", {"begin": B, "other": O, "end_P1": st("end_P1", 1), "end_P1_2": st("end_P1", 2),
++                         "end_P2": st("end_P2", 1), "end_P2_2": st("end_P2", 3)})
++        asked, rc = self.follow("T73", looks=[5, 6, 7, 8])
++        v, c, page = self.verdict("learn", "T73")
++        self.assertEqual(asked, ASKED["T73"])
++        self.assertEqual(rc, 1)                       # end_P2 shares end_P1's characters: left out, not read as its own
++        self.assertEqual(v["recorded"]["cannot be told apart"], ["end_P2"])     # the cap, as today
++        self.assertFalse(c["left out: end_P2"]["met"])
++        self.put("T74", {"begin": B, "other": O, "end_P1": st("end_P1", 1), "end_P1_2": st("end_P1", 2),
++                         "end_P1_3": st("end_P1", 4), "end_P2": st("end_P2", 1), "end_P2_2": st("end_P2", 3),
++                         "end_P2_3": st("end_P2", 5)})
++        rc, v, c, page, out = self.learn("T74")
++        self.assertEqual(rc, 0, out + page)
++        for r in ("end_P1", "end_P1_2", "end_P1_3", "end_P2", "end_P2_2", "end_P2_3"):
++            self.assertEqual(c[f"left out: {r}"]["read"], [self.pag._role_class(r), 2.0])
++        # the spec written is the one learnt from every save
++        es = self.pag._endscreen()
++        pics = self.tmp / "home/T74/pictures"
++        spec, _arr, _rep = es.learn(pics, pics / "labels.json", "first", name="madeupneart74")
++        written = json.loads((self.tmp / "rules/madeupneart74.endscreen.json").read_text())
++        self.assertEqual(written["frames"], spec["frames"])
++        self.assertEqual(written["margin_needed"], spec["margin_needed"])
++        self.assertEqual(written["outcome_mask_px"], spec["outcome_mask_px"])
++
++    def test_4_far_apart_two(self):
++        self.put("T75", {"begin": B, "other": O, "end_P1": st("end_P1", 1, True), "end_P1_2": st("end_P1", 2, True),
++                         "end_P2": st("end_P2", 3, True), "end_P2_2": st("end_P2", 4, True)})
++        rc, v, c, page, out = self.learn("T75")
++        self.assertEqual(rc, 0, out + page)
++
++    def test_5_the_same_match_twice(self):
++        """The same characters within an ending, only the cursor moved: leave-one-out alone would pass it."""
++        self.put("T76", {"begin": B, "other": O, "end_P1": st("end_P1", 1, cur=0), "end_P1_2": st("end_P1", 1, cur=3),
++                         "end_P2": st("end_P2", 2, cur=0), "end_P2_2": st("end_P2", 2, cur=3)})
++        rc, v, c, page, out = self.learn("T76")
++        self.assertEqual(rc, 1, out)
++        pairs = c["no two saves of one ending the same picture"]["read"]
++        self.assertEqual([p[:2] for p in pairs], [["end_P1", "end_P1_2"], ["end_P2", "end_P2_2"]])
++        self.assertTrue(all(p[2] < 1.0 for p in pairs))
++        self.assertEqual(c["left out: end_P1"]["read"], "its ending's only match")   # the pair counts as one
++        line = "end_P1 and end_P1_2 look like the same match saved twice: save end_P1_2 again from another match."
++        self.assertEqual(v["recorded"], {"same match twice": ["end_P1", "end_P1_2"], "line": line})
++        self.assertIn(line, page)
++        self.assertIn(line, out)
++        self.put("T76", {"end_P1_2": st("end_P1", 3)})                     # saved again from another match
++        rc, v, c, page, out = self.learn("T76")
++        self.assertEqual(v["recorded"]["same match twice"], ["end_P2", "end_P2_2"])
++
++    def test_6_a_save_in_the_wrong_role(self):
++        """Two per ending, end_P2_2 holds a P1 win: two saves cannot tell it from a thin ending — saves are asked (the user
++        gives each from another match, the right winner); once its ending has two other matches, the save in the wrong
++        role is named and nothing more is asked."""
++        self.put("T77", {"begin": B, "other": O, "end_P1": st("end_P1", 1), "end_P1_2": st("end_P1", 2),
++                         "end_P2": st("end_P2", 3), "end_P2_2": st("end_P1", 4)})
++        rc, v, c, page, out = self.learn("T77")
++        self.assertEqual(rc, 1, out)
++        self.assertNotIn("wrong role", v["recorded"])
++        asked, looks = [], iter([5, 6, 7, 8])
++        while (v.get("recorded") or {}).get("one more save") and len(asked) < 4:
++            role = v["recorded"]["one more save"]
++            asked.append(role)
++            self.put("T77", {role: st(self.pag._role_class(role), next(looks))})
++            rc, v, c, page, out = self.learn("T77")
++        self.assertEqual(asked, ASKED["T77"])
++        self.assertEqual(rc, 1, out)
++        line = ("A save may be in the wrong role: end_P2_2 reads as end_P1. Check which player won that match; collect "
++                "it again under the right role.")
++        self.assertEqual(v["recorded"], {"wrong role": ["end_P2_2", "end_P1"], "line": line})
++        self.assertIn(line, page)
++        self.assertNotIn("One more save", page + out)
++
++    def test_7_only_the_margin_fails(self):
++        """A large mark the begin alone shows: the endings' tally a small share of the outcome mask — separable, nothing
++        unknown, every replay and every left-out save its own, and the margin under its bar."""
++        m = 16
++        self.put("T78", {"begin": st("start", mark=m), "other": O,
++                         **{r: st(self.pag._role_class(r), look, mark=m) for r, look in
++                            (("end_P1", 1), ("end_P1_2", 2), ("end_P1_3", 4), ("end_P2", 1), ("end_P2_2", 3),
++                             ("end_P2_3", 5))}})
++        rc, v, c, page, out = self.learn("T78")
++        self.assertEqual(rc, 1, out)
++        self.assertEqual(self.bad(c), ["margin_needed"])
++        self.assertLess(c["margin_needed"]["read"], 0.0796)
++
++    def test_8_through_register(self):
++        """A new title through register and learn (the made-up hub, the user's made-up slots): asks a third."""
++        self.two_per_ending(1, 1)
++        rc, out = _tool("learn", "T80")
++        v, c, page = self.verdict("learn")
++        self.assertEqual(rc, 1, out)
++        self.assertTrue(any(k.startswith("left out: ") for k in c))
++        self.names_absent(self.written() + out)
++
++
++class RehearseCarries(b171.Rehearse):
++    """rehearse runs learn's whole path in its scratch: the left-out cells come with it."""
++
++    test_t88_shape_asks_then_passes = None
++    test_a_kept_extra_that_is_an_end_screen_is_a_source = None
++
++    def test_rehearse_carries_the_cell(self):
++        self.save(2, "other")
++        rc, out = _tool("rehearse", "T85", "--collect", "other=2")
++        v, c, page = self.verdict("rehearse", "T85")
++        self.assertEqual(rc, 1, out)
++        self.assertEqual(c["learn: left out: end_P1"]["read"], "its ending's only match")
++        self.assertEqual(v["recorded"]["one more save"], "end_P1_2")
++        self.assertIn("then rehearse T85 --collect end_P1_2=<slot>.", page)
++        self.assertTrue(c["the real rules folder: every file's sha256 before = after"]["met"])
++
++
++ASKED = {"T72": ["end_P1_3", "end_P2_3", "end_P2_4"], "T73": ["end_P1_3", "end_P2_3", "end_P2_4"],
++         "T77": ["end_P1_3", "end_P2_3", "end_P2_4"]}      # as the first run gave them (the learner decides)
++
++
++if __name__ == "__main__":
++    unittest.main()

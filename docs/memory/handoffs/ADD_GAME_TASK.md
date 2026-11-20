@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
 
 # ADD-GAME — one title, by its code, through the tool's five stages
@@ -132,6 +132,26 @@ four saves of each player's win, its end screen still doesn't show the hub who w
 screen shows who won by player (P1 / P2, not the character), or another screen after a match that does, tell me and we
 start its saves again; otherwise it stays off the board." Then `close`, then "YOU, now: commit".
 
+**B175 — every save is read by a spec that never saw it.** learn learns again without each match's saves and reads
+them back ("left out: <role>"): each must end as its own ending within 2 s and never as another. With two saves of an
+ending, leaving one out leaves one, so **a title whose endings look nearly alike needs at least three saves of each
+player's win** (learn asks for the third with the line above); one whose endings look clearly different can pass on
+two. The spec the hub uses is still learnt from every save.
+
+**B176 — two more lines; the page ends with only one, and the session passes it on in this order:**
+- **"A save may be in the wrong role: <role> reads as <the other ending>. …"** — say, word for word: "YOU, now: one of
+  the saves of <the game> may be the wrong player's win: the one saved as P<k>'s win looks like P<j>'s. Play one more
+  match that P<k> wins and save to slot <2 or 3> on the screen after it that shows P<k> won. Reply ok." (`<k>` from the
+  role, `<j>` from the other ending.) Then `register <code> … --collect <role>=<slot>` (it replaces that save) and
+  `learn <code>`. **Ask for no other save until learn no longer says it.**
+- **"<a> and <b> look like the same match saved twice: save <b> again from another match."** — say, word for word:
+  "YOU, now: two of the saves of <the game> for P<k>'s win look like the same match. Play another match that P<k> wins,
+  with other characters (or another stage) than any match saved so far, and save to slot <2 or 3> on the screen after it
+  that shows P<k> won. Reply ok." (`<k>` from `<b>`.) Then `register <code> … --collect <b>=<slot>` (it replaces `<b>`)
+  and `learn <code>`. The two count as one save until then.
+- **"One more save: <role> …"** — the line above.
+- **"The end screens cannot be told apart this way …"** — the cap's words above.
+
 (Four players and `places`: the rounds as the roles above; four people, or the user with four pads. A `places` title's
 rows already come from different matches; learn may ask one more results screen: "collect it as end_r<its row>, or
 end_r<its row>_<n> when that row is kept already".)
@@ -152,8 +172,9 @@ python3 tools/party_add_game.py close <code>                                    
 
 - **register** FAIL "missing: …" → ask the user for exactly those saves (the role's line above), collect, run again.
   Any other FAIL → stop (below).
-- **learn** → PASS; or its page's last line names one more save (§1's line for it, then register's `--collect` and
-  learn again); or the cap's line (§1: say it, stop). Any other FAIL → stop. **bench** → PASS or stop (it ends every
+- **learn** → PASS; or its page's last line is one of §1's four — a save in the wrong role, the same match saved twice,
+  one more save (each: §1's line to the user, then register's `--collect` and learn again), or the cap (§1: say it,
+  stop). Any other FAIL → stop. **bench** → PASS or stop (it ends every
   kept save, each save of an ending as that ending); it needs nobody: no pad, no TV.
 - **rehearse** (§0 only) → as §0 says.
 - **solo:** it first sets the hub's **one-title setting** (B162): while it is set the board offers only this title for
@@ -179,3 +200,26 @@ The tool's `docs/memory/evidence/add_game/<code>/` (verdicts and pages) and your
 `docs/memory/evidence/ADD_<code>_<date>.md`: the stages' verdicts in order, the user's words verbatim (titles replaced
 by the code), what was disclosed. Then "YOU, now: commit". Nothing adopted: the title is offered by the board only while
 both bench flags are on, as T88 and T89 are; adoption is the user's own go.
+
+## 4. The user's part, as it now is (B177) — two players, `winner`
+
+**Saves: 6 at the least** (the begin, a mid-match save, two wins for each player — enough when the two players' end
+screens look clearly different), **in practice 8 for a game whose end screens look nearly alike** (three wins for each
+player), **10 at the most** (four wins for each player); a save in the wrong role or the same match saved twice is saved
+again, not added.
+
+1. Tell the session which game the code is (in chat only).
+2. Answer: two players; who won is shown by player after a match; anything to unlock (its setup made in Extras →
+   Cheats first); the words to find it in Games.
+3. Set the shortest match (one round, items off), the same for every save.
+4. Round 1 — no setup: slot 1 the select screen before anyone picks, slot 2 the middle of a match, slot 3 after a match
+   P1 won. Under a setup: never slot 1; slot 2 the middle of a match, slot 3 after a P1 win.
+5. Round 2 — each match with other characters (or another stage) than any saved so far: no setup, P2 wins → slot 1,
+   P1 wins → slot 2, P2 wins → slot 3; under a setup, P2 wins → slot 2, P1 wins → slot 3, then one more P2 win → slot 2.
+6. Then as the session asks, one line at a time: one more win for a player (other characters again; up to four wins each);
+   a win saved again under the right player; a win saved again from another match.
+7. Nothing during bench.
+8. Solo: the pads on the onn; follow the lines; say who won and whether the board showed one card.
+9. If the session says the game can't be added this way: another mode or another screen that shows who won by player,
+   or the game stays off the board.
+10. Commit.

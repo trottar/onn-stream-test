@@ -43,7 +43,8 @@ def picture(token: str, k: int, rng):
 
 def capture(state, binding, out_dir, seconds, every):
     token = token_of(state)
-    rng = np.random.default_rng(157 + sum(map(ord, token)))
+    again = int(json.loads(Path(state).read_text()).get("P2") or 0)    # B175: another save of a screen, other pictures
+    rng = np.random.default_rng(157 + sum(map(ord, token)) + 1009 * again)
     rows = []
     for k in range(int(seconds / every) + 1):
         name = f"f{k:04d}.png"

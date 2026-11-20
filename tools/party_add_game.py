@@ -64,6 +64,8 @@ NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B
 SAVES_PER_ENDING_MAX = 4      # B171: the most saves of one ending the tool asks for (T88's three sittings, plus one); not a bar
 ROLE = re.compile(r"^(begin|other\d*|end_P[1-4](_[2-4])?|end_r[1-4]{2,4}(_[2-4])?)$")     # B171: end_P1_2 ... end_P1_4
 SUFFIX = re.compile(r"_([2-4])$")
+SAME_PICTURE = (1.0, "64 x 48 grey, mean |difference| of the screens that stay; H7-V1: one state run twice, 391 of 400 "
+                     "frames under 1.0")          # B176: under this, two saves of one ending are one match (not a bar)
 FLAG_FILES = {"h7.conf": "PRIVYHUB_H7=1", "party.conf": "PRIVYHUB_PARTY=1"}
 UNIT = "privyhub-companion.service"
 
@@ -587,6 +589,39 @@ def _near(a, b) -> bool:
     return float((abs(a - b) > MOVED_GREY).mean()) < MOVED_SHARE
 
 
+def _anchor(small: list) -> int:
+    """The frame most of a run stays near (B140's measure; the earliest on a tie): the screen that stays (B167)."""
+    near = [[_near(a, b) for b in small] for a in small]
+    return max(range(len(small)), key=lambda i: (sum(near[i]), -i))
+
+
+def _matches(pics: Path, kept) -> tuple[dict, list]:
+    """B176: each ending's saves grouped by match — two saves whose screens that stay are the same picture (under
+    SAME_PICTURE) are one match. -> ({role: the first role of its match}, [[a, b, mean difference] for each such pair])."""
+    import numpy as np
+    shot = {}
+    for role in sorted(r for r in kept if r.startswith("end_")):
+        rows = [r["file"] for r in csv.DictReader((pics / role / "index.csv").open())]
+        if rows:
+            small = [_small(pics / role / f) for f in rows]
+            shot[role] = small[_anchor(small)]
+    group = {r: r for r in shot}
+    pairs = []
+    roles = sorted(shot, key=lambda r: (_role_class(r), r != _role_class(r), r))
+    for i, a in enumerate(roles):
+        for b_ in roles[i + 1:]:
+            if _role_class(a) != _role_class(b_):
+                continue
+            d = float(np.abs(shot[a] - shot[b_]).mean())
+            if d < SAME_PICTURE[0]:
+                pairs.append([a, b_, round(d, 2)])
+                ga, gb = group[a], group[b_]
+                for r in group:
+                    if group[r] == gb:
+                        group[r] = ga
+    return group, pairs
+
+
 def _labels(pics: Path, kept: dict, es) -> dict:
     """Labels from the state each picture came from — never by eye. B167: a begin / end run's screen is the frame most
     of the run stays near (B140's measure; the earliest on a tie) — the screen that stays, whether the save was made a
@@ -600,9 +635,8 @@ def _labels(pics: Path, kept: dict, es) -> dict:
         labs = [cls] * len(rows)
         if cls != "other" and rows:
             small = [_small(pics / role / f) for _t, f in rows]
-            near = [[_near(a, b) for b in small] for a in small]
-            anchor = max(range(len(small)), key=lambda i: (sum(near[i]), -i))
-            labs = [cls if near[anchor][j] else "ignore" for j in range(len(small))]
+            anchor = _anchor(small)
+            labs = [cls if _near(small[anchor], small[j]) else "ignore" for j in range(len(small))]
         spans = []
         for (t, f), lab in zip(rows, labs):
             if spans and spans[-1]["label"] == lab:
@@ -659,26 +693,146 @@ def _replay_cells(cells: Cells, es, spec: dict, arrays: dict, pics: Path, kept: 
                       got is not None and got[0] - rows[0][0] <= BARS["ended_within_s"][0])
 
 
+def _replay_all(es, spec: dict, arrays: dict, run: Path) -> list:
+    """B175: a save's pictures through one Reader and Ended as learn's replays read them (the begin loaded first):
+    every end it says — [(seconds from its first picture, class, places)]."""
+    from PIL import Image
+    rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((run / "index.csv").open())]
+    now = [0.0]
+    reader = es.Reader(spec, arrays, clock=lambda: now[0])
+    ended = es.Ended(spec)
+    ended.start_loaded()
+    said = []
+    for t, f in rows:
+        now[0] = t
+        with Image.open(run / f) as im:
+            r = reader.read(im.convert("L"), now=t)
+        done = ended.feed(r["class"], r.get("places"))
+        if done:
+            said.append((round(t - rows[0][0], 2), done, list(ended.places) if ended.places else None))
+    return said
+
+
+def _left_out_cells(cells: Cells, es, b: dict, pics: Path, kept, labels: dict, group: dict) -> dict:
+    """B175: every ending's every save — the spec learnt without its match's saves (learn's own call), then each of
+    them replayed through it: met when it ends as its own ending within ended_within_s and never as another. One cell
+    per save. -> {role: {"other": another ending it ended as, or None; "others": the ending's other matches}}."""
+    out: dict = {}
+    tmp = pics / "left_out_labels.json"
+    bar = BARS["ended_within_s"][0]
+    for gid in sorted(set(group.values())):
+        members = sorted(r for r in group if group[r] == gid)
+        cls = _role_class(gid)
+        others = len({group[r] for r in group if _role_class(r) == cls and group[r] != gid})
+        if b["result"] == "places":
+            others = len({group[r] for r in group if group[r] != gid})
+        runs = {r: v for r, v in labels["runs"].items() if r not in members}
+        still = {x["label"] for v in runs.values() for x in v} | {"ignore"}      # a row with no save left: not a class
+        lab = {"classes": {c: t for c, t in labels["classes"].items() if c in still}, "runs": runs}
+        spec = arrays = None
+        why = None
+        if others == 0:
+            why = "its ending's only match"
+        else:
+            try:
+                write_if_changed(tmp, json.dumps(lab, sort_keys=True))
+                spec, arrays, _rep = es.learn(pics, tmp, "first", name=b["game"])
+            except ValueError as exc:                           # the learner's own refusal, said as the read
+                why = f"not learnt without it: {str(exc)[:80]}"
+            finally:
+                tmp.unlink(missing_ok=True)
+        for role in members:
+            want = f"{_role_class(role)} within <= {bar} s, never another"
+            if why:
+                cells.add(f"left out: {role}", why, want, False)
+                out[role] = {"other": None, "others": others}
+                continue
+            said = _replay_all(es, spec, arrays, pics / role)
+            row = [int(c) for c in cls[5:]] if cls.startswith("end_r") else None
+            own = [x for x in said if (x[1] == cls if row is None else x[2] == row)]
+            wrong = [x for x in said if x not in own]
+            first = said[0] if said else None
+            ok = bool(said) and not wrong and said[0][0] <= bar
+            read = None if first is None else ([first[1], first[0]] if row is None else [first[2], first[0]])
+            cells.add(f"left out: {role}", read, want, ok)
+            other = next((x[1] for x in wrong if row is None and x[1] not in ("start", "other")), None)
+            out[role] = {"other": other, "others": others}
+    return out
+
+
+def _held_out_wrong(es, spec: dict, arrays: dict, pics: Path, labels: dict, kept) -> dict:
+    """B176: {role: another ending} for a save whose held-out frames (second halves) the full spec reads as another
+    ending (not unknown)."""
+    from PIL import Image
+    out = {}
+    ends = set(spec.get("end_classes") or [])
+    for role in sorted(r for r in kept if r.startswith("end_P")):
+        cls = _role_class(role)
+        lab = {"classes": labels["classes"], "runs": {role: labels["runs"][role]}}
+        for c, fs in es.labelled_frames(pics, lab, "second").items():
+            for f in fs:
+                with Image.open(f) as im:
+                    got = es.read(spec, arrays, im.convert("L"))["class"]
+                if got in ends and got != cls:
+                    out.setdefault(role, got)
+    return out
+
+
+def _relabel_fixes(es, b: dict, pics: Path, labels: dict, role: str, other: str) -> bool:
+    """B176: the spec learnt from every save with `role` labelled `other` instead meets learn's own bars (every class
+    separable, margin_needed, held-out unknown, nothing read as another class) — the mark of a save in the wrong role."""
+    lab = json.loads(json.dumps(labels))
+    for x in lab["runs"][role]:
+        if x["label"] != "ignore":
+            x["label"] = other
+    tmp = pics / "relabel_labels.json"
+    try:
+        write_if_changed(tmp, json.dumps(lab, sort_keys=True))
+        spec, arrays, _rep = es.learn(pics, tmp, "first", name=b["game"])
+        sc = es.score(pics, tmp, spec, arrays, "second")
+    except ValueError:
+        return False
+    finally:
+        tmp.unlink(missing_ok=True)
+    m = spec.get("margin_needed")
+    held = {c: row for c, row in (sc.get("confusion") or {}).items() if c not in ("other", "ignore")}
+    n = sum(sum(row.values()) for row in held.values()) or 1
+    unknown = sum(row.get("unknown", 0) + row.get("other", 0) for row in held.values())
+    wrong = sum(cnt for c, row in held.items() for k, cnt in row.items() if k not in (c, "unknown", "other"))
+    sep = spec.get("separable") or {}
+    return (bool(sep) and all(sep.values()) and m is not None and m >= BARS["margin_needed_min"][0]
+            and unknown / n <= BARS["unknown_share_max"][0] and wrong <= BARS["wrong_class_max"][0])
+
+
 ASK_CELLS = ("every class separable", "margin_needed", "held-out frames read unknown (share)")
 ASK_REPLAY = (": ended as itself", ": ended within", ": never ended", ": recognised within")
 
 
 def one_more_save(b: dict, cells: Cells, kept, conf: dict | None = None,
-                  then: str = "register <code> … --collect <role>=<slot> and learn <code> again") -> tuple[str, dict] | None:
+                  then: str = "register <code> … --collect <role>=<slot> and learn <code> again",
+                  group: dict | None = None, pairs: list | None = None, wrong: dict | None = None) -> tuple[str, dict] | None:
     """B171: when learn's separable / margin / unknown / replay cells are not met — one plain line: the ending that
     needs one more save from a different match (its next role), or, at the cap, that the end screens cannot be told
     apart this way. None when none of those cells failed. The bars are the same every time."""
-    asked = [r for r in cells.rows if not r["met"] and (r["cell"] in ASK_CELLS or r["cell"].endswith(ASK_REPLAY))]
+    code = b["code"]
+    for role, other in sorted((wrong or {}).items()):        # B176: first, a save in the wrong role — nothing asked
+        line = (f"A save may be in the wrong role: {role} reads as {other}. Check which player won that match; "
+                "collect it again under the right role.")
+        return line, {"wrong role": [role, other], "line": line}
+    for a, b_, _d in pairs or []:                            # B176: then the same match saved twice
+        line = f"{a} and {b_} look like the same match saved twice: save {b_} again from another match."
+        return line, {"same match twice": [a, b_], "line": line}
+    asked = [r for r in cells.rows if not r["met"] and (r["cell"] in ASK_CELLS or r["cell"].endswith(ASK_REPLAY)
+                                                         or r["cell"].startswith("left out: "))]
     if not asked:
         return None
-    code = b["code"]
     if b["result"] == "places":
         n = sum(1 for k in kept if k.startswith("end_r"))
         if n >= SAVES_PER_ENDING_MAX * b["players"]:
             return _cannot(code, ["every results row"], n)
-        return (f"One more save: a results screen from a match not saved yet; collect it as end_r<its row>, or "
-                f"end_r<its row>_<n> when that row is kept already, then learn {code} again.",
-                {"one more save": "end_r<its row>"})
+        line = (f"One more save: a results screen from a match not saved yet; collect it as end_r<its row>, or "
+                f"end_r<its row>_<n> when that row is kept already, then learn {code} again.")
+        return line, {"one more save": "end_r<its row>", "line": line}
     endings = sorted({_role_class(k) for k in kept if k.startswith("end_P")})
     named: set = set()
     for r in asked:
@@ -688,10 +842,13 @@ def one_more_save(b: dict, cells: Cells, kept, conf: dict | None = None,
         elif c == "held-out frames read unknown (share)":
             named |= {x for x, row in (conf or {}).items()
                       if x in endings and (row.get("unknown", 0) + row.get("other", 0)) > 0}
+        elif c.startswith("left out: "):                    # B175: the ending of a save not read when left out
+            named |= {x for x in [_role_class(c[len("left out: "):])] if x in endings}
         elif c.endswith(ASK_REPLAY):
             named |= {x for x in [_role_class(c.split(": ", 1)[0])] if x in endings}
     named = named or set(endings)                            # margin alone, or only the start: every ending
-    count = {e: sum(1 for k in kept if k.startswith("end_P") and _role_class(k) == e) for e in named}
+    g = group or {}
+    count = {e: len({g.get(k, k) for k in kept if k.startswith("end_P") and _role_class(k) == e}) for e in named}
     open_ = sorted((count[e], e) for e in named if count[e] < SAVES_PER_ENDING_MAX)
     if not open_:
         return _cannot(code, sorted(named), SAVES_PER_ENDING_MAX)
@@ -700,14 +857,14 @@ def one_more_save(b: dict, cells: Cells, kept, conf: dict | None = None,
     line = (f"One more save: {role} — the screen after a match player {ending[5:]} won, from a match not saved yet "
             f"(other characters or another stage than its saves kept); save it to a free slot, then "
             + then.replace("<code>", code).replace("<role>", role) + ".")
-    return line, {"one more save": role}
+    return line, {"one more save": role, "line": line}
 
 
 def _cannot(code: str, endings: list, n: int) -> tuple[str, dict]:
     line = (f"The end screens cannot be told apart this way: {', '.join(endings)} have {n} saves each from different "
             "matches and learn still does not meet its bars. Instead: another mode whose end screen shows who won by "
             "player, or save each ending on another screen that shows it, and start the title's saves again.")
-    return line, {"cannot be told apart": endings}
+    return line, {"cannot be told apart": endings, "line": line}
 
 
 def _sidecar(b: dict, spec: dict) -> dict:
@@ -790,6 +947,23 @@ def cmd_learn(code: str, a: dict) -> int:
     cells.add("other read as a screen", sc.get("other_read_as_screen"), BARS["other_as_screen_max"][0],
               (sc.get("other_read_as_screen") or 0) <= BARS["other_as_screen_max"][0])
     _replay_cells(cells, es, spec, arrays, pics, kept, labels)
+    group, pairs = _matches(pics, kept)                      # B176: saves that are the same picture are one match
+    cells.add("no two saves of one ending the same picture", pairs,
+              f">= {SAME_PICTURE[0]} grey ({SAME_PICTURE[1]})", not pairs)
+    left = _left_out_cells(cells, es, b, pics, kept, labels, group)     # B175: a match the spec did not learn from
+    wrong: dict = {}
+    if b["result"] == "winner" and spec.get("version") != es.VERSION_PLACES:
+        wrong = _held_out_wrong(es, spec, arrays, pics, labels, kept)
+        full_ok = all(r["met"] for r in cells.rows if r["cell"] in ASK_CELLS)  # the spec from every save sound
+        met = {r["cell"]: r["met"] for r in cells.rows}
+        ends = sorted({_role_class(k) for k in kept if k.startswith("end_P")})
+        for role, info in sorted(left.items()):             # B176: a left-out save not read as its own, its ending
+            if wrong or full_ok or info["others"] < 2 or met.get(f"left out: {role}", True):   # two other matches,
+                continue                                    # the spec from every save not sound (a mislabel spoils it)
+            for other in [info["other"]] if info["other"] else [e for e in ends if e != _role_class(role)]:
+                if _relabel_fixes(es, b, pics, labels, role, other):   # and only that save's other label mends it
+                    wrong[role] = other
+                    break
     if b["result"] == "winner" and spec.get("version") == es.VERSION_PLACES:
         pass                                                 # winner read from a row of places (B158)
     elif b["result"] == "places":
@@ -811,7 +985,7 @@ def cmd_learn(code: str, a: dict) -> int:
         b["learnt"] = {"from": digest(kept), "spec": sha(spec_path)}
         write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
         return finish(code, "learn", cells, inputs)
-    ask = one_more_save(b, cells, kept, conf)                # B171: which save to add, in one plain line
+    ask = one_more_save(b, cells, kept, conf, group=group, pairs=pairs, wrong=wrong)   # B171 / B175 / B176: one line
     rc = finish(code, "learn", cells, inputs, note=ask[0] if ask else "", recorded=ask[1] if ask else None)
     if ask:
         out(ask[0])
@@ -948,8 +1122,7 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
         learnt = load_verdict(code, "learn") or {}
         if rec_learn is not None:                            # B171: learn's line, said as rehearse takes the save
             rec_learn["v"] = learnt
-            page = (evidence(code) / "learn.md").read_text() if (evidence(code) / "learn.md").is_file() else ""
-            line = next((ln for ln in page.splitlines() if ln.startswith(("One more save:", "The end screens cannot"))), "")
+            line = str((learnt.get("recorded") or {}).get("line") or "")      # B175: the line learn recorded
             rec_learn["line"] = re.sub(r"then (register \S+ … --collect (\S+)=<slot> and )?learn (\S+) again",
                                        lambda m: f"then rehearse {m.group(3)} --collect "
                                                  f"{m.group(2) or 'end_r<its row>'}=<slot>", line)
@@ -1064,7 +1237,8 @@ def cmd_rehearse(code: str, a: dict) -> int:
     asked = (rec_learn.get("v") or {}).get("recorded") or {}
     line = rec_learn.get("line") or ""
     if line:                                                 # B171: learn's line, as rehearse takes the save
-        rec.update({k: asked[k] for k in ("one more save", "cannot be told apart") if k in asked})
+        rec.update({k: asked[k] for k in ("one more save", "cannot be told apart", "wrong role", "same match twice")
+                    if k in asked})
         note += "\n\n" + line
     rc = finish(code, "rehearse", cells, inputs, note=note, recorded=rec)
     if line:

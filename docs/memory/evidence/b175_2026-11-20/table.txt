@@ -1,0 +1,10 @@
+| made-up title (saves) | today's cells not met | left out | same picture | the line | saves asked, each from another look | then |
+| --- | --- | --- | --- | --- | --- | --- |
+| one per ending, other characters in each (settle's weak pass) | all met | 0 of 2 met; not: end_P1 (its ending's only match); end_P2 (its ending's only match) | met | one more save: end_P1_2 | - | FAIL |
+| two per ending, other characters in every match | all met | 0 of 4 met; not: end_P1 (never ended); end_P1_2 (never ended); end_P2 (end_P1); end_P2_2 (never ended) | met | one more save: end_P1_3 | end_P1_3, end_P2_3, end_P2_4 | PASS |
+| near-alike two per ending, P2's first with P1's characters | all met | 1 of 4 met; not: end_P1 (never ended); end_P2 (end_P1); end_P2_2 (never ended) | met | one more save: end_P1_3 | end_P1_3, end_P2_3, end_P2_4 | cap: end_P2 |
+| near-alike three per ending, other characters | all met | 6 of 6 met | met | - | - | PASS |
+| far apart, two per ending, other characters | all met | 4 of 4 met | met | - | - | PASS |
+| two per ending, the same characters within (only the cursor moved) | all met | 0 of 4 met; not: end_P1 (its ending's only match); end_P1_2 (its ending's only match); end_P2 (its ending's only match); end_P2_2 (its ending's only match) | not met [["end_P1", "end_P1_2"], ["end_P2", "end_P2_2"]] | same match twice: ['end_P1', 'end_P1_2'] | - | FAIL |
+| two per ending, end_P2_2 holding a P1 win | all met | 0 of 4 met; not: end_P1 (never ended); end_P1_2 (never ended); end_P2 (end_P1); end_P2_2 (never ended) | met | one more save: end_P1_3 | end_P1_3, end_P2_3, end_P2_4 | wrong role: end_P2_2 as end_P1 |
+| three per ending, a large mark only the begin shows | margin_needed | 6 of 6 met | met | one more save: end_P1_4 | - | FAIL |
