@@ -6,7 +6,7 @@ Written by `tools/party_add_game.py` (B157). Every cell as read / bar / met; no 
 | --- | --- | --- | --- |
 | learn: spec usable | true | true | yes |
 | learn: every class separable | ["end_P1", "end_P2"] | [] | **no** |
-| learn: margin_needed | 0.0164 | ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))" | **no** |
+| learn: margin_needed | 0.0165 | ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))" | **no** |
 | learn: held-out frames read as another class | 0 | 0 | yes |
 | learn: held-out frames read unknown (share) | 0.6552 | "<= 0.105" | **no** |
 | learn: other read as a screen | 0 | 0 | yes |
@@ -20,9 +20,11 @@ Written by `tools/party_add_game.py` (B157). Every cell as read / bar / met; no 
 | learn's verdict in the scratch | "FAIL" | "PASS" | **no** |
 | end_P1: the scratch rules read it as the real rules | [null, ["end_P1", null]] | "the same, ended, its own ending" | **no** |
 | end_P2: the scratch rules read it as the real rules | [null, ["end_P2", null]] | "the same, ended, its own ending" | **no** |
-| end_p1_b: the scratch rules read it as the real rules | [null, null] | "the same, ended, its own ending" | **no** |
-| end_p2_b: the scratch rules read it as the real rules | [null, null] | "the same, ended, its own ending" | **no** |
+| end_p1_b: the scratch rules read it as the real rules | [null, null] | "the same (an ending the real rules end on: its own)" | **no** |
+| end_p2_b: the scratch rules read it as the real rules | [null, null] | "the same (an ending the real rules end on: its own)" | **no** |
 | the real rules folder: every file's sha256 before = after | [15, 15, 0] | "the same files, 0 changed" | yes |
 | the scratch removed | true | true | yes |
 
-Roles (kept file -> role): the rules folder's begin -> begin, end_p1.state -> end_P1, end_p2.state -> end_P2, slot 2 -> other. Missing: none. Endings read, not a role: end_p1_b, end_p2_b.
+Roles (kept file -> role): the rules folder's begin -> begin, end_p1.state -> end_P1, end_p2.state -> end_P2, slot 2 -> other. Missing: none. Endings read, not a role: end_p1_b (not an end screen to the real rules), end_p2_b (not an end screen to the real rules). Below two saves per ending (a new title's minimum): end_P1_2, end_P2_2.
+
+One more save: end_P1_2 — the screen after a match player 1 won, from a match not saved yet (other characters or another stage than its saves kept); save it to a free slot, then rehearse T88 --collect end_P1_2=<slot>.

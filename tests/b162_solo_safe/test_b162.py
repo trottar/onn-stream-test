@@ -389,6 +389,8 @@ class Unit(unittest.TestCase):
         page = (self.tmp / "ev/T93/close.md").read_text()
         self.assertIn("under the setup 1: changed; own 1: changed", page)
         self.assertNotIn("Made Up", page + json.dumps(v) + text)
+        self.assertFalse((self.tmp / "home/T93/files_before.json").exists())    # B172: close ended the before
+        (self.tmp / "home/T93/files_before.json").write_text(json.dumps(pag.files_digest(b)))   # the next bench's
         (prof / "states/Beetle PSX HW/Made Up (USA).state1").write_text("the user's slot 1, changed")
         rc, text = _tool("close", "T93")
         v = json.loads((self.tmp / "ev/T93/close.json").read_text())

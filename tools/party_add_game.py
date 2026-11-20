@@ -19,6 +19,13 @@ refuses). The private things between stages (the game id, its system, its setup,
 ~/privyhub_h7/add_game/<code>/binding.json, beside the rules folder, off the repo. Every bar is in BARS with where it
 comes from; nothing here judges a picture. Design: docs/memory/evidence/b157_2026-11-18/design_written_before_code.md.
 
+B171: an ending may have up to four saves (end_P1, end_P1_2 ... end_P1_4; end_r<row>_2 ...), each one more run for the
+learner (its class the role without the suffix); register asks two per ending from the start (`winner`); when learn's
+separable / margin / unknown / replay cells are not met, its page says in one plain line which save to add next (or,
+at four saves an ending, that the end screens cannot be told apart this way) — the same bars every time. rehearse
+takes a kept extra ending the real rules end on as one more source, and keeps the saves it collects. B172: close (and
+register) end the solo mark and the befores.
+
 Run-time places (each replaceable, for the tests): PRIVYHUB_H7_RULES (the rules folder), PRIVYHUB_ADD_GAME_HOME
 (~/privyhub_h7/add_game), PRIVYHUB_ADD_GAME_EVIDENCE (the repo's docs/memory/evidence/add_game),
 PRIVYHUB_ADD_GAME_PROJECT (the hub's project root: logs, slot indexes, the session config), PRIVYHUB_ADD_GAME_HUB
@@ -54,7 +61,9 @@ CODE = re.compile(r"^T\d\d$")
 SYSTEMS = {"ps1", "n64", "snes"}                       # h7-start's systems (B103 / B123)
 NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B159)",
            "gamecube": "GameCube: no paused load confirmation, no frame advance yet (B159)"}
-ROLE = re.compile(r"^(begin|other\d*|end_P[1-4]|end_r[1-4]{2,4})$")
+SAVES_PER_ENDING_MAX = 4      # B171: the most saves of one ending the tool asks for (T88's three sittings, plus one); not a bar
+ROLE = re.compile(r"^(begin|other\d*|end_P[1-4](_[2-4])?|end_r[1-4]{2,4}(_[2-4])?)$")     # B171: end_P1_2 ... end_P1_4
+SUFFIX = re.compile(r"_([2-4])$")
 FLAG_FILES = {"h7.conf": "PRIVYHUB_H7=1", "party.conf": "PRIVYHUB_PARTY=1"}
 UNIT = "privyhub-companion.service"
 
@@ -356,8 +365,29 @@ def ps1_four_on(game: str) -> bool:
     return isinstance(entry, dict) and entry.get("ps1_multitap") == "port1"
 
 
-def _roles_needed(players: int, result: str) -> list[str]:
-    return ["begin", "other"] + ([f"end_P{k}" for k in range(1, players + 1)] if result == "winner" else [])
+def _roles_needed(players: int, result: str, per_ending: int = 2) -> list[str]:
+    """B171: two saves of every ending from the start (`winner`), each from a different match; rehearse asks one for
+    learn to run at all (per_ending=1). `places`: the rows that cover every place (each row another match already)."""
+    if result != "winner":
+        return ["begin", "other"]
+    return ["begin", "other"] + [f"end_P{k}" + ("" if n == 1 else f"_{n}") for k in range(1, players + 1)
+                                 for n in range(1, per_ending + 1)]
+
+
+def next_role(ending: str, have) -> str | None:
+    """B171: the ending's next free role (end_P1, end_P1_2 ... end_P1_4); None at the cap."""
+    for n in range(1, SAVES_PER_ENDING_MAX + 1):
+        role = ending if n == 1 else f"{ending}_{n}"
+        if role not in have:
+            return role
+    return None
+
+
+def end_solo_mark(code: str) -> None:
+    """B172: the solo mark and the befores end (the tool's own files in the title's add_game folder), so the next
+    solo writes its own and reads only its own rows."""
+    for name in ("solo_mark.json", "files_before.json", "saves_before.json"):
+        (home(code) / name).unlink(missing_ok=True)
 
 
 def cmd_register(code: str, a: dict) -> int:
@@ -425,12 +455,13 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
         empty = [k for k in kept if (kept_folder(code) / f"{k}.state").stat().st_size == 0]
         cells.add("kept states not empty", empty, [], not empty)
         if result == "places":
-            rows = [k[5:] for k in kept if k.startswith("end_r")]
+            rows = sorted({_role_class(k)[5:] for k in kept if k.startswith("end_r")})     # B171: end_r1234_2 is row 1234
             ok_rows = [r for r in rows if len(r) == players and sorted(r) == [str(i) for i in range(1, players + 1)]]
             cover = all({r[c] for r in ok_rows} == {str(i) for i in range(1, players + 1)} for c in range(players))
             cells.add("results rows: every place in every column", sorted(ok_rows), "each column sees 1..n",
                       bool(ok_rows) and len(ok_rows) == len(rows) and cover)
-        extra = [k for k in kept if k.startswith("end_") and k not in need and result == "winner"]
+        ends = {f"end_P{i}" for i in range(1, players + 1)}                       # B171: a third / fourth save allowed
+        extra = [k for k in kept if k.startswith("end_") and _role_class(k) not in ends and result == "winner"]
         cells.add("no ending of another kind", extra, [], not extra)
     flag_lines = _companion_lines()
     b["found_lines"] = digest(flag_lines)
@@ -440,6 +471,7 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
     b["register_inputs"] = inputs
     if not check:
         write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
+        end_solo_mark(code)                                  # B172: a mark an earlier use left unclosed ends here
     return cells, b, inputs
 
 
@@ -462,7 +494,7 @@ def _role_class(role: str) -> str:
         return "start"
     if role.startswith("other"):
         return "other"
-    return role
+    return SUFFIX.sub("", role)                              # B171: end_P1_2 is a save of end_P1
 
 
 class PicturesFailed(Exception):
@@ -511,20 +543,34 @@ def _pictures(code: str, b: dict, kept: dict) -> Path:
     """Every kept state's run (made once for these kept states; again only if they change)."""
     pics = home(code) / "pictures"
     mark = pics / "made_from.json"
-    if read_json(mark) == kept:
+    made = read_json(mark)
+    if made == kept:
         return pics
-    if pics.exists():
-        shutil.rmtree(pics)                                  # the tool's own pictures of other kept states
-    cap = _capture_fn()
+    made = {r: h for r, h in (made if isinstance(made, dict) else {}).items() if kept.get(r) == h}
+    pics.mkdir(parents=True, exist_ok=True)
+    for child in sorted(pics.iterdir()):                     # B171: a save's run kept while its state is the same
+        if child.is_dir() and (child.name not in made or not (child / "index.csv").is_file()):
+            shutil.rmtree(child)                             # the tool's own pictures of a save no longer kept
+            made.pop(child.name, None)
+    cap = None
     for role in sorted(kept):
         run = pics / role
+        if role in made and run.is_dir():
+            continue
+        cap = cap or _capture_fn()
         run.mkdir(parents=True)
-        rows = _call_capture(cap, kept_folder(code) / f"{role}.state", b, run, role, code)
+        try:
+            rows = _call_capture(cap, kept_folder(code) / f"{role}.state", b, run, role, code)
+        except PicturesFailed:
+            shutil.rmtree(run, ignore_errors=True)           # never reused half made
+            raise
         with (run / "index.csv").open("w", newline="") as f:
             w = csv.writer(f)
             w.writerow(["seconds", "file"])
             for t, name in rows:
                 w.writerow([f"{t:.2f}", name])
+        made[role] = kept[role]
+        write_if_changed(mark, json.dumps(made, sort_keys=True))
     write_if_changed(mark, json.dumps(kept, sort_keys=True))
     return pics
 
@@ -613,6 +659,57 @@ def _replay_cells(cells: Cells, es, spec: dict, arrays: dict, pics: Path, kept: 
                       got is not None and got[0] - rows[0][0] <= BARS["ended_within_s"][0])
 
 
+ASK_CELLS = ("every class separable", "margin_needed", "held-out frames read unknown (share)")
+ASK_REPLAY = (": ended as itself", ": ended within", ": never ended", ": recognised within")
+
+
+def one_more_save(b: dict, cells: Cells, kept, conf: dict | None = None,
+                  then: str = "register <code> … --collect <role>=<slot> and learn <code> again") -> tuple[str, dict] | None:
+    """B171: when learn's separable / margin / unknown / replay cells are not met — one plain line: the ending that
+    needs one more save from a different match (its next role), or, at the cap, that the end screens cannot be told
+    apart this way. None when none of those cells failed. The bars are the same every time."""
+    asked = [r for r in cells.rows if not r["met"] and (r["cell"] in ASK_CELLS or r["cell"].endswith(ASK_REPLAY))]
+    if not asked:
+        return None
+    code = b["code"]
+    if b["result"] == "places":
+        n = sum(1 for k in kept if k.startswith("end_r"))
+        if n >= SAVES_PER_ENDING_MAX * b["players"]:
+            return _cannot(code, ["every results row"], n)
+        return (f"One more save: a results screen from a match not saved yet; collect it as end_r<its row>, or "
+                f"end_r<its row>_<n> when that row is kept already, then learn {code} again.",
+                {"one more save": "end_r<its row>"})
+    endings = sorted({_role_class(k) for k in kept if k.startswith("end_P")})
+    named: set = set()
+    for r in asked:
+        c = r["cell"]
+        if c == "every class separable":
+            named |= {x for x in (r["read"] or []) if x in endings}
+        elif c == "held-out frames read unknown (share)":
+            named |= {x for x, row in (conf or {}).items()
+                      if x in endings and (row.get("unknown", 0) + row.get("other", 0)) > 0}
+        elif c.endswith(ASK_REPLAY):
+            named |= {x for x in [_role_class(c.split(": ", 1)[0])] if x in endings}
+    named = named or set(endings)                            # margin alone, or only the start: every ending
+    count = {e: sum(1 for k in kept if k.startswith("end_P") and _role_class(k) == e) for e in named}
+    open_ = sorted((count[e], e) for e in named if count[e] < SAVES_PER_ENDING_MAX)
+    if not open_:
+        return _cannot(code, sorted(named), SAVES_PER_ENDING_MAX)
+    ending = open_[0][1]
+    role = next_role(ending, kept)
+    line = (f"One more save: {role} — the screen after a match player {ending[5:]} won, from a match not saved yet "
+            f"(other characters or another stage than its saves kept); save it to a free slot, then "
+            + then.replace("<code>", code).replace("<role>", role) + ".")
+    return line, {"one more save": role}
+
+
+def _cannot(code: str, endings: list, n: int) -> tuple[str, dict]:
+    line = (f"The end screens cannot be told apart this way: {', '.join(endings)} have {n} saves each from different "
+            "matches and learn still does not meet its bars. Instead: another mode whose end screen shows who won by "
+            "player, or save each ending on another screen that shows it, and start the title's saves again.")
+    return line, {"cannot be told apart": endings}
+
+
 def _sidecar(b: dict, spec: dict) -> dict:
     side: dict = {"players": b["players"]}
     if b["result"] == "winner":
@@ -673,6 +770,7 @@ def cmd_learn(code: str, a: dict) -> int:
     _spec_cells(cells, spec)
     fn = es.score_places if spec.get("version") == es.VERSION_PLACES else es.score
     sc = fn(pics, pics / "labels.json", spec, arrays, "second")
+    conf: dict = {}
     if spec.get("version") == es.VERSION_PLACES:
         rows = sc.get("rows") or {}
         wrong = sum(v.get("wrong", 0) for v in rows.values())
@@ -705,14 +803,19 @@ def cmd_learn(code: str, a: dict) -> int:
         for p, want in ((begin, (kept_folder(code) / "begin.state").read_bytes()), (side_path, side.encode())):
             if p.exists() and p.read_bytes() != want and not made:
                 cells.add("rules folder: no other title's file overwritten", False, True, False)
-                return finish(code, "learn", cells, inputs)
+                return finish(code, "learn", cells, inputs)       # not an ending's save: no line
         if not (made.get("from") == digest(kept) and spec_path.is_file() and sha(spec_path) == made.get("spec")):
             es.save_spec(spec, arrays, spec_path)
         write_if_changed(begin, (kept_folder(code) / "begin.state").read_bytes())
         write_if_changed(side_path, side)
         b["learnt"] = {"from": digest(kept), "spec": sha(spec_path)}
         write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
-    return finish(code, "learn", cells, inputs)
+        return finish(code, "learn", cells, inputs)
+    ask = one_more_save(b, cells, kept, conf)                # B171: which save to add, in one plain line
+    rc = finish(code, "learn", cells, inputs, note=ask[0] if ask else "", recorded=ask[1] if ask else None)
+    if ask:
+        out(ask[0])
+    return rc
 
 
 def learn_inputs(code: str, b: dict) -> str:
@@ -792,8 +895,23 @@ def _rules_shas() -> dict:
     return {p.name: sha(p) for p in sorted(r.iterdir()) if p.is_file()} if r.is_dir() else {}
 
 
-def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells) -> None:
+def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells,
+                 promoted=None, not_end=None, rec_learn=None) -> None:
     """rehearse's work inside the scratch (the environment pointed at it and put back by the caller)."""
+    for name, (p, want) in sorted(extra.items()):          # B171: a kept extra ending the real rules end on as its own
+        if not want or not want.startswith("end_P"):        # is one more source; one they do not stays read, not a role
+            continue
+        run = scratch / "extra" / name
+        _capture_run(p, sb, run)
+        got = _read_run(es, rspec, rarr, run)
+        role = next_role(want, roles) if got is not None and got[0] == want else None
+        if role:
+            roles[role] = p
+            del extra[name]
+            if promoted is not None:
+                promoted[name] = role
+        elif not_end is not None:
+            not_end.append(name)
     for p in found["results"]:                            # a results screen: its row as the real rules read it
         run = scratch / "extra" / p.name[:-6]
         _capture_run(p, sb, run)
@@ -805,7 +923,7 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
             said_rows[p.name] = f"end_r{row}"
         else:
             extra[p.name[:-6]] = (p, None)
-    need = _roles_needed(b["players"], b["result"])
+    need = _roles_needed(b["players"], b["result"], per_ending=1)   # what learn cannot run without
     missing.extend(r for r in need if r not in roles)
     if b["result"] == "places":
         rows_ = [r[5:] for r in roles if r.startswith("end_r")]
@@ -828,6 +946,13 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
         with contextlib.redirect_stdout(buf):
             cmd_learn(code, {"check": False})             # learn's whole real path, into the scratch rules
         learnt = load_verdict(code, "learn") or {}
+        if rec_learn is not None:                            # B171: learn's line, said as rehearse takes the save
+            rec_learn["v"] = learnt
+            page = (evidence(code) / "learn.md").read_text() if (evidence(code) / "learn.md").is_file() else ""
+            line = next((ln for ln in page.splitlines() if ln.startswith(("One more save:", "The end screens cannot"))), "")
+            rec_learn["line"] = re.sub(r"then (register \S+ … --collect (\S+)=<slot> and )?learn (\S+) again",
+                                       lambda m: f"then rehearse {m.group(3)} --collect "
+                                                 f"{m.group(2) or 'end_r<its row>'}=<slot>", line)
         for r in learnt.get("cells", []):
             cells.add(f"learn: {r['cell']}", r["read"], r["bar"], r["met"])
         cells.add("learn's verdict in the scratch", learnt.get("verdict"), "PASS", learnt.get("verdict") == "PASS")
@@ -835,7 +960,7 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
         cells.add("learn ran in the scratch", f"{type(exc).__name__}: {str(exc)[:120]}", "no error", False)
     spec_path = rules_folder() / f"{b['game']}.endscreen.json"
     sspec = es.load_spec(spec_path) if spec_path.is_file() else None
-    endings = {r: (home(code) / "pictures" / r, r) for r in roles if r.startswith("end_")}
+    endings = {r: (home(code) / "pictures" / r, _role_class(r)) for r in roles if r.startswith("end_")}
     for name, (p, want) in sorted(extra.items()):
         run = scratch / "extra" / name
         if not (run / "index.csv").is_file():
@@ -874,17 +999,27 @@ def cmd_rehearse(code: str, a: dict) -> int:
             found["unused"].append(f"{found['roles']['begin'].name} (not the begin its mini game starts from)")
         found["roles"]["begin"] = rules_begin
         shown["begin"] = "the rules folder's begin"
-    for item in a.get("collect") or []:                     # a role the kept folder lacks: the user's slot, read only
+    own = kept_folder(code)                                  # B171: the saves rehearse collected (the tool's, off the
+    for item in a.get("collect") or []:                     # repo); a role the kept folder lacks: the user's slot, read only
         role, _, slot = item.partition("=")
         if not ROLE.match(role) or role in found["roles"] or slot not in ("1", "2", "3"):
             raise Usage("rehearse --collect role=slot: a role its kept folder lacks (e.g. other=2), slots 1-3")
-        found["roles"][role] = _slot_file({**b, "relative_path": rel}, int(slot))
+        data = _slot_file({**b, "relative_path": rel}, int(slot)).read_bytes()
+        own.mkdir(parents=True, exist_ok=True)
+        write_if_changed(own / f"{role}.state", data)        # kept: the user may save over the slot now
         shown[role] = f"slot {slot}"
+    collected = set()
+    for p in sorted(own.glob("*.state")) if own.is_dir() else []:
+        role = p.name[:-6]
+        if ROLE.match(role) and role not in found["roles"]:
+            found["roles"][role] = p
+            shown.setdefault(role, "a save collected before")
+            collected.add(role)
     es = _endscreen()
     real = rules_folder()
     rspec, rarr = es.load_spec(real / f"{b['game']}.endscreen.json")          # the real rules, read only
     kept_in = {p.name: sha(p) for p in sorted(kept_source(code).iterdir()) if p.is_file()} if kept_source(code).is_dir() else {}
-    kept_in.update({f"slot:{r}": sha(p) for r, p in found["roles"].items() if shown[r].startswith("slot ")})
+    kept_in.update({f"slot:{r}": sha(p) for r, p in found["roles"].items() if r in collected})
     inputs = digest({"register": b["register_inputs"], "kept": kept_in})
     shas_before = _rules_shas()
     cells = Cells()
@@ -896,8 +1031,12 @@ def cmd_rehearse(code: str, a: dict) -> int:
     said_rows: dict = {}
     old_env = {k: os.environ.get(k) for k in SCRATCH_ENV}
     missing: list = []
+    promoted: dict = {}
+    not_end: list = []
+    rec_learn: dict = {}
     try:
-        _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells)
+        _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells,
+                     promoted, not_end, rec_learn)
     except PicturesFailed as exc:                                  # B167: an ending's pictures, with its reason
         cells.add("rehearse's pictures made", exc.read(), "every kept ending's pictures", False)
     except Exception as exc:                                       # anything else in the scratch: a cell, not a trace
@@ -914,12 +1053,23 @@ def cmd_rehearse(code: str, a: dict) -> int:
     cells.add("the real rules folder: every file's sha256 before = after", [len(shas_before), len(shas_after), len(changed)],
               "the same files, 0 changed", not changed)
     cells.add("the scratch removed", not scratch.exists(), True, not scratch.exists())
+    below = [r for r in _roles_needed(b["players"], b["result"]) if r.startswith("end_") and r not in roles]
     rec = {"roles": {r: shown.get(r, p.name) for r, p in sorted(roles.items())}, "missing": missing,
-           "endings read, not a role": sorted(extra), "unused": found["unused"], "rows read by the real rules": said_rows}
+           "endings read, not a role": sorted(extra), "unused": found["unused"], "rows read by the real rules": said_rows,
+           "below two saves per ending": below}
     note = ("Roles (kept file -> role): " + ", ".join(f"{shown.get(r, p.name)} -> {r}" for r, p in sorted(roles.items())) +
             ". Missing: " + (", ".join(missing) or "none") + ". Endings read, not a role: " +
-            (", ".join(sorted(extra)) or "none") + ".")
-    return finish(code, "rehearse", cells, inputs, note=note, recorded=rec)
+            (", ".join(f"{x} (not an end screen to the real rules)" if x in not_end else x for x in sorted(extra))
+             or "none") + ". Below two saves per ending (a new title's minimum): " + (", ".join(below) or "none") + ".")
+    asked = (rec_learn.get("v") or {}).get("recorded") or {}
+    line = rec_learn.get("line") or ""
+    if line:                                                 # B171: learn's line, as rehearse takes the save
+        rec.update({k: asked[k] for k in ("one more save", "cannot be told apart") if k in asked})
+        note += "\n\n" + line
+    rc = finish(code, "rehearse", cells, inputs, note=note, recorded=rec)
+    if line:
+        out(line)
+    return rc
 
 
 # --- the files that must not change (before = after) ------------------------------------------------------------------------
@@ -1232,8 +1382,8 @@ def cmd_bench(code: str, a: dict) -> int:
         took = round(time.monotonic() - t_load, 2)
         if scratch is not None:
             scratch.unlink(missing_ok=True)
-        want_cls = ending if ending.startswith("end_P") else "end"
-        exp_scores, exp_winner = _expected(b, side, ending)
+        want_cls = _role_class(ending) if ending.startswith("end_P") else "end"      # B171: end_P1_2 ends as end_P1
+        exp_scores, exp_winner = _expected(b, side, _role_class(ending))
         cells.add(f"{ending}: ended with its class", [got.get("state"), got.get("class")], ["ended", want_cls],
                   got.get("state") == "ended" and got.get("class") == want_cls)
         cells.add(f"{ending}: scores", got.get("scores"), exp_scores, got.get("scores") == exp_scores)
@@ -1528,6 +1678,7 @@ def cmd_close(code: str, a: dict) -> int:
         cells.add("every file = bench's before", len(changed), 0, not changed)
     note = "The title's own in-game saves (recorded, never a cell): " + (
         "; ".join(f"{r['save']}: {r['is']}" for r in saves) if saves else "none found") + "."
+    end_solo_mark(code)                                      # B172: the next solo writes its own mark and befores
     return finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}),
                   note=note, recorded={"in_game_saves": saves})
 

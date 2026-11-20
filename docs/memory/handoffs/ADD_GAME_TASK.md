@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-11-19
-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+as_of: 2026-11-20
+status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
 
 # ADD-GAME — one title, by its code, through the tool's five stages
@@ -51,18 +51,24 @@ kept state is which role and **what is missing**. **T88's and T89's kept folders
 and the learner cannot learn without one: before `rehearse`, ask the user for that one save — "YOU, now: start <the
 game's name> from Games the way you always play it (with its Extras setup, if it has one), and in the middle of a match
 press SAVE to slot 2 or 3 — never slot 1 (with a setup, slot 1 is the game's own start). Reply with the slot number." —
-then `rehearse <code> --collect other=<that slot>` (the slot is only read, copied into the scratch). **The save stays
-usable until the user saves over that slot:** a later rehearse takes it again (`--collect other=<the same slot>`), no new
-save asked; ask again only if the user has saved over it.
+then `rehearse <code> --collect other=<that slot>` (the slot is only read). **B171: rehearse keeps a copy of every save
+it collects** in the title's own add_game folder (off the repo), so the user may save over that slot at once; a later
+rehearse takes the copy (no `--collect` needed again; `--collect` again replaces it).
 
 **rehearse as B167 leaves it:** the picture source starts as the hub starts the title (the hub's display, its own core
 and core options); the begin is the one the mini game starts from (the rules folder's own, read only); a capture that
 cannot start says why in a cell ("pictures made": busy, display, content not found, core missing, config, exited, not
 playing, state refused), and RetroArch's own log is in the title's add_game folder (`logs/`, never the repo). **For
-T88 today rehearse is FAIL on learn's own bars** (B167: from one still save per ending the learner cannot separate its
-two end screens, which differ only in a small win tally — the real rules were learnt from three sittings). So in §0,
-rehearse's cells are recorded and **it stops the task only when the real rules folder's sha256 cell is not met or a
-"pictures made" cell names a reason** (the picture source did not run); learn's bars there are the record, not a stop. T89 also lacks three of the four results rows `register` needs for a
+T88 rehearse is FAIL on learn's own bars from its kept saves alone** (B167: from one still save per ending the learner
+cannot separate its two end screens, which differ only in a small win tally; B171: its kept `end_p1_b` / `end_p2_b` are
+mid-fight saves, not end screens). **B171: rehearse's page now ends with learn's line** — "One more save: <role> — the
+screen after a match player <k> won, from a match not saved yet … then rehearse <code> --collect <role>=<slot>." — and
+lists the endings below two saves (for T88: `end_P1_2`, `end_P2_2`). Ask the user for exactly that save with §1's line
+for one more save (under a setup: slot 2 or 3), then `rehearse <code> --collect <role>=<slot>`; repeat while the page
+names a save; the most it asks is four saves of each ending, then the cap's line (§1). In §0, **rehearse stops the task
+only when the real rules folder's sha256 cell is not met or a "pictures made" cell names a reason** (the picture source
+did not run); learn's bars there are the record and its line the next save, not a stop. T88's own rules are never
+changed by rehearse, PASS or not. T89 also lacks three of the four results rows `register` needs for a
 `places` title (its kept folder has one results screen): its rehearse names them missing; it needs the user's saves of
 the rows `2341`, `3412`, `4123` (`--collect end_r2341=<slot>` …) before it can be met.
 
@@ -83,25 +89,61 @@ two at a time:
 - **`begin`:** the screen just before a match, nobody picked yet, nothing moving when nobody presses (two players:
   the select screen; four: the character select screen). Under a setup: its slot 1.
 - **`other`:** the middle of a match (a fight, a race) — anything that is not a begin or an end screen.
-- **`winner`, n players:** `end_P1` … `end_Pn` — for each player, a match that player won, saved on the screen that
-  stays after it and shows who won by player (not by character).
+- **`winner`, n players (B171): two saves of every ending from the start** — `end_P1`, `end_P1_2`, … `end_Pn`,
+  `end_Pn_2`: for each player, **two matches that player won, each from a different match with other characters (or
+  another stage)** than every other match saved, saved on the screen that stays after it and shows who won by player
+  (not by character). Two saves of one match, or two matches with the same characters, do not help: the tool learns
+  what tells the endings apart from what changes between the matches.
 - **`places`, four players:** four matches finished in set orders so every player takes every place — rows `1234`,
   `2341`, `3412`, `4123` (P1's place first) — each saved on its results screen: `end_r1234` …
 
-Line for the user (two players, `winner`, round 1): "YOU, now: set the game to its shortest match (one round, items
-off). Save to slot 1 on the select screen before anyone picks; start a match and save to slot 2 in the middle of it;
-let P1 win and save to slot 3 on the screen after the match that shows P1 won. Reply ok." Round 2: "YOU, now: play a
-match P2 wins and save to slot 2 (never slot 1 when it has a setup) on the screen after it. Reply ok." (Four players and `places`: the rounds as the
-roles above; four people, or the user with four pads.)
+**The rounds, two players, `winner` (B171): begin, other, `end_P1`, `end_P1_2`, `end_P2`, `end_P2_2`.**
+
+- **No setup — rounds of three slots:** round 1 `--collect begin=1 --collect other=2 --collect end_P1=3`; round 2
+  `--collect end_P2=1 --collect end_P1_2=2 --collect end_P2_2=3`.
+- **Under a setup — slot 1 is never used by the user** (it is the setup's own start, the begin): round 1 `--collect
+  begin=1 --collect other=2 --collect end_P1=3`; round 2 `--collect end_P2=2 --collect end_P1_2=3`; round 3 `--collect
+  end_P2_2=2`.
+
+Lines for the user, word for word (the game named by the name the user gave, in the reply only):
+- Round 1: "YOU, now: set <the game> to its shortest match (one round, items off). Save to slot 1 on the select screen
+  before anyone picks; start a match and save to slot 2 in the middle of it; let P1 win and save to slot 3 on the screen
+  after the match that shows P1 won. Reply ok." Under a setup: "YOU, now: start <the game> from Games with its Extras
+  setup and set it to its shortest match (one round, items off). Don't save to slot 1. Start a match and save to slot 2
+  in the middle of it; let P1 win and save to slot 3 on the screen after the match that shows P1 won. Reply ok."
+- Round 2, no setup: "YOU, now: play three more matches, each with other characters (or another stage) than any match
+  saved so far: P2 wins the first — save to slot 1 on the screen after it that shows P2 won; P1 wins the second — save to
+  slot 2; P2 wins the third — save to slot 3. Reply ok."
+- Round 2 under a setup: "YOU, now: play two more matches, each with other characters (or another stage) than any match
+  saved so far: P2 wins the first — save to slot 2 on the screen after it that shows P2 won; P1 wins the second — save to
+  slot 3. Never slot 1. Reply ok." Round 3: "YOU, now: play one more match P2 wins, with other characters (or another
+  stage) than any match saved so far, and save to slot 2 on the screen after it that shows P2 won. Reply ok."
+
+**One more save (B171) — when learn's (or rehearse's) page ends with "One more save: <role> …":** the line to the
+user, word for word, `<k>` the player in the role (`end_P<k>_<n>`), the slot 2 or 3 (never 1 under a setup):
+"YOU, now: play one more match of <the game> that P<k> wins, with other characters (or another stage) than any match
+saved so far, and save to slot <2 or 3> on the screen after it that shows P<k> won. Reply ok." Then `register <code> …
+--collect <role>=<slot>` and `learn <code>` (§0: `rehearse <code> --collect <role>=<slot>`). The bars are the same every
+time; never a bar changed.
+
+**The cap (B171):** the tool asks for at most four saves of each ending. When the page ends with "The end screens cannot
+be told apart this way …", stop asking and say, word for word: "YOU, now: <the game> can't be added this way: after
+four saves of each player's win, its end screen still doesn't show the hub who won. If it has another mode whose end
+screen shows who won by player (P1 / P2, not the character), or another screen after a match that does, tell me and we
+start its saves again; otherwise it stays off the board." Then `close`, then "YOU, now: commit".
+
+(Four players and `places`: the rounds as the roles above; four people, or the user with four pads. A `places` title's
+rows already come from different matches; learn may ask one more results screen: "collect it as end_r<its row>, or
+end_r<its row>_<n> when that row is kept already".)
 
 ## 2. The stages — one command each, the verdict read from its last line
 
 ```
 python3 tools/party_add_game.py register <code> --players <2|4> --system <ps1|n64|snes> --result <winner|places> \
         --find "<the user's words>" --setup <none|slot1> --collect begin=1 --collect other=2 --collect end_P1=3
-python3 tools/party_add_game.py register <code> … --collect end_P2=1          # each further round
+python3 tools/party_add_game.py register <code> … --collect end_P2=1 --collect end_P1_2=2 --collect end_P2_2=3  # round 2
 python3 tools/party_add_game.py learn <code>
-python3 tools/party_add_game.py rehearse <code> [--collect other=<slot>]       # §0 only: a title already added
+python3 tools/party_add_game.py rehearse <code> [--collect <role>=<slot>]      # §0 only: a title already added
 python3 tools/party_add_game.py bench <code>                                    # unattended, ~5 min, flags on
 python3 tools/party_add_game.py solo <code>                                     # sets the one-title setting, prints the lines
 python3 tools/party_add_game.py solo <code> --read --winner <the seat the user named>
@@ -110,8 +152,10 @@ python3 tools/party_add_game.py close <code>                                    
 
 - **register** FAIL "missing: …" → ask the user for exactly those saves (the role's line above), collect, run again.
   Any other FAIL → stop (below).
-- **learn**, **bench** → PASS or stop. **bench** needs nobody: no pad, no TV.
-- **rehearse** (§0 only) → PASS or stop.
+- **learn** → PASS; or its page's last line names one more save (§1's line for it, then register's `--collect` and
+  learn again); or the cap's line (§1: say it, stop). Any other FAIL → stop. **bench** → PASS or stop (it ends every
+  kept save, each save of an ending as that ending); it needs nobody: no pad, no TV.
+- **rehearse** (§0 only) → as §0 says.
 - **solo:** it first sets the hub's **one-title setting** (B162): while it is set the board offers only this title for
   its player count, so its card is the only one shown. It refuses (nothing asked of the user) if the hub did not take
   it. Then pass its "YOU, now:" lines to the user one by one (pads on the onn; one person with the pads is enough; the
@@ -121,7 +165,8 @@ python3 tools/party_add_game.py close <code>                                    
   was this title** (the launches since the lines, compared in memory), **the board showed one card** (the board's own
   `cards 1` line, B169), and S over every switch whose next began 4 s or more after it (a quicker one is listed, not
   read; at least four read). **solo's first run writes the users' files' before** when bench left none (a title
-  already added: always, B169), so close compares them after every solo.
+  already added: always, B169), so close compares them after every solo. **B172: close ends the solo mark and the
+  befores** (and register ends one an earlier use left), so a later solo reads only its own rows.
 - **close** always, last — also after any stop. It clears the one-title setting too (as does any restart), and records
   the title's own in-game saves before and after as changed or not — never a cell.
 

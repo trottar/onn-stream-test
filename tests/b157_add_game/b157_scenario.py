@@ -56,7 +56,8 @@ try:
         ent = idx["games"].setdefault(f"{rec['system'].casefold()}::{rel.casefold()}", {"slots": {}})
         for n_, tok_ in roles.items():
             f_ = d_ / f"{stem}.state{n_}"
-            f_.write_text(json.dumps({"P1": TOK[tok_], "P2": 0}))
+            tok_, _, again_ = tok_.partition("#")             # B171: "end_P1#2" — another save of the same screen
+            f_.write_text(json.dumps({"P1": TOK[tok_], "P2": int(again_ or 0)}))
             ent["slots"][str(n_)] = {"state_file": str(f_.relative_to(root))}
         ix.write_text(json.dumps(idx))
         return rec
@@ -78,8 +79,8 @@ try:
     S["t90_learn_first"] = tool("learn", "T90")
     S["t90_reg_missing"] = tool(*reg2, "--collect", "begin=1", "--collect", "other=2", "--collect", "end_P1=3")
     S["t90_reg_missing_v"] = verdict("T90", "register")
-    slots(title, {1: "end_P2"})
-    S["t90_reg"] = tool(*reg2, "--collect", "end_P2=1")
+    slots(title, {1: "end_P2", 2: "end_P1#2", 3: "end_P2#2"})          # B171: two saves per ending
+    S["t90_reg"] = tool(*reg2, "--collect", "end_P2=1", "--collect", "end_P1_2=2", "--collect", "end_P2_2=3")
     S["t90_reg_v"] = verdict("T90", "register")
     S["t90_learn"] = tool("learn", "T90")
     S["t90_learn_v"] = verdict("T90", "learn")
@@ -125,6 +126,8 @@ try:
     reg91 = ["register", "T91"] + reg2[2:]
     tool(*reg91, "--collect", "begin=1", "--collect", "other=2", "--collect", "end_P1=3")
     (agw / "home" / "T91" / "kept" / "end_P2.state").write_text(json.dumps({"P1": TOK["end_P1"], "P2": 1}))
+    for r_, p2_ in (("end_P1_2", 2), ("end_P2_2", 3)):          # B171: two saves per ending (end_P2's shows end_P1's)
+        (agw / "home" / "T91" / "kept" / f"{r_}.state").write_text(json.dumps({"P1": TOK["end_P1"], "P2": p2_}))
     S["t91_reg"] = tool(*reg91)
     S["t91_learn"] = tool("learn", "T91")
     S["t91_learn_v"] = verdict("T91", "learn")

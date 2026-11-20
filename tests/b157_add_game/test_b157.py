@@ -84,7 +84,7 @@ class WholePath(unittest.TestCase):
     def test_2_a_missing_state(self):
         self.assertEqual(self.s["t90_reg_missing"]["rc"], 1)
         self.assertIn("kept states present", self.s["t90_reg_missing_v"]["bad"])
-        self.assertEqual(self.s["t90_reg_missing_v"]["cells"]["missing"], ["end_P2"])
+        self.assertEqual(self.s["t90_reg_missing_v"]["cells"]["missing"], ["end_P1_2", "end_P2", "end_P2_2"])   # B171: two per ending
 
     def test_3_an_ending_read_as_another(self):
         self.assertEqual(self.s["t91_reg"]["rc"], 0)

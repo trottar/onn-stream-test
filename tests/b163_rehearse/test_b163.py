@@ -159,21 +159,25 @@ class Rehearse(unittest.TestCase):
         self.assertEqual([p.name for p in (self.tmp / "home/T95").iterdir() if p.name.startswith("rehearse_")], [])
         self.assertTrue(any(k.startswith("learn: ") for k in c))
         self.assertEqual(c["learn's verdict in the scratch"]["read"], "PASS")
-        for e in ("end_P1", "end_P2", "end_p1_b"):
+        for e in ("end_P1", "end_P2", "end_P1_2"):
             self.assertTrue(c[f"{e}: the scratch rules read it as the real rules"]["met"], e)
-        self.assertEqual(c["end_p1_b: the scratch rules read it as the real rules"]["read"][1][0], "end_P1")
+        # B171: the kept extra the real rules end on as its own ending is one more source (end_P1_2)
+        self.assertEqual(c["end_P1_2: the scratch rules read it as the real rules"]["read"][1][0], "end_P1")
         # B167: a title already added rehearses from the begin its mini game starts from (the rules folder's)
         self.assertEqual(v["recorded"]["roles"], {"begin": "the rules folder's begin", "end_P1": "end_p1.state",
-                                                  "end_P2": "end_p2.state", "other": "slot 2"})
+                                                  "end_P1_2": "end_p1_b.state", "end_P2": "end_p2.state",
+                                                  "other": "slot 2"})
         self.assertEqual(v["recorded"]["unused"], [])                    # the kept begin is the same bytes here
         self.assertEqual(v["recorded"]["missing"], [])
         self.assertEqual(self.slot2, hashlib.sha256((self.tmp / "proj/data/games/retroarch/states/Beetle PSX HW/"
                                                      "Made Up Three (USA).state2").read_bytes()).hexdigest())
-        self.assertEqual(v["recorded"]["endings read, not a role"], ["end_p1_b"])
+        self.assertEqual(v["recorded"]["endings read, not a role"], [])
+        self.assertEqual(v["recorded"]["below two saves per ending"], ["end_P2_2"])      # B171
         page = (self.tmp / "ev/T95/rehearse.md").read_text()
         self.assertIn("Missing: none", page)
         self.assertIn("slot 2 -> other", page)
-        self.assertIn("Endings read, not a role: end_p1_b", page)
+        self.assertIn("end_p1_b.state -> end_P1_2", page)
+        self.assertIn("Endings read, not a role: none", page)
         for n in (GAME, str(self.tmp), "Made Up Three"):
             self.assertNotIn(n, page + json.dumps(v) + text)
         rc2, _ = _tool("rehearse", "T95", "--collect", "other=2")         # twice: the same verdict, the same bytes

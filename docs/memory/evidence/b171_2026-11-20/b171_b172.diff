@@ -1,0 +1,1029 @@
+diff --git a/tests/b157_add_game/b157_scenario.py b/tests/b157_add_game/b157_scenario.py
+index 83d9cc6d..a13164b5 100644
+--- a/tests/b157_add_game/b157_scenario.py
++++ b/tests/b157_add_game/b157_scenario.py
+@@ -56,7 +56,8 @@ try:
+         ent = idx["games"].setdefault(f"{rec['system'].casefold()}::{rel.casefold()}", {"slots": {}})
+         for n_, tok_ in roles.items():
+             f_ = d_ / f"{stem}.state{n_}"
+-            f_.write_text(json.dumps({"P1": TOK[tok_], "P2": 0}))
++            tok_, _, again_ = tok_.partition("#")             # B171: "end_P1#2" — another save of the same screen
++            f_.write_text(json.dumps({"P1": TOK[tok_], "P2": int(again_ or 0)}))
+             ent["slots"][str(n_)] = {"state_file": str(f_.relative_to(root))}
+         ix.write_text(json.dumps(idx))
+         return rec
+@@ -78,8 +79,8 @@ try:
+     S["t90_learn_first"] = tool("learn", "T90")
+     S["t90_reg_missing"] = tool(*reg2, "--collect", "begin=1", "--collect", "other=2", "--collect", "end_P1=3")
+     S["t90_reg_missing_v"] = verdict("T90", "register")
+-    slots(title, {1: "end_P2"})
+-    S["t90_reg"] = tool(*reg2, "--collect", "end_P2=1")
++    slots(title, {1: "end_P2", 2: "end_P1#2", 3: "end_P2#2"})          # B171: two saves per ending
++    S["t90_reg"] = tool(*reg2, "--collect", "end_P2=1", "--collect", "end_P1_2=2", "--collect", "end_P2_2=3")
+     S["t90_reg_v"] = verdict("T90", "register")
+     S["t90_learn"] = tool("learn", "T90")
+     S["t90_learn_v"] = verdict("T90", "learn")
+@@ -125,6 +126,8 @@ try:
+     reg91 = ["register", "T91"] + reg2[2:]
+     tool(*reg91, "--collect", "begin=1", "--collect", "other=2", "--collect", "end_P1=3")
+     (agw / "home" / "T91" / "kept" / "end_P2.state").write_text(json.dumps({"P1": TOK["end_P1"], "P2": 1}))
++    for r_, p2_ in (("end_P1_2", 2), ("end_P2_2", 3)):          # B171: two saves per ending (end_P2's shows end_P1's)
++        (agw / "home" / "T91" / "kept" / f"{r_}.state").write_text(json.dumps({"P1": TOK["end_P1"], "P2": p2_}))
+     S["t91_reg"] = tool(*reg91)
+     S["t91_learn"] = tool("learn", "T91")
+     S["t91_learn_v"] = verdict("T91", "learn")
+diff --git a/tests/b157_add_game/test_b157.py b/tests/b157_add_game/test_b157.py
+index 8165bd78..c737deab 100644
+--- a/tests/b157_add_game/test_b157.py
++++ b/tests/b157_add_game/test_b157.py
+@@ -84,7 +84,7 @@ class WholePath(unittest.TestCase):
+     def test_2_a_missing_state(self):
+         self.assertEqual(self.s["t90_reg_missing"]["rc"], 1)
+         self.assertIn("kept states present", self.s["t90_reg_missing_v"]["bad"])
+-        self.assertEqual(self.s["t90_reg_missing_v"]["cells"]["missing"], ["end_P2"])
++        self.assertEqual(self.s["t90_reg_missing_v"]["cells"]["missing"], ["end_P1_2", "end_P2", "end_P2_2"])   # B171: two per ending
+ 
+     def test_3_an_ending_read_as_another(self):
+         self.assertEqual(self.s["t91_reg"]["rc"], 0)
+diff --git a/tests/b162_solo_safe/test_b162.py b/tests/b162_solo_safe/test_b162.py
+index efd37a8f..b3950b98 100644
+--- a/tests/b162_solo_safe/test_b162.py
++++ b/tests/b162_solo_safe/test_b162.py
+@@ -389,6 +389,8 @@ class Unit(unittest.TestCase):
+         page = (self.tmp / "ev/T93/close.md").read_text()
+         self.assertIn("under the setup 1: changed; own 1: changed", page)
+         self.assertNotIn("Made Up", page + json.dumps(v) + text)
++        self.assertFalse((self.tmp / "home/T93/files_before.json").exists())    # B172: close ended the before
++        (self.tmp / "home/T93/files_before.json").write_text(json.dumps(pag.files_digest(b)))   # the next bench's
+         (prof / "states/Beetle PSX HW/Made Up (USA).state1").write_text("the user's slot 1, changed")
+         rc, text = _tool("close", "T93")
+         v = json.loads((self.tmp / "ev/T93/close.json").read_text())
+diff --git a/tests/b163_rehearse/test_b163.py b/tests/b163_rehearse/test_b163.py
+index f3b2dc02..aa4a82b5 100644
+--- a/tests/b163_rehearse/test_b163.py
++++ b/tests/b163_rehearse/test_b163.py
+@@ -159,21 +159,25 @@ class Rehearse(unittest.TestCase):
+         self.assertEqual([p.name for p in (self.tmp / "home/T95").iterdir() if p.name.startswith("rehearse_")], [])
+         self.assertTrue(any(k.startswith("learn: ") for k in c))
+         self.assertEqual(c["learn's verdict in the scratch"]["read"], "PASS")
+-        for e in ("end_P1", "end_P2", "end_p1_b"):
++        for e in ("end_P1", "end_P2", "end_P1_2"):
+             self.assertTrue(c[f"{e}: the scratch rules read it as the real rules"]["met"], e)
+-        self.assertEqual(c["end_p1_b: the scratch rules read it as the real rules"]["read"][1][0], "end_P1")
++        # B171: the kept extra the real rules end on as its own ending is one more source (end_P1_2)
++        self.assertEqual(c["end_P1_2: the scratch rules read it as the real rules"]["read"][1][0], "end_P1")
+         # B167: a title already added rehearses from the begin its mini game starts from (the rules folder's)
+         self.assertEqual(v["recorded"]["roles"], {"begin": "the rules folder's begin", "end_P1": "end_p1.state",
+-                                                  "end_P2": "end_p2.state", "other": "slot 2"})
++                                                  "end_P1_2": "end_p1_b.state", "end_P2": "end_p2.state",
++                                                  "other": "slot 2"})
+         self.assertEqual(v["recorded"]["unused"], [])                    # the kept begin is the same bytes here
+         self.assertEqual(v["recorded"]["missing"], [])
+         self.assertEqual(self.slot2, hashlib.sha256((self.tmp / "proj/data/games/retroarch/states/Beetle PSX HW/"
+                                                      "Made Up Three (USA).state2").read_bytes()).hexdigest())
+-        self.assertEqual(v["recorded"]["endings read, not a role"], ["end_p1_b"])
++        self.assertEqual(v["recorded"]["endings read, not a role"], [])
++        self.assertEqual(v["recorded"]["below two saves per ending"], ["end_P2_2"])      # B171
+         page = (self.tmp / "ev/T95/rehearse.md").read_text()
+         self.assertIn("Missing: none", page)
+         self.assertIn("slot 2 -> other", page)
+-        self.assertIn("Endings read, not a role: end_p1_b", page)
++        self.assertIn("end_p1_b.state -> end_P1_2", page)
++        self.assertIn("Endings read, not a role: none", page)
+         for n in (GAME, str(self.tmp), "Made Up Three"):
+             self.assertNotIn(n, page + json.dumps(v) + text)
+         rc2, _ = _tool("rehearse", "T95", "--collect", "other=2")         # twice: the same verdict, the same bytes
+diff --git a/tests/b169_solo_cells/test_b169.py b/tests/b169_solo_cells/test_b169.py
+index 1f60b2c4..ba775ed3 100644
+--- a/tests/b169_solo_cells/test_b169.py
++++ b/tests/b169_solo_cells/test_b169.py
+@@ -105,6 +105,9 @@ class FilesBefore(unittest.TestCase):
+         self.assertEqual(rc, 0, text + json.dumps(v))
+         self.assertIn({"save": "under the setup 1", "is": "changed"}, v["recorded"]["in_game_saves"])
+         self.assertIn("every file = bench's before", [c["cell"] for c in v["cells"]])
++        self.assertFalse((self.tmp / "home/T93/files_before.json").exists())    # B172: close ended the before
++        rc, text = _tool("solo", "T93")                                         # the next solo: its own before
++        self.assertEqual(rc, 3, text)
+         (prof / "states/Beetle PSX HW/Made Up (USA).state1").write_text("the user's slot 1, saved over")
+         rc, text = _tool("close", "T93")
+         v = json.loads((self.tmp / "ev/T93/close.json").read_text())
+diff --git a/tools/party_add_game.py b/tools/party_add_game.py
+index b4f59577..e0fbb781 100644
+--- a/tools/party_add_game.py
++++ b/tools/party_add_game.py
+@@ -19,6 +19,13 @@ refuses). The private things between stages (the game id, its system, its setup,
+ ~/privyhub_h7/add_game/<code>/binding.json, beside the rules folder, off the repo. Every bar is in BARS with where it
+ comes from; nothing here judges a picture. Design: docs/memory/evidence/b157_2026-11-18/design_written_before_code.md.
+ 
++B171: an ending may have up to four saves (end_P1, end_P1_2 ... end_P1_4; end_r<row>_2 ...), each one more run for the
++learner (its class the role without the suffix); register asks two per ending from the start (`winner`); when learn's
++separable / margin / unknown / replay cells are not met, its page says in one plain line which save to add next (or,
++at four saves an ending, that the end screens cannot be told apart this way) — the same bars every time. rehearse
++takes a kept extra ending the real rules end on as one more source, and keeps the saves it collects. B172: close (and
++register) end the solo mark and the befores.
++
+ Run-time places (each replaceable, for the tests): PRIVYHUB_H7_RULES (the rules folder), PRIVYHUB_ADD_GAME_HOME
+ (~/privyhub_h7/add_game), PRIVYHUB_ADD_GAME_EVIDENCE (the repo's docs/memory/evidence/add_game),
+ PRIVYHUB_ADD_GAME_PROJECT (the hub's project root: logs, slot indexes, the session config), PRIVYHUB_ADD_GAME_HUB
+@@ -54,7 +61,9 @@ CODE = re.compile(r"^T\d\d$")
+ SYSTEMS = {"ps1", "n64", "snes"}                       # h7-start's systems (B103 / B123)
+ NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B159)",
+            "gamecube": "GameCube: no paused load confirmation, no frame advance yet (B159)"}
+-ROLE = re.compile(r"^(begin|other\d*|end_P[1-4]|end_r[1-4]{2,4})$")
++SAVES_PER_ENDING_MAX = 4      # B171: the most saves of one ending the tool asks for (T88's three sittings, plus one); not a bar
++ROLE = re.compile(r"^(begin|other\d*|end_P[1-4](_[2-4])?|end_r[1-4]{2,4}(_[2-4])?)$")     # B171: end_P1_2 ... end_P1_4
++SUFFIX = re.compile(r"_([2-4])$")
+ FLAG_FILES = {"h7.conf": "PRIVYHUB_H7=1", "party.conf": "PRIVYHUB_PARTY=1"}
+ UNIT = "privyhub-companion.service"
+ 
+@@ -356,8 +365,29 @@ def ps1_four_on(game: str) -> bool:
+     return isinstance(entry, dict) and entry.get("ps1_multitap") == "port1"
+ 
+ 
+-def _roles_needed(players: int, result: str) -> list[str]:
+-    return ["begin", "other"] + ([f"end_P{k}" for k in range(1, players + 1)] if result == "winner" else [])
++def _roles_needed(players: int, result: str, per_ending: int = 2) -> list[str]:
++    """B171: two saves of every ending from the start (`winner`), each from a different match; rehearse asks one for
++    learn to run at all (per_ending=1). `places`: the rows that cover every place (each row another match already)."""
++    if result != "winner":
++        return ["begin", "other"]
++    return ["begin", "other"] + [f"end_P{k}" + ("" if n == 1 else f"_{n}") for k in range(1, players + 1)
++                                 for n in range(1, per_ending + 1)]
++
++
++def next_role(ending: str, have) -> str | None:
++    """B171: the ending's next free role (end_P1, end_P1_2 ... end_P1_4); None at the cap."""
++    for n in range(1, SAVES_PER_ENDING_MAX + 1):
++        role = ending if n == 1 else f"{ending}_{n}"
++        if role not in have:
++            return role
++    return None
++
++
++def end_solo_mark(code: str) -> None:
++    """B172: the solo mark and the befores end (the tool's own files in the title's add_game folder), so the next
++    solo writes its own and reads only its own rows."""
++    for name in ("solo_mark.json", "files_before.json", "saves_before.json"):
++        (home(code) / name).unlink(missing_ok=True)
+ 
+ 
+ def cmd_register(code: str, a: dict) -> int:
+@@ -425,12 +455,13 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+         empty = [k for k in kept if (kept_folder(code) / f"{k}.state").stat().st_size == 0]
+         cells.add("kept states not empty", empty, [], not empty)
+         if result == "places":
+-            rows = [k[5:] for k in kept if k.startswith("end_r")]
++            rows = sorted({_role_class(k)[5:] for k in kept if k.startswith("end_r")})     # B171: end_r1234_2 is row 1234
+             ok_rows = [r for r in rows if len(r) == players and sorted(r) == [str(i) for i in range(1, players + 1)]]
+             cover = all({r[c] for r in ok_rows} == {str(i) for i in range(1, players + 1)} for c in range(players))
+             cells.add("results rows: every place in every column", sorted(ok_rows), "each column sees 1..n",
+                       bool(ok_rows) and len(ok_rows) == len(rows) and cover)
+-        extra = [k for k in kept if k.startswith("end_") and k not in need and result == "winner"]
++        ends = {f"end_P{i}" for i in range(1, players + 1)}                       # B171: a third / fourth save allowed
++        extra = [k for k in kept if k.startswith("end_") and _role_class(k) not in ends and result == "winner"]
+         cells.add("no ending of another kind", extra, [], not extra)
+     flag_lines = _companion_lines()
+     b["found_lines"] = digest(flag_lines)
+@@ -440,6 +471,7 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+     b["register_inputs"] = inputs
+     if not check:
+         write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
++        end_solo_mark(code)                                  # B172: a mark an earlier use left unclosed ends here
+     return cells, b, inputs
+ 
+ 
+@@ -462,7 +494,7 @@ def _role_class(role: str) -> str:
+         return "start"
+     if role.startswith("other"):
+         return "other"
+-    return role
++    return SUFFIX.sub("", role)                              # B171: end_P1_2 is a save of end_P1
+ 
+ 
+ class PicturesFailed(Exception):
+@@ -511,20 +543,34 @@ def _pictures(code: str, b: dict, kept: dict) -> Path:
+     """Every kept state's run (made once for these kept states; again only if they change)."""
+     pics = home(code) / "pictures"
+     mark = pics / "made_from.json"
+-    if read_json(mark) == kept:
++    made = read_json(mark)
++    if made == kept:
+         return pics
+-    if pics.exists():
+-        shutil.rmtree(pics)                                  # the tool's own pictures of other kept states
+-    cap = _capture_fn()
++    made = {r: h for r, h in (made if isinstance(made, dict) else {}).items() if kept.get(r) == h}
++    pics.mkdir(parents=True, exist_ok=True)
++    for child in sorted(pics.iterdir()):                     # B171: a save's run kept while its state is the same
++        if child.is_dir() and (child.name not in made or not (child / "index.csv").is_file()):
++            shutil.rmtree(child)                             # the tool's own pictures of a save no longer kept
++            made.pop(child.name, None)
++    cap = None
+     for role in sorted(kept):
+         run = pics / role
++        if role in made and run.is_dir():
++            continue
++        cap = cap or _capture_fn()
+         run.mkdir(parents=True)
+-        rows = _call_capture(cap, kept_folder(code) / f"{role}.state", b, run, role, code)
++        try:
++            rows = _call_capture(cap, kept_folder(code) / f"{role}.state", b, run, role, code)
++        except PicturesFailed:
++            shutil.rmtree(run, ignore_errors=True)           # never reused half made
++            raise
+         with (run / "index.csv").open("w", newline="") as f:
+             w = csv.writer(f)
+             w.writerow(["seconds", "file"])
+             for t, name in rows:
+                 w.writerow([f"{t:.2f}", name])
++        made[role] = kept[role]
++        write_if_changed(mark, json.dumps(made, sort_keys=True))
+     write_if_changed(mark, json.dumps(kept, sort_keys=True))
+     return pics
+ 
+@@ -613,6 +659,57 @@ def _replay_cells(cells: Cells, es, spec: dict, arrays: dict, pics: Path, kept:
+                       got is not None and got[0] - rows[0][0] <= BARS["ended_within_s"][0])
+ 
+ 
++ASK_CELLS = ("every class separable", "margin_needed", "held-out frames read unknown (share)")
++ASK_REPLAY = (": ended as itself", ": ended within", ": never ended", ": recognised within")
++
++
++def one_more_save(b: dict, cells: Cells, kept, conf: dict | None = None,
++                  then: str = "register <code> … --collect <role>=<slot> and learn <code> again") -> tuple[str, dict] | None:
++    """B171: when learn's separable / margin / unknown / replay cells are not met — one plain line: the ending that
++    needs one more save from a different match (its next role), or, at the cap, that the end screens cannot be told
++    apart this way. None when none of those cells failed. The bars are the same every time."""
++    asked = [r for r in cells.rows if not r["met"] and (r["cell"] in ASK_CELLS or r["cell"].endswith(ASK_REPLAY))]
++    if not asked:
++        return None
++    code = b["code"]
++    if b["result"] == "places":
++        n = sum(1 for k in kept if k.startswith("end_r"))
++        if n >= SAVES_PER_ENDING_MAX * b["players"]:
++            return _cannot(code, ["every results row"], n)
++        return (f"One more save: a results screen from a match not saved yet; collect it as end_r<its row>, or "
++                f"end_r<its row>_<n> when that row is kept already, then learn {code} again.",
++                {"one more save": "end_r<its row>"})
++    endings = sorted({_role_class(k) for k in kept if k.startswith("end_P")})
++    named: set = set()
++    for r in asked:
++        c = r["cell"]
++        if c == "every class separable":
++            named |= {x for x in (r["read"] or []) if x in endings}
++        elif c == "held-out frames read unknown (share)":
++            named |= {x for x, row in (conf or {}).items()
++                      if x in endings and (row.get("unknown", 0) + row.get("other", 0)) > 0}
++        elif c.endswith(ASK_REPLAY):
++            named |= {x for x in [_role_class(c.split(": ", 1)[0])] if x in endings}
++    named = named or set(endings)                            # margin alone, or only the start: every ending
++    count = {e: sum(1 for k in kept if k.startswith("end_P") and _role_class(k) == e) for e in named}
++    open_ = sorted((count[e], e) for e in named if count[e] < SAVES_PER_ENDING_MAX)
++    if not open_:
++        return _cannot(code, sorted(named), SAVES_PER_ENDING_MAX)
++    ending = open_[0][1]
++    role = next_role(ending, kept)
++    line = (f"One more save: {role} — the screen after a match player {ending[5:]} won, from a match not saved yet "
++            f"(other characters or another stage than its saves kept); save it to a free slot, then "
++            + then.replace("<code>", code).replace("<role>", role) + ".")
++    return line, {"one more save": role}
++
++
++def _cannot(code: str, endings: list, n: int) -> tuple[str, dict]:
++    line = (f"The end screens cannot be told apart this way: {', '.join(endings)} have {n} saves each from different "
++            "matches and learn still does not meet its bars. Instead: another mode whose end screen shows who won by "
++            "player, or save each ending on another screen that shows it, and start the title's saves again.")
++    return line, {"cannot be told apart": endings}
++
++
+ def _sidecar(b: dict, spec: dict) -> dict:
+     side: dict = {"players": b["players"]}
+     if b["result"] == "winner":
+@@ -673,6 +770,7 @@ def cmd_learn(code: str, a: dict) -> int:
+     _spec_cells(cells, spec)
+     fn = es.score_places if spec.get("version") == es.VERSION_PLACES else es.score
+     sc = fn(pics, pics / "labels.json", spec, arrays, "second")
++    conf: dict = {}
+     if spec.get("version") == es.VERSION_PLACES:
+         rows = sc.get("rows") or {}
+         wrong = sum(v.get("wrong", 0) for v in rows.values())
+@@ -705,14 +803,19 @@ def cmd_learn(code: str, a: dict) -> int:
+         for p, want in ((begin, (kept_folder(code) / "begin.state").read_bytes()), (side_path, side.encode())):
+             if p.exists() and p.read_bytes() != want and not made:
+                 cells.add("rules folder: no other title's file overwritten", False, True, False)
+-                return finish(code, "learn", cells, inputs)
++                return finish(code, "learn", cells, inputs)       # not an ending's save: no line
+         if not (made.get("from") == digest(kept) and spec_path.is_file() and sha(spec_path) == made.get("spec")):
+             es.save_spec(spec, arrays, spec_path)
+         write_if_changed(begin, (kept_folder(code) / "begin.state").read_bytes())
+         write_if_changed(side_path, side)
+         b["learnt"] = {"from": digest(kept), "spec": sha(spec_path)}
+         write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
+-    return finish(code, "learn", cells, inputs)
++        return finish(code, "learn", cells, inputs)
++    ask = one_more_save(b, cells, kept, conf)                # B171: which save to add, in one plain line
++    rc = finish(code, "learn", cells, inputs, note=ask[0] if ask else "", recorded=ask[1] if ask else None)
++    if ask:
++        out(ask[0])
++    return rc
+ 
+ 
+ def learn_inputs(code: str, b: dict) -> str:
+@@ -792,8 +895,23 @@ def _rules_shas() -> dict:
+     return {p.name: sha(p) for p in sorted(r.iterdir()) if p.is_file()} if r.is_dir() else {}
+ 
+ 
+-def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells) -> None:
++def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells,
++                 promoted=None, not_end=None, rec_learn=None) -> None:
+     """rehearse's work inside the scratch (the environment pointed at it and put back by the caller)."""
++    for name, (p, want) in sorted(extra.items()):          # B171: a kept extra ending the real rules end on as its own
++        if not want or not want.startswith("end_P"):        # is one more source; one they do not stays read, not a role
++            continue
++        run = scratch / "extra" / name
++        _capture_run(p, sb, run)
++        got = _read_run(es, rspec, rarr, run)
++        role = next_role(want, roles) if got is not None and got[0] == want else None
++        if role:
++            roles[role] = p
++            del extra[name]
++            if promoted is not None:
++                promoted[name] = role
++        elif not_end is not None:
++            not_end.append(name)
+     for p in found["results"]:                            # a results screen: its row as the real rules read it
+         run = scratch / "extra" / p.name[:-6]
+         _capture_run(p, sb, run)
+@@ -805,7 +923,7 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
+             said_rows[p.name] = f"end_r{row}"
+         else:
+             extra[p.name[:-6]] = (p, None)
+-    need = _roles_needed(b["players"], b["result"])
++    need = _roles_needed(b["players"], b["result"], per_ending=1)   # what learn cannot run without
+     missing.extend(r for r in need if r not in roles)
+     if b["result"] == "places":
+         rows_ = [r[5:] for r in roles if r.startswith("end_r")]
+@@ -828,6 +946,13 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
+         with contextlib.redirect_stdout(buf):
+             cmd_learn(code, {"check": False})             # learn's whole real path, into the scratch rules
+         learnt = load_verdict(code, "learn") or {}
++        if rec_learn is not None:                            # B171: learn's line, said as rehearse takes the save
++            rec_learn["v"] = learnt
++            page = (evidence(code) / "learn.md").read_text() if (evidence(code) / "learn.md").is_file() else ""
++            line = next((ln for ln in page.splitlines() if ln.startswith(("One more save:", "The end screens cannot"))), "")
++            rec_learn["line"] = re.sub(r"then (register \S+ … --collect (\S+)=<slot> and )?learn (\S+) again",
++                                       lambda m: f"then rehearse {m.group(3)} --collect "
++                                                 f"{m.group(2) or 'end_r<its row>'}=<slot>", line)
+         for r in learnt.get("cells", []):
+             cells.add(f"learn: {r['cell']}", r["read"], r["bar"], r["met"])
+         cells.add("learn's verdict in the scratch", learnt.get("verdict"), "PASS", learnt.get("verdict") == "PASS")
+@@ -835,7 +960,7 @@ def _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, sai
+         cells.add("learn ran in the scratch", f"{type(exc).__name__}: {str(exc)[:120]}", "no error", False)
+     spec_path = rules_folder() / f"{b['game']}.endscreen.json"
+     sspec = es.load_spec(spec_path) if spec_path.is_file() else None
+-    endings = {r: (home(code) / "pictures" / r, r) for r in roles if r.startswith("end_")}
++    endings = {r: (home(code) / "pictures" / r, _role_class(r)) for r in roles if r.startswith("end_")}
+     for name, (p, want) in sorted(extra.items()):
+         run = scratch / "extra" / name
+         if not (run / "index.csv").is_file():
+@@ -874,17 +999,27 @@ def cmd_rehearse(code: str, a: dict) -> int:
+             found["unused"].append(f"{found['roles']['begin'].name} (not the begin its mini game starts from)")
+         found["roles"]["begin"] = rules_begin
+         shown["begin"] = "the rules folder's begin"
+-    for item in a.get("collect") or []:                     # a role the kept folder lacks: the user's slot, read only
++    own = kept_folder(code)                                  # B171: the saves rehearse collected (the tool's, off the
++    for item in a.get("collect") or []:                     # repo); a role the kept folder lacks: the user's slot, read only
+         role, _, slot = item.partition("=")
+         if not ROLE.match(role) or role in found["roles"] or slot not in ("1", "2", "3"):
+             raise Usage("rehearse --collect role=slot: a role its kept folder lacks (e.g. other=2), slots 1-3")
+-        found["roles"][role] = _slot_file({**b, "relative_path": rel}, int(slot))
++        data = _slot_file({**b, "relative_path": rel}, int(slot)).read_bytes()
++        own.mkdir(parents=True, exist_ok=True)
++        write_if_changed(own / f"{role}.state", data)        # kept: the user may save over the slot now
+         shown[role] = f"slot {slot}"
++    collected = set()
++    for p in sorted(own.glob("*.state")) if own.is_dir() else []:
++        role = p.name[:-6]
++        if ROLE.match(role) and role not in found["roles"]:
++            found["roles"][role] = p
++            shown.setdefault(role, "a save collected before")
++            collected.add(role)
+     es = _endscreen()
+     real = rules_folder()
+     rspec, rarr = es.load_spec(real / f"{b['game']}.endscreen.json")          # the real rules, read only
+     kept_in = {p.name: sha(p) for p in sorted(kept_source(code).iterdir()) if p.is_file()} if kept_source(code).is_dir() else {}
+-    kept_in.update({f"slot:{r}": sha(p) for r, p in found["roles"].items() if shown[r].startswith("slot ")})
++    kept_in.update({f"slot:{r}": sha(p) for r, p in found["roles"].items() if r in collected})
+     inputs = digest({"register": b["register_inputs"], "kept": kept_in})
+     shas_before = _rules_shas()
+     cells = Cells()
+@@ -896,8 +1031,12 @@ def cmd_rehearse(code: str, a: dict) -> int:
+     said_rows: dict = {}
+     old_env = {k: os.environ.get(k) for k in SCRATCH_ENV}
+     missing: list = []
++    promoted: dict = {}
++    not_end: list = []
++    rec_learn: dict = {}
+     try:
+-        _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells)
++        _rehearse_in(code, b, sb, es, rspec, rarr, scratch, found, roles, extra, said_rows, missing, cells,
++                     promoted, not_end, rec_learn)
+     except PicturesFailed as exc:                                  # B167: an ending's pictures, with its reason
+         cells.add("rehearse's pictures made", exc.read(), "every kept ending's pictures", False)
+     except Exception as exc:                                       # anything else in the scratch: a cell, not a trace
+@@ -914,12 +1053,23 @@ def cmd_rehearse(code: str, a: dict) -> int:
+     cells.add("the real rules folder: every file's sha256 before = after", [len(shas_before), len(shas_after), len(changed)],
+               "the same files, 0 changed", not changed)
+     cells.add("the scratch removed", not scratch.exists(), True, not scratch.exists())
++    below = [r for r in _roles_needed(b["players"], b["result"]) if r.startswith("end_") and r not in roles]
+     rec = {"roles": {r: shown.get(r, p.name) for r, p in sorted(roles.items())}, "missing": missing,
+-           "endings read, not a role": sorted(extra), "unused": found["unused"], "rows read by the real rules": said_rows}
++           "endings read, not a role": sorted(extra), "unused": found["unused"], "rows read by the real rules": said_rows,
++           "below two saves per ending": below}
+     note = ("Roles (kept file -> role): " + ", ".join(f"{shown.get(r, p.name)} -> {r}" for r, p in sorted(roles.items())) +
+             ". Missing: " + (", ".join(missing) or "none") + ". Endings read, not a role: " +
+-            (", ".join(sorted(extra)) or "none") + ".")
+-    return finish(code, "rehearse", cells, inputs, note=note, recorded=rec)
++            (", ".join(f"{x} (not an end screen to the real rules)" if x in not_end else x for x in sorted(extra))
++             or "none") + ". Below two saves per ending (a new title's minimum): " + (", ".join(below) or "none") + ".")
++    asked = (rec_learn.get("v") or {}).get("recorded") or {}
++    line = rec_learn.get("line") or ""
++    if line:                                                 # B171: learn's line, as rehearse takes the save
++        rec.update({k: asked[k] for k in ("one more save", "cannot be told apart") if k in asked})
++        note += "\n\n" + line
++    rc = finish(code, "rehearse", cells, inputs, note=note, recorded=rec)
++    if line:
++        out(line)
++    return rc
+ 
+ 
+ # --- the files that must not change (before = after) ------------------------------------------------------------------------
+@@ -1232,8 +1382,8 @@ def cmd_bench(code: str, a: dict) -> int:
+         took = round(time.monotonic() - t_load, 2)
+         if scratch is not None:
+             scratch.unlink(missing_ok=True)
+-        want_cls = ending if ending.startswith("end_P") else "end"
+-        exp_scores, exp_winner = _expected(b, side, ending)
++        want_cls = _role_class(ending) if ending.startswith("end_P") else "end"      # B171: end_P1_2 ends as end_P1
++        exp_scores, exp_winner = _expected(b, side, _role_class(ending))
+         cells.add(f"{ending}: ended with its class", [got.get("state"), got.get("class")], ["ended", want_cls],
+                   got.get("state") == "ended" and got.get("class") == want_cls)
+         cells.add(f"{ending}: scores", got.get("scores"), exp_scores, got.get("scores") == exp_scores)
+@@ -1528,6 +1678,7 @@ def cmd_close(code: str, a: dict) -> int:
+         cells.add("every file = bench's before", len(changed), 0, not changed)
+     note = "The title's own in-game saves (recorded, never a cell): " + (
+         "; ".join(f"{r['save']}: {r['is']}" for r in saves) if saves else "none found") + "."
++    end_solo_mark(code)                                      # B172: the next solo writes its own mark and befores
+     return finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}),
+                   note=note, recorded={"in_game_saves": saves})
+ 
+diff --git a/tests/b171_more_saves/near_capture.py b/tests/b171_more_saves/near_capture.py
+new file mode 100644
+index 00000000..e6124894
+--- /dev/null
++++ b/tests/b171_more_saves/near_capture.py
+@@ -0,0 +1,93 @@
++"""B171's tests: the add-a-game tool's picture source replaced by made-up near-alike end screens
++(PARTY_ADD_GAME_CAPTURE=near_capture:capture). A made-up kept state is JSON {"kind": k, "look": m, "far": bool}:
++
++  start   the select screen before anyone picks: a still textured screen, both portraits empty, the tally 0-0
++  end_P1 / end_P2   the same screen after a match: the two portraits of the match's characters (their shades drawn
++          from the look `m`: the same look = the same characters), a cursor, the tally 1-0 / 0-1 in 2-px segments —
++          the endings differ only in a few pixels; `far`: a large banner on the winner's side as well (far apart)
++  same    an ending whose screen does not show who won (the tally 1-1 for either player)
++  other / mid   the middle of a match (moving shapes on another background)
++
++Every frame of a save is the same picture with +-2 noise (a still save); a picture every other 0.5-s tick (about half
++the ticks give one on the hub, B167). CALLS lists every capture (the state's kind and look). Every picture made-up."""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import numpy as np
++from PIL import Image, ImageDraw
++
++W, H = 320, 240
++TALLY = {"start": "00", "end_P1": "10", "end_P2": "01", "same": "11"}
++SEG = {"0": "abcdef", "1": "bc"}
++_g = np.random.default_rng(88)
++BACK = np.clip(np.add.outer(np.linspace(20, 140, H), np.linspace(0, 80, W))
++               + _g.integers(-25, 26, size=(H // 8, W // 8)).repeat(8, 0).repeat(8, 1), 0, 255).astype(np.uint8)
++CALLS: list = []
++
++
++def state(kind: str, look: int = 0, far: bool = False, n: int = 0) -> str:
++    """`n`: another save of the same screen (other bytes, the same picture)."""
++    return json.dumps({"kind": kind, "look": look, "far": far, "n": n})
++
++
++def _digit(d, x, y, ch, s=2):
++    w, h = 4 * s, 7 * s
++    boxes = {"a": (x, y, x + w, y + s), "b": (x + w - s, y, x + w, y + h // 2), "c": (x + w - s, y + h // 2, x + w, y + h),
++             "d": (x, y + h - s, x + w, y + h), "e": (x, y + h // 2, x + s, y + h), "f": (x, y, x + s, y + h // 2)}
++    for k in SEG[ch]:
++        d.rectangle(boxes[k], fill=235)
++
++
++def screen(kind: str, look: int, rng, far: bool = False) -> Image.Image:
++    im = Image.fromarray(BACK.copy(), "L")
++    d = ImageDraw.Draw(im)
++    d.rectangle((120, 90, 200, 125), fill=90)                     # the tally's panel
++    m = np.random.default_rng(1000 + look)
++    for x0 in (10, 230):                                          # the two portraits: the match's characters
++        if kind == "start":
++            d.rectangle((x0, 40, x0 + 80, 180), fill=60)
++            continue
++        d.rectangle((x0, 40, x0 + 80, 180), fill=int(m.integers(20, 230)))
++        d.ellipse((x0 + 10, 60, x0 + 70, 120), fill=int(m.integers(20, 230)))
++        d.rectangle((x0 + 20, 130, x0 + 60, 170), fill=int(m.integers(20, 230)))
++    cx = int(m.integers(0, 4))                                    # the cursor
++    d.rectangle((110 + 25 * cx, 190, 130 + 25 * cx, 210), fill=200)
++    t = TALLY[kind]
++    _digit(d, 140, 100, t[0])
++    _digit(d, 170, 100, t[1])
++    if far and kind in ("end_P1", "end_P2"):
++        x = 100 if kind == "end_P1" else 160
++        d.rectangle((x, 30, x + 60, 90), fill=250)
++    a = np.asarray(im, dtype=np.int16) + rng.integers(-2, 3, size=(H, W))
++    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "L")
++
++
++def other(i: int, rng) -> Image.Image:
++    im = Image.new("L", (W, H), int(rng.integers(100, 180)))
++    d = ImageDraw.Draw(im)
++    for _ in range(6):
++        x, y = int(rng.integers(0, W - 60)), int(rng.integers(0, H - 60))
++        d.ellipse((x, y, x + int(rng.integers(20, 90)), y + int(rng.integers(20, 90))), fill=int(rng.integers(0, 255)))
++    return im
++
++
++def capture(state_path, binding, out_dir, seconds, every):
++    s = json.loads(Path(state_path).read_text())
++    CALLS.append((s["kind"], s["look"]))
++    rng = np.random.default_rng(171 + 7 * s["look"] + len(s["kind"]))
++    rows = []
++    for k in range(int(seconds / every) + 1):
++        if k % 2:
++            continue
++        name = f"f{k:04d}.png"
++        pic = other(k, rng) if s["kind"] in ("other", "mid") else screen(s["kind"], s["look"], rng, s.get("far", False))
++        pic.save(Path(out_dir) / name)
++        rows.append((round(k * every, 2), name))
++    return rows
++
++
++def fails(state_path, binding, out_dir, seconds, every):
++    """A picture source that does not run (learn: a "pictures made" cell, never a line)."""
++    raise RuntimeError("made-up: the picture source did not start")
+diff --git a/tests/b171_more_saves/test_b171.py b/tests/b171_more_saves/test_b171.py
+new file mode 100644
+index 00000000..f13e0d9f
+--- /dev/null
++++ b/tests/b171_more_saves/test_b171.py
+@@ -0,0 +1,354 @@
++#!/usr/bin/env python3
++"""B171 (host): several saves per ending; learn says which save to add — the add-a-game tool on made-up near-alike and
++far-apart end screens (`near_capture.py`), a made-up hub on loopback (the library's one made-up title, its game file),
++the user's made-up slots (the slot index as the hub keeps it). Nothing of the hub's read.
++
++- **register asks for two saves per ending:** one per ending → FAIL, `end_P1_2`, `end_P2_2` missing; a role past the
++  cap (`end_P1_5`) refused; an ending of a player the title has not → "another kind".
++- **near-alike, two per ending of the same look** (the same characters in every match) → learn FAIL on its own bars
++  and **one plain line naming the save to add**; each named save collected from a match with other characters → learn
++  again on **the same bars** → PASS, no line; only the added save captured each time.
++- **far-apart screens pass on two saves per ending.**
++- **the cap:** two endings whose screens look the same → asked up to `_4` each, then "cannot be told apart this way",
++  no role named, FAIL.
++- **rehearse, T88's shape** (a made-up title already added; its kept folder: begin, one save per ending, a mid-fight
++  extra): FAIL naming `end_P1_2`, the mid-fight extra "not an end screen", below two saves `end_P1_2`, `end_P2_2`;
++  each named save collected (the slot saved over between: the tool's kept copy used) → PASS; the real rules folder's
++  every sha256 before = after; a kept extra the real rules end on is one more source.
++- no title, id or path in anything written or printed; learn twice → the same bytes. Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b171_more_saves -v
++"""
++from __future__ import annotations
++
++import contextlib
++import hashlib
++import http.server
++import io
++import json
++import os
++import shutil
++import sys
++import tempfile
++import threading
++import unittest
++from pathlib import Path
++from urllib.parse import urlparse
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path.insert(0, str(HERE))
++sys.path.insert(0, str(ROOT / "tools"))
++import near_capture as nc  # noqa: E402
++
++GAME = "madeupnear1"
++WORDS = "Near Alike Made Up"
++REL = "games/ps1/Near Alike Made Up (USA).cue"
++REG = ("register", "T80", "--players", 2, "--system", "ps1", "--result", "winner", "--find", WORDS, "--setup", "none")
++
++
++class NearHub:
++    """The routes register and rehearse call: `games` (one made-up title), `details` (its made-up game file)."""
++
++    def __init__(self):
++        class H(http.server.BaseHTTPRequestHandler):
++            def _answer(self):
++                action = urlparse(self.path).path.rsplit("/", 1)[-1]
++                body = {"ok": True}
++                if action == "games":
++                    body = {"nodes": [{"id": GAME, "node_type": "game", "name": WORDS}]}
++                elif action == "details":
++                    body = {"relative_path": REL, "title": WORDS}
++                raw = json.dumps(body).encode()
++                self.send_response(200)
++                self.send_header("Content-Length", str(len(raw)))
++                self.end_headers()
++                self.wfile.write(raw)
++
++            do_GET = do_POST = _answer
++
++            def log_message(self, *a):
++                pass
++
++        self.srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
++        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
++        self.url = f"http://127.0.0.1:{self.srv.server_address[1]}"
++
++    def close(self):
++        self.srv.shutdown()
++        self.srv.server_close()
++
++
++def _tool(*argv):
++    import party_add_game as pag
++    buf = io.StringIO()
++    with contextlib.redirect_stdout(buf):
++        rc = pag.main([str(a) for a in argv])
++    return rc, buf.getvalue()
++
++
++class Base(unittest.TestCase):
++    def setUp(self):
++        import party_add_game as pag
++        self.pag = pag
++        self.tmp = Path(tempfile.mkdtemp(prefix="b171_"))
++        self.hub = NearHub()
++        self.env = {"PRIVYHUB_ADD_GAME_HOME": str(self.tmp / "home"), "PRIVYHUB_ADD_GAME_EVIDENCE": str(self.tmp / "ev"),
++                    "PRIVYHUB_ADD_GAME_PROJECT": str(self.tmp / "proj"), "PRIVYHUB_H7_RULES": str(self.tmp / "rules"),
++                    "PRIVYHUB_ADD_GAME_DROPINS": str(self.tmp / "dropins"), "PRIVYHUB_ADD_GAME_SYSTEMCTL": "true",
++                    "PRIVYHUB_ADD_GAME_HUB": self.hub.url, "PRIVYHUB_ADD_GAME_KEPT_ROOT": str(self.tmp / "kept"),
++                    "PARTY_ADD_GAME_CAPTURE": "near_capture:capture"}
++        self.old = {k: os.environ.get(k) for k in self.env}
++        os.environ.update(self.env)
++        self.bars = json.dumps(pag.BARS, sort_keys=True)
++        (self.tmp / "dropins").mkdir()                       # eighteen made-up lines, never the hub's own
++        for i in range(18):
++            (self.tmp / "dropins" / f"line{i:02d}.conf").write_text(f"[Service]\nEnvironment=PRIVYHUB_LINE{i:02d}=1\n")
++        (self.tmp / "rules").mkdir()
++        (self.tmp / "proj/data/games/retroarch/states/Beetle PSX HW").mkdir(parents=True)
++        nc.CALLS.clear()
++        self.n = 0
++
++    def tearDown(self):
++        self.assertEqual(json.dumps(self.pag.BARS, sort_keys=True), self.bars)     # no bar changed, ever
++        self.hub.close()
++        for k, v in self.old.items():
++            if v is None:
++                os.environ.pop(k, None)
++            else:
++                os.environ[k] = v
++        shutil.rmtree(self.tmp, ignore_errors=True)
++
++    def save(self, slot: int, kind: str, look: int = 0, far: bool = False) -> None:
++        """The user's SAVE to slot `slot` (the slot index as the hub keeps it); every save other bytes."""
++        self.n += 1
++        ra = self.tmp / "proj/data/games/retroarch"
++        f = ra / "states/Beetle PSX HW" / f"Near Alike Made Up (USA).state{slot}"
++        f.write_text(nc.state(kind, look, far, self.n))
++        ix = ra / "privyhub_state_slots.json"
++        idx = json.loads(ix.read_text()) if ix.is_file() else {"schema": 1, "games": {}}
++        ent = idx["games"].setdefault(f"ps1::{REL.casefold()}", {"slots": {}})
++        ent["slots"][str(slot)] = {"state_file": str(f.relative_to(self.tmp / "proj"))}
++        ix.write_text(json.dumps(idx))
++
++    def collect(self, saves: list) -> tuple[int, str]:
++        """A round: [(role, kind, look, far)], to slots 1, 2, 3 in turn, then register --collect each."""
++        args = []
++        for slot, (role, kind, look, far) in enumerate(saves, 1):
++            self.save(slot, kind, look, far)
++            args += ["--collect", f"{role}={slot}"]
++        return _tool(*REG, *args)
++
++    def verdict(self, stage: str, code: str = "T80") -> tuple[dict, dict, str]:
++        v = json.loads((self.tmp / f"ev/{code}/{stage}.json").read_text())
++        return v, {c["cell"]: c for c in v["cells"]}, (self.tmp / f"ev/{code}/{stage}.md").read_text()
++
++    def written(self) -> str:
++        return "\n".join(p.read_text() for p in sorted((self.tmp / "ev").rglob("*")) if p.is_file())
++
++    def names_absent(self, text: str) -> None:
++        for n in (GAME, WORDS, "Near Alike", str(self.tmp)):
++            self.assertNotIn(n.casefold(), text.casefold())
++
++    def two_per_ending(self, look1=1, look2=1, far=False) -> None:
++        rc, text = self.collect([("begin", "start", 0, False), ("other", "other", 0, False),
++                                 ("end_P1", "end_P1", look1, far)])
++        rc, text = self.collect([("end_P2", "end_P2", look1, far), ("end_P1_2", "end_P1", look2, far),
++                                 ("end_P2_2", "end_P2", look2, far)])
++        self.assertEqual(rc, 0, text)
++
++    def follow_asks(self, kinds: dict, looks, most: int = 6) -> tuple[list, int, str]:
++        """learn; while its line names a save: that save from the next look, collected; learn again (the same bars)."""
++        asked, looks = [], iter(looks)
++        rc, out = _tool("learn", "T80")
++        while rc != 0 and len(asked) < most:
++            v, _c, page = self.verdict("learn")
++            role = (v.get("recorded") or {}).get("one more save")
++            if not role:
++                break
++            asked.append(role)
++            ending = self.pag._role_class(role)
++            nc.CALLS.clear()
++            rc2, text = self.collect([(role, kinds[ending], next(looks), False)])
++            self.assertEqual(rc2, 0, text)
++            rc, out = _tool("learn", "T80")
++            self.assertEqual([k for k, _l in nc.CALLS], [kinds[ending]], "only the added save captured")
++        return asked, rc, out
++
++
++class Register(Base):
++    def test_one_save_per_ending_asks_for_the_second(self):
++        self.collect([("begin", "start", 0, False), ("other", "other", 0, False), ("end_P1", "end_P1", 1, False)])
++        rc, text = self.collect([("end_P2", "end_P2", 1, False)])
++        v, c, _page = self.verdict("register")
++        self.assertEqual(rc, 1, text)
++        self.assertEqual(c["missing"]["read"], ["end_P1_2", "end_P2_2"])
++        self.assertEqual(_tool("learn", "T80")[0], 2)                      # learn refused without register's PASS
++
++    def test_past_the_cap_refused_and_another_kind(self):
++        self.two_per_ending(1, 2)
++        self.save(1, "end_P1", 3)
++        self.assertEqual(_tool(*REG, "--collect", "end_P1_5=1")[0], 2)    # the most is end_P1_4
++        rc, text = _tool(*REG, "--collect", "end_P3_2=1")
++        v, c, _page = self.verdict("register")
++        self.assertEqual(rc, 1, text)
++        self.assertEqual(c["no ending of another kind"]["read"], ["end_P3_2"])
++
++
++class Learn(Base):
++    def test_near_alike_asks_then_passes_on_the_same_bars(self):
++        self.two_per_ending(1, 1)                                          # the same characters in every match
++        rc, out = _tool("learn", "T80")
++        v, c, page = self.verdict("learn")
++        self.assertEqual(rc, 1, out)
++        bad = [k for k, x in c.items() if not x["met"]]
++        self.assertTrue({"every class separable", "margin_needed"} & set(bad), bad)
++        self.assertEqual(v["recorded"], {"one more save": "end_P1_3"})
++        line = ("One more save: end_P1_3 — the screen after a match player 1 won, from a match not saved yet (other "
++                "characters or another stage than its saves kept); save it to a free slot, then register T80 … "
++                "--collect end_P1_3=<slot> and learn T80 again.")
++        self.assertIn(line, page)
++        self.assertIn(line, out)
++        asked, rc, out = self.follow_asks({"end_P1": "end_P1", "end_P2": "end_P2"}, looks=[2, 3, 4, 5])
++        v, c, page = self.verdict("learn")
++        self.assertEqual(rc, 0, out + page)
++        self.assertEqual(asked, ASKED_NEAR)
++        self.assertNotIn("One more save", page + out)
++        self.assertNotIn("recorded", v)
++        self.assertTrue(c["margin_needed"]["met"])
++        self.assertEqual(c["margin_needed"]["bar"], ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))")
++        self.assertTrue((self.tmp / f"rules/{GAME}.endscreen.json").is_file())    # only a pass reaches the rules
++        self.names_absent(self.written() + out)
++        before = {p.name: p.read_bytes() for p in (self.tmp / "ev/T80").iterdir()}
++        rc2, _ = _tool("learn", "T80")                                      # twice: the same verdict, the same bytes
++        self.assertEqual(rc2, 0)
++        self.assertEqual(before, {p.name: p.read_bytes() for p in (self.tmp / "ev/T80").iterdir()})
++
++    def test_far_apart_pass_on_two(self):
++        self.two_per_ending(1, 1, far=True)
++        rc, out = _tool("learn", "T80")
++        v, c, page = self.verdict("learn")
++        self.assertEqual(rc, 0, out + page)
++        self.assertNotIn("One more save", page)
++
++    def test_the_cap(self):
++        """Two endings whose screens are the same (who won not shown): asked to the cap, then said plainly."""
++        self.collect([("begin", "start", 0, False), ("other", "other", 0, False), ("end_P1", "same", 1, False)])
++        self.collect([("end_P2", "same", 1, False), ("end_P1_2", "same", 2, False), ("end_P2_2", "same", 2, False)])
++        asked, rc, out = self.follow_asks({"end_P1": "same", "end_P2": "same"}, looks=[3, 3, 4, 4, 5, 5], most=6)
++        v, c, page = self.verdict("learn")
++        self.assertEqual(rc, 1)
++        self.assertEqual(asked, ["end_P1_3", "end_P2_3", "end_P1_4", "end_P2_4"])
++        self.assertEqual(v["recorded"], {"cannot be told apart": ["end_P1", "end_P2"]})
++        self.assertIn("The end screens cannot be told apart this way: end_P1, end_P2 have 4 saves each from different "
++                      "matches and learn still does not meet its bars. Instead: another mode whose end screen shows who "
++                      "won by player, or save each ending on another screen that shows it, and start the title's saves "
++                      "again.", page)
++        self.assertNotIn("One more save", page)
++        self.assertFalse((self.tmp / f"rules/{GAME}.endscreen.json").exists())
++
++    def test_no_line_when_the_pictures_fail(self):
++        self.two_per_ending(1, 1)
++        os.environ["PARTY_ADD_GAME_CAPTURE"] = "near_capture:fails"
++        rc, out = _tool("learn", "T80")
++        v, c, page = self.verdict("learn")
++        self.assertEqual(rc, 1)
++        self.assertIn("pictures made", c)
++        self.assertNotIn("One more save", page + out)
++
++
++class Rehearse(Base):
++    """T88's shape: a made-up title already added (its rules learnt from three looks per ending — three sittings, the
++    kept saves' among them);
++    its kept folder: begin, one save per ending, a mid-fight extra."""
++
++    def setUp(self):
++        super().setUp()
++        pag = self.pag
++        es = pag._endscreen()
++        pics = self.tmp / "made" / "pictures"
++        kept = {}
++        plan = [("begin", "start", 0), ("other", "other", 0)] + \
++               [(f"end_P{k}" + ("" if s == 1 else f"_{s}"), f"end_P{k}", look) for k in (1, 2)
++                for s, look in ((1, 1), (2, 11), (3, 12))]          # the kept saves among them, as T88's V1 sitting
++        for role, kind, look in plan:
++            sf = self.tmp / "made" / f"{role}.state"
++            sf.parent.mkdir(parents=True, exist_ok=True)
++            sf.write_text(nc.state(kind, look))
++            (pics / role).mkdir(parents=True)
++            rows = nc.capture(sf, {}, pics / role, 12.0, pag.CAPTURE_EVERY)
++            (pics / role / "index.csv").write_text("seconds,file\n" + "".join(f"{t:.2f},{n}\n" for t, n in rows))
++            kept[role] = role
++        labels = pag._labels(pics, kept, es)
++        (pics / "labels.json").write_text(json.dumps(labels))
++        spec, arrays, _rep = es.learn(pics, pics / "labels.json", "first", name=GAME)
++        self.assertGreaterEqual(spec["margin_needed"], pag.BARS["margin_needed_min"][0])   # the real rules are good
++        es.save_spec(spec, arrays, self.tmp / "rules" / f"{GAME}.endscreen.json")
++        (self.tmp / "rules" / f"{GAME}.state").write_text(nc.state("start"))
++        (self.tmp / "rules" / f"{GAME}.party.json").write_text(json.dumps({"players": 2, "result": "winner"}, indent=1,
++                                                                          sort_keys=True) + "\n")
++        shutil.rmtree(self.tmp / "made")
++        k = self.tmp / "kept" / "t85"
++        k.mkdir(parents=True)
++        (k / "begin.state").write_text(nc.state("start"))
++        (k / "end_p1.state").write_text(nc.state("end_P1", 1))
++        (k / "end_p2.state").write_text(nc.state("end_P2", 1, n=1))
++        (k / "end_p1_b.state").write_text(nc.state("mid", 0))                 # mid-fight: not an end screen
++        self.kept_sha = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in k.iterdir()}
++        args = ("T85", "--players", 2, "--system", "ps1", "--result", "winner", "--rules-players", 2)
++        self.assertEqual(_tool("register", *args)[0], 0)
++        self.assertEqual(_tool("learn", "T85")[0], 0)
++
++    def rules_shas(self):
++        return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((self.tmp / "rules").iterdir())}
++
++    def test_t88_shape_asks_then_passes(self):
++        before = self.rules_shas()
++        self.save(2, "other")
++        rc, out = _tool("rehearse", "T85", "--collect", "other=2")
++        v, c, page = self.verdict("rehearse", "T85")
++        self.assertEqual(rc, 1, out)
++        self.assertEqual(v["recorded"]["one more save"], "end_P1_2")
++        self.assertEqual(v["recorded"]["below two saves per ending"], ["end_P1_2", "end_P2_2"])
++        self.assertEqual(v["recorded"]["endings read, not a role"], ["end_p1_b"])
++        self.assertIn("end_p1_b (not an end screen to the real rules)", page)
++        self.assertIn("then rehearse T85 --collect end_P1_2=<slot>.", page)
++        self.assertIn("then rehearse T85 --collect end_P1_2=<slot>.", out)
++        self.assertTrue(c["the real rules folder: every file's sha256 before = after"]["met"])
++        asked = ["end_P1_2"]
++        looks = iter([2, 3, 4, 5])
++        for _ in range(4):
++            role = v["recorded"].get("one more save")
++            if rc == 0 or not role:
++                break
++            self.save(2, self.pag._role_class(role), next(looks))        # slot 2 saved over: other is the tool's copy
++            rc, out = _tool("rehearse", "T85", "--collect", f"{role}=2")
++            v, c, page = self.verdict("rehearse", "T85")
++            if v["recorded"].get("one more save"):
++                asked.append(v["recorded"]["one more save"])
++        self.assertEqual(rc, 0, out + page)
++        self.assertEqual(asked, ASKED_REHEARSE)
++        self.assertEqual(v["recorded"]["roles"]["other"], "a save collected before")
++        self.assertEqual(before, self.rules_shas())
++        self.assertTrue(c["the scratch removed"]["met"])
++        self.assertEqual(self.kept_sha, {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
++                                         for p in (self.tmp / "kept/t85").iterdir()})
++        self.names_absent(self.written() + out)
++
++    def test_a_kept_extra_that_is_an_end_screen_is_a_source(self):
++        (self.tmp / "kept/t85/end_p2_b.state").write_text(nc.state("end_P2", 5))
++        self.save(2, "other")
++        rc, out = _tool("rehearse", "T85", "--collect", "other=2")
++        v, c, page = self.verdict("rehearse", "T85")
++        self.assertEqual(v["recorded"]["roles"]["end_P2_2"], "end_p2_b.state")
++        self.assertEqual(v["recorded"]["endings read, not a role"], ["end_p1_b"])
++        self.assertEqual(v["recorded"]["below two saves per ending"], ["end_P1_2"])
++        self.assertTrue(c["end_P2_2: the scratch rules read it as the real rules"]["read"][1][0] == "end_P2")
++
++
++ASKED_NEAR = ["end_P1_3", "end_P2_3"]   # as the first run gave them (the learner decides; the bars never change)
++ASKED_REHEARSE = ["end_P1_2", "end_P2_2"]
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/b171_more_saves/test_b172.py b/tests/b171_more_saves/test_b172.py
+new file mode 100644
+index 00000000..e245c901
+--- /dev/null
++++ b/tests/b171_more_saves/test_b172.py
+@@ -0,0 +1,85 @@
++#!/usr/bin/env python3
++"""B172 (host): the solo mark ends at close — on made-up logs and a made-up hub on loopback (B157's solo fixture, B162's
++close fixture), nothing of the hub's read.
++
++- solo's lines write the mark; **close ends it with the files' and in-game saves' befores**; the next solo writes its
++  own mark from the logs as they are then — **its read counts only its own rows** (the first solo's switches are not
++  read again: "planned switches" 0 with no new rows).
++- **register ends a mark an earlier use left unclosed** (T88's add_game folder holds one from the first use).
++Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b171_more_saves -p 'test_b172.py' -v
++"""
++from __future__ import annotations
++
++import contextlib
++import io
++import json
++import sys
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++for sub in ("b157_add_game", "b162_solo_safe"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++sys.path.insert(0, str(ROOT / "tools"))
++import test_b157 as b157t  # noqa: E402  (its SoloReads fixture, reused)
++import test_b162 as b162t  # noqa: E402  (its close fixture, reused)
++
++MARKS = ("solo_mark.json", "files_before.json", "saves_before.json")
++
++
++def _tool(*argv):
++    import party_add_game as pag
++    buf = io.StringIO()
++    with contextlib.redirect_stdout(buf):
++        rc = pag.main([str(a) for a in argv])
++    return rc, buf.getvalue()
++
++
++class SoloMark(unittest.TestCase):
++    setUp = b157t.SoloReads.setUp
++    tearDown = b157t.SoloReads.tearDown
++    logs = b157t.SoloReads.logs
++    close_ready = b162t.Unit.close_ready
++
++    def here(self):
++        return {n: (self.tmp / "home/T93" / n).is_file() for n in MARKS}
++
++    def test_close_ends_the_mark_and_the_next_solo_reads_only_its_own_rows(self):
++        self.close_ready()
++        rc, text = _tool("solo", "T93")
++        self.assertEqual(rc, 3, text)
++        first = json.loads((self.tmp / "home/T93/solo_mark.json").read_text())
++        self.assertEqual(self.here(), {n: True for n in MARKS})
++        self.logs()                                                   # the first solo's practice, go and end
++        rc, text = _tool("solo", "T93", "--read", "--winner", 1)
++        self.assertEqual(rc, 0, text + (self.tmp / "ev/T93/solo.md").read_text())
++        rc, text = _tool("close", "T93")
++        self.assertEqual(rc, 0, text)
++        self.assertEqual(self.here(), {n: False for n in MARKS})       # ended at close
++        rc, text = _tool("solo", "T93")                                # the next solo: its own mark
++        self.assertEqual(rc, 3, text)
++        second = json.loads((self.tmp / "home/T93/solo_mark.json").read_text())
++        self.assertGreater(second["party"], first["party"])
++        self.assertGreater(second["since_unix"], first["since_unix"])
++        rc, text = _tool("solo", "T93", "--read", "--winner", 1)       # no new rows: nothing of the first solo's read
++        c = {x["cell"]: x for x in json.loads((self.tmp / "ev/T93/solo.json").read_text())["cells"]}
++        self.assertEqual(rc, 1)
++        self.assertEqual(c["planned switches"]["read"], 0)
++
++    def test_register_ends_a_mark_left_unclosed(self):
++        rc, text = _tool("solo", "T93")
++        self.assertEqual(rc, 3, text)
++        self.assertTrue((self.tmp / "home/T93/solo_mark.json").is_file())
++        rules = self.tmp / "rules"                                     # a title already in a made-up rules folder
++        (rules / "madeupgame1.party.json").write_text(json.dumps({"players": 2, "result": "winner"}))
++        (rules / "madeupgame1.state").write_text("made-up begin")
++        (rules / "madeupgame1.endscreen.json").write_text("{}")
++        rc, text = _tool("register", "T93", "--players", 2, "--system", "n64", "--result", "winner", "--rules-players", 2)
++        self.assertEqual(self.here(), {n: False for n in MARKS}, text)
++
++
++if __name__ == "__main__":
++    unittest.main()

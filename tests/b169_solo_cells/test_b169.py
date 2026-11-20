@@ -105,6 +105,9 @@ class FilesBefore(unittest.TestCase):
         self.assertEqual(rc, 0, text + json.dumps(v))
         self.assertIn({"save": "under the setup 1", "is": "changed"}, v["recorded"]["in_game_saves"])
         self.assertIn("every file = bench's before", [c["cell"] for c in v["cells"]])
+        self.assertFalse((self.tmp / "home/T93/files_before.json").exists())    # B172: close ended the before
+        rc, text = _tool("solo", "T93")                                         # the next solo: its own before
+        self.assertEqual(rc, 3, text)
         (prof / "states/Beetle PSX HW/Made Up (USA).state1").write_text("the user's slot 1, saved over")
         rc, text = _tool("close", "T93")
         v = json.loads((self.tmp / "ev/T93/close.json").read_text())
