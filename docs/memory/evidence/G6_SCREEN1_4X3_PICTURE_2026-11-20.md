@@ -163,4 +163,6 @@ g6_screen1.diff` is OK. The redactor is clean on the Kotlin files and the record
 
 ## 5. Part 2 — the run (after it)
 
-Not run yet.
+**Not run; superseded by G6-SCREEN1b** (`G6_SCREEN1B_PS2_PS1_FILL_2026-11-20.md`), on the user's decisions of
+2026-11-20 (PS2's widescreen patch off for handheld launches; PS1 stretched). No verdict. The pre-registration stays
+as hashed (`eddc7ddc…`).

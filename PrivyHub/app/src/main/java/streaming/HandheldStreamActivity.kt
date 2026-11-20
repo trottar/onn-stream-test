@@ -73,7 +73,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
     @Volatile private var p1JoinAfterReleaseMs: Long = -1
     /** G6-SCREEN1: the catalog entry's system (H10), and whether the picture is cropped now. */
     @Volatile private var gameSystem: String? = null
-    @Volatile private var cropShown = false
+    /** G6-SCREEN1b: the reply's `widescreen` (H12; null = no field) and the fill shown, with the box's share of the surface. */
+    @Volatile private var gameWidescreen: Boolean? = null
+    @Volatile private var fillShown = HandheldGeometry.Fill.NONE
+    @Volatile private var shownShare = 1.0
     private val pressed = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
     /** [left, right] stick x [up, down, left, right]: the largest deflection seen, 0..1. */
     private val stickMax = Array(2) { FloatArray(4) }
@@ -121,7 +124,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
         }
         // End last: on top of the pad and the panel, so it stays reachable with the status panel shown (Q1 (c))
         area.addView(end, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
-        return HandheldLayout(this, streamLayer, area, streamSurface, { gameSystem }) { cropShown = it }.also { frame = it }
+        return HandheldLayout(this, streamLayer, area, streamSurface, { gameSystem }, { gameWidescreen }) { fill, share ->
+            fillShown = fill
+            shownShare = share
+        }.also { frame = it }
     }
 
     // B70: the touchscreen only, in this activity only; mice, touchpads and a pad's touchpad stay consumed
@@ -139,11 +145,18 @@ class HandheldStreamActivity : NativeStreamActivity() {
         ui.post { streamSurface.requestLayout() }
     }
 
-    // G6-SCREEN1 (H11): a cropped picture's paused copy is the shown 4:3 (the centre of the surface), 360 x 270
+    // G6-SCREEN1b (H12): the hub ran this PS2 launch without its widescreen patch -> PS2 is cropped too
+    override fun onGameWidescreen(widescreen: Boolean?) {
+        gameWidescreen = widescreen
+        ui.post { streamSurface.requestLayout() }
+    }
+
+    // G6-SCREEN1 (H11): a cropped (or, G6-SCREEN1b, stretched) picture's paused copy is what the box shows (the
+    // surface's centre, the box's share of its width), 360 x 270
     override fun pausedFramePreview(source: Bitmap): Bitmap {
-        if (!cropShown) return super.pausedFramePreview(source)
+        if (fillShown == HandheldGeometry.Fill.NONE) return super.pausedFramePreview(source)
         val ch = source.height
-        val cw = minOf(source.width, ch * 4 / 3)
+        val cw = minOf(source.width, Math.round(source.width * shownShare).toInt())
         if (cw <= 0 || ch <= 0) return super.pausedFramePreview(source)
         val m = Matrix().apply { setScale(PAUSED_W_4X3 / cw, PAUSED_H / ch) }
         return Bitmap.createBitmap(source, (source.width - cw) / 2, 0, cw, ch, m, true)
@@ -209,8 +222,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
             .put("touch_live", TOUCH_LIVE)
             .put("video_box", "${w}x${HandheldGeometry.videoBoxHeight(w, h)}")
             .put("pad_region", "${w}x${HandheldGeometry.padRegionHeight(w, h)}")
-            .put("video_crop", HandheldGeometry.videoCrop(cropShown))
-            .put("video_source_rect", HandheldGeometry.videoSourceRect(cropShown))
+            .put("video_crop", HandheldGeometry.videoCrop(fillShown))
+            .put("video_source_rect", HandheldGeometry.videoSourceRect(fillShown))
             .put("density", density.toDouble())
             .put("nav_mode", navMode)
             .put("sdk", Build.VERSION.SDK_INT)
@@ -310,7 +323,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
         private val area: View,
         private val surface: View,
         private val system: () -> String?,
-        private val onCrop: (Boolean) -> Unit,
+        private val widescreen: () -> Boolean?,
+        private val onFill: (HandheldGeometry.Fill, Double) -> Unit,
     ) : ViewGroup(ctx) {
         init {
             addView(video)
@@ -332,12 +346,12 @@ class HandheldStreamActivity : NativeStreamActivity() {
         /** The surface's size and gravity in the stream layer (a FrameLayout), set before the layer is measured. */
         private fun placeSurface(w: Int, box: Int) {
             val lp = surface.layoutParams as? FrameLayout.LayoutParams ?: return
-            val crop = HandheldGeometry.crop43(system(), w, box)
-            val r = HandheldGeometry.surfaceRect(w, box, crop)
+            val fill = HandheldGeometry.fill(system(), widescreen(), w, box)
+            val r = HandheldGeometry.surfaceRect(w, box, fill)
             lp.width = r[2]
             lp.height = r[3]
-            lp.gravity = if (crop) Gravity.TOP or Gravity.CENTER_HORIZONTAL else Gravity.TOP or Gravity.START
-            onCrop(crop)
+            lp.gravity = if (fill != HandheldGeometry.Fill.NONE) Gravity.TOP or Gravity.CENTER_HORIZONTAL else Gravity.TOP or Gravity.START
+            onFill(fill, if (r[2] > 0) minOf(1.0, w.toDouble() / r[2]) else 1.0)
         }
 
         override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {

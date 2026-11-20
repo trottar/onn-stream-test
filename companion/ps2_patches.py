@@ -200,3 +200,68 @@ def wrote_before(gamesettings: Path, serial: str, crc: str) -> bool:
 def log_line(toggles: Mapping[str, bool]) -> str:
     on = {k: ("on" if toggles.get(k) else "off") for k, _g in GROUPS}
     return f"PS2 patches: ws={on['ws']} ni={on['ni']} 60={on['60']}"
+
+
+# --- G6-SCREEN1b: a handheld launch runs without the widescreen patch, for that launch only -------------------------
+# The request's `display=handheld` (the tablet's portrait screen) -> the title's game settings file is written with
+# EnableWideScreenPatches = false, PCSX2 reads it at its "Disc changed" (about 1 s in; patches turn on later, at the
+# ELF, from what it read), and the file's exact earlier bytes are put back before the launch returns. The earlier
+# bytes go into a journal first: a crash before the put-back leaves the journal, and the next PS2 launch puts them back
+# before it writes anything. The toggle record (TOGGLES_FILE) is never touched. A request without the field: none of
+# this runs (today's launch).
+HANDHELD_DISPLAY = "handheld"
+JOURNAL_FILE = "data/games/ps2/handheld_ws_journal.json"
+
+
+def handheld_toggles(toggles: Mapping[str, bool]) -> dict[str, bool]:
+    """The title's toggles with the widescreen patch off; every other toggle as it is."""
+    out = {key: bool(toggles.get(key, False)) for key, _g in GROUPS}
+    out["ws"] = False
+    return out
+
+
+def handheld_line(was_on: bool) -> str:
+    """The game log's line for a handheld PS2 launch (no title, no serial)."""
+    return f"PS2 handheld: widescreen patch off for this launch only (the title's setting: {'on' if was_on else 'off'})"
+
+
+def journal_game_ini(project_root: Path, gamesettings: Path, serial: str, crc: str) -> None:
+    """Keep the two game settings files' exact bytes (or their absence) before a handheld write."""
+    import base64
+    folder = Path(gamesettings)
+    files: dict[str, str | None] = {}
+    for name in (f"{crc.upper()}.ini", f"{serial}_{crc.upper()}.ini"):
+        path = folder / name
+        files[name] = base64.b64encode(path.read_bytes()).decode("ascii") if path.is_file() else None
+    _atomic_json(Path(project_root) / JOURNAL_FILE, {"folder": str(folder), "files": files})
+
+
+def restore_journal(project_root: Path) -> list[str]:
+    """Put the journalled files back byte for byte (a file that was absent is removed), then drop the journal.
+    No journal: nothing (every launch without a handheld write before it)."""
+    import base64
+    path = Path(project_root) / JOURNAL_FILE
+    if not path.is_file():
+        return []
+    data = _read_json(path)
+    folder = Path(str(data.get("folder", "")))
+    done = []
+    for name, b64 in (data.get("files") or {}).items():
+        if "/" in name or "\\" in name or not name.endswith(".ini"):
+            continue
+        target = folder / name
+        if b64 is None:
+            if target.exists():
+                target.unlink()
+        else:
+            tmp = folder / (name + ".privyhub.tmp")
+            tmp.write_bytes(base64.b64decode(b64))
+            tmp.replace(target)
+        done.append(name)
+    path.unlink()
+    return done
+
+
+def settings_read_in_log(log_text: str) -> bool:
+    """PCSX2 2.8.2's own log line when it has read (or looked for) the game settings file at the disc's detection."""
+    return "Loading game settings from" in log_text or "No game settings found" in log_text

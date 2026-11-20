@@ -963,6 +963,8 @@ open class NativeStreamActivity :
                 onPlayersOpened(restart != null)
                 // G6-SCREEN1: the launched game's system, from its catalog entry in the reply (a no-op here)
                 onGameSystem(json.optJSONObject("game_session")?.optJSONObject("game")?.optString("system"))
+                // G6-SCREEN1b: the reply's `widescreen` (a handheld PS2 launch; absent = null) (a no-op here)
+                onGameWidescreen(json.optJSONObject("game_session")?.let { if (it.has("widescreen")) it.optBoolean("widescreen") else null })
                 // B67: the N64 layout once per onn (only with the prompt on: the card's view exists then)
                 n64CardView?.let { card ->
                     val prefs = getSharedPreferences(N64LayoutCard.PREFS, MODE_PRIVATE)
@@ -4753,6 +4755,8 @@ open class NativeStreamActivity :
             270,
             true
         )
+    /** H12 (G6-SCREEN1b): the start reply's `game_session.widescreen` (null without it); the session's thread. */
+    protected open fun onGameWidescreen(widescreen: Boolean?) {}
     protected val streamSurface: View get() = surfaceView
     protected val streamSender: NativeControllerSender? get() = controllerSender
     protected val streamPrompt: PlayerPrompt? get() = playerPrompt

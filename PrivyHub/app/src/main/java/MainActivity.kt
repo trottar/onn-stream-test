@@ -12734,7 +12734,9 @@ class MainActivity : AppCompatActivity() {
                             // B46 / B54: the title's last joined count sets the session's ports (none, or the prompt off: today)
                             playersChosenLaunchSuffix(gameId) +
                             // B74: "Start on disc…"'s pick (none: today's URL; the host starts a set on disc 1)
-                            DiscSafe.launchSuffix(startDisc)
+                            DiscSafe.launchSuffix(startDisc) +
+                            // G6-SCREEN1b: the handheld screen's launch (PS2 without its widescreen patch); "" = today's URL
+                            com.safeiot.privyhub.streaming.HandheldGeometry.launchSuffix(useHandheldGameScreen())
                     )
 
                 val json =

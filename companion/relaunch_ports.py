@@ -75,6 +75,8 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
         raise RelaunchRefused("The session already has these ports")
     previous = 4 if current.get("multitap") else 2
     kind = "pcsx2" if getattr(emulator, "_launch_kind", None) == "pcsx2" else "retroarch"
+    # G6-SCREEN1b: a handheld PS2 session relaunches as one (its widescreen patch stays off); otherwise today's call
+    handheld = kind == "pcsx2" and bool(getattr(emulator, "_ps2_handheld", False))
 
     steps: dict[str, int] = {}
     t_all = clock()
@@ -115,14 +117,16 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
     def launch_ports(name: str, ports: int) -> int:
         nonlocal ok
         try:
-            step(name, lambda: emulator.launch(game, players_chosen=ports))
+            step(name, lambda: emulator.launch(game, players_chosen=ports) if not handheld
+                 else emulator.launch(game, players_chosen=ports, display="handheld"))
             return ports
         except Exception as exc:
             ok = False
             row["fallback"] = "previous_ports"
             row["launch_error"] = str(exc)[:200]
             try:
-                step(name + "_previous", lambda: emulator.launch(game, players_chosen=previous))
+                step(name + "_previous", lambda: emulator.launch(game, players_chosen=previous) if not handheld
+                     else emulator.launch(game, players_chosen=previous, display="handheld"))
                 return previous
             except Exception as exc2:
                 row["ok"] = False

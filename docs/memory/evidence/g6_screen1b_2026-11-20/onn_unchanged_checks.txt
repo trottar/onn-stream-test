@@ -1,0 +1,9 @@
+1 manifest NativeStreamActivity element vs pre-G6: 4d36c0bbfc04341d 4d36c0bbfc04341d EQUAL | manifest changed by SCREEN1b: no
+2 NativeStreamActivity hunks: 4 lines added, 0 removed; other lines: 0 | hook defaults today's: 10/10
+  added: H12 onGameWidescreen (no-op default; one call after H10, reading the reply's game_session only)
+3 PadSlots.kt unchanged since pre-G6
+3 PointerGuard.kt unchanged since pre-G6
+4 MainActivity: 3 lines added, 1 removed; only the launch URL's added term launchSuffix(useHandheldGameScreen()): OK | the screen choice still inside useHandheldGameScreen(): OK
+5 tools/ changed: no | companion/ changed: ['companion/games/emulator_manager.py', 'companion/plugins/games.py', 'companion/ps2_patches.py', 'companion/relaunch_ports.py'] (the four expected)
+SCREEN1b's client code change: files ['PrivyHub/app/src/main/java/MainActivity.kt', 'PrivyHub/app/src/main/java/streaming/HandheldInput.kt', 'PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt', 'PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt', 'PrivyHub/app/src/test/java/streaming/G6Screen1bTest.kt']
+ALL FIVE OK

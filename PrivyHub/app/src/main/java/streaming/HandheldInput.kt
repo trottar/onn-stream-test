@@ -70,6 +70,64 @@ object HandheldGeometry {
         }
 
     /**
+     * G6-SCREEN1b: how the picture fills the 4:3 box. [CROP_4X3]: the stream's centre 4:3 (SNES, N64, and PS2 when the
+     * hub's reply says the launch ran without the widescreen patch). [STRETCH_PS1]: PS1's narrower picture (aspect
+     * 1.219) stretched to the box, about 9.6 % wider than its true shape (the user's choice). [NONE]: SCREEN1's 16:9
+     * picture at the box's top. Any 16:9 fallback box is [NONE].
+     */
+    enum class Fill { CROP_4X3, STRETCH_PS1, NONE }
+
+    fun fill(system: String?, widescreen: Boolean?, boxW: Int, boxH: Int): Fill {
+        if (boxW <= 0 || boxH != videoBoxHeight(boxW)) return Fill.NONE
+        return when (system?.trim()?.lowercase()) {
+            in CROP_4X3_SYSTEMS -> Fill.CROP_4X3
+            "ps2" -> if (widescreen == false) Fill.CROP_4X3 else Fill.NONE     // no field (an older hub): no crop
+            "ps1" -> Fill.STRETCH_PS1
+            else -> Fill.NONE
+        }
+    }
+
+    /**
+     * G6-SCREEN1b: PS1's picture in the stream, from C5-M4's measurement (the adopted 1920 x 1080 fullscreen window:
+     * the picture at x 302-1617, 1316 px wide) scaled to the stream: x 201.3-1078.7 of 1280, so the whole pixels
+     * inside are x 202-1077: `202,0,876x720`. The core's aspect 1.2190 x 720 = 877.7 agrees within 2 px.
+     */
+    const val PS1_MEASURED_X_1080P = 302
+    const val PS1_MEASURED_W_1080P = 1316
+
+    fun ps1Content(streamW: Int = STREAM_W, streamH: Int = STREAM_H): IntArray {
+        val left = Math.ceil(PS1_MEASURED_X_1080P * streamW / 1920.0).toInt()
+        val right = Math.floor((PS1_MEASURED_X_1080P + PS1_MEASURED_W_1080P) * streamW / 1920.0).toInt()
+        return intArrayOf(left, 0, right - left, streamH)
+    }
+
+    fun videoCrop(fill: Fill): String = when (fill) {
+        Fill.CROP_4X3 -> "4:3"
+        Fill.STRETCH_PS1 -> "stretch"
+        Fill.NONE -> "none"
+    }
+
+    fun videoSourceRect(fill: Fill): String = when (fill) {
+        Fill.CROP_4X3 -> videoSourceRect(true)
+        Fill.STRETCH_PS1 -> ps1Content().let { "${it[0]},${it[1]},${it[2]}x${it[3]}" }
+        Fill.NONE -> videoSourceRect(false)
+    }
+
+    /** G6-SCREEN1b: the surface for a fill (the whole stream scaled so that its shown rectangle is the box). */
+    fun surfaceRect(boxW: Int, boxH: Int, fill: Fill): IntArray = when (fill) {
+        Fill.CROP_4X3 -> surfaceRect(boxW, boxH, true)
+        Fill.NONE -> surfaceRect(boxW, boxH, false)
+        Fill.STRETCH_PS1 -> {
+            val c = ps1Content()
+            val w = Math.round(STREAM_W.toDouble() * boxW / c[2]).toInt()        // 1280 x 1200 / 876 = 1753
+            intArrayOf((boxW - w) / 2, 0, w, boxH)
+        }
+    }
+
+    /** G6-SCREEN1b: the launch request's field, only from the handheld screen (`""` = today's URL). */
+    fun launchSuffix(handheld: Boolean): String = if (handheld) "&display=handheld" else ""
+
+    /**
      * The video surface in the box: `[left, top, width, height]`. Cropped: 16:9 of the box's height, centred (1600 x
      * 900 at x −200 on the tablet), so the stream's side bars fall off the screen's edges. Not cropped: the 16:9
      * picture full width at the top of the box (1200 x 675); the rest of the box is the background.

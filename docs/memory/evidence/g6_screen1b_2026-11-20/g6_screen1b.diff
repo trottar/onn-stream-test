@@ -1,0 +1,801 @@
+diff --git a/PrivyHub/app/src/main/java/MainActivity.kt b/PrivyHub/app/src/main/java/MainActivity.kt
+index 93b0a7ca..7807d47f 100644
+--- a/PrivyHub/app/src/main/java/MainActivity.kt
++++ b/PrivyHub/app/src/main/java/MainActivity.kt
+@@ -12734,7 +12734,9 @@ class MainActivity : AppCompatActivity() {
+                             // B46 / B54: the title's last joined count sets the session's ports (none, or the prompt off: today)
+                             playersChosenLaunchSuffix(gameId) +
+                             // B74: "Start on disc…"'s pick (none: today's URL; the host starts a set on disc 1)
+-                            DiscSafe.launchSuffix(startDisc)
++                            DiscSafe.launchSuffix(startDisc) +
++                            // G6-SCREEN1b: the handheld screen's launch (PS2 without its widescreen patch); "" = today's URL
++                            com.safeiot.privyhub.streaming.HandheldGeometry.launchSuffix(useHandheldGameScreen())
+                     )
+ 
+                 val json =
+diff --git a/PrivyHub/app/src/main/java/streaming/HandheldInput.kt b/PrivyHub/app/src/main/java/streaming/HandheldInput.kt
+index 64fadc20..e17f64e2 100644
+--- a/PrivyHub/app/src/main/java/streaming/HandheldInput.kt
++++ b/PrivyHub/app/src/main/java/streaming/HandheldInput.kt
+@@ -69,6 +69,64 @@ object HandheldGeometry {
+             "0,0,${streamW}x$streamH"
+         }
+ 
++    /**
++     * G6-SCREEN1b: how the picture fills the 4:3 box. [CROP_4X3]: the stream's centre 4:3 (SNES, N64, and PS2 when the
++     * hub's reply says the launch ran without the widescreen patch). [STRETCH_PS1]: PS1's narrower picture (aspect
++     * 1.219) stretched to the box, about 9.6 % wider than its true shape (the user's choice). [NONE]: SCREEN1's 16:9
++     * picture at the box's top. Any 16:9 fallback box is [NONE].
++     */
++    enum class Fill { CROP_4X3, STRETCH_PS1, NONE }
++
++    fun fill(system: String?, widescreen: Boolean?, boxW: Int, boxH: Int): Fill {
++        if (boxW <= 0 || boxH != videoBoxHeight(boxW)) return Fill.NONE
++        return when (system?.trim()?.lowercase()) {
++            in CROP_4X3_SYSTEMS -> Fill.CROP_4X3
++            "ps2" -> if (widescreen == false) Fill.CROP_4X3 else Fill.NONE     // no field (an older hub): no crop
++            "ps1" -> Fill.STRETCH_PS1
++            else -> Fill.NONE
++        }
++    }
++
++    /**
++     * G6-SCREEN1b: PS1's picture in the stream, from C5-M4's measurement (the adopted 1920 x 1080 fullscreen window:
++     * the picture at x 302-1617, 1316 px wide) scaled to the stream: x 201.3-1078.7 of 1280, so the whole pixels
++     * inside are x 202-1077: `202,0,876x720`. The core's aspect 1.2190 x 720 = 877.7 agrees within 2 px.
++     */
++    const val PS1_MEASURED_X_1080P = 302
++    const val PS1_MEASURED_W_1080P = 1316
++
++    fun ps1Content(streamW: Int = STREAM_W, streamH: Int = STREAM_H): IntArray {
++        val left = Math.ceil(PS1_MEASURED_X_1080P * streamW / 1920.0).toInt()
++        val right = Math.floor((PS1_MEASURED_X_1080P + PS1_MEASURED_W_1080P) * streamW / 1920.0).toInt()
++        return intArrayOf(left, 0, right - left, streamH)
++    }
++
++    fun videoCrop(fill: Fill): String = when (fill) {
++        Fill.CROP_4X3 -> "4:3"
++        Fill.STRETCH_PS1 -> "stretch"
++        Fill.NONE -> "none"
++    }
++
++    fun videoSourceRect(fill: Fill): String = when (fill) {
++        Fill.CROP_4X3 -> videoSourceRect(true)
++        Fill.STRETCH_PS1 -> ps1Content().let { "${it[0]},${it[1]},${it[2]}x${it[3]}" }
++        Fill.NONE -> videoSourceRect(false)
++    }
++
++    /** G6-SCREEN1b: the surface for a fill (the whole stream scaled so that its shown rectangle is the box). */
++    fun surfaceRect(boxW: Int, boxH: Int, fill: Fill): IntArray = when (fill) {
++        Fill.CROP_4X3 -> surfaceRect(boxW, boxH, true)
++        Fill.NONE -> surfaceRect(boxW, boxH, false)
++        Fill.STRETCH_PS1 -> {
++            val c = ps1Content()
++            val w = Math.round(STREAM_W.toDouble() * boxW / c[2]).toInt()        // 1280 x 1200 / 876 = 1753
++            intArrayOf((boxW - w) / 2, 0, w, boxH)
++        }
++    }
++
++    /** G6-SCREEN1b: the launch request's field, only from the handheld screen (`""` = today's URL). */
++    fun launchSuffix(handheld: Boolean): String = if (handheld) "&display=handheld" else ""
++
+     /**
+      * The video surface in the box: `[left, top, width, height]`. Cropped: 16:9 of the box's height, centred (1600 x
+      * 900 at x −200 on the tablet), so the stream's side bars fall off the screen's edges. Not cropped: the 16:9
+diff --git a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+index 8cd8e565..8bdb7285 100644
+--- a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+@@ -73,7 +73,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
+     @Volatile private var p1JoinAfterReleaseMs: Long = -1
+     /** G6-SCREEN1: the catalog entry's system (H10), and whether the picture is cropped now. */
+     @Volatile private var gameSystem: String? = null
+-    @Volatile private var cropShown = false
++    /** G6-SCREEN1b: the reply's `widescreen` (H12; null = no field) and the fill shown, with the box's share of the surface. */
++    @Volatile private var gameWidescreen: Boolean? = null
++    @Volatile private var fillShown = HandheldGeometry.Fill.NONE
++    @Volatile private var shownShare = 1.0
+     private val pressed = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
+     /** [left, right] stick x [up, down, left, right]: the largest deflection seen, 0..1. */
+     private val stickMax = Array(2) { FloatArray(4) }
+@@ -121,7 +124,10 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         }
+         // End last: on top of the pad and the panel, so it stays reachable with the status panel shown (Q1 (c))
+         area.addView(end, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT))
+-        return HandheldLayout(this, streamLayer, area, streamSurface, { gameSystem }) { cropShown = it }.also { frame = it }
++        return HandheldLayout(this, streamLayer, area, streamSurface, { gameSystem }, { gameWidescreen }) { fill, share ->
++            fillShown = fill
++            shownShare = share
++        }.also { frame = it }
+     }
+ 
+     // B70: the touchscreen only, in this activity only; mice, touchpads and a pad's touchpad stay consumed
+@@ -139,11 +145,18 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         ui.post { streamSurface.requestLayout() }
+     }
+ 
+-    // G6-SCREEN1 (H11): a cropped picture's paused copy is the shown 4:3 (the centre of the surface), 360 x 270
++    // G6-SCREEN1b (H12): the hub ran this PS2 launch without its widescreen patch -> PS2 is cropped too
++    override fun onGameWidescreen(widescreen: Boolean?) {
++        gameWidescreen = widescreen
++        ui.post { streamSurface.requestLayout() }
++    }
++
++    // G6-SCREEN1 (H11): a cropped (or, G6-SCREEN1b, stretched) picture's paused copy is what the box shows (the
++    // surface's centre, the box's share of its width), 360 x 270
+     override fun pausedFramePreview(source: Bitmap): Bitmap {
+-        if (!cropShown) return super.pausedFramePreview(source)
++        if (fillShown == HandheldGeometry.Fill.NONE) return super.pausedFramePreview(source)
+         val ch = source.height
+-        val cw = minOf(source.width, ch * 4 / 3)
++        val cw = minOf(source.width, Math.round(source.width * shownShare).toInt())
+         if (cw <= 0 || ch <= 0) return super.pausedFramePreview(source)
+         val m = Matrix().apply { setScale(PAUSED_W_4X3 / cw, PAUSED_H / ch) }
+         return Bitmap.createBitmap(source, (source.width - cw) / 2, 0, cw, ch, m, true)
+@@ -209,8 +222,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
+             .put("touch_live", TOUCH_LIVE)
+             .put("video_box", "${w}x${HandheldGeometry.videoBoxHeight(w, h)}")
+             .put("pad_region", "${w}x${HandheldGeometry.padRegionHeight(w, h)}")
+-            .put("video_crop", HandheldGeometry.videoCrop(cropShown))
+-            .put("video_source_rect", HandheldGeometry.videoSourceRect(cropShown))
++            .put("video_crop", HandheldGeometry.videoCrop(fillShown))
++            .put("video_source_rect", HandheldGeometry.videoSourceRect(fillShown))
+             .put("density", density.toDouble())
+             .put("nav_mode", navMode)
+             .put("sdk", Build.VERSION.SDK_INT)
+@@ -310,7 +323,8 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         private val area: View,
+         private val surface: View,
+         private val system: () -> String?,
+-        private val onCrop: (Boolean) -> Unit,
++        private val widescreen: () -> Boolean?,
++        private val onFill: (HandheldGeometry.Fill, Double) -> Unit,
+     ) : ViewGroup(ctx) {
+         init {
+             addView(video)
+@@ -332,12 +346,12 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         /** The surface's size and gravity in the stream layer (a FrameLayout), set before the layer is measured. */
+         private fun placeSurface(w: Int, box: Int) {
+             val lp = surface.layoutParams as? FrameLayout.LayoutParams ?: return
+-            val crop = HandheldGeometry.crop43(system(), w, box)
+-            val r = HandheldGeometry.surfaceRect(w, box, crop)
++            val fill = HandheldGeometry.fill(system(), widescreen(), w, box)
++            val r = HandheldGeometry.surfaceRect(w, box, fill)
+             lp.width = r[2]
+             lp.height = r[3]
+-            lp.gravity = if (crop) Gravity.TOP or Gravity.CENTER_HORIZONTAL else Gravity.TOP or Gravity.START
+-            onCrop(crop)
++            lp.gravity = if (fill != HandheldGeometry.Fill.NONE) Gravity.TOP or Gravity.CENTER_HORIZONTAL else Gravity.TOP or Gravity.START
++            onFill(fill, if (r[2] > 0) minOf(1.0, w.toDouble() / r[2]) else 1.0)
+         }
+ 
+         override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+diff --git a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+index 9e2adf06..b86fcbc8 100644
+--- a/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/NativeStreamActivity.kt
+@@ -963,6 +963,8 @@ open class NativeStreamActivity :
+                 onPlayersOpened(restart != null)
+                 // G6-SCREEN1: the launched game's system, from its catalog entry in the reply (a no-op here)
+                 onGameSystem(json.optJSONObject("game_session")?.optJSONObject("game")?.optString("system"))
++                // G6-SCREEN1b: the reply's `widescreen` (a handheld PS2 launch; absent = null) (a no-op here)
++                onGameWidescreen(json.optJSONObject("game_session")?.let { if (it.has("widescreen")) it.optBoolean("widescreen") else null })
+                 // B67: the N64 layout once per onn (only with the prompt on: the card's view exists then)
+                 n64CardView?.let { card ->
+                     val prefs = getSharedPreferences(N64LayoutCard.PREFS, MODE_PRIVATE)
+@@ -4753,6 +4755,8 @@ open class NativeStreamActivity :
+             270,
+             true
+         )
++    /** H12 (G6-SCREEN1b): the start reply's `game_session.widescreen` (null without it); the session's thread. */
++    protected open fun onGameWidescreen(widescreen: Boolean?) {}
+     protected val streamSurface: View get() = surfaceView
+     protected val streamSender: NativeControllerSender? get() = controllerSender
+     protected val streamPrompt: PlayerPrompt? get() = playerPrompt
+diff --git a/companion/games/emulator_manager.py b/companion/games/emulator_manager.py
+index 314b3037..7495d1fc 100644
+--- a/companion/games/emulator_manager.py
++++ b/companion/games/emulator_manager.py
+@@ -114,6 +114,9 @@ class EmulatorManager:
+         # B49: "pcsx2" while a PS2 session runs (None = RetroArch, today) and its process helper
+         self._launch_kind: str | None = None
+         self._ps2: Any = None
++        # G6-SCREEN1b: the PS2 session was a handheld launch (its widescreen patch off); False on every other launch
++        self._ps2_handheld = False
++        self._ps2_ws_journaled = False
+         # B69: the Dolphin process helper ("dolphin" kind) and the last Dolphin's session id (its AppImage helper,
+         # waited for at the next GameCube launch); both None outside a GameCube session (today)
+         self._gc: Any = None
+@@ -545,6 +548,9 @@ class EmulatorManager:
+                 payload["party"] = {"renderer": getattr(self._party, "renderer", None),
+                                     "window": self._party.window_id is not None,
+                                     "paused_by_key": self._party.paused_by_key}
++            # G6-SCREEN1b: a handheld PS2 launch ran without the widescreen patch (absent on every other session)
++            if active and self._launch_kind == "pcsx2" and self._ps2_handheld:
++                payload["widescreen"] = False
+             return payload
+ 
+     def _resolve_game(
+@@ -5994,6 +6000,7 @@ class EmulatorManager:
+         mod_index: int | None = None,
+         players_chosen: int | None = None,
+         start_disc: Any = None,
++        display: str | None = None,
+     ) -> dict[str, Any]:
+         with self.lock:
+             self._refresh_process()
+@@ -6010,9 +6017,11 @@ class EmulatorManager:
+             # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
+             if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
+                 # B81: the ticked .pnach files reach PCSX2 (PRIVYHUB_CHEAT_DROPINS=0: today's call, the arguments dropped)
++                # G6-SCREEN1b: `display=handheld` -> this launch without the widescreen patch (absent: today's calls)
++                hh = {"handheld": True} if display == "handheld" else {}
+                 if self._ps2_dropins_on() and cheat_source_index is not None:
+-                    return self._launch_pcsx2(game, players_chosen, cheat_source_index, cheat_enabled_indexes)
+-                return self._launch_pcsx2(game, players_chosen)
++                    return self._launch_pcsx2(game, players_chosen, cheat_source_index, cheat_enabled_indexes, **hh)
++                return self._launch_pcsx2(game, players_chosen, **hh)
+             # B69: a GameCube title launches Dolphin (only with PRIVYHUB_GAMECUBE=1; absent = today's refusal below)
+             if _gc is not None and str(game.get("system", "")).strip().casefold() == _gc.SYSTEM_ID:
+                 # B79: the ticked codes reach Dolphin (PRIVYHUB_GC_CHEATS=0: today's call, the arguments dropped)
+@@ -7461,10 +7470,15 @@ class EmulatorManager:
+             raise EmulatorError(str(exc)) from exc
+         return {"available": list(offer["available"]), "on": [k for k in offer["available"] if rec.get(k)]}
+ 
+-    def _ps2_game_settings(self, game: dict[str, Any], cheat_extra: dict[str, Any] | None = None) -> list[str]:
++    def _ps2_game_settings(self, game: dict[str, Any], cheat_extra: dict[str, Any] | None = None,
++                           handheld: bool = False) -> list[str]:
+         """B80 (+ B81's cheats): the game's settings file before PCSX2 starts; the game log's lines. Nothing is
+-        written for a title without a toggle record and without a cheat pick (today)."""
++        written for a title without a toggle record and without a cheat pick (today).
++        G6-SCREEN1b: `handheld` with the title's widescreen on -> its files journalled, then written with it off."""
+         import ps2_patches as _patches
++        # G6-SCREEN1b: a handheld launch's files not yet put back (a crash) are put back first (no journal: a no-op)
++        _patches.restore_journal(self.project_root)
++        self._ps2_ws_journaled = False
+         if not _patches.enabled():
+             return []
+         root = self.project_root
+@@ -7479,16 +7493,35 @@ class EmulatorManager:
+             if not (_dropins.enabled() and _patches.wrote_before(gamesettings, ids[0], ids[1])):
+                 return []
+             cheat_extra = {"cheats": False}
++        if handheld and toggles is not None and toggles.get("ws"):
++            _patches.journal_game_ini(root, gamesettings, ids[0], ids[1])
++            self._ps2_ws_journaled = True
++            toggles = _patches.handheld_toggles(toggles)
+         text = _patches.game_ini_text(toggles, cheat_extra)
+         _patches.write_game_ini(gamesettings, ids[0], ids[1], text)
+         return [_patches.log_line(toggles or {})]
+ 
++    def _ps2_handheld_put_back(self, pcsx2_log: Path | None = None) -> str | None:
++        """G6-SCREEN1b: a handheld launch's game settings files back to their earlier bytes; the game log's line."""
++        import ps2_patches as _patches
++        if not self._ps2_ws_journaled:
++            return None
++        self._ps2_ws_journaled = False
++        seen = False
++        try:
++            seen = pcsx2_log is not None and _patches.settings_read_in_log(pcsx2_log.read_text(errors="replace"))
++        except OSError:
++            pass
++        _patches.restore_journal(self.project_root)
++        return f"PS2 handheld: game settings put back (PCSX2 had read them: {'yes' if seen else 'not seen'})"
++
+     def _launch_pcsx2(
+         self,
+         game: dict[str, Any],
+         players_chosen: int | None,
+         cheat_source_index: int | None = None,
+         cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
++        handheld: bool = False,
+     ) -> dict[str, Any]:
+         import players_session as _players_session
+ 
+@@ -7538,10 +7571,14 @@ class EmulatorManager:
+                 _staged, groups = _dropins.stage_pnach(ini.parent.parent / "cheats", serial, crc,
+                                                        ps2_cheat_pick["files"])
+                 cheat_extra = {"cheats": True, "cheat_groups": groups}
+-            patch_lines = self._ps2_game_settings(game, cheat_extra)
++            patch_lines = self._ps2_game_settings(game, cheat_extra, handheld=handheld)
+             if ps2_cheat_pick is not None:
+                 patch_lines.append(f"PS2 cheats: {len(ps2_cheat_pick['files'])} files enabled")
++            if handheld:   # G6-SCREEN1b (absent on every other launch: today's log)
++                import ps2_patches as _patches
++                patch_lines.append(_patches.handheld_line(self._ps2_ws_journaled))
+         except (OSError, ValueError) as exc:
++            self._ps2_handheld_put_back()
+             raise EmulatorError(f"PS2 launch refused: {exc}") from exc
+ 
+         logs_dir = self._project_path("logs/games")
+@@ -7584,6 +7621,7 @@ class EmulatorManager:
+                 start_new_session=True,
+             )
+         except Exception as exc:
++            self._ps2_handheld_put_back()
+             log_handle.close()
+             raise EmulatorError(f"PS2 launch failed: {exc}") from exc
+ 
+@@ -7606,11 +7644,13 @@ class EmulatorManager:
+         self._players_session = plan if chosen is not None else None
+         self._hold_rewind_core = None
+         self._launch_kind = "pcsx2"
++        self._ps2_handheld = bool(handheld)   # G6-SCREEN1b
+         self._last_device_args = []       # B66: PCSX2 takes its ports from its ini
+         # B52: the session reads PCSX2's own log (the ELF line, the TLB check)
+         self._ps2 = _ps2.Session(process.pid, log_line, log_path=pcsx2_log)
+ 
+         if self._ps2.wait_window(alive=lambda: process.poll() is None) is None:
++            self._ps2_handheld_put_back()
+             try:
+                 self._pcsx2_stop()
+             except Exception:
+@@ -7622,6 +7662,10 @@ class EmulatorManager:
+         # B50: kept (the sink-input is the earliest proof of the audio stream), on the session's injectable clock
+         waited = self._ps2.wait_audio(alive=lambda: process.poll() is None)
+         log_line(f"PS2 audio: sink-input {'%.1fs' % waited if waited is not None else 'none'}")
++        # G6-SCREEN1b: PCSX2 read its game settings at the disc (~1 s in, before its window and audio); put them back
++        put_back = self._ps2_handheld_put_back(pcsx2_log)
++        if put_back:
++            log_line(put_back)
+ 
+         payload = self.status()
+         payload["action"] = "launch"
+diff --git a/companion/plugins/games.py b/companion/plugins/games.py
+index bf1d2d38..3bbcf106 100644
+--- a/companion/plugins/games.py
++++ b/companion/plugins/games.py
+@@ -5040,6 +5040,9 @@ class GamesPlugin:
+                 # Every other game, or PRIVYHUB_DISC_SWAP=0 -> today's call.
+                 if _disc_swap.enabled() and self._game_discs(game) > 1:
+                     launch_extra["start_disc"] = self._first(query, "disc").strip() or 1
++                # G6-SCREEN1b: the tablet's portrait handheld screen (`display=handheld`); absent: today's call
++                if self._first(query, "display").strip() == "handheld":
++                    launch_extra["display"] = "handheld"
+                 payload = self._emulator.launch(
+                     game,
+                     cheat_source_index=cheat_source_index,
+diff --git a/companion/ps2_patches.py b/companion/ps2_patches.py
+index 9dfe5915..232eb77c 100644
+--- a/companion/ps2_patches.py
++++ b/companion/ps2_patches.py
+@@ -200,3 +200,68 @@ def wrote_before(gamesettings: Path, serial: str, crc: str) -> bool:
+ def log_line(toggles: Mapping[str, bool]) -> str:
+     on = {k: ("on" if toggles.get(k) else "off") for k, _g in GROUPS}
+     return f"PS2 patches: ws={on['ws']} ni={on['ni']} 60={on['60']}"
++
++
++# --- G6-SCREEN1b: a handheld launch runs without the widescreen patch, for that launch only -------------------------
++# The request's `display=handheld` (the tablet's portrait screen) -> the title's game settings file is written with
++# EnableWideScreenPatches = false, PCSX2 reads it at its "Disc changed" (about 1 s in; patches turn on later, at the
++# ELF, from what it read), and the file's exact earlier bytes are put back before the launch returns. The earlier
++# bytes go into a journal first: a crash before the put-back leaves the journal, and the next PS2 launch puts them back
++# before it writes anything. The toggle record (TOGGLES_FILE) is never touched. A request without the field: none of
++# this runs (today's launch).
++HANDHELD_DISPLAY = "handheld"
++JOURNAL_FILE = "data/games/ps2/handheld_ws_journal.json"
++
++
++def handheld_toggles(toggles: Mapping[str, bool]) -> dict[str, bool]:
++    """The title's toggles with the widescreen patch off; every other toggle as it is."""
++    out = {key: bool(toggles.get(key, False)) for key, _g in GROUPS}
++    out["ws"] = False
++    return out
++
++
++def handheld_line(was_on: bool) -> str:
++    """The game log's line for a handheld PS2 launch (no title, no serial)."""
++    return f"PS2 handheld: widescreen patch off for this launch only (the title's setting: {'on' if was_on else 'off'})"
++
++
++def journal_game_ini(project_root: Path, gamesettings: Path, serial: str, crc: str) -> None:
++    """Keep the two game settings files' exact bytes (or their absence) before a handheld write."""
++    import base64
++    folder = Path(gamesettings)
++    files: dict[str, str | None] = {}
++    for name in (f"{crc.upper()}.ini", f"{serial}_{crc.upper()}.ini"):
++        path = folder / name
++        files[name] = base64.b64encode(path.read_bytes()).decode("ascii") if path.is_file() else None
++    _atomic_json(Path(project_root) / JOURNAL_FILE, {"folder": str(folder), "files": files})
++
++
++def restore_journal(project_root: Path) -> list[str]:
++    """Put the journalled files back byte for byte (a file that was absent is removed), then drop the journal.
++    No journal: nothing (every launch without a handheld write before it)."""
++    import base64
++    path = Path(project_root) / JOURNAL_FILE
++    if not path.is_file():
++        return []
++    data = _read_json(path)
++    folder = Path(str(data.get("folder", "")))
++    done = []
++    for name, b64 in (data.get("files") or {}).items():
++        if "/" in name or "\\" in name or not name.endswith(".ini"):
++            continue
++        target = folder / name
++        if b64 is None:
++            if target.exists():
++                target.unlink()
++        else:
++            tmp = folder / (name + ".privyhub.tmp")
++            tmp.write_bytes(base64.b64decode(b64))
++            tmp.replace(target)
++        done.append(name)
++    path.unlink()
++    return done
++
++
++def settings_read_in_log(log_text: str) -> bool:
++    """PCSX2 2.8.2's own log line when it has read (or looked for) the game settings file at the disc's detection."""
++    return "Loading game settings from" in log_text or "No game settings found" in log_text
+diff --git a/companion/relaunch_ports.py b/companion/relaunch_ports.py
+index ccf7860d..8da84fc8 100644
+--- a/companion/relaunch_ports.py
++++ b/companion/relaunch_ports.py
+@@ -75,6 +75,8 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
+         raise RelaunchRefused("The session already has these ports")
+     previous = 4 if current.get("multitap") else 2
+     kind = "pcsx2" if getattr(emulator, "_launch_kind", None) == "pcsx2" else "retroarch"
++    # G6-SCREEN1b: a handheld PS2 session relaunches as one (its widescreen patch stays off); otherwise today's call
++    handheld = kind == "pcsx2" and bool(getattr(emulator, "_ps2_handheld", False))
+ 
+     steps: dict[str, int] = {}
+     t_all = clock()
+@@ -115,14 +117,16 @@ def run(plugin: Any, players: int, players_joined: int | None = None, *,
+     def launch_ports(name: str, ports: int) -> int:
+         nonlocal ok
+         try:
+-            step(name, lambda: emulator.launch(game, players_chosen=ports))
++            step(name, lambda: emulator.launch(game, players_chosen=ports) if not handheld
++                 else emulator.launch(game, players_chosen=ports, display="handheld"))
+             return ports
+         except Exception as exc:
+             ok = False
+             row["fallback"] = "previous_ports"
+             row["launch_error"] = str(exc)[:200]
+             try:
+-                step(name + "_previous", lambda: emulator.launch(game, players_chosen=previous))
++                step(name + "_previous", lambda: emulator.launch(game, players_chosen=previous) if not handheld
++                     else emulator.launch(game, players_chosen=previous, display="handheld"))
+                 return previous
+             except Exception as exc2:
+                 row["ok"] = False
+diff --git a/tests/g6_screen1b/test_g6s1b.py b/tests/g6_screen1b/test_g6s1b.py
+new file mode 100644
+index 00000000..8657c9b5
+--- /dev/null
++++ b/tests/g6_screen1b/test_g6s1b.py
+@@ -0,0 +1,254 @@
++#!/usr/bin/env python3
++"""G6-SCREEN1b (host): a handheld PS2 launch (`display=handheld` on the launch request) runs without the widescreen
++patch, for that launch only. Fixtures only (B49's PCSX2 launch rig in a subprocess, a fake Popen and Session, made-up
++logs); nothing fetched, no emulator started; temp dirs removed at exit.
++
++    python3 -m unittest discover -s tests/g6_screen1b -v
++"""
++
++from __future__ import annotations
++
++import ast
++import base64
++import hashlib
++import importlib.util
++import json
++import os
++import subprocess
++import sys
++import types
++import unittest
++from pathlib import Path
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path.insert(0, str(ROOT / "companion"))
++sys.path.insert(0, str(ROOT / "tests" / "art_systems"))
++import _tmp_cleanup  # noqa: E402,F401
++
++import ps2_patches as pp  # noqa: E402
++
++sys.path.insert(0, str(ROOT / "tests" / "ps2_session"))
++import test_ps2_session as ps2rig  # noqa: E402
++
++SERIAL, CRC = "SLUS-99901", "1234ABCD"      # made up
++GAME_ID = "game_ps2_x"
++
++
++def log_text(name: str) -> str:
++    return (f"[    1.3691] Disc changed to {name}.\n[    1.3691]   Serial: {SERIAL}\n[    1.3691]   CRC: {CRC}\n")
++
++
++def must_replace(text: str, old: str, new: str) -> str:
++    assert text.count(old) == 1, old[:80]        # a missed anchor fails loudly
++    return text.replace(old, new)
++
++
++# B49's rig with: the request's display, the game settings files as PCSX2 would read them at its spawn, the
++# session's `widescreen` field, and a second launch without the field (the next launch)
++CODE = ps2rig.LAUNCH_CODE
++CODE = must_replace(CODE, """        calls["popen"].append({""", """        gs = proj / "data/games/ps2/config/PCSX2/gamesettings"
++        calls.setdefault("gs_at_spawn", []).append({p.name: p.read_text() for p in sorted(gs.glob("*.ini"))} if gs.is_dir() else {})
++        calls["popen"].append({""")
++CODE = must_replace(CODE, """    r = m.launch(game, players_chosen=int(os.environ["B49_PICK"]) if os.environ.get("B49_PICK") else None)""",
++                    """    kw = {"display": os.environ["G6_DISPLAY"]} if os.environ.get("G6_DISPLAY") else {}
++    if os.environ.get("G6_SYSTEM"):
++        game["system"] = os.environ["G6_SYSTEM"]
++    r = m.launch(game, players_chosen=int(os.environ["B49_PICK"]) if os.environ.get("B49_PICK") else None, **kw)
++    out["status_widescreen"] = m.status().get("widescreen", "absent")
++    out["launch_widescreen"] = r.get("widescreen", "absent")""")
++CODE = must_replace(CODE, """    out["stop"] = m.stop().get("ps2_exit"); out["kind_after"] = m._launch_kind""",
++                    """    out["stop"] = m.stop().get("ps2_exit"); out["kind_after"] = m._launch_kind
++    if os.environ.get("G6_NEXT"):
++        r2 = m.launch(game)
++        out["next_widescreen"] = m.status().get("widescreen", "absent")
++        m.stop()""")
++
++
++def tree_hashes(folder: Path) -> dict[str, str]:
++    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(folder.glob("*.ini"))} \
++        if folder.is_dir() else {}
++
++
++class Pure(unittest.TestCase):
++    def test_handheld_toggles_turn_only_ws_off(self):
++        self.assertEqual(pp.handheld_toggles({"ws": True, "ni": True, "60": True}), {"ws": False, "ni": True, "60": True})
++        self.assertEqual(pp.handheld_toggles({"ws": True}), {"ws": False, "ni": False, "60": False})
++
++    def test_the_line_has_no_title_or_serial(self):
++        self.assertEqual(pp.handheld_line(True),
++                         "PS2 handheld: widescreen patch off for this launch only (the title's setting: on)")
++        self.assertIn("setting: off", pp.handheld_line(False))
++
++    def test_the_journal_puts_back_bytes_and_absence(self):
++        root = ps2rig.tree({"data/games/ps2/x": b""})
++        gs = root / "gs"
++        gs.mkdir()
++        (gs / f"{CRC}.ini").write_bytes(b"; earlier\r\nEnableWideScreenPatches = true\n\xff")
++        pp.journal_game_ini(root, gs, SERIAL, CRC)                   # the second name absent
++        (gs / f"{CRC}.ini").write_text("changed")
++        (gs / f"{SERIAL}_{CRC}.ini").write_text("new")
++        self.assertEqual(sorted(pp.restore_journal(root)), sorted([f"{CRC}.ini", f"{SERIAL}_{CRC}.ini"]))
++        self.assertEqual((gs / f"{CRC}.ini").read_bytes(), b"; earlier\r\nEnableWideScreenPatches = true\n\xff")
++        self.assertFalse((gs / f"{SERIAL}_{CRC}.ini").exists())
++        self.assertFalse((root / pp.JOURNAL_FILE).exists())
++        self.assertEqual(pp.restore_journal(root), [])                 # no journal: nothing
++
++    def test_pcsx2s_settings_lines(self):
++        self.assertTrue(pp.settings_read_in_log("[ 0.98] Loading game settings from '/x/gamesettings/A.ini'...\n"))
++        self.assertTrue(pp.settings_read_in_log("[ 1.56] No game settings found (tried '/x/A.ini')\n"))
++        self.assertFalse(pp.settings_read_in_log("[ 0.04] Game Settings Directory: /x/gamesettings\n"))
++
++
++class Launch(unittest.TestCase):
++    """B49's rig in a subprocess (PRIVYHUB_PS2=1): what PCSX2 would read at its spawn, and the files after."""
++
++    def setUp(self):
++        self.games = ps2rig.tree({"one.chd": b"1"})
++        self.bios = ps2rig.tree({"image.bin": b"\0" * ps2rig.ps2.BIOS_IMAGE_BYTES, "image.nvm": b"n"})
++
++    def project(self, toggles=None, earlier: bytes | None = None):
++        proj = ps2rig.tree({"runtime/emulators/pcsx2/pcsx2-fake.AppImage": b"x"})
++        (proj / "runtime" / "h3_p1_paths.txt").write_text(f"BIOS_DIR={self.bios}\nGAMES_DIR={self.games}\n")
++        (proj / "data/games/ps2/logs").mkdir(parents=True)
++        (proj / "data/games/ps2/logs/20261101T000000Z-pcsx2.log").write_text(log_text("one.chd"))
++        if toggles is not None:
++            pp.set_toggles(proj, GAME_ID, toggles, ["ws", "ni", "60"])
++        if earlier is not None:       # the files as an earlier (normal) launch left them
++            gs = proj / "data/games/ps2/config/PCSX2/gamesettings"
++            gs.mkdir(parents=True)
++            for n in (f"{CRC}.ini", f"{SERIAL}_{CRC}.ini"):
++                (gs / n).write_bytes(earlier)
++        return proj
++
++    def run_rig(self, proj, display=None, system=None, nxt=False):
++        env = {"PATH": "/usr/bin:/bin", "B49_PROJ": str(proj), "PRIVYHUB_PS2": "1"}
++        if display:
++            env["G6_DISPLAY"] = display
++        if system:
++            env["G6_SYSTEM"] = system
++        if nxt:
++            env["G6_NEXT"] = "1"
++        r = subprocess.run([sys.executable, "-c", CODE], cwd=ROOT, env=env, capture_output=True, text=True)
++        if r.returncode:
++            raise AssertionError(r.stderr[-2000:])
++        out = json.loads(r.stdout.strip().splitlines()[-1])
++        logs = sorted((proj / "logs/games").glob("*-ps2.log"))
++        return out, "\n".join(p.read_text() for p in logs)
++
++    def test_handheld_ws_on_is_off_at_the_spawn_and_the_files_come_back(self):
++        earlier = pp.game_ini_text({"ws": True, "ni": False, "60": True}).encode()
++        proj = self.project({"ws": True, "ni": False, "60": True}, earlier=earlier)
++        gs = proj / "data/games/ps2/config/PCSX2/gamesettings"
++        toggles_file = proj / pp.TOGGLES_FILE
++        before, toggles_before = tree_hashes(gs), toggles_file.read_bytes()
++        out, log = self.run_rig(proj, display="handheld")
++        spawn = out["calls"]["gs_at_spawn"][0]
++        for n in (f"{CRC}.ini", f"{SERIAL}_{CRC}.ini"):
++            self.assertIn("EnableWideScreenPatches = false", spawn[n])     # what PCSX2 reads
++            self.assertIn("Enable = 60 FPS", spawn[n])                       # the other toggles as they are
++        self.assertEqual(tree_hashes(gs), before)                            # put back, byte for byte
++        self.assertEqual(toggles_file.read_bytes(), toggles_before)           # the record never touched
++        self.assertFalse((proj / pp.JOURNAL_FILE).exists())
++        self.assertIs(out["status_widescreen"], False)
++        self.assertIs(out["launch_widescreen"], False)
++        self.assertIn("PS2 handheld: widescreen patch off for this launch only (the title's setting: on)", log)
++        self.assertIn("PS2 handheld: game settings put back", log)
++        self.assertNotIn(SERIAL, log)
++
++    def test_the_next_launch_without_the_field_has_it_on_again(self):
++        earlier = pp.game_ini_text({"ws": True, "ni": False, "60": False}).encode()
++        proj = self.project({"ws": True, "ni": False, "60": False}, earlier=earlier)
++        out, _ = self.run_rig(proj, display="handheld", nxt=True)
++        self.assertIn("EnableWideScreenPatches = false", out["calls"]["gs_at_spawn"][0][f"{CRC}.ini"])
++        self.assertIn("EnableWideScreenPatches = true", out["calls"]["gs_at_spawn"][1][f"{CRC}.ini"])
++        self.assertEqual(out["calls"]["gs_at_spawn"][1][f"{CRC}.ini"], earlier.decode())
++        self.assertEqual(out["next_widescreen"], "absent")
++
++    def test_without_the_field_today(self):
++        proj = self.project({"ws": True, "ni": False, "60": False})
++        out, log = self.run_rig(proj)
++        self.assertIn("EnableWideScreenPatches = true", out["calls"]["gs_at_spawn"][0][f"{CRC}.ini"])
++        self.assertEqual(out["status_widescreen"], "absent")
++        self.assertNotIn("PS2 handheld", log)
++
++    def test_handheld_with_ws_already_off_writes_nothing_new(self):
++        for toggles in (None, {"ws": False, "ni": True, "60": False}):
++            proj = self.project(toggles)
++            gs = proj / "data/games/ps2/config/PCSX2/gamesettings"
++            out_today, _ = self.run_rig(self.project(toggles))
++            out, log = self.run_rig(proj, display="handheld")
++            self.assertEqual(out["calls"]["gs_at_spawn"], out_today["calls"]["gs_at_spawn"], toggles)
++            self.assertIs(out["status_widescreen"], False)
++            self.assertIn("(the title's setting: off)", log)
++            self.assertNotIn("put back", log)
++            self.assertFalse((proj / pp.JOURNAL_FILE).exists())
++
++    def test_a_crash_left_journal_is_put_back_by_the_next_launch(self):
++        earlier = b"; an earlier launch's bytes\nEnableWideScreenPatches = true\n"
++        proj = self.project(None, earlier=earlier)
++        gs = proj / "data/games/ps2/config/PCSX2/gamesettings"
++        pp.journal_game_ini(proj, gs, SERIAL, CRC)
++        for n in (f"{CRC}.ini", f"{SERIAL}_{CRC}.ini"):
++            (gs / n).write_text(pp.game_ini_text({"ws": False}))           # as a crash after the handheld write
++        out, _ = self.run_rig(proj)                                           # the next launch, no field, no record
++        self.assertEqual(out["calls"]["gs_at_spawn"][0][f"{CRC}.ini"], earlier.decode())
++        self.assertFalse((proj / pp.JOURNAL_FILE).exists())
++
++
++class Manager(unittest.TestCase):
++    def test_display_is_read_only_in_the_ps2_branch(self):
++        """Any other system: `display` is never read (the launch as today)."""
++        src = (ROOT / "companion/games/emulator_manager.py").read_text()
++        tree = ast.parse(src)
++        launch = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "launch")
++        uses = [n for n in ast.walk(launch) if isinstance(n, ast.Name) and n.id == "display"]
++        self.assertEqual(len(uses), 1)
++        ps2_if = next(n for n in ast.walk(launch) if isinstance(n, ast.If) and "_ps2.SYSTEM_ID" in ast.unparse(n.test))
++        self.assertIn(uses[0], list(ast.walk(ps2_if)))
++
++
++class Plugin(unittest.TestCase):
++    def plugin(self):
++        spec = importlib.util.spec_from_file_location("g_g6s1b", ROOT / "companion/plugins/games.py")
++        G = importlib.util.module_from_spec(spec)
++        spec.loader.exec_module(G)
++        p = object.__new__(G.GamesPlugin)
++        seen = []
++        p._find_game_by_id = lambda gid: {"id": gid, "system": "ps2", "relative_path": "ps2/one.chd"}
++        p._parse_cheat_launch_request = lambda q: (None, None)
++        p._game_discs = lambda g: 1
++        p._log_launch_ports = lambda g, pl, q: None
++        p._emulator = types.SimpleNamespace(launch=lambda g, **kw: (seen.append(kw), {"ok": True})[1])
++        return p, seen
++
++    def test_the_field_reaches_the_launch_only_when_sent(self):
++        p, seen = self.plugin()
++        p.handle_post("launch", "id=game_ps2_x")
++        p.handle_post("launch", "id=game_ps2_x&display=handheld")
++        p.handle_post("launch", "id=game_ps2_x&display=tv")
++        self.assertNotIn("display", seen[0])
++        self.assertEqual(seen[1].get("display"), "handheld")
++        self.assertNotIn("display", seen[2])
++        self.assertEqual({k: v for k, v in seen[1].items() if k != "display"}, seen[0])
++
++
++class Relaunch(unittest.TestCase):
++    def test_a_handheld_session_relaunches_as_one(self):
++        sys.path.insert(0, str(ROOT / "tests" / "relaunch_ports"))
++        import test_relaunch_ports as rr
++        import relaunch_ports as rp
++        for handheld in (True, False):
++            p, rec, calls, clock, _ = rr.rig(kind="pcsx2", system="ps2", fail_save=True)
++            kws = []
++            emu = p._emulator
++            orig = emu.launch
++            emu._ps2_handheld = handheld
++            emu.launch = lambda game, **kw: (kws.append(kw), orig(game, **kw))[1]
++            rp.run(p, 4, 3, clock=clock, sleep=clock.sleep)
++            self.assertEqual(kws[0].get("display"), "handheld" if handheld else None, handheld)
++            if not handheld:
++                self.assertEqual(kws[0], {"players_chosen": 4})          # today's call
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/PrivyHub/app/src/test/java/streaming/G6Screen1bTest.kt b/PrivyHub/app/src/test/java/streaming/G6Screen1bTest.kt
+new file mode 100644
+index 00000000..2b770a10
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/G6Screen1bTest.kt
+@@ -0,0 +1,73 @@
++package com.safeiot.privyhub.streaming
++
++import com.safeiot.privyhub.streaming.HandheldGeometry.Fill
++import org.junit.Assert.assertArrayEquals
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import java.io.File
++
++/**
++ * G6-SCREEN1b: PS2 cropped to 4:3 when the hub's reply says the launch ran without the widescreen patch; PS1's
++ * narrower picture stretched to the 4:3 box; the launch request's `display=handheld` only from the handheld screen.
++ */
++class G6Screen1bTest {
++
++    // the fill per system: PS2 only with the reply's widescreen false; PS1 stretched; SNES / N64 as SCREEN1
++    @Test
++    fun theFillPerSystem() {
++        assertEquals(Fill.CROP_4X3, HandheldGeometry.fill("ps2", false, 1200, 900))
++        assertEquals(Fill.NONE, HandheldGeometry.fill("ps2", null, 1200, 900))       // no field: an older hub
++        assertEquals(Fill.NONE, HandheldGeometry.fill("ps2", true, 1200, 900))
++        assertEquals(Fill.STRETCH_PS1, HandheldGeometry.fill("ps1", null, 1200, 900))
++        assertEquals(Fill.STRETCH_PS1, HandheldGeometry.fill(" PS1 ", false, 1200, 900))
++        for (s in listOf("snes", "n64")) assertEquals(s, Fill.CROP_4X3, HandheldGeometry.fill(s, null, 1200, 900))
++        for (s in listOf("gamecube", "party", "nes", "genesis", "", "unknown", null))
++            assertEquals("$s", Fill.NONE, HandheldGeometry.fill(s, false, 1200, 900))
++        // the 16:9 fallback box: nothing filled
++        for (s in listOf("ps2", "ps1", "snes")) assertEquals(s, Fill.NONE, HandheldGeometry.fill(s, false, 1200, 675))
++        assertEquals("4:3", HandheldGeometry.videoCrop(Fill.CROP_4X3))
++        assertEquals("stretch", HandheldGeometry.videoCrop(Fill.STRETCH_PS1))
++        assertEquals("none", HandheldGeometry.videoCrop(Fill.NONE))
++    }
++
++    // PS2's crop is SCREEN1's centre 4:3
++    @Test
++    fun ps2CropsTheCentre4x3() {
++        assertEquals("160,0,960x720", HandheldGeometry.videoSourceRect(Fill.CROP_4X3))
++        assertArrayEquals(intArrayOf(-200, 0, 1600, 900), HandheldGeometry.surfaceRect(1200, 900, Fill.CROP_4X3))
++    }
++
++    // PS1's content, derived from C5-M4's measured box (x 302, 1316 wide at 1920) and checked against the core's aspect
++    @Test
++    fun ps1ContentIs202By876FromTheEvidence() {
++        assertArrayEquals(intArrayOf(202, 0, 876, 720), HandheldGeometry.ps1Content())
++        assertEquals("202,0,876x720", HandheldGeometry.videoSourceRect(Fill.STRETCH_PS1))
++        assertEquals(876.0, 1.2190 * 720, 2.0)                                           // 877.7
++        val c = HandheldGeometry.ps1Content()
++        assertEquals(640, c[0] + c[2] / 2)                                               // centred in the stream
++    }
++
++    // PS1 stretched: the surface scaled so the content fills the 1200 x 900 box (about 9.6 % wider than true shape)
++    @Test
++    fun ps1IsStretchedToTheBox() {
++        val r = HandheldGeometry.surfaceRect(1200, 900, Fill.STRETCH_PS1)
++        assertArrayEquals(intArrayOf(-276, 0, 1753, 900), r)
++        val sx = r[2] / 1280.0
++        assertEquals(0.0, r[0] + 202 * sx, 1.0)                                          // the content's left at the box's left
++        assertEquals(1200.0, r[0] + (202 + 876) * sx, 1.0)                                // its right at the box's right
++        val shown = (876 * sx / 900) / (876.0 / 720)                                     // shown aspect over the true one
++        assertEquals(1.096, shown, 0.002)
++    }
++
++    // the launch request's field: only for the handheld screen, nothing otherwise (the onn's URL as today)
++    @Test
++    fun theRequestFieldOnlyFromTheHandheldPath() {
++        assertEquals("&display=handheld", HandheldGeometry.launchSuffix(true))
++        assertEquals("", HandheldGeometry.launchSuffix(false))
++        val main = File("src/main/java/MainActivity.kt").readText()
++        val uses = Regex("""HandheldGeometry\.launchSuffix\(([^)]*\))\)""").findAll(main).map { it.groupValues[1] }.toList()
++        assertEquals(listOf("useHandheldGameScreen()"), uses)
++        assertTrue(main.contains("\"/plugins/games/launch?id=\$gameId\$cheatQuerySuffix\$modQuerySuffix\""))
++    }
++}

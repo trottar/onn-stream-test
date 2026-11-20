@@ -5040,6 +5040,9 @@ class GamesPlugin:
                 # Every other game, or PRIVYHUB_DISC_SWAP=0 -> today's call.
                 if _disc_swap.enabled() and self._game_discs(game) > 1:
                     launch_extra["start_disc"] = self._first(query, "disc").strip() or 1
+                # G6-SCREEN1b: the tablet's portrait handheld screen (`display=handheld`); absent: today's call
+                if self._first(query, "display").strip() == "handheld":
+                    launch_extra["display"] = "handheld"
                 payload = self._emulator.launch(
                     game,
                     cheat_source_index=cheat_source_index,

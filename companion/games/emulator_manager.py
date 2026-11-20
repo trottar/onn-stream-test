@@ -114,6 +114,9 @@ class EmulatorManager:
         # B49: "pcsx2" while a PS2 session runs (None = RetroArch, today) and its process helper
         self._launch_kind: str | None = None
         self._ps2: Any = None
+        # G6-SCREEN1b: the PS2 session was a handheld launch (its widescreen patch off); False on every other launch
+        self._ps2_handheld = False
+        self._ps2_ws_journaled = False
         # B69: the Dolphin process helper ("dolphin" kind) and the last Dolphin's session id (its AppImage helper,
         # waited for at the next GameCube launch); both None outside a GameCube session (today)
         self._gc: Any = None
@@ -545,6 +548,9 @@ class EmulatorManager:
                 payload["party"] = {"renderer": getattr(self._party, "renderer", None),
                                     "window": self._party.window_id is not None,
                                     "paused_by_key": self._party.paused_by_key}
+            # G6-SCREEN1b: a handheld PS2 launch ran without the widescreen patch (absent on every other session)
+            if active and self._launch_kind == "pcsx2" and self._ps2_handheld:
+                payload["widescreen"] = False
             return payload
 
     def _resolve_game(
@@ -5994,6 +6000,7 @@ class EmulatorManager:
         mod_index: int | None = None,
         players_chosen: int | None = None,
         start_disc: Any = None,
+        display: str | None = None,
     ) -> dict[str, Any]:
         with self.lock:
             self._refresh_process()
@@ -6010,9 +6017,11 @@ class EmulatorManager:
             # B49: a PS2 title launches PCSX2 (only with PRIVYHUB_PS2=1; absent = today's refusal below)
             if _ps2 is not None and str(game.get("system", "")).strip().casefold() == _ps2.SYSTEM_ID:
                 # B81: the ticked .pnach files reach PCSX2 (PRIVYHUB_CHEAT_DROPINS=0: today's call, the arguments dropped)
+                # G6-SCREEN1b: `display=handheld` -> this launch without the widescreen patch (absent: today's calls)
+                hh = {"handheld": True} if display == "handheld" else {}
                 if self._ps2_dropins_on() and cheat_source_index is not None:
-                    return self._launch_pcsx2(game, players_chosen, cheat_source_index, cheat_enabled_indexes)
-                return self._launch_pcsx2(game, players_chosen)
+                    return self._launch_pcsx2(game, players_chosen, cheat_source_index, cheat_enabled_indexes, **hh)
+                return self._launch_pcsx2(game, players_chosen, **hh)
             # B69: a GameCube title launches Dolphin (only with PRIVYHUB_GAMECUBE=1; absent = today's refusal below)
             if _gc is not None and str(game.get("system", "")).strip().casefold() == _gc.SYSTEM_ID:
                 # B79: the ticked codes reach Dolphin (PRIVYHUB_GC_CHEATS=0: today's call, the arguments dropped)
@@ -7461,10 +7470,15 @@ class EmulatorManager:
             raise EmulatorError(str(exc)) from exc
         return {"available": list(offer["available"]), "on": [k for k in offer["available"] if rec.get(k)]}
 
-    def _ps2_game_settings(self, game: dict[str, Any], cheat_extra: dict[str, Any] | None = None) -> list[str]:
+    def _ps2_game_settings(self, game: dict[str, Any], cheat_extra: dict[str, Any] | None = None,
+                           handheld: bool = False) -> list[str]:
         """B80 (+ B81's cheats): the game's settings file before PCSX2 starts; the game log's lines. Nothing is
-        written for a title without a toggle record and without a cheat pick (today)."""
+        written for a title without a toggle record and without a cheat pick (today).
+        G6-SCREEN1b: `handheld` with the title's widescreen on -> its files journalled, then written with it off."""
         import ps2_patches as _patches
+        # G6-SCREEN1b: a handheld launch's files not yet put back (a crash) are put back first (no journal: a no-op)
+        _patches.restore_journal(self.project_root)
+        self._ps2_ws_journaled = False
         if not _patches.enabled():
             return []
         root = self.project_root
@@ -7479,9 +7493,27 @@ class EmulatorManager:
             if not (_dropins.enabled() and _patches.wrote_before(gamesettings, ids[0], ids[1])):
                 return []
             cheat_extra = {"cheats": False}
+        if handheld and toggles is not None and toggles.get("ws"):
+            _patches.journal_game_ini(root, gamesettings, ids[0], ids[1])
+            self._ps2_ws_journaled = True
+            toggles = _patches.handheld_toggles(toggles)
         text = _patches.game_ini_text(toggles, cheat_extra)
         _patches.write_game_ini(gamesettings, ids[0], ids[1], text)
         return [_patches.log_line(toggles or {})]
+
+    def _ps2_handheld_put_back(self, pcsx2_log: Path | None = None) -> str | None:
+        """G6-SCREEN1b: a handheld launch's game settings files back to their earlier bytes; the game log's line."""
+        import ps2_patches as _patches
+        if not self._ps2_ws_journaled:
+            return None
+        self._ps2_ws_journaled = False
+        seen = False
+        try:
+            seen = pcsx2_log is not None and _patches.settings_read_in_log(pcsx2_log.read_text(errors="replace"))
+        except OSError:
+            pass
+        _patches.restore_journal(self.project_root)
+        return f"PS2 handheld: game settings put back (PCSX2 had read them: {'yes' if seen else 'not seen'})"
 
     def _launch_pcsx2(
         self,
@@ -7489,6 +7521,7 @@ class EmulatorManager:
         players_chosen: int | None,
         cheat_source_index: int | None = None,
         cheat_enabled_indexes: list[int] | tuple[int, ...] | None = None,
+        handheld: bool = False,
     ) -> dict[str, Any]:
         import players_session as _players_session
 
@@ -7538,10 +7571,14 @@ class EmulatorManager:
                 _staged, groups = _dropins.stage_pnach(ini.parent.parent / "cheats", serial, crc,
                                                        ps2_cheat_pick["files"])
                 cheat_extra = {"cheats": True, "cheat_groups": groups}
-            patch_lines = self._ps2_game_settings(game, cheat_extra)
+            patch_lines = self._ps2_game_settings(game, cheat_extra, handheld=handheld)
             if ps2_cheat_pick is not None:
                 patch_lines.append(f"PS2 cheats: {len(ps2_cheat_pick['files'])} files enabled")
+            if handheld:   # G6-SCREEN1b (absent on every other launch: today's log)
+                import ps2_patches as _patches
+                patch_lines.append(_patches.handheld_line(self._ps2_ws_journaled))
         except (OSError, ValueError) as exc:
+            self._ps2_handheld_put_back()
             raise EmulatorError(f"PS2 launch refused: {exc}") from exc
 
         logs_dir = self._project_path("logs/games")
@@ -7584,6 +7621,7 @@ class EmulatorManager:
                 start_new_session=True,
             )
         except Exception as exc:
+            self._ps2_handheld_put_back()
             log_handle.close()
             raise EmulatorError(f"PS2 launch failed: {exc}") from exc
 
@@ -7606,11 +7644,13 @@ class EmulatorManager:
         self._players_session = plan if chosen is not None else None
         self._hold_rewind_core = None
         self._launch_kind = "pcsx2"
+        self._ps2_handheld = bool(handheld)   # G6-SCREEN1b
         self._last_device_args = []       # B66: PCSX2 takes its ports from its ini
         # B52: the session reads PCSX2's own log (the ELF line, the TLB check)
         self._ps2 = _ps2.Session(process.pid, log_line, log_path=pcsx2_log)
 
         if self._ps2.wait_window(alive=lambda: process.poll() is None) is None:
+            self._ps2_handheld_put_back()
             try:
                 self._pcsx2_stop()
             except Exception:
@@ -7622,6 +7662,10 @@ class EmulatorManager:
         # B50: kept (the sink-input is the earliest proof of the audio stream), on the session's injectable clock
         waited = self._ps2.wait_audio(alive=lambda: process.poll() is None)
         log_line(f"PS2 audio: sink-input {'%.1fs' % waited if waited is not None else 'none'}")
+        # G6-SCREEN1b: PCSX2 read its game settings at the disc (~1 s in, before its window and audio); put them back
+        put_back = self._ps2_handheld_put_back(pcsx2_log)
+        if put_back:
+            log_line(put_back)
 
         payload = self.status()
         payload["action"] = "launch"
