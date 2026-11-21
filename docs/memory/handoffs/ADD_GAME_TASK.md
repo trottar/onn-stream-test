@@ -295,11 +295,17 @@ python3 tools/party_add_game.py close <code>                                    
   won, run the read with that seat: it clears the setting first, then reads — among its cells, **the mini game played
   was this title** (the launches since the lines, compared in memory), **the board showed one card** (the board's own
   `cards 1` line, B169), and S over every switch whose next began 4 s or more after it (a quicker one is listed, not
-  read; at least four read). **solo's first run writes the users' files' before** when bench left none (a title
+  read). **B197: the real match's two switches (the go and the end) must be read; a practice's may be listed** (the
+  user readied sooner than 4 s after it) — not met only when a real-match switch is unreadable or a read switch fails
+  S. solo's line after a practice says to wait a few seconds on the load screen before pressing ✕ (A on an Xbox pad). **solo's first run writes the users' files' before** when bench left none (a title
   already added: always, B169), so close compares them after every solo. **B172: close ends the solo mark and the
   befores** (and register ends one an earlier use left), so a later solo reads only its own rows.
 - **close** always, last — also after any stop. It clears the one-title setting too (as does any restart), and records
-  the title's own in-game saves before and after as changed or not — never a cell.
+  the title's own in-game saves before and after as changed or not — never a cell. **B196: its "every file = bench's
+  before" cell lists each changed file by root, kind and hashed name** (a user's slot n, slot 0, a rules file, a kept
+  state …; never a name), in its page too, **before** it ends the befores; the hub's own slots 8 and 9 and their
+  pictures are left out (its page says so). Pass the kinds on in your page as the tool names them. **A close that
+  failed is run again only after another solo** (close ended the befores; the next solo writes new ones).
 
 **Stop:** one plain sentence — the cell(s) not met and by how much, from the stage's page — then `close`, then "YOU,
 now: commit". Never run a stage again with a changed bar.

@@ -111,7 +111,9 @@ BARS = {
     "underrun_rise_max": (20, "B150's S: underruns rising at most 20 a row"),
     "listed_within_s": (4.0, "B150's S: a switch whose next switch starts sooner is listed, not read"),
     "s_span_s": (30.0, "B150's S: from a switch to the next one's start, or 30 s"),
-    "switches_read_min": (4, "B162: four read (a practice in and out, the go, the end)"),
+    "switches_read_min": (4, "B162: four planned (a practice in and out, the go, the end); B197: the planned count's bar"),
+    "real_switches_read": (["the go", "the end"], "B197: the real match's two switches read for S; a practice's may be "
+                                                  "listed (the user readied sooner than 4 s after it)"),
     "flag_lines_task": (20, "PP-H4: twenty lines with the two flags"),
     "flag_lines_found": (18, "the eighteen adopted lines"),
     "synthetic_held_wrong_max": (0, "B192: the training's own bar — every held-out synthetic picture read; it never "
@@ -2601,20 +2603,71 @@ def cmd_rehearse(code: str, a: dict) -> int:
 
 
 # --- the files that must not change (before = after) ------------------------------------------------------------------------
+SLOT_FILE = re.compile(r"\.state(\d*)(\.png)?$")
+HUB_SLOTS = (8, 9)          # B196: the hub's own scratch slots — 8 its load copy (B169), 9 its hold scratch (B9 / B12)
+LEFT_OUT = ("the hub's own slots 8 and 9 and their pictures, under states and setups' states (the onn offers the user "
+            "slots 1-3 only; RetroArch writes 9 only on the hub's own SAVE_STATE_SLOT 9 while a game plays, 8 only by "
+            "the hub's load copy)")
+
+
+def file_kind(name: str, root: str) -> str:
+    """B196: what kind of file it is, from its suffix and its root only (never its name)."""
+    if root in ("rules",):
+        return "a rules file"
+    if root in ("this title's kept folder", "a kept H7 folder"):
+        return "a kept state"
+    m = SLOT_FILE.search(name)
+    if m:
+        n, pic = int(m.group(1) or 0), " picture" if m.group(2) else ""
+        if 1 <= n <= 3:
+            return f"a user's slot {n}{pic}"
+        if n == 0:
+            return f"slot 0{pic} (every SAVE rewrites it)"
+        if n in HUB_SLOTS:
+            return f"the hub's slot {n}{pic}"
+        return f"slot {n}{pic}"
+    return "an in-game save" if name.endswith(".srm") else "another file"
+
+
 def files_digest(b: dict) -> dict:
     """sha256 of the title's user slots and slot pictures (both indexes), every rules file, the kept folders (names
-    hashed: no name is kept)."""
-    roots = [project() / "data/games/retroarch/states", project() / "data/games/retroarch/cheat_profiles",
-             rules_folder(), home(b["code"]) / "kept"]
+    hashed: no name is kept). B196: each with its root and kind ([sha, root, kind]); the hub's own slots 8 and 9 and
+    their pictures left out (LEFT_OUT)."""
+    roots = [("states", project() / "data/games/retroarch/states"),
+             ("setups' states", project() / "data/games/retroarch/cheat_profiles"),
+             ("rules", rules_folder()), ("this title's kept folder", home(b["code"]) / "kept")]
     h7 = _env_path("PRIVYHUB_ADD_GAME_KEPT_ROOT", Path.home() / "privyhub_h7")      # the kept H7 folders
-    roots += [p for p in sorted(h7.iterdir()) if p.is_dir() and p.name not in ("rules", "add_game")] if h7.is_dir() else []
+    roots += [("a kept H7 folder", p) for p in sorted(h7.iterdir()) if p.is_dir() and p.name not in ("rules", "add_game")] \
+        if h7.is_dir() else []
     out_ = {}
-    for root in roots:
+    for rname, root in roots:
         if not root.is_dir():
             continue
         for p in sorted(root.rglob("*")):
-            if p.is_file() and not p.name.endswith(".state8"):
-                out_[hashlib.sha256(str(p.relative_to(root.parent)).encode()).hexdigest()[:16]] = sha(p)
+            if not p.is_file():
+                continue
+            kind = file_kind(p.name, rname)
+            if rname in ("states", "setups' states") and any(kind.startswith(f"the hub's slot {n}") for n in HUB_SLOTS):
+                continue
+            out_[hashlib.sha256(str(p.relative_to(root.parent)).encode()).hexdigest()[:16]] = [sha(p), rname, kind]
+    return out_
+
+
+def _sha_of(v):
+    """A before's entry: [sha, root, kind] (B196), or the sha alone (a before written by older code)."""
+    return v[0] if isinstance(v, list) else v
+
+
+def files_changed(before: dict, after: dict, skip=()) -> list[dict]:
+    """B196: every file whose sha differs, with its root, kind and hashed name — changed, new or gone."""
+    out_ = []
+    for k in sorted(set(before) | set(after)):
+        if k in skip or _sha_of(before.get(k)) == _sha_of(after.get(k)):
+            continue
+        meta = after.get(k) if isinstance(after.get(k), list) else before.get(k)
+        root, kind = (meta[1], meta[2]) if isinstance(meta, list) else ("not known", "not known")
+        out_.append({"root": root, "kind": kind, "file": k,
+                     "is": "new" if k not in before else "gone" if k not in after else "changed"})
     return out_
 
 
@@ -2931,8 +2984,8 @@ def cmd_bench(code: str, a: dict) -> int:
         cells.add(f"{ending}: keys_written", launch.get("keys_written"), True, launch.get("keys_written") is True)
     hub("POST", "stop")
     after = files_digest(b)
-    changed = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k))
-    cells.add("every file after = before", len(changed), 0, not changed)
+    changed = files_changed(before, after)                       # B196: each named by root and kind
+    cells.add("every file after = before", changed, [], not changed)
     return finish(code, "bench", cells, bench_inputs(code, b))
 
 
@@ -3006,7 +3059,8 @@ def solo_lines(b: dict, words: str = "playstation") -> list[str]:
         f"{who} until a mini game for {n} comes up (this game, the only card shown; if two cards show, stop and "
         "tell me).",
         f"YOU, now: on its load screen press {w['practice']} for a practice, stay in it at least ten seconds, leave "
-        f"it with {w['back']}, then press {w['play']} to play it for real and play it to its end.",
+        f"it with {w['back']}, then wait a few seconds on the load screen before pressing {w['play']} to play it for "
+        "real, and play it to its end.",
         "YOU, now: when you are back on the board, reply with who won (P1, P2" + (", P3 or P4" if n == 4 else "") + ").",
     ]
 
@@ -3097,7 +3151,8 @@ def cmd_solo(code: str, a: dict) -> int:
               "this title >= 1, another 0", this >= 1 and len(ids) == this)
     rows = party_rows(mark["party"])
     sw = [x for x in rows if x.get("step") == "minigame_stream" and x.get("planned")]
-    cells.add("planned switches", len(sw), ">= 4 (a practice in and out, the go, the end)", len(sw) >= 4)
+    cells.add("planned switches", len(sw), f">= {BARS['switches_read_min'][0]} (a practice in and out, the go, the end)",
+              len(sw) >= BARS["switches_read_min"][0])
     cells.add("every planned switch switched", all(x.get("switched") for x in sw), True,
               bool(sw) and all(x.get("switched") for x in sw))
     secs = [x.get("seconds") for x in sw]
@@ -3121,8 +3176,13 @@ def cmd_solo(code: str, a: dict) -> int:
             listed.append(i)
         else:
             read_i.append(i)
-    cells.add("switches read for S (the next starts 4 s or more after)", [len(read_i), len(listed)],
-              f">= {BARS['switches_read_min'][0]} read", len(read_i) >= BARS["switches_read_min"][0])
+    go = max((i for i, x in enumerate(sw) if x.get("window") == "minigame"), default=None)     # B197: the real match
+    end = next((i for i, x in enumerate(sw) if go is not None and i > go and x.get("window") == "board"), None)
+    role = {i: ("the go" if i == go else "the end" if i == end else "a practice's") for i in range(len(sw))}
+    real = [r for r, i in (("the go", go), ("the end", end)) if i is not None and i in read_i]
+    cells.add("the real match's go and end read for S (a practice's may be listed)",
+              {"read": [f"{i + 1} ({role[i]})" for i in read_i], "listed": [f"{i + 1} ({role[i]})" for i in listed]},
+              BARS["real_switches_read"][0], real == BARS["real_switches_read"][0])
     for i in read_i:
         t = times[i]
         nxt = starts[i + 1] if i + 1 < len(sw) else None
@@ -3176,7 +3236,7 @@ def cmd_solo(code: str, a: dict) -> int:
     note = ""
     if listed:
         note = "Listed, not read (the next switch began less than 4 s after): " + "; ".join(
-            f"switch {i + 1} (to the {sw[i].get('window') or '?'}, {sw[i].get('seconds')} s; the next began "
+            f"switch {i + 1} ({role[i]}, to the {sw[i].get('window') or '?'}, {sw[i].get('seconds')} s; the next began "
             f"{round(starts[i + 1] - times[i], 2)} s after)" for i in listed) + "."
     return finish(code, "solo", cells, digest({"after": before_solo, "mark": mark, "winner": winner}), note=note)
 
@@ -3211,17 +3271,23 @@ def cmd_close(code: str, a: dict) -> int:
     s_after = ingame_saves(b)
     saves = saves_recorded(s_before, s_after)
     own_saves = set(s_after) | set(s_before or {})
+    changed = None
     if before is not None:                                   # bench ran: its before
         after = files_digest(b)
-        changed = sorted(k for k in set(before) | set(after) if before.get(k) != after.get(k) and k not in own_saves)
-        cells.add("every file = bench's before", len(changed), 0, not changed)
+        changed = files_changed(before, after, skip=own_saves)   # B196: each by root, kind and hashed name
+        cells.add("every file = bench's before", changed, [], not changed)
     note = "The title's own in-game saves (recorded, never a cell): " + (
         "; ".join(f"{r['save']}: {r['is']}" for r in saves) if saves else "none found") + "."
-    end_solo_mark(code)                                      # B172: the next solo writes its own mark and befores
+    if changed is not None:                                  # B196: what changed, in the page, before anything ends
+        note += (" Changed since bench's before: " + ("; ".join(f"{c['kind']} in {c['root']} ({c['file']}, {c['is']})"
+                                                               for c in changed) if changed else "none")
+                 + ". Left out of the comparison: " + LEFT_OUT + ".")
+    rc = finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}),
+                note=note, recorded={"in_game_saves": saves, **({"changed": changed} if changed is not None else {})})
+    end_solo_mark(code)                                      # B172: then the next solo writes its own mark and befores
     for pic in sorted(ask_folder().glob(f"{code}_*.png")):   # B187: the picture shown to the user, removed
         pic.unlink()
-    return finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}),
-                  note=note, recorded={"in_game_saves": saves})
+    return rc
 
 
 def _active_units() -> list[str]:

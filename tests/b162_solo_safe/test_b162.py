@@ -13,7 +13,7 @@ anything the tool wrote or printed.
 (`party-minigame-only` included: unknown on both); `today` and `cheat_today` with both flags — the same bytes but the
 new route's own answer.
 `Unit` (made-up logs, a made-up hub): the title cell; a quick switch listed, not read, and named on the page; three
-read → not met; a changed in-game save recorded and close PASS, any other changed file close FAIL; the lines for
+read (a practice listed, the go and the end read) → met (B197); a changed in-game save recorded and close PASS, any other changed file close FAIL; the lines for
 `sony`, `xbox`, mixed and no row, two and four players; the setting not taken → REFUSED, no line for the user; the
 setting set by solo and cleared by `--read` and by `close`. Temp dirs removed.
 
@@ -121,7 +121,8 @@ class Harness(unittest.TestCase):
         # B169: solo now writes a title already added its files' before, so close compares them — and this harness
         # rewrote one made-up sidecar in the rules folder (three two-player titles) after T90's solo: exactly that cell
         self.assertEqual(s["close_v"]["bad"], ["every file = bench's before"], (s["close"], s["close_v"]))
-        self.assertEqual(s["close_v"]["cells"]["every file = bench's before"], 1)
+        self.assertEqual(len(s["close_v"]["cells"]["every file = bench's before"]), 1)   # B196: the list, by kind
+        self.assertEqual(s["close_v"]["cells"]["every file = bench's before"][0]["kind"], "a rules file")
         self.assertEqual(s["after_close"], s["three_before"])
         self.assertEqual([r.get("on") for r in s["only_rows_close"]], [False])
         self.assertEqual(s["before_restart"], ["Juliet Run (USA)"])
@@ -276,22 +277,25 @@ class Unit(unittest.TestCase):
                                      (20, 1.3, "minigame", True, True), (40, 1.3, "board", False, True),
                                      (60, 1.3, "minigame", False, True), (90, 1.3, "board", False, True)])
         v, c = self.verdict()
-        self.assertEqual(c["switches read for S (the next starts 4 s or more after)"]["read"], [5, 1])
-        self.assertTrue(c["switches read for S (the next starts 4 s or more after)"]["met"])
+        self.assertEqual(c["the real match's go and end read for S (a practice's may be listed)"]["read"],          # B197: by role
+                         {"read": ["2 (a practice's)", "3 (a practice's)", "4 (a practice's)", "5 (the go)", "6 (the end)"],
+                          "listed": ["1 (a practice's)"]})
+        self.assertTrue(c["the real match's go and end read for S (a practice's may be listed)"]["met"])
         self.assertTrue(c["S: sound within 4 s of each switch, underruns rising <= 20 a row"]["met"])
         self.assertTrue(c["audio_max_arrival_gap_ms at each switch"]["met"])
         self.assertEqual(rc, 0, text + (self.tmp / "ev/T93/solo.md").read_text())
         page = (self.tmp / "ev/T93/solo.md").read_text()
         self.assertIn("Listed, not read", page)
-        self.assertIn("switch 1 (to the minigame, 1.3 s; the next began 1.3 s after)", page)
+        self.assertIn("switch 1 (a practice's, to the minigame, 1.3 s; the next began 1.3 s after)", page)   # B197
 
-    def test_three_read_not_met(self):
+    def test_three_read_a_practice_listed_met(self):
+        """B197 (was B162's "three read, not met"): the practice's switch listed, the go and the end read -> met."""
         rc, _ = self.switch_logs([(0, 1.3, "minigame", True, False), (2.6, 1.3, "board", False, True),
                                   (30, 1.3, "minigame", False, True), (60, 1.3, "board", False, True)])
         v, c = self.verdict()
-        self.assertEqual(c["switches read for S (the next starts 4 s or more after)"]["read"], [3, 1])
-        self.assertFalse(c["switches read for S (the next starts 4 s or more after)"]["met"])
-        self.assertEqual(rc, 1)
+        self.assertEqual(c["the real match's go and end read for S (a practice's may be listed)"]["read"]["listed"], ["1 (a practice's)"])
+        self.assertTrue(c["the real match's go and end read for S (a practice's may be listed)"]["met"])
+        self.assertEqual(rc, 0)
 
     # --- the lines
     def heartbeat(self, classes):
@@ -305,7 +309,7 @@ class Unit(unittest.TestCase):
     def test_lines_by_pad_class(self):
         import party_add_game as pag
         for classes, words, must, must_not in ((["sony", "sony"], "playstation", ["△", "✕", "Select button (Share)"], ["Y ", "View"]),
-                                               (["xbox", "generic"], "xbox", ["press Y", "press A", "View button (Back)"], ["△", "✕"]),
+                                               (["xbox", "generic"], "xbox", ["press Y", "pressing A", "View button (Back)"], ["△", "✕"]),   # B197
                                                (["sony", "xbox"], "both", ["△ (Y on an Xbox pad)", "✕ (A on an Xbox pad)", "View on an Xbox pad"], []),
                                                (None, "playstation", ["△", "✕"], ["View"])):
             self.heartbeat(classes)
