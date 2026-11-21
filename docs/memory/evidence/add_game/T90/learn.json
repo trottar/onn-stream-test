@@ -7,19 +7,22 @@
    "read": true
   },
   {
+   "bar": "found",
+   "cell": "the score places found",
+   "met": true,
+   "read": "found"
+  },
+  {
    "bar": [],
-   "cell": "every class separable",
-   "met": false,
-   "read": [
-    "end_P1",
-    "end_P2"
-   ]
+   "cell": "every digit separable",
+   "met": true,
+   "read": []
   },
   {
    "bar": ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))",
-   "cell": "margin_needed",
-   "met": false,
-   "read": 0.0046
+   "cell": "digit margin_needed",
+   "met": true,
+   "read": 0.2085
   },
   {
    "bar": 0,
@@ -30,8 +33,8 @@
   {
    "bar": "<= 0.105",
    "cell": "held-out frames read unknown (share)",
-   "met": false,
-   "read": 0.6333
+   "met": true,
+   "read": 0.0
   },
   {
    "bar": 0,
@@ -52,52 +55,76 @@
    "read": 0.0
   },
   {
-   "bar": "end_P1",
+   "bar": [
+    15,
+    2
+   ],
    "cell": "end_P1: ended as itself",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": [
+    15,
+    2
+   ]
   },
   {
    "bar": "<= 2.0 s",
    "cell": "end_P1: ended within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 1.5
   },
   {
-   "bar": "end_P1",
+   "bar": [
+    35,
+    28
+   ],
    "cell": "end_P1_2: ended as itself",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": [
+    35,
+    28
+   ]
   },
   {
    "bar": "<= 2.0 s",
    "cell": "end_P1_2: ended within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 2.0
   },
   {
-   "bar": "end_P2",
+   "bar": [
+    0,
+    22
+   ],
    "cell": "end_P2: ended as itself",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": [
+    0,
+    22
+   ]
   },
   {
    "bar": "<= 2.0 s",
    "cell": "end_P2: ended within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 2.0
   },
   {
-   "bar": "end_P2",
+   "bar": [
+    0,
+    29
+   ],
    "cell": "end_P2_2: ended as itself",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": [
+    0,
+    29
+   ]
   },
   {
    "bar": "<= 2.0 s",
    "cell": "end_P2_2: ended within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 2.0
   },
   {
    "bar": true,
@@ -112,35 +139,97 @@
    "read": []
   },
   {
-   "bar": "end_P1 within <= 2.0 s, never another",
+   "bar": "9+2+2+2+_+_=15-0+0+2+0+_+_=2 (every number) within <= 2.0 s, never other numbers",
    "cell": "left out: end_P1",
    "met": false,
    "read": null
   },
   {
-   "bar": "end_P1 within <= 2.0 s, never another",
+   "bar": "7+7+7+7+7+_=35-7+7+7+7+0+_=28 (every number) within <= 2.0 s, never other numbers",
    "cell": "left out: end_P1_2",
    "met": false,
    "read": null
   },
   {
-   "bar": "end_P2 within <= 2.0 s, never another",
+   "bar": "0+0+0+0+_+_=0-2+9+2+9+_+_=22 (every number) within <= 2.0 s, never other numbers",
    "cell": "left out: end_P2",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": [
+    "0+0+0+0+_+_=0-2+9+2+9+_+_=22",
+    2.0
+   ]
   },
   {
-   "bar": "end_P2 within <= 2.0 s, never another",
+   "bar": "0+0+0+0+_+_=0-9+9+2+9+_+_=29 (every number) within <= 2.0 s, never other numbers",
    "cell": "left out: end_P2_2",
+   "met": true,
+   "read": [
+    "0+0+0+0+_+_=0-9+9+2+9+_+_=29",
+    2.0
+   ]
+  },
+  {
+   "bar": {
+    "shown by fewer than two saves": []
+   },
+   "cell": "every digit 0-9 read by a reader learnt without each save that shows it",
    "met": false,
-   "read": null
+   "read": {
+    "shown by fewer than two saves": [
+     "1",
+     "3",
+     "4",
+     "6",
+     "7",
+     "8"
+    ]
+   }
   }
  ],
  "code": "T90",
- "inputs": "07344094c0d722881b18c8128837dab849233be47fb1be1709e8af9c5dc46875",
+ "inputs": "987d4a24fdc0057f28b18977d403b87a51ac9fcf10d2b9fd2e05a75e6780cb08",
  "recorded": {
-  "line": "One more save: end_P1_3 \u2014 the screen after a match player 1 won, from a match not saved yet (other characters or another stage than its saves kept); save it to a free slot, then register T90 \u2026 --collect end_P1_3=<slot> and learn T90 again.",
-  "one more save": "end_P1_3"
+  "digits": {
+   "in one save": [
+    "1",
+    "3",
+    "7",
+    "8"
+   ],
+   "in two saves or more": [
+    "0",
+    "2",
+    "5",
+    "9"
+   ],
+   "never": [
+    "4",
+    "6"
+   ]
+  },
+  "digits asked": [
+   "1",
+   "3",
+   "4",
+   "6",
+   "7",
+   "8"
+  ],
+  "digits learnt": [
+   "0",
+   "1",
+   "2",
+   "3",
+   "5",
+   "7",
+   "8",
+   "9"
+  ],
+  "line": "One more save: a match either player won whose line score shows 1, 3, 4, 6, 7 or 8 (in any quarter, overtime or final, either side); the more of them the better \u2014 save the screen after it to a free slot, then register T90 \u2026 --collect <role>=<slot> with the role of the player who won (end_P1_3 if P1 won, end_P2_3 if P2 won), label T90 and learn T90 again.",
+  "one more save": [
+   "end_P1_3",
+   "end_P2_3"
+  ]
  },
  "schema": 1,
  "stage": "learn",
