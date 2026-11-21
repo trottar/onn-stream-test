@@ -103,11 +103,13 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
         circle(Control.DPAD, 300f, 295f, Ps2TouchLayout.DPAD_R, Ps2TouchLayout.DPAD_HIT)
         dpadR = Ps2TouchLayout.DPAD_R * sx
         circle(Control.L3, 540f, 815f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.TRIANGLE, 900f, 715f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.CIRCLE, 990f, 805f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.CROSS, 900f, 895f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.SQUARE, 810f, 805f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
-        circle(Control.RSTICK, 900f, 295f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
+        // G6-SWAP1 (the user, 2026-11-21): the face diamond and the right stick trade places, as the left side's D-pad
+        // above its stick; the diamond unchanged around (900, 295), the stick at (900, 805)
+        circle(Control.TRIANGLE, 900f, 205f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.CIRCLE, 990f, 295f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.CROSS, 900f, 385f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.SQUARE, 810f, 295f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+        circle(Control.RSTICK, 900f, 805f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
         circle(Control.R3, 690f, 565f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
         rect(Control.SELECT, 400f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
         rect(Control.START, 600f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
@@ -327,6 +329,8 @@ object Ps2TouchLayout {
     const val BOX_GROWTH = REF_H_HM4 - REF_H
     /** G6-SCREEN1: End's x (G6-HM4: 960). */
     const val END_X = 1080f
+    /** G6-SWAP1: the layout's version in the handheld report (the face diamond top right, the right stick below). */
+    const val LAYOUT_VERSION = "ps2-swap1"
     /** G6-HM4's stick radius (drawn ring = full throw). */
     const val STICK_R_HM4 = 132f
     /** G6-HM4b: the throw shortened to 0.875 x (the user: "10-15% smaller"); the drawn ring matches it. */

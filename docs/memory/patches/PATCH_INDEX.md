@@ -239,6 +239,7 @@ note feeds, or its gate / flag, where the records say; "—" where none applies.
 | G6_SCREEN1B_PS2_PS1_FILL.md | g-track | APPLIED | a handheld launch (`display=handheld`) runs PS2 without its widescreen patch for that launch only (opt-in hub change, every other launch identical); PS2 cropped and PS1 stretched in the 4:3 box (G6-SCREEN1b); candidate APK `adcb1222…` tablet only |
 | G6_STICK1_DUALSHOCK2_FEEL.md | g-track | APPLIED | the touch sticks as a DualShock 2 end to end: dead zone 0.1, full at 0.75 of the throw, the circle to the square, PCSX2's AxisScale 1.33 compensated on the tablet (G6-STICK1); candidate APK `786cb2f8…` tablet only |
 | G6_JOIN1_HOLD_TO_JOIN.md | g-track | APPLIED | holding any touch control for a real pad's join hold (500 ms) during the countdown makes the touch pad P1 at once; the 5-s countdown the fallback (G6-JOIN1); candidate APK `6d2fff76…` tablet only |
+| G6_SWAP1_RIGHT_SIDE_SWAP.md | g-track | APPLIED | the face buttons and the right stick trade places (face diamond top right, right stick bottom right), every other control unchanged (G6-SWAP1); candidate APK `0a631e79…` tablet only |
 | G8-P1_IMPAIRMENT_SHIM.md | g-track | APPLIED | test shim `PRIVYHUB_IMPAIRMENT`, not adopted |
 | G8-S1_SHIM_NONE_PROFILE.md | g-track | APPLIED | the shim's `none` profile |
 | G8-S2_START_RUNG.md | g-track | APPLIED | `START_RUNG`: one of G4-S4's four, under line 13 |

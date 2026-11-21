@@ -50,7 +50,7 @@ T90_SHAPE = {"begin": {"kind": "begin"}, "other": {"kind": "other"},
              "end_P1": {"kind": "end", "s": [15, 2], "look": 1}, "end_P1_2": {"kind": "end", "s": [35, 28], "look": 2},
              "end_P2": {"kind": "end", "s": [0, 22], "look": 3}, "end_P2_2": {"kind": "end", "s": [0, 29], "look": 4}}
 ENV_KEYS = ("PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE", "PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_LOGS",
-            "PARTY_ADD_GAME_CAPTURE", "PRIVYHUB_ADD_GAME_HUB", "PRIVYHUB_ADD_GAME_DROPINS")
+            "PARTY_ADD_GAME_CAPTURE", "PRIVYHUB_ADD_GAME_HUB", "PRIVYHUB_ADD_GAME_DROPINS", "PRIVYHUB_ADD_GAME_ASK")
 
 
 def rd(nums, again=None) -> str:
@@ -69,7 +69,8 @@ class Made(unittest.TestCase):
         os.environ.update({"PRIVYHUB_ADD_GAME_HOME": str(cls.tmp / "home"), "PRIVYHUB_ADD_GAME_EVIDENCE": str(cls.tmp / "ev"),
                            "PRIVYHUB_H7_RULES": str(cls.tmp / "rules"), "PRIVYHUB_ADD_GAME_LOGS": str(cls.tmp / "logs"),
                            "PARTY_ADD_GAME_CAPTURE": "score_capture:capture", "PRIVYHUB_ADD_GAME_HUB": "http://127.0.0.1:9",
-                           "PRIVYHUB_ADD_GAME_DROPINS": str(cls.tmp / "dropins")})
+                           "PRIVYHUB_ADD_GAME_DROPINS": str(cls.tmp / "dropins"),
+                           "PRIVYHUB_ADD_GAME_ASK": str(cls.tmp / "ask")})          # B187: the ask's picture
         (cls.tmp / "rules").mkdir()
         import party_add_game as pag
         cls.pag = pag
@@ -150,7 +151,8 @@ class Learn(Made):
         rc, out = self.label_all("T92", T90_SHAPE)
         lv = self.verdict("T92", "label")
         self.assertEqual(rc, 0, out + json.dumps(lv["bad"]))
-        self.assertEqual(lv["cells"]["end_P1: read back by a reader learnt without it"], "not read (shown only here: 1)")
+        self.assertEqual(lv["cells"]["end_P1: read back by a reader learnt without it"],   # B185: read at its places
+                         "?5-2 (shown only here: 1)")
         self.assertEqual(lv["cells"]["end_P2: read back by a reader learnt without it"], "0-22")
         rc, out = self.tool("learn", "T92")
         v = self.verdict("T92", "learn")
@@ -228,7 +230,9 @@ class LabelChecks(Made):
         self.assertEqual(rc, 1)
         self.assertIn("Read again: end_P1 (its two readings differ)", out)
         rc, out = self.tool("label", "T95", f"end_P1={rd([21, 14], [21, 11])}")
-        self.assertIn("Ask the user for end_P1's numbers", out)
+        self.assertIn("Ask the user about the match player 1 won 21-14 (or 21-11), kept at ", out)   # B187
+        self.assertIn("player 2's final", out)
+        self.assertTrue((self.pag.ask_folder() / "T95_end_P1.png").is_file())
         rc, out = self.looked("T95", *self.tool("label", "T95", "end_P1=21-14,user"))
         self.assertEqual(rc, 0, out)
 
@@ -250,18 +254,16 @@ class LabelChecks(Made):
             self.assertNotIn(right, out)
 
     def test_a_misread_digit_only_this_save_shows(self):
-        """T90's shape: 16-2 for 15-2 (no other save shows a 1 or a 6) passes the label stage; learn cannot pass with
-        it; once one more save shows a 1, the label stage names that save alone."""
+        """T90's shape: 16-2 for 15-2 (no other save shows a 1 or a 6). B185: the reader learnt without it reads its
+        numbers at their places (?5-2), so the label stage names that save alone at once (it passed until B181's
+        learn); read right, PASS."""
         self.put("T88", T90_SHAPE)
         rc, out = self.label_all("T88", T90_SHAPE, {"end_P1": rd([16, 2])})
-        self.assertEqual(rc, 0, out)
-        rc, out = self.tool("learn", "T88")
         self.assertEqual(rc, 1, out)
-        self.put("T88", {"end_P1_3": {"kind": "end", "s": [39, 18], "look": 7}})
-        rc, out = self.tool("label", "T88", f"end_P1_3={rd([39, 18])}")
-        self.assertEqual(rc, 1, out)
-        self.assertIn("Read again: end_P1 (a reader learnt from the other saves reads it as 15-2)", out)
+        self.assertIn("Read again: end_P1 (a reader learnt from the other saves reads it as ?5-2)", out)
         self.assertNotIn("end_P1_2 (", out)
+        rc, out = self.looked("T88", *self.tool("label", "T88", f"end_P1={rd([15, 2])}"))
+        self.assertEqual(rc, 0, out)
 
     def test_a_dropped_digit(self):
         self.put("T98", A)

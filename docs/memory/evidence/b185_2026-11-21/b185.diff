@@ -1,0 +1,1121 @@
+diff --git a/docs/memory/handoffs/ADD_GAME_TASK.md b/docs/memory/handoffs/ADD_GAME_TASK.md
+index 2b3ac52a..e8041ec1 100644
+--- a/docs/memory/handoffs/ADD_GAME_TASK.md
++++ b/docs/memory/handoffs/ADD_GAME_TASK.md
+@@ -1,7 +1,7 @@
+ ---
+ memory_schema: 1
+ as_of: 2026-11-20
+-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
++status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+ ---
+ 
+ # ADD-GAME — one title, by its code, through the tool's five stages
+@@ -204,6 +204,9 @@ python3 tools/party_add_game.py close <code>
+   final): read **every number of it** for each side, left to right, `_` for a blank cell, `=` before the final, sides
+   joined by `-`, P1 first. T90's first save, for instance: `end_P1=9+2+2+2+_+_=15-0+0+2+0+_+_=2,9+2+2+2+_+_=15-0+0+2+0+_+_=2`.
+   The final is still the result; the other numbers teach the tool every digit.
++  **Overtime (B185):** a save whose cells add up to its finals counts, whichever columns it fills. An overtime (or a
++  second overtime, an extra round) cell that no other save fills is "shown only here" on the label page — not a misread,
++  never read again, never asked of the user. **Never ask the user to replace a save whose rows add up.**
+   **The tool checks every reading:**
+   - the two the same;
+   - the role's player ahead (an `end_P<k>` save has P<k> ahead);
+@@ -222,9 +225,17 @@ python3 tools/party_add_game.py close <code>
+     run `label <code> <role>=<P1>-<P2>,<P1>-<P2>` (with a line score, every number as above). The whys include "P<k>'s
+     cells add up to <s>, not its final <f>" (a misread cell or final) and "a glyph read as <d> is not one, at the last
+     look". Nothing to the user.
+-  - **"Ask the user for <role>'s numbers …"** (the same save named a second time) → say, word for word: "YOU, now: I
+-    couldn't read one final score of <the game> for sure. In the match P<k> won that you saved for me, what was the
+-    final score — P1's number, then P2's? Reply like 21-14." Then `label <code> <role>=<their numbers>,user`.
++  - **"Ask the user about the match player <k> won <its final as you read it>[ in overtime], saved at <time> to slot
++    <n> (or "kept at <time>"): <the cells in doubt, by column> …"** (B187: only when your two readings of that save
++    differed twice, or its cells failed to add up twice — never for a column or a digit no other save shows). The tool
++    has copied that save's picture to `logs/add_game_ask/<code>_<role>.png` in this repo (git-ignored, removed by
++    `close`). Say, word for word: "YOU, now: I couldn't read some numbers of one match of <the game> for sure: the match
++    player <k> won <its final as you read it>[ in overtime], saved at <time> to slot <n>. On its final stats screen,
++    what are <the cells in doubt, e.g. player 1's Q4>? YOU, now: ask Cowork to show you the picture of that match;
++    then reply with its scores." Never a final alone on a title with a line score: put the user's numbers into those
++    cells of your reading and run `label <code> <role>=<the whole line score>,user` (the tool refuses a final alone).
++  - **"Stop: <role> (…) after it was read again twice …"** (a reader learnt from the other saves still reads a number
++    otherwise) → nothing to the user, no new match: stop and take the line back to the chat (Cowork).
+   - "<role> cannot be read as the user says … collect it again from another match …" → §1's line for one more save for
+     P<k>, `register <code> … --collect <role>=<slot>`, `label <code>` (its pictures), read, label, learn.
+   - none (PASS) → learn. Any other FAIL → stop.
+@@ -239,8 +250,13 @@ python3 tools/party_add_game.py close <code>
+     after the match that shows the final score, then tell me who won." (With only the final: "… try to end it with a
+     <digit> in either side's final score ….") Then `register <code> … --collect end_P<the winner>_<n>=<slot>` (the role
+     the line names for that winner), `label <code>`, read the new save's pictures, `label <code> <role>=…`, the last
+-    look, `learn <code>`. **learn passes only when every digit 0-9 is shown by two saves or more** (B181): the hub can
+-    then read any final score.
++    look, `learn <code>`. **learn passes only when every digit 0-9 is learnt** (B181, B186): shown by two saves or more,
++    or by one save at least twice, each of its glyphs read back by that save's other glyphs (and the title's glyphs
++    drawn the same from match to match) — the hub can then read any final score. **With this line, say to the user how
++    many digits are still short and that learn may ask for one more match after this one.** The tool's line ends "<n>
++    digits are still short (<digits>); if one is still short after that match, learn asks for one more"; add to your
++    line, word for word: "<n> numbers are still missing (<digits>); if one is still missing after this match, I may
++    ask for one more." **Never say that one match is enough.**
+ - **bench** → PASS or stop (it ends every kept save, each save of an ending as that ending); it needs nobody: no pad,
+   no TV.
+ - **rehearse** (§0 only) → as §0 says.
+@@ -272,9 +288,12 @@ both bench flags are on, as T88 and T89 are; adoption is the user's own go.
+ 
+ **`score` (B178, B181):** the same saves, rounds and lines; the user says only who won each match. The numbers on the
+ final screen — the whole line score when it shows one — are read by you in the label stage. **The user is asked one
+-match's final score only when your readings of it disagree twice.**
+-- **Every digit 0-9 must be shown by two saves or more** (B181), so learn may ask for one more match showing the
+-  digits it names.
++match's numbers only when your two readings of it disagree twice, or its cells fail to add up twice** (B187): the
++cells in doubt, never a final alone, with the picture of that match (Cowork shows it). Never for an overtime cell or a
++digit no other save shows.
++- **Every digit 0-9 must be learnt** (B181, B186): shown by two saves or more, or several times by one save, so learn
++  may ask for one more match showing the digits it names — and, if a digit is still short after it, one more.
++- **Overtime (B185):** a match that went to overtime counts like any other; the hub reads its final as any other.
+ - **The least:** 6 saves, when the four end saves' line scores show every digit twice.
+ - **A line score:** in practice 7-8.
+ - **Only the final on its screen:** at least 7 (5 end saves at the very best), often the cap; a game whose scores
+diff --git a/tests/b178_score_kind/test_b178.py b/tests/b178_score_kind/test_b178.py
+index a998062b..2faf1b1f 100644
+--- a/tests/b178_score_kind/test_b178.py
++++ b/tests/b178_score_kind/test_b178.py
+@@ -50,7 +50,7 @@ T90_SHAPE = {"begin": {"kind": "begin"}, "other": {"kind": "other"},
+              "end_P1": {"kind": "end", "s": [15, 2], "look": 1}, "end_P1_2": {"kind": "end", "s": [35, 28], "look": 2},
+              "end_P2": {"kind": "end", "s": [0, 22], "look": 3}, "end_P2_2": {"kind": "end", "s": [0, 29], "look": 4}}
+ ENV_KEYS = ("PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE", "PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_LOGS",
+-            "PARTY_ADD_GAME_CAPTURE", "PRIVYHUB_ADD_GAME_HUB", "PRIVYHUB_ADD_GAME_DROPINS")
++            "PARTY_ADD_GAME_CAPTURE", "PRIVYHUB_ADD_GAME_HUB", "PRIVYHUB_ADD_GAME_DROPINS", "PRIVYHUB_ADD_GAME_ASK")
+ 
+ 
+ def rd(nums, again=None) -> str:
+@@ -69,7 +69,8 @@ class Made(unittest.TestCase):
+         os.environ.update({"PRIVYHUB_ADD_GAME_HOME": str(cls.tmp / "home"), "PRIVYHUB_ADD_GAME_EVIDENCE": str(cls.tmp / "ev"),
+                            "PRIVYHUB_H7_RULES": str(cls.tmp / "rules"), "PRIVYHUB_ADD_GAME_LOGS": str(cls.tmp / "logs"),
+                            "PARTY_ADD_GAME_CAPTURE": "score_capture:capture", "PRIVYHUB_ADD_GAME_HUB": "http://127.0.0.1:9",
+-                           "PRIVYHUB_ADD_GAME_DROPINS": str(cls.tmp / "dropins")})
++                           "PRIVYHUB_ADD_GAME_DROPINS": str(cls.tmp / "dropins"),
++                           "PRIVYHUB_ADD_GAME_ASK": str(cls.tmp / "ask")})          # B187: the ask's picture
+         (cls.tmp / "rules").mkdir()
+         import party_add_game as pag
+         cls.pag = pag
+@@ -150,7 +151,8 @@ class Learn(Made):
+         rc, out = self.label_all("T92", T90_SHAPE)
+         lv = self.verdict("T92", "label")
+         self.assertEqual(rc, 0, out + json.dumps(lv["bad"]))
+-        self.assertEqual(lv["cells"]["end_P1: read back by a reader learnt without it"], "not read (shown only here: 1)")
++        self.assertEqual(lv["cells"]["end_P1: read back by a reader learnt without it"],   # B185: read at its places
++                         "?5-2 (shown only here: 1)")
+         self.assertEqual(lv["cells"]["end_P2: read back by a reader learnt without it"], "0-22")
+         rc, out = self.tool("learn", "T92")
+         v = self.verdict("T92", "learn")
+@@ -228,7 +230,9 @@ class LabelChecks(Made):
+         self.assertEqual(rc, 1)
+         self.assertIn("Read again: end_P1 (its two readings differ)", out)
+         rc, out = self.tool("label", "T95", f"end_P1={rd([21, 14], [21, 11])}")
+-        self.assertIn("Ask the user for end_P1's numbers", out)
++        self.assertIn("Ask the user about the match player 1 won 21-14 (or 21-11), kept at ", out)   # B187
++        self.assertIn("player 2's final", out)
++        self.assertTrue((self.pag.ask_folder() / "T95_end_P1.png").is_file())
+         rc, out = self.looked("T95", *self.tool("label", "T95", "end_P1=21-14,user"))
+         self.assertEqual(rc, 0, out)
+ 
+@@ -250,18 +254,16 @@ class LabelChecks(Made):
+             self.assertNotIn(right, out)
+ 
+     def test_a_misread_digit_only_this_save_shows(self):
+-        """T90's shape: 16-2 for 15-2 (no other save shows a 1 or a 6) passes the label stage; learn cannot pass with
+-        it; once one more save shows a 1, the label stage names that save alone."""
++        """T90's shape: 16-2 for 15-2 (no other save shows a 1 or a 6). B185: the reader learnt without it reads its
++        numbers at their places (?5-2), so the label stage names that save alone at once (it passed until B181's
++        learn); read right, PASS."""
+         self.put("T88", T90_SHAPE)
+         rc, out = self.label_all("T88", T90_SHAPE, {"end_P1": rd([16, 2])})
+-        self.assertEqual(rc, 0, out)
+-        rc, out = self.tool("learn", "T88")
+-        self.assertEqual(rc, 1, out)
+-        self.put("T88", {"end_P1_3": {"kind": "end", "s": [39, 18], "look": 7}})
+-        rc, out = self.tool("label", "T88", f"end_P1_3={rd([39, 18])}")
+         self.assertEqual(rc, 1, out)
+-        self.assertIn("Read again: end_P1 (a reader learnt from the other saves reads it as 15-2)", out)
++        self.assertIn("Read again: end_P1 (a reader learnt from the other saves reads it as ?5-2)", out)
+         self.assertNotIn("end_P1_2 (", out)
++        rc, out = self.looked("T88", *self.tool("label", "T88", f"end_P1={rd([15, 2])}"))
++        self.assertEqual(rc, 0, out)
+ 
+     def test_a_dropped_digit(self):
+         self.put("T98", A)
+diff --git a/tests/b181_every_digit/test_b181.py b/tests/b181_every_digit/test_b181.py
+index 56733f1c..6e8d423d 100644
+--- a/tests/b181_every_digit/test_b181.py
++++ b/tests/b181_every_digit/test_b181.py
+@@ -152,8 +152,8 @@ class LineScore(Made):
+         v = self.verdict("T93", "learn")
+         self.assertEqual(rc, 1, out)
+         self.assertIn("every digit 0-9 read by a reader learnt without each save that shows it", v["bad"])
+-        self.assertEqual(v["cells"]["every digit 0-9 read by a reader learnt without each save that shows it"],
+-                         {"shown by fewer than two saves": ["6"]})
++        self.assertEqual(v["cells"]["every digit 0-9 read by a reader learnt without each save that shows it"]
++                         ["shown by fewer than two saves"], ["6"])            # B186: the cell also says what one save showed
+         self.assertIn("whose line score shows 6", out)
+         more = {"end_P1_3": {"kind": "end_line", "q": [[6, 6, 1, 0, _, _], [3, 2, 0, 0, _, _]], "s": [13, 5], "look": 5}}
+         self.put("T93", more)
+diff --git a/tools/h7_endscreen.py b/tools/h7_endscreen.py
+index 7d94d7ec..02f279b4 100644
+--- a/tools/h7_endscreen.py
++++ b/tools/h7_endscreen.py
+@@ -1107,6 +1107,74 @@ def read_columns(a: np.ndarray, score: dict, refs: np.ndarray) -> list[list]:
+     return out
+ 
+ 
++def save_glyphs(score: dict, nums: list, lines: list, paths: list) -> list[tuple]:
++    """B186: every labelled glyph of one save at the spec's places and columns, in every picture given ->
++    [(picture index, where — "<side>" or "<side>.<column>" — , glyph index, key, cell)]. A number whose glyphs do
++    not fit its place is left out (as the learner's own `gather`)."""
++    out = []
++    for pi, path in enumerate(paths):
++        with Image.open(path) as im:
++            a = score_picture(im)
++        contrast = _contrast(a)
++        spots = [(p, nums[k], f"{k + 1}") for k, p in enumerate(score["places"])]
++        spots += [(pl, lines[k][c], f"{k + 1}.{c + 1}") for k, row in enumerate(score.get("columns") or [])
++                  for c, pl in enumerate(row) if pl is not None and k < len(lines) and c < len(lines[k])
++                  and lines[k][c] is not None]
++        for pl, v, where in spots:
++            gl = place_glyphs(a, pl, contrast)
++            if gl is None or len(gl) != len(str(v)):
++                continue
++            for i, (ch, g) in enumerate(zip(str(v), gl)):
++                out.append((pi, where, i, pl["group"] + ch, glyph_cell(a, g, pl)))
++    return out
++
++
++def read_glyph_with(others: dict, shown: dict, key: str, own: list, cell: np.ndarray) -> str:
++    """B186: one glyph read by templates learnt from `others` ({key: [cells]}, the other saves' glyphs; `shown`: how
++    many saves show each key) and `own` (its own save's other glyphs of `key`, never the glyph itself), by B178's own
++    rule (`_digit_stats`: thresholds, margin) -> the digit read, or "?"."""
++    cells = {k: list(v) for k, v in others.items() if k != key}
++    if not own:
++        return "?"
++    cells[key] = list(own)
++    sh = {k: v for k, v in shown.items() if k != key}
++    sh[key] = 1
++    keys, refs, gaps, need, _noise, _small = _digit_stats(cells, sh)
++    score = _stat_score(keys, gaps, need)
++    group = key[:-1]
++    idx = [i for i, k in enumerate(keys) if k[:-1] == group]
++    d = cell_dists(cell, refs[idx])
++    order = np.argsort(d, kind="stable")
++    best = keys[idx[int(order[0])]]
++    margin = float(d[order[1]] - d[order[0]]) if len(idx) > 1 else float("inf")
++    thr = score["thresholds"].get(best)
++    ok = (score["separable"].get(best) and thr is not None and float(d[order[0]]) <= thr and need is not None
++          and margin >= need)
++    return best[len(group):] if ok else "?"
++
++
++def spread_across_within(glyphs: dict) -> tuple:
++    """B186: {save: [(key, cell)]} (one picture of each save) -> (the largest distance between two glyphs of one key
++    from two saves, the largest within one save, pairs across, pairs within), over the keys two saves show; None for a
++    side with no pair."""
++    by: dict = {}
++    for save, gs in glyphs.items():
++        for key, cell in gs:
++            by.setdefault(key, []).append((save, cell))
++    across, within, na, nw = None, None, 0, 0
++    for key, gs in by.items():
++        if len({s_ for s_, _c in gs}) < 2:
++            continue
++        for i, (sa, ca) in enumerate(gs):
++            for sb, cb in gs[i + 1:]:
++                dd = float(cell_dists(ca, cb[None])[0])
++                if sa == sb:
++                    within, nw = (dd if within is None else max(within, dd)), nw + 1
++                else:
++                    across, na = (dd if across is None else max(across, dd)), na + 1
++    return (None if across is None else round(across, 4), None if within is None else round(within, 4), na, nw)
++
++
+ def _clusters(points: list) -> list:
+     """Anchors within 2 x SCORE_TOL of a cluster's first are one cluster; left to right."""
+     out: list = []
+diff --git a/tools/party_add_game.py b/tools/party_add_game.py
+index 24d0849c..7e02726a 100644
+--- a/tools/party_add_game.py
++++ b/tools/party_add_game.py
+@@ -442,6 +442,8 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+     if system == "ps1" and players == 4 and not b.get("described"):
+         on = ps1_four_on(b["game"])
+         cells.add("four-player PS1: the title's four-player setting on", on, True, on)
++    old_b = read_json(binding_path(code), {}) or {}
++    collected = dict(old_b.get("collected") or {})           # B187: each collected role's slot and the slot's time
+     if not check and a.get("collect"):                      # the user's slots copied to the kept folder (read only)
+         kf = kept_folder(code)
+         kf.mkdir(parents=True, exist_ok=True)
+@@ -449,8 +451,11 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+             role, _, slot = item.partition("=")
+             if not ROLE.match(role) or slot not in ("1", "2", "3"):
+                 raise Usage(f"--collect role=slot (roles begin, other, other2, end_P1..4, end_r<places>; slots 1-3)")
+-            data = _slot_file(b, int(slot)).read_bytes()
++            src = _slot_file(b, int(slot))
++            data = src.read_bytes()
+             write_if_changed(kf / f"{role}.state", data)
++            collected[role] = {"slot": int(slot), "saved": src.stat().st_mtime,       # B187: for the ask's words
++                               "sha": hashlib.sha256(data).hexdigest()}
+     if b.get("described"):                                  # its rules folder as it is: the files the listing needs
+         r = rules_folder()
+         begin = r / (f"{b['game']}.{b['cheat']['profile_id'][:12].upper()}.state" if b.get("cheat") else f"{b['game']}.state")
+@@ -485,6 +490,8 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+               len(flag_lines) == BARS["flag_lines_found"][0] or b.get("described"))
+     inputs = register_inputs(b, kept)
+     b["register_inputs"] = inputs
++    if collected:
++        b["collected"] = {r: v for r, v in collected.items() if v.get("sha") == kept_states(code).get(r)}
+     if not check:
+         write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
+         end_solo_mark(code)                                  # B172: a mark an earlier use left unclosed ends here
+@@ -1049,6 +1056,12 @@ READING = re.compile(rf"^{SIDE}(?:-{SIDE}){{1,3}}$")
+ LOOK = re.compile(r"^look=(all|[0-9]:\d+(?:\.\d+)*)$")      # B183: the last look's answer
+ LEFT_OUT_TRIES = 2                                           # a save named this often after the session read it again:
+                                                              # the user is asked for its numbers (not a bar)
++NO_PLACE = "*"                                               # B185: a column the reader has no place for (no other save
++                                                             # fills it)
++ACROSS_MARGIN = 0.05                                         # B186: a title's across-save glyph spread may be at most its
++                                                             # within-save spread + this (T90: across 0.401, within 0.418,
++                                                             # two digits >= 0.656; queue BI's settle) — not a bar in BARS
++ASK_REASONS = ("readings", "sum")                            # B187: the only reasons a save is asked of the user
+ 
+ 
+ def label_path(code: str) -> Path:
+@@ -1181,24 +1194,38 @@ def _replay_scores(es, spec: dict, arrays: dict, run: Path) -> list:
+     return said
+ 
+ 
+-def _read_all(es, spec: dict, arrays: dict, run: Path, want: str) -> tuple[list, list | None]:
++def _read_all(es, spec: dict, arrays: dict, run: Path, want: str, direct: bool = False) -> tuple[list, list | None]:
+     """B181: the save's end through the spec (its finals, as the hub reads them) and, on the picture it ended on, every
+-    learnt line-score column -> (said, [(cells read — int, "_" blank, text with "?" not read — , final) per side])."""
++    learnt line-score column -> (said, [(cells read — int, "_" blank, text with "?" not read, B185's "*" a column with
++    no place: no save the spec was learnt from fills it — , final) per side]). B186: a replay that never ends (a final
++    holding a digit the spec has no template for) reads its finals and columns at their places on the save's first
++    labelled picture instead (a final read in part is text with "?"); `said` stays empty (`direct`: learn's
++    left-out cell and the label stage's read-back)."""
++    from PIL import Image
+     said = _replay_scores(es, spec, arrays, run)
+-    if not said:
++    if said:
++        finals, f = said[0][2], said[0][3]
++    elif not direct:
+         return said, None
+-    finals, f = said[0][2], said[0][3]
++    else:
++        two = _two_pictures(run.parent, run.name)
++        if not two or not (spec.get("score") or {}).get("places"):
++            return said, None
++        f = two[0]
++        with Image.open(run / f) as im:
++            rd = es.read_scores(es.score_picture(im), spec["score"], arrays["digit_refs"])["read"]
++        finals = [("_" if not x else int(x) if "?" not in x else x) for x in rd]
+     sides = _sides(want)
+     cols = None
+     if any(cells for cells, _fin in sides):
+-        from PIL import Image
+         with Image.open(run / f) as im:
+             cols = es.read_columns(es.score_picture(im), spec["score"], arrays["digit_refs"])
+     got = []
+     for k, (cells, _fin) in enumerate(sides):
+         colk = (cols[k] if cols and k < len(cols) else []) if cells else []
+-        got.append(([("_" if (c >= len(colk) or colk[c] in (None, "_")) else colk[c]) for c in range(len(cells))],
+-                     finals[k]))
++        got.append(([("_" if cells[c] is None else NO_PLACE) if c >= len(colk) or colk[c] is None
++                     else "_" if colk[c] == "_" else colk[c] for c in range(len(cells))],
++                    finals[k] if k < len(finals) else "_"))
+     return said, got
+ 
+ 
+@@ -1206,19 +1233,56 @@ def _got_text(got) -> str:
+     return "-".join(("+".join(str(c) for c in cells) + "=" if cells else "") + str(fin) for cells, fin in got)
+ 
+ 
+-def _compare(want: str, got) -> str:
+-    """'same', 'contradicted' (a number read as another), or 'unread' (a glyph not read, nothing contradicted)."""
++def _judge(want: str, got, only=()) -> tuple[str, dict]:
++    """B185 / B186: a save's reading against what a reader read -> (how, shown only here). how: 'same' (every number
++    as labelled, but for what is shown only here), 'contradicted' (a number read as another, a blank read as a number,
++    a number read as blank), or 'unread' (a glyph not read whose digit is not in `only`). Shown only here:
++    {"digits": the digits of `only` not read, "columns": "P<k> column <c>" for a filled cell in a column the reader
++    has no place for (no other save fills it — never a misread)}."""
+     if got is None:
+-        return "unread"
++        return "unread", {}
+     diff = unread = False
++    digs, cols = set(), []
++    for k, ((wc, wf), (gc, gf)) in enumerate(zip(_sides(want), got)):
++        for c, (w, g) in enumerate([*zip(wc, gc), (wf, gf)]):
++            if g == NO_PLACE:
++                if w is not None:
++                    cols.append(f"P{k + 1} column {c + 1}")
++            elif g == "_":
++                diff |= w is not None
++            elif isinstance(g, str):
++                if w is None or len(g) != len(str(w)):
++                    diff = True
++                    continue
++                for gch, wch in zip(g, str(w)):
++                    if gch == "?":
++                        if wch in only:
++                            digs.add(wch)
++                        else:
++                            unread = True
++                    elif gch != wch:
++                        diff = True
++            else:
++                diff |= w is None or int(g) != int(w)
++    here = {k: v for k, v in (("digits", sorted(digs)), ("columns", cols)) if v}
++    return ("contradicted" if diff else "unread" if unread else "same"), here
++
++
++def _fill(want: str, got, mine) -> list | None:
++    """B186: a glyph not read whose digit is learnt from this save alone (`mine`, each of its glyphs read back by its
++    own other glyphs) is that digit."""
++    if got is None or not mine:
++        return got
++    out = []
+     for (wc, wf), (gc, gf) in zip(_sides(want), got):
+-        diff |= gf != wf
+-        for w, g in zip(wc, gc):
+-            if isinstance(g, str) and g != "_":
+-                unread = True
+-            elif (w is None) != (g == "_") or (w is not None and g != w):
+-                diff = True
+-    return "contradicted" if diff else "unread" if unread else "same"
++        row = []
++        for w, g in [*zip(wc, gc), (wf, gf)]:
++            if isinstance(g, str) and "?" in g and w is not None and len(g) == len(str(w)):
++                t = "".join(wch if gch == "?" and wch in mine else gch for gch, wch in zip(g, str(w)))
++                g = int(t) if "?" not in t else t
++            row.append(g)
++        out.append((row[:-1], row[-1]))
++    return out
+ 
+ 
+ def _digits_of(text: str) -> set:
+@@ -1249,12 +1313,73 @@ def _learn_without(es, b: dict, pics: Path, labels: dict, members) -> tuple:
+     return spec, arrays, None
+ 
+ 
++def _one_save_digits(es, spec: dict, pics: Path, labels: dict, texts: dict) -> dict:
++    """B186: for every digit only one end save shows, whether it is learnt from that save alone: the save shows it at
++    least twice, each glyph read back as it by templates learnt from the other saves' glyphs and the save's own other
++    glyphs of that digit (never the glyph under test, by its place, in any picture), and the title's across-save
++    spread within its within-save spread + ACROSS_MARGIN. -> {"digits": {d: {"save", "glyphs", "read back",
++    "learnt"}}, "spread": {"across", "within", "bar", "met"}}."""
++    sc = spec.get("score") or {}
++    if not sc.get("found"):
++        return {"digits": {}, "spread": None}
++    frames = es.labelled_frames(pics, labels, "first")
++    paths: dict = {}
++    for c, ps in frames.items():
++        for p_ in ps:
++            if p_.parent.name in texts:
++                paths.setdefault(p_.parent.name, []).append(p_)
++    glyphs = {}
++    for role, ps in paths.items():
++        sides = _sides(texts[role])
++        glyphs[role] = es.save_glyphs(sc, [fin for _c, fin in sides], [cl for cl, _f in sides], sorted(ps))
++    across, within, na, nw = es.spread_across_within(
++        {r: [(g[3], g[4]) for g in gs if g[0] == 0] for r, gs in glyphs.items()})
++    met = across is not None and within is not None and across <= within + ACROSS_MARGIN
++    spread = {"across": across, "within": within, "pairs": [na, nw],
++              "bar": f"across <= within + {ACROSS_MARGIN}", "met": met}
++    shows = {d: [r for r, t in texts.items() if d in _digits_of(t)] for d in "0123456789"}
++    out = {}
++    for d in "0123456789":
++        if len(shows[d]) != 1 or shows[d][0] not in glyphs:
++            continue
++        role = shows[d][0]
++        mine = [g for g in glyphs[role] if g[3][-1] == d]
++        tests = [g for g in mine if g[0] == 0]
++        others: dict = {}
++        seen: dict = {}
++        for r, gs in glyphs.items():
++            if r == role:
++                continue
++            for g in gs:
++                others.setdefault(g[3], []).append(g[4])
++            for key in {g[3] for g in gs}:
++                seen[key] = seen.get(key, 0) + 1
++        back = 0
++        for t in tests:
++            own = [g[4] for g in mine if g[3] == t[3] and (g[1], g[2]) != (t[1], t[2])]
++            back += es.read_glyph_with(others, seen, t[3], own, t[4]) == d
++        out[d] = {"save": role, "glyphs": len(tests), "read back": back,
++                  "learnt": len(tests) >= 2 and back == len(tests) and met}
++    return {"digits": out, "spread": spread}
++
++
+ def _read_back(es, b: dict, pics: Path, labels: dict, role: str, want: str):
+     """Every number a reader learnt without this save reads on its pictures (`_read_all`), or None."""
+     spec, arrays, why = _learn_without(es, b, pics, labels, [role])
+     if spec is None or why:
+         return None
+-    return _read_all(es, spec, arrays, pics / role, want)[1]
++    return _read_all(es, spec, arrays, pics / role, want, direct=True)[1]
++
++
++def _mend(w, g):
++    """What the other saves' reader read, its unread glyphs ("?") and its columns with no place ("*") as labelled."""
++    if g == "_":
++        return None
++    if g == NO_PLACE or not isinstance(g, str):
++        return w if g == NO_PLACE else g
++    if w is None or len(g) != len(str(w)):
++        return w
++    return int("".join(wch if gch == "?" else gch for gch, wch in zip(g, str(w))))
+ 
+ 
+ def _culprit(es, b: dict, pics: Path, kept: dict, ends: list, texts: dict, contradicted: dict) -> str | None:
+@@ -1262,11 +1387,11 @@ def _culprit(es, b: dict, pics: Path, kept: dict, ends: list, texts: dict, contr
+     save read back as labelled; None when no single one does."""
+     for x in sorted(contradicted):
+         got = contradicted[x]
+-        mended = [([(w if isinstance(g, str) and g != "_" else (None if g == "_" else g)) for w, g in zip(wc, gc)], gf)
+-                  for (wc, _wf), (gc, gf) in zip(_sides(texts[x]), got)]
++        mended = [([_mend(w, g) for w, g in zip(wc, gc)], _mend(wf, gf))
++                  for (wc, wf), (gc, gf) in zip(_sides(texts[x]), got)]
+         t2 = {**texts, x: _text(mended)}
+         labels2 = _labels(pics, kept, es, {r: _score_class(t2[r]) for r in ends})
+-        if all(_compare(t2[y], _read_back(es, b, pics, labels2, y, t2[y])) == "same"
++        if all(_judge(t2[y], _read_back(es, b, pics, labels2, y, t2[y]), _only_here(y, [y], t2))[0] == "same"
+                for y in sorted(contradicted) if y != x):
+             return x
+     return None
+@@ -1316,6 +1441,64 @@ def _sheet(es, spec: dict, pics: Path, ends: list, texts: dict, folder: Path) ->
+     return {dg: [r for r, _c in v] for dg, v in sorted(tiles.items())}
+ 
+ 
++def ask_folder() -> Path:
++    """B187: where the one picture in doubt is put for Cowork to show the user — this repo's logs/ (git-ignored)."""
++    return _env_path("PRIVYHUB_ADD_GAME_ASK", project() / "logs" / "add_game_ask")
++
++
++def _column_words(c: int, n: int) -> str:
++    return (["Q1", "Q2", "Q3", "Q4", "OT1", "OT2"][c] if n == 6 else f"cell {c + 1}")
++
++
++def _when_saved(code: str, b: dict, role: str) -> str:
++    """B187: when and where the save was made — register --collect's slot and the slot file's time (the hub's clock),
++    else when the tool kept it."""
++    import time as _t
++    got = (b.get("collected") or {}).get(role) or {}
++    kept = kept_folder(code) / f"{role}.state"
++    if got.get("sha") == (sha(kept) if kept.is_file() else None) and got.get("saved"):
++        at = _t.strftime("%I:%M %p", _t.localtime(float(got["saved"]))).lstrip("0").lower()
++        return f"saved at {at} to slot {got['slot']}"
++    at = _t.strftime("%I:%M %p", _t.localtime(kept.stat().st_mtime)).lstrip("0").lower() if kept.is_file() else "?"
++    return f"kept at {at} (its slot not recorded)"
++
++
++def _ask_line(code: str, b: dict, rec: dict, role: str, why: str, texts: dict, folder: Path) -> tuple[str, str]:
++    """B187: the ask to the user — the save by its match, the cells in doubt in the line score's own form, the one
++    picture in doubt copied for Cowork to show. -> (the line printed, the line written down: the final left out)."""
++    rd = rec["saves"][role]["readings"]
++    k = int(role[5])
++    one, two = _sides(rd[0]), _sides(rd[-1])
++    fin1 = "-".join(str(f_) for _c, f_ in one)
++    fin2 = "-".join(str(f_) for _c, f_ in two)
++    final = fin1 + (f" (or {fin2})" if fin2 != fin1 else "")
++    blank_elsewhere = {(j, c) for r, t in texts.items() if r != role
++                       for j, (cl, _f) in enumerate(_sides(t)) for c, x in enumerate(cl) if x is None}
++    overtime = any(x is not None and (j, c) in blank_elsewhere for j, (cl, _f) in enumerate(one)
++                   for c, x in enumerate(cl))
++    match = f"the match player {k} won {{final}}{' in overtime' if overtime else ''}, {_when_saved(code, b, role)}"
++    doubt = []
++    for j, ((c1, f1), (c2, f2)) in enumerate(zip(one, two)):
++        bad_sum = why == "sum" and c1 and sum(x for x in c1 if x is not None) != f1
++        cols = [c for c in range(len(c1)) if why == "readings" and (c >= len(c2) or c1[c] != c2[c])]
++        cols = list(range(len(c1))) if bad_sum else cols
++        fin = bad_sum or (why == "readings" and f1 != f2)
++        if cols or fin:
++            doubt.append(f"player {j + 1}'s " + ", ".join([_column_words(c, len(c1)) for c in cols]
++                                                          + (["final"] if fin else [])))
++    cells_words = "; ".join(doubt) or "every number"
++    pic = ask_folder() / f"{code}_{role}.png"
++    pic.parent.mkdir(parents=True, exist_ok=True)
++    shutil.copyfile(folder / f"{role}.1.png", pic)
++    form = _side_words(b["players"], any(cl for cl, _f in one))
++    tail = (f": {cells_words}, as its final stats screen shows them. YOU, now: ask Cowork to show you the picture "
++            f"of that match; then reply with its scores. Then label {code} {role}={form},user — the whole line "
++            f"score, the user's numbers in those cells (the picture: logs/add_game_ask/{code}_{role}.png, "
++            f"git-ignored).")
++    return ("Ask the user about " + match.format(final=final) + tail,
++            "Ask the user about " + match.format(final="<its final as read: run time only>") + tail)
++
++
+ def cmd_label(code: str, a: dict) -> int:
+     b = load_binding(code)
+     if b.get("result") != "score":
+@@ -1335,13 +1518,21 @@ def cmd_label(code: str, a: dict) -> int:
+     for role in given:
+         if role not in kept:
+             raise Usage(f"{role} is not a kept end save")
++    lined_now = any(_sides(v["readings"][0])[0][0] for r, v in rec["saves"].items() if v.get("readings")
++                    and kept.get(r) == v.get("sha") and r not in given) or any(
++        _sides(v["readings"][0])[0][0] for v in given.values())
++    for role, v in given.items():                            # B187: a line-score title's answer is a line score
++        if v["by"] == "user" and lined_now and not all(cl for cl, _f in _sides(v["readings"][0])):
++            raise Usage(f"the user's answer is the line score's own form — every side's cells, then '=' and its "
++                        f"final ({_side_words(b['players'], True)}): {role}")
+     for role in list(rec["saves"]):                          # a save changed or gone: its readings and counts end
+         if rec["saves"][role].get("sha") != kept.get(role):
+             del rec["saves"][role]
+     for role, v in given.items():
+         old = rec["saves"].get(role) or {}
+         rec["saves"][role] = {"sha": kept[role], "readings": v["readings"], "by": v["by"],
+-                              "named": old.get("named", 0), "again": bool(old.get("named"))}
++                              "named": old.get("named", 0), "again": bool(old.get("named")),
++                              "named_for": dict(old.get("named_for") or {})}
+     cells = Cells()
+     try:
+         pics = _pictures(code, b, kept)
+@@ -1363,6 +1554,11 @@ def cmd_label(code: str, a: dict) -> int:
+     missing = [r for r in ends if r not in rec["saves"]]
+     cells.add("every end save read", missing, [], not missing)
+     named: dict = {}
++    reason: dict = {}                                        # B187: why each save was named (ASK_REASONS asked)
++
++    def name(role_: str, words_: str, why_: str) -> None:
++        if role_ not in named:
++            named[role_], reason[role_] = words_, why_
+     n = b["players"]
+     for role in ends:
+         v = rec["saves"].get(role)
+@@ -1371,18 +1567,18 @@ def cmd_label(code: str, a: dict) -> int:
+         rd = v["readings"]
+         same = v["by"] == "user" or (len(rd) == 2 and rd[0] == rd[1])
+         if not cells.add(f"{role}: the two readings the same", rd, "the same numbers from both pictures", same):
+-            named.setdefault(role, "its two readings differ")
++            name(role, "its two readings differ", "readings")
+         k = int(role[5])
+         nums = _finals(rd[0])
+         ahead = all(nums[k - 1] > x for j, x in enumerate(nums) if j != k - 1)
+         if not cells.add(f"{role}: the role's player ahead", nums, f"P{k} more than every other side", ahead):
+-            named.setdefault(role, f"P{k} is not ahead in it")
++            name(role, f"P{k} is not ahead in it", "ahead")
+         sums = [(k_ + 1, sum(x for x in cl if x is not None), fin) for k_, (cl, fin) in enumerate(_sides(rd[0])) if cl]
+         if sums:                                             # B181: each side's cells add up to its final
+             bad = [x for x in sums if x[1] != x[2]]
+             if not cells.add(f"{role}: the cells add up to the finals", [[s_, f_] for _k, s_, f_ in sums],
+                              "each side's cells = its final", not bad):
+-                named.setdefault(role, f"P{bad[0][0]}'s cells add up to {bad[0][1]}, not its final {bad[0][2]}")
++                name(role, f"P{bad[0][0]}'s cells add up to {bad[0][1]}, not its final {bad[0][2]}", "sum")
+     texts = {r: rec["saves"][r]["readings"][0] for r in ends if r in rec["saves"]}
+     recorded: dict = {"pictures": {r: [f"{r}.1.png", f"{r}.2.png"] for r in ends}}
+     look_for = digest({r: texts.get(r) for r in ends})
+@@ -1397,7 +1593,7 @@ def cmd_label(code: str, a: dict) -> int:
+             what = (f"P{side}'s number" if not col else f"P{side}'s number of cells" if col == "cells"
+                     else f"P{side}'s cell {col}")
+             for role in saves:
+-                named.setdefault(role, f"{what} does not fit where the other saves have it")
++                name(role, f"{what} does not fit where the other saves have it", "place")
+         if found:
+             rec["places"] = spec["score"]["places"]
+             for role in ends:
+@@ -1405,31 +1601,33 @@ def cmd_label(code: str, a: dict) -> int:
+             contradicted, unread = {}, []
+             for role in ends:                                # 4: read back by a reader learnt without it
+                 got = _read_back(es, b, pics, labels, role, texts[role])
+-                how = _compare(texts[role], got)
+                 only = _only_here(role, [role], texts)
+-                name = f"{role}: read back by a reader learnt without it"
++                how, here = _judge(texts[role], got, only)   # B185: a column no other save fills, shown only here
++                if got is None and only:
++                    how, here = "same", {"digits": only}
++                cell = f"{role}: read back by a reader learnt without it"
++                words_ = ("not read" if got is None else _got_text(got)) + (
++                    " (shown only here: " + "; ".join(", ".join(v) for v in here.values()) + ")" if here else "")
++                bar_ = f"{texts[role]}, but for a digit or a column no other save shows"
++                if here:
++                    recorded.setdefault("shown only here", {})[role] = here
+                 if how == "same":
+-                    cells.add(name, _got_text(got), texts[role], True)
++                    cells.add(cell, words_, bar_, True)
+                 elif how == "contradicted":
+-                    cells.add(name, _got_text(got), texts[role], False)
++                    cells.add(cell, words_, bar_, False)
+                     contradicted[role] = got
+                 else:
+-                    cells.add(name, ("not read" if got is None else _got_text(got))
+-                              + (f" (shown only here: {', '.join(only)})" if only else ""),
+-                              f"{texts[role]}, or not read for a digit no other save shows", bool(only))
+-                    if not only:
+-                        unread.append(role)
+-                    else:
+-                        recorded.setdefault("shown only here", {})[role] = only
++                    cells.add(cell, words_, bar_, False)
++                    unread.append(role)
+             # one misread label spoils the other saves' readers too: name the save whose own reading, put right,
+             # clears the rest; a save not read is named only when nothing else is
+             culprit = _culprit(es, b, pics, kept, ends, texts, contradicted) if len(contradicted) > 1 else None
+             for role, got in sorted(contradicted.items()):
+                 if culprit is None or role == culprit:
+-                    named.setdefault(role, "a reader learnt from the other saves reads it as " + _got_text(got))
++                    name(role, "a reader learnt from the other saves reads it as " + _got_text(got), "read back")
+             if not named:
+                 for role in unread:
+-                    named.setdefault(role, "a reader learnt from the other saves does not read it")
++                    name(role, "a reader learnt from the other saves does not read it", "read back")
+             # B183: the last look — every glyph by the digit it was read as, one picture; the session's answer
+             rows = _sheet(es, spec, pics, ends, texts, folder)
+             if looks and rec.get("tiles", {}).get("for") == look_for:
+@@ -1454,13 +1652,14 @@ def cmd_label(code: str, a: dict) -> int:
+                           not look["bad"])
+                 for dg, idx in sorted(look["bad"].items()):
+                     for i in idx:
+-                        named.setdefault(rows[dg][i - 1], f"a glyph read as {dg} is not one, at the last look")
++                        name(rows[dg][i - 1], f"a glyph read as {dg} is not one, at the last look", "look")
+             recorded["sheet"] = {d_: len(v) for d_, v in rows.items()}
+-    line = ""
++    line = line_rec = ""
+     for role in ends:                                        # how often each save was named after a reading again
+         v = rec["saves"].get(role)
+         if v is not None and role in named and role in given:
+             v["named"] = v.get("named", 0) + 1
++            v.setdefault("named_for", {})[reason[role]] = v.get("named_for", {}).get(reason[role], 0) + 1
+         if v is not None:
+             v.pop("again", None)
+     if named and (rec.get("look") or {}).get("bad"):
+@@ -1476,17 +1675,24 @@ def cmd_label(code: str, a: dict) -> int:
+         recorded["read"] = missing
+     elif named:
+         user = [r for r in sorted(named) if rec["saves"][r]["by"] == "user"]
+-        twice = [r for r in sorted(named) if rec["saves"][r].get("named", 0) >= LEFT_OUT_TRIES and r not in user]
++        cnt = {r: (rec["saves"][r].get("named_for") or {}).get(reason[r], 0) for r in named}
++        twice = [r for r in sorted(named) if reason[r] in ASK_REASONS and cnt[r] >= LEFT_OUT_TRIES and r not in user]
++        stuck = [r for r in sorted(named) if reason[r] not in ASK_REASONS and cnt[r] >= LEFT_OUT_TRIES
++                 and r not in user]
+         if user:
+             r = user[0]
+             line = (f"{r} cannot be read as the user says ({named[r]}): collect it again from another match "
+                     f"P{r[5]} won, then register {code} … --collect {r}=<slot>, label {code} and learn {code} again.")
+             recorded["collect again"] = r
+-        elif twice:
++        elif twice:                                          # B187: the ask, plain, with the picture
+             r = twice[0]
+-            line = (f"Ask the user for {r}'s numbers ({named[r]}, after it was read again): the final score of that "
+-                    f"match, P1's first; then label {code} {r}={_side_words(n)},user.")
+-            recorded["ask the user"] = r
++            line, line_rec = _ask_line(code, b, rec, r, reason[r], texts, folder)
++            recorded["ask the user"] = {"save": r, "why": reason[r], "picture": f"logs/add_game_ask/{code}_{r}.png"}
++        elif stuck:                                          # B187: never the user, never a new match
++            r = stuck[0]
++            line = (f"Stop: {r} ({named[r]}) after it was read again twice. Do not ask the user and do not ask for "
++                    f"another match: take this line back to the chat (Cowork).")
++            recorded["back to the chat"] = r
+         else:
+             crops = bool(rec.get("places"))
+             line = ("Read again: " + "; ".join(f"{r} ({named[r]})" for r in sorted(named)) + ". Their pictures in "
+@@ -1499,9 +1705,10 @@ def cmd_label(code: str, a: dict) -> int:
+                 f"If every glyph in every row is its row's digit: label {code} look=all. Else name the ones that are "
+                 f"not: label {code} look=<digit>:<numbers joined by '.'> (one look= for each such row).")
+         recorded["look"] = "asked"
++    line_rec = line_rec or line                              # B187: the final as read is never written down
+     if line:
+-        recorded["line"] = line
+-    rc = finish(code, "label", cells, label_inputs(code, b), note=line, recorded=recorded)
++        recorded["line"] = line_rec
++    rc = finish(code, "label", cells, label_inputs(code, b), note=line_rec, recorded=recorded)
+     if line:
+         out(line)
+     return rc
+@@ -1545,6 +1752,7 @@ def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
+               unknown / n <= BARS["unknown_share_max"][0])
+     cells.add("other read as a screen", sc.get("other_read_as_screen"), BARS["other_as_screen_max"][0],
+               (sc.get("other_read_as_screen") or 0) <= BARS["other_as_screen_max"][0])
++    in_time: dict = {}                                       # B186: the full reader's own end, per end save
+     for role in sorted(kept):                                # the replays (the begin, other, every end save)
+         cls = _role_class(role)
+         said = _replay_scores(es, spec, arrays, pics / role) if cls not in ("start",) else []
+@@ -1573,36 +1781,58 @@ def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
+                       got is not None and got[2] == want)
+             cells.add(f"{role}: ended within", None if got is None else got[0], f"<= {BARS['ended_within_s'][0]} s",
+                       got is not None and got[0] <= BARS["ended_within_s"][0])
++            if got is not None and got[2] == want and got[0] <= BARS["ended_within_s"][0]:
++                in_time[role] = got[0]
+     group, pairs = _matches(pics, kept)                      # B176: saves that are the same picture are one match
+     cells.add("no two saves of one ending the same picture", pairs,
+               f">= {SAME_PICTURE[0]} grey ({SAME_PICTURE[1]})", not pairs)
+     only: dict = {}
+     bar = BARS["ended_within_s"][0]
++    one = _one_save_digits(es, spec, pics, labels, texts)    # B186: a digit one save shows several times
++    from_one = {d: v for d, v in one["digits"].items() if v["learnt"]}
++    shown_here: dict = {}
+     for gid in sorted(set(group.values())):                  # B175 for numbers (B181: every number of the save)
+         members = sorted(x for x in group if group[x] == gid)
+         lo_spec, lo_arr, why = _learn_without(es, b, pics, labels, members)
++        mine = [d for d, v in from_one.items() if v["save"] in members]
+         for role in members:
+             name = f"left out: {role}"
+-            bar_words = f"{texts[role]} (every number) within <= {bar} s, never other numbers"
+-            here = _only_here(role, members, texts)
++            bar_words = (f"{texts[role]} (every number) within <= {bar} s, never other numbers (a digit only it shows "
++                         "read with its own other glyphs; a column only it fills shown only here)")
++            here = [d for d in _only_here(role, members, texts) if d not in from_one]
+             if why:
+                 cells.add(name, why, bar_words, False)
+                 only[role] = here
+                 continue
+-            said, got = _read_all(es, lo_spec, lo_arr, pics / role, texts[role])
+-            ok = bool(said) and _compare(texts[role], got) == "same" and said[0][0] <= bar
+-            cells.add(name, None if not said else [_got_text(got), said[0][0]], bar_words, ok)
++            said, got = _read_all(es, lo_spec, lo_arr, pics / role, texts[role], direct=True)
++            got = _fill(texts[role], got, mine)
++            how, here_ = _judge(texts[role], got, mine)       # B185 / B186
++            if here_:
++                shown_here[role] = here_
++            took = said[0][0] if said else in_time.get(role)  # the full reader's own end when its final holds one
++            ok = got is not None and how == "same" and took is not None and took <= bar
++            cells.add(name, None if got is None else [_got_text(got) + (
++                " (shown only here: " + "; ".join(", ".join(v) for v in here_.values()) + ")" if here_ else ""),
++                took if said else f"{took} (the full reader's)"], bar_words, ok)
+             if not ok:
+                 only[role] = here
+     learnt = sorted(k[-1] for k in (spec.get("score") or {}).get("keys") or [])
+     shows = {d: sum(1 for t in texts.values() if d in _digits_of(t)) for d in "0123456789"}
+-    few = [d for d in "0123456789" if shows[d] < 2]
++    few = [d for d in "0123456789" if shows[d] < 2 and d not in from_one]
++    read_ = {"shown by fewer than two saves": few}
++    if one["digits"]:                                        # B186: what one save alone showed, and the spread
++        read_["learnt from one save"] = {d: f"{v['glyphs']} glyphs in {v['save']}, {v['read back']} read back"
++                                         + ("" if v["learnt"] else " — not learnt") for d, v in one["digits"].items()}
++        read_["across-save spread"] = one["spread"]
+     cells.add("every digit 0-9 read by a reader learnt without each save that shows it",
+-              {"shown by fewer than two saves": few}, {"shown by fewer than two saves": []}, not few)   # B181
++              read_, {"shown by fewer than two saves": []}, not few)   # B181 / B186
+     recorded = {"digits": {"in two saves or more": [d for d in "0123456789" if shows[d] >= 2],
+                            "in one save": [d for d in "0123456789" if shows[d] == 1],
++                           "learnt from one save": sorted(from_one),
+                            "never": [d for d in "0123456789" if shows[d] == 0]},
+                 "digits learnt": learnt}
++    if shown_here:
++        recorded["shown only here"] = shown_here
+     inputs = learn_inputs(code, b)
+     if cells.passed:                                         # only a passing title reaches the rules folder
+         begin = r / _begin_name(b)
+@@ -1649,7 +1879,8 @@ def _score_line(b: dict, cells: Cells, kept, only: dict, group: dict, pairs: lis
+         line = (f"One more save: a match either player won {where}; the more of them the better — save the screen "
+                 f"after it to a free slot, then register {code} … --collect <role>=<slot> with the role of the player "
+                 f"who won (" + ", ".join(f"{x} if P{x[5]} won" for x in roles) + f"), label {code} and learn {code} "
+-                "again.")
++                f"again. {len(digits)} digit{'s are' if len(digits) != 1 else ' is'} still short ({words}); if one "
++                "is still short after that match, learn asks for one more.")     # B188: never "one is enough"
+         return line, {"one more save": roles, "digits asked": digits, "line": line}
+     return one_more_save(b, cells, kept, None, group=group, pairs=pairs)
+ 
+@@ -2530,6 +2761,8 @@ def cmd_close(code: str, a: dict) -> int:
+     note = "The title's own in-game saves (recorded, never a cell): " + (
+         "; ".join(f"{r['save']}: {r['is']}" for r in saves) if saves else "none found") + "."
+     end_solo_mark(code)                                      # B172: the next solo writes its own mark and befores
++    for pic in sorted(ask_folder().glob(f"{code}_*.png")):   # B187: the picture shown to the user, removed
++        pic.unlink()
+     return finish(code, "close", cells, digest({"register": b.get("register_inputs"), "before": digest(before)}),
+                   note=note, recorded={"in_game_saves": saves})
+ 
+diff --git a/tests/b185_overtime/test_b185.py b/tests/b185_overtime/test_b185.py
+new file mode 100644
+index 00000000..86e14c01
+--- /dev/null
++++ b/tests/b185_overtime/test_b185.py
+@@ -0,0 +1,294 @@
++#!/usr/bin/env python3
++"""B185 / B186 / B187 (host): a column only one save fills (overtime); a digit only one save shows, learnt from that
++save when it shows it several times; the ask to the user, rare and plain, with the picture. Every picture made-up
++(B181's `line_capture.py`); no title, nothing read from the hub's own folders, the hub never reached (port 9), no
++systemctl (a stand-in that lists nothing).
++
++- `Overtime`: one save fills OT1 -> label PASS, its OT cells "shown only here", never named; learn PASS (the left-out
++  cell not failed by it); two overtime saves -> the column learnt (a place in the spec, read back in each left out);
++  a filled OT cell breaking the sum still caught.
++- `OneSave`: a digit one save shows three times (and no other save) -> learnt from that save, learn PASS; the
++  across-save spread within its bar; a digit one save shows once -> short, learn FAIL naming it.
++- `Ask`: two readings differing twice -> the ask names the match (who won, its final as read, when kept), the cells
++  in doubt by column, the picture copied to the ask folder, the final left out of the record; a final alone refused;
++  the whole line score with the user's numbers -> PASS; close removes the picture. A sum failing twice -> the ask
++  names that side's every cell. A read-back contradiction named twice -> never the user, never another match.
++Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b185_overtime -v
++"""
++from __future__ import annotations
++
++import contextlib
++import io
++import json
++import os
++import shutil
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "tests" / "b181_every_digit"), str(ROOT / "tests" / "b178_score_kind")]
++
++ENV_KEYS = ("PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE", "PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_LOGS",
++            "PARTY_ADD_GAME_CAPTURE", "PRIVYHUB_ADD_GAME_HUB", "PRIVYHUB_ADD_GAME_DROPINS", "PRIVYHUB_ADD_GAME_ASK",
++            "PRIVYHUB_ADD_GAME_PROJECT", "PRIVYHUB_ADD_GAME_SYSTEMCTL")
++EVERY = "every digit 0-9 read by a reader learnt without each save that shows it"
++_ = None
++B, O = {"kind": "begin"}, {"kind": "other"}
++
++
++def end(q1, s1, q2, s2, look):
++    return {"kind": "end_line", "q": [q1, q2], "s": [s1, s2], "look": look}
++
++
++# B181's LINE (every digit in two saves or more), its end_P1_2 now an overtime match (OT1 filled, both rows)
++OT = {"begin": B, "other": O,
++      "end_P1": end([1, 2, 3, 4, _, _], 10, [0, 5, 0, 1, _, _], 6, 1),
++      "end_P1_2": end([7, 8, 9, 0, 3, _], 27, [6, 5, 4, 3, 0, _], 18, 2),
++      "end_P2": end([2, 0, 1, 3, _, _], 6, [9, 8, 7, 0, _, _], 24, 3),
++      "end_P2_2": end([5, 6, 0, 0, _, _], 11, [7, 8, 9, 1, _, _], 25, 4)}
++OT2 = dict(OT, end_P2=end([2, 0, 1, 3, 1, _], 7, [9, 8, 7, 0, 6, _], 30, 3))       # two overtime matches
++# T90's shape: the overtime save the only one with a 7 (nine of them, in its cells only) and the only one filling OT1
++T90S = {"begin": B, "other": O,
++        "end_P1": end([1, 2, 3, 4, _, _], 10, [0, 5, 0, 1, _, _], 6, 1),
++        "end_P1_2": end([7, 7, 7, 7, 7, _], 35, [7, 7, 7, 7, 0, _], 28, 2),
++        "end_P2": end([2, 0, 1, 3, _, _], 6, [9, 8, 6, 0, _, _], 23, 3),
++        "end_P2_2": end([5, 6, 0, 0, _, _], 11, [6, 8, 9, 1, _, _], 24, 4)}
++# 6 shown by end_P2 alone, three times; every other digit by two saves or more
++SIX = {"begin": B, "other": O,
++       "end_P1": end([1, 2, 3, 4, _, _], 10, [0, 5, 0, 2, _, _], 7, 1),
++       "end_P1_2": end([7, 8, 9, 0, _, _], 24, [5, 5, 4, 3, _, _], 17, 2),
++       "end_P2": end([6, 0, 0, 0, _, _], 6, [9, 8, 6, 1, _, _], 24, 3),
++       "end_P2_2": end([5, 5, 0, 0, _, _], 10, [7, 8, 9, 1, _, _], 25, 4)}
++# 6 shown by end_P2 alone, once
++SIX1 = dict(SIX, end_P2=end([2, 0, 1, 3, _, _], 6, [9, 8, 7, 0, _, _], 24, 3))
++
++
++def text(st: dict) -> str:
++    return "-".join("+".join("_" if c is None else str(c) for c in cells) + "=" + str(fin)
++                    for cells, fin in zip(st["q"], st["s"]))
++
++
++class Made(unittest.TestCase):
++    N = [0]
++
++    @classmethod
++    def setUpClass(cls):
++        cls.tmp = Path(tempfile.mkdtemp(prefix="b185_"))
++        cls.old = {k: os.environ.get(k) for k in ENV_KEYS}
++        os.environ.update({"PRIVYHUB_ADD_GAME_HOME": str(cls.tmp / "home"), "PRIVYHUB_ADD_GAME_EVIDENCE": str(cls.tmp / "ev"),
++                           "PRIVYHUB_H7_RULES": str(cls.tmp / "rules"), "PRIVYHUB_ADD_GAME_LOGS": str(cls.tmp / "logs"),
++                           "PARTY_ADD_GAME_CAPTURE": "line_capture:capture", "PRIVYHUB_ADD_GAME_HUB": "http://127.0.0.1:9",
++                           "PRIVYHUB_ADD_GAME_DROPINS": str(cls.tmp / "dropins"),
++                           "PRIVYHUB_ADD_GAME_ASK": str(cls.tmp / "project" / "logs" / "add_game_ask"),
++                           "PRIVYHUB_ADD_GAME_PROJECT": str(cls.tmp / "project"),
++                           "PRIVYHUB_ADD_GAME_SYSTEMCTL": "true"})
++        (cls.tmp / "rules").mkdir()
++        (cls.tmp / "project").mkdir()
++        import party_add_game as pag
++        cls.pag = pag
++
++    @classmethod
++    def tearDownClass(cls):
++        for k, v in cls.old.items():
++            if v is None:
++                os.environ.pop(k, None)
++            else:
++                os.environ[k] = v
++        shutil.rmtree(cls.tmp, ignore_errors=True)
++
++    def setUp(self):
++        """The made-up font's own thresholds are tight (its noise +-2): at some noise seeds a reader learnt without a
++        save misses that save's 5s and 8s (HEAD's code too — B181's suite's order happens to miss them). Every test
++        here pins its seeds (the state counter from 0, whatever ran before), so it reads; disclosed in the record."""
++        self.N[0] = 0
++
++    def put(self, code: str, saves: dict) -> None:
++        pag = self.pag
++        kf = pag.kept_folder(code)
++        kf.mkdir(parents=True, exist_ok=True)
++        for role, st in saves.items():
++            self.N[0] += 1
++            (kf / f"{role}.state").write_text(json.dumps({**st, "n": self.N[0]}))
++        bp = pag.binding_path(code)
++        b = json.loads(bp.read_text()) if bp.is_file() else {
++            "code": code, "game": "madeup" + code.lower(), "players": 2, "system": "ps1", "result": "score",
++            "cheat": None, "relative_path": "", "title": "", "content": ""}
++        b["register_inputs"] = pag.register_inputs(b, pag.kept_states(code))
++        bp.write_text(json.dumps(b))
++        pag.verdict_path(code, "register").parent.mkdir(parents=True, exist_ok=True)
++        pag.verdict_path(code, "register").write_text(json.dumps({"verdict": "PASS", "inputs": b["register_inputs"]}))
++
++    def tool(self, *argv) -> tuple[int, str]:
++        buf, err = io.StringIO(), io.StringIO()
++        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
++            rc = self.pag.main([str(a) for a in argv])
++        return rc, buf.getvalue() + err.getvalue()
++
++    def verdict(self, code: str, stage: str) -> dict:
++        v = self.pag.load_verdict(code, stage) or {}
++        return {"verdict": v.get("verdict"), "bad": [c["cell"] for c in v.get("cells", []) if not c["met"]],
++                "cells": {c["cell"]: c["read"] for c in v.get("cells", [])}, "recorded": v.get("recorded") or {},
++                "raw": v}
++
++    def looked(self, code: str, rc: int, out: str) -> tuple[int, str]:
++        if rc == 1 and "Look at label/digits.png" in out:
++            return self.tool("label", code, "look=all")
++        return rc, out
++
++    def label_all(self, code: str, saves: dict, wrong: dict | None = None):
++        texts = {r: f"{text(st)},{text(st)}" for r, st in saves.items() if r.startswith("end_")}
++        texts.update(wrong or {})
++        return self.looked(code, *self.tool("label", code, *[f"{r}={t}" for r, t in sorted(texts.items())]))
++
++
++class Overtime(Made):
++    def test_1_one_overtime_save_counts(self):
++        self.put("T91", OT)
++        rc, out = self.label_all("T91", OT)
++        lv = self.verdict("T91", "label")
++        self.assertEqual(rc, 0, out + json.dumps(lv["bad"]))
++        self.assertNotIn("Read again", out)
++        self.assertEqual(lv["recorded"]["shown only here"]["end_P1_2"],
++                         {"columns": ["P1 column 5", "P2 column 5"]})
++        self.assertIn("shown only here: P1 column 5, P2 column 5",
++                      lv["cells"]["end_P1_2: read back by a reader learnt without it"])
++        rc, out = self.tool("learn", "T91")
++        v = self.verdict("T91", "learn")
++        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
++        self.assertEqual(v["recorded"]["shown only here"]["end_P1_2"], {"columns": ["P1 column 5", "P2 column 5"]})
++        self.assertEqual(v["cells"]["end_P1_2: ended as itself"], [27, 18])      # the hub reads its finals
++        spec = json.loads((Path(os.environ["PRIVYHUB_H7_RULES"]) / "madeupt91.endscreen.json").read_text())
++        self.assertIsNotNone(spec["score"]["columns"][0][4])                   # learnt from the one save
++        self.assertIsNone(spec["score"]["columns"][0][5])
++
++    def test_2_two_overtime_saves_the_column_learnt(self):
++        self.put("T92", OT2)
++        rc, out = self.label_all("T92", OT2)
++        lv = self.verdict("T92", "label")
++        self.assertEqual(rc, 0, out + json.dumps(lv["bad"]))
++        self.assertNotIn("shown only here", json.dumps(lv["recorded"]))
++        self.assertEqual(lv["cells"]["end_P2: read back by a reader learnt without it"], text(OT2["end_P2"]))
++        rc, out = self.tool("learn", "T92")
++        v = self.verdict("T92", "learn")
++        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
++        self.assertEqual(v["cells"]["left out: end_P1_2"][0], text(OT2["end_P1_2"]))   # OT1 read at its place
++
++    def test_4_t90s_shape(self):
++        """The refused case: label twice with the same readings -> PASS, never read again, never the user; learn
++        PASS, the 7 learnt from the overtime save's own nine."""
++        self.put("T90", T90S)
++        for _try in (1, 2):
++            rc, out = self.label_all("T90", T90S)
++            lv = self.verdict("T90", "label")
++            self.assertEqual(rc, 0, out + json.dumps(lv["bad"]))
++            self.assertNotIn("Read again", out)
++            self.assertNotIn("Ask the user", out)
++        self.assertEqual(lv["recorded"]["shown only here"]["end_P1_2"],
++                         {"digits": ["7"], "columns": ["P1 column 5", "P2 column 5"]})
++        rc, out = self.tool("learn", "T90")
++        v = self.verdict("T90", "learn")
++        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
++        self.assertEqual(v["cells"][EVERY]["learnt from one save"], {"7": "9 glyphs in end_P1_2, 9 read back"})
++        self.assertEqual(v["cells"]["end_P1_2: ended as itself"], [35, 28])
++        self.assertEqual(v["cells"]["left out: end_P1_2"][0],
++                         "7+7+7+7+*+_=35-7+7+7+7+*+_=28 (shown only here: P1 column 5, P2 column 5)")
++
++    def test_3_an_overtime_cell_breaking_the_sum(self):
++        self.put("T93", OT)
++        bad = text(OT["end_P1_2"]).replace("7+8+9+0+3", "7+8+9+0+5")
++        rc, out = self.label_all("T93", OT, {"end_P1_2": f"{bad},{bad}"})
++        self.assertEqual(rc, 1)
++        self.assertIn("end_P1_2 (P1's cells add up to 29, not its final 27)", out)
++
++
++class OneSave(Made):
++    def test_1_a_digit_one_save_shows_three_times(self):
++        self.put("T94", SIX)
++        rc, out = self.label_all("T94", SIX)
++        self.assertEqual(rc, 0, out + json.dumps(self.verdict("T94", "label")["bad"]))
++        rc, out = self.tool("learn", "T94")
++        v = self.verdict("T94", "learn")
++        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
++        cell = v["cells"][EVERY]
++        self.assertEqual(cell["shown by fewer than two saves"], [])
++        self.assertEqual(cell["learnt from one save"], {"6": "3 glyphs in end_P2, 3 read back"})
++        sp = cell["across-save spread"]
++        self.assertTrue(sp["met"] and sp["across"] <= sp["within"] + self.pag.ACROSS_MARGIN, sp)
++        self.assertEqual(v["recorded"]["digits"]["learnt from one save"], ["6"])
++        self.assertEqual(v["cells"]["left out: end_P2"][0], text(SIX["end_P2"]))  # its 6s by its own other 6s
++
++    def test_2_a_digit_one_save_shows_once(self):
++        self.put("T95", SIX1)
++        rc, out = self.label_all("T95", SIX1)
++        self.assertEqual(rc, 0, out)
++        rc, out = self.tool("learn", "T95")
++        v = self.verdict("T95", "learn")
++        self.assertEqual(rc, 1, out)
++        self.assertEqual(v["cells"][EVERY]["shown by fewer than two saves"], ["6"])
++        self.assertEqual(v["cells"][EVERY]["learnt from one save"], {"6": "1 glyphs in end_P2, 0 read back — not learnt"})
++        self.assertIn("whose line score shows 6", out)
++        self.assertIn("1 digit is still short (6); if one is still short after that match, learn asks for one more.",
++                      out)                                                     # B188: never "one is enough"
++
++
++class Ask(Made):
++    def test_1_two_readings_differ_twice_then_the_user(self):
++        self.put("T96", OT)
++        r1 = text(OT["end_P1_2"])
++        r2 = r1.replace("7+8+9+0+3", "7+8+9+6+3")
++        rc, out = self.label_all("T96", OT, {"end_P1_2": f"{r1},{r2}"})
++        self.assertEqual(rc, 1)
++        self.assertIn("Read again: end_P1_2 (its two readings differ)", out)
++        self.assertNotIn("Ask the user", out)
++        rc, out = self.tool("label", "T96", f"end_P1_2={r1},{r2}")
++        self.assertEqual(rc, 1)
++        self.assertIn("Ask the user about the match player 1 won 27-18 in overtime, kept at ", out)
++        self.assertIn(": player 1's Q4, as its final stats screen shows them. YOU, now: ask Cowork to show you the "
++                      "picture of that match; then reply with its scores.", out)
++        pic = self.pag.ask_folder() / "T96_end_P1_2.png"
++        self.assertTrue(pic.is_file())
++        self.assertEqual([p.name for p in self.pag.ask_folder().iterdir()], ["T96_end_P1_2.png"])   # only that one
++        v = self.verdict("T96", "label")
++        self.assertNotIn("27-18", json.dumps(v["raw"]))                        # the final never written down
++        self.assertNotIn("27-18", (self.pag.evidence("T96") / "label.md").read_text())
++        self.assertEqual(v["recorded"]["ask the user"]["why"], "readings")
++        rc, out = self.tool("label", "T96", "end_P1_2=27-18,user")            # a final alone: refused
++        self.assertEqual(rc, 2)
++        self.assertIn("the user's answer is the line score's own form", out)
++        rc, out = self.looked("T96", *self.tool("label", "T96", f"end_P1_2={r1},user"))
++        self.assertEqual(rc, 0, out)
++        rc, out = self.tool("close", "T96")
++        self.assertFalse(pic.exists())                                         # removed by close
++
++    def test_2_a_sum_failing_twice(self):
++        self.put("T97", OT)
++        bad = text(OT["end_P1"]).replace("1+2+3+4", "1+2+3+9")                # 15, not its final 10
++        rc, out = self.label_all("T97", OT, {"end_P1": f"{bad},{bad}"})
++        self.assertIn("Read again: end_P1 (P1's cells add up to 15, not its final 10)", out)
++        rc, out = self.tool("label", "T97", f"end_P1={bad},{bad}")
++        self.assertIn("Ask the user about the match player 1 won 10-6, kept at ", out)
++        self.assertIn(": player 1's Q1, Q2, Q3, Q4, OT1, OT2, final, as its final stats screen", out)
++        self.assertNotIn("in overtime", out)
++
++    def test_3_a_read_back_contradiction_is_never_asked(self):
++        self.put("T98", OT)
++        bad = text(OT["end_P1"]).replace("1+2+3+4+_+_=10", "1+2+3+7+_+_=13")   # adds up; the others read 4, 10
++        rc, out = self.label_all("T98", OT, {"end_P1": f"{bad},{bad}"})
++        self.assertEqual(rc, 1)
++        self.assertIn("Read again: end_P1 (a reader learnt from the other saves reads it as", out)
++        rc, out = self.tool("label", "T98", f"end_P1={bad},{bad}")
++        self.assertEqual(rc, 1)
++        self.assertNotIn("Ask the user", out)
++        self.assertNotIn("collect it again", out)
++        self.assertIn("Stop: end_P1 (a reader learnt from the other saves reads it as", out)
++        self.assertIn("take this line back to the chat (Cowork)", out)
++        self.assertFalse(self.pag.ask_folder().is_dir() and any(self.pag.ask_folder().glob("T98_*")))
++
++
++if __name__ == "__main__":
++    unittest.main()

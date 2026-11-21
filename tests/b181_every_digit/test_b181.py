@@ -152,8 +152,8 @@ class LineScore(Made):
         v = self.verdict("T93", "learn")
         self.assertEqual(rc, 1, out)
         self.assertIn("every digit 0-9 read by a reader learnt without each save that shows it", v["bad"])
-        self.assertEqual(v["cells"]["every digit 0-9 read by a reader learnt without each save that shows it"],
-                         {"shown by fewer than two saves": ["6"]})
+        self.assertEqual(v["cells"]["every digit 0-9 read by a reader learnt without each save that shows it"]
+                         ["shown by fewer than two saves"], ["6"])            # B186: the cell also says what one save showed
         self.assertIn("whose line score shows 6", out)
         more = {"end_P1_3": {"kind": "end_line", "q": [[6, 6, 1, 0, _, _], [3, 2, 0, 0, _, _]], "s": [13, 5], "look": 5}}
         self.put("T93", more)

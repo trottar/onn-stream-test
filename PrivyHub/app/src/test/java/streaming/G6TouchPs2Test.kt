@@ -38,8 +38,9 @@ class G6TouchPs2Test {
     fun theLayoutIsAddendumB2() {
         val b2 = mapOf(
             Control.LSTICK to (300f to 805f), Control.DPAD to (300f to 295f), Control.L3 to (540f to 815f),
-            Control.TRIANGLE to (900f to 715f), Control.CIRCLE to (990f to 805f), Control.CROSS to (900f to 895f),
-            Control.SQUARE to (810f to 805f), Control.RSTICK to (900f to 295f), Control.R3 to (690f to 565f),
+            // G6-SWAP1: the face diamond and the right stick trade places (G6-SCREEN1: △ 715, ○ / □ 805, ✕ 895, RS 295)
+            Control.TRIANGLE to (900f to 205f), Control.CIRCLE to (990f to 295f), Control.CROSS to (900f to 385f),
+            Control.SQUARE to (810f to 295f), Control.RSTICK to (900f to 805f), Control.R3 to (690f to 565f),
             Control.SELECT to (400f to 70f), Control.START to (600f to 70f),
             Control.L2 to (56f to 549f), Control.L1 to (170f to 549f), Control.R1 to (1030f to 549f), Control.R2 to (1144f to 549f),
         )

@@ -1107,6 +1107,74 @@ def read_columns(a: np.ndarray, score: dict, refs: np.ndarray) -> list[list]:
     return out
 
 
+def save_glyphs(score: dict, nums: list, lines: list, paths: list) -> list[tuple]:
+    """B186: every labelled glyph of one save at the spec's places and columns, in every picture given ->
+    [(picture index, where — "<side>" or "<side>.<column>" — , glyph index, key, cell)]. A number whose glyphs do
+    not fit its place is left out (as the learner's own `gather`)."""
+    out = []
+    for pi, path in enumerate(paths):
+        with Image.open(path) as im:
+            a = score_picture(im)
+        contrast = _contrast(a)
+        spots = [(p, nums[k], f"{k + 1}") for k, p in enumerate(score["places"])]
+        spots += [(pl, lines[k][c], f"{k + 1}.{c + 1}") for k, row in enumerate(score.get("columns") or [])
+                  for c, pl in enumerate(row) if pl is not None and k < len(lines) and c < len(lines[k])
+                  and lines[k][c] is not None]
+        for pl, v, where in spots:
+            gl = place_glyphs(a, pl, contrast)
+            if gl is None or len(gl) != len(str(v)):
+                continue
+            for i, (ch, g) in enumerate(zip(str(v), gl)):
+                out.append((pi, where, i, pl["group"] + ch, glyph_cell(a, g, pl)))
+    return out
+
+
+def read_glyph_with(others: dict, shown: dict, key: str, own: list, cell: np.ndarray) -> str:
+    """B186: one glyph read by templates learnt from `others` ({key: [cells]}, the other saves' glyphs; `shown`: how
+    many saves show each key) and `own` (its own save's other glyphs of `key`, never the glyph itself), by B178's own
+    rule (`_digit_stats`: thresholds, margin) -> the digit read, or "?"."""
+    cells = {k: list(v) for k, v in others.items() if k != key}
+    if not own:
+        return "?"
+    cells[key] = list(own)
+    sh = {k: v for k, v in shown.items() if k != key}
+    sh[key] = 1
+    keys, refs, gaps, need, _noise, _small = _digit_stats(cells, sh)
+    score = _stat_score(keys, gaps, need)
+    group = key[:-1]
+    idx = [i for i, k in enumerate(keys) if k[:-1] == group]
+    d = cell_dists(cell, refs[idx])
+    order = np.argsort(d, kind="stable")
+    best = keys[idx[int(order[0])]]
+    margin = float(d[order[1]] - d[order[0]]) if len(idx) > 1 else float("inf")
+    thr = score["thresholds"].get(best)
+    ok = (score["separable"].get(best) and thr is not None and float(d[order[0]]) <= thr and need is not None
+          and margin >= need)
+    return best[len(group):] if ok else "?"
+
+
+def spread_across_within(glyphs: dict) -> tuple:
+    """B186: {save: [(key, cell)]} (one picture of each save) -> (the largest distance between two glyphs of one key
+    from two saves, the largest within one save, pairs across, pairs within), over the keys two saves show; None for a
+    side with no pair."""
+    by: dict = {}
+    for save, gs in glyphs.items():
+        for key, cell in gs:
+            by.setdefault(key, []).append((save, cell))
+    across, within, na, nw = None, None, 0, 0
+    for key, gs in by.items():
+        if len({s_ for s_, _c in gs}) < 2:
+            continue
+        for i, (sa, ca) in enumerate(gs):
+            for sb, cb in gs[i + 1:]:
+                dd = float(cell_dists(ca, cb[None])[0])
+                if sa == sb:
+                    within, nw = (dd if within is None else max(within, dd)), nw + 1
+                else:
+                    across, na = (dd if across is None else max(across, dd)), na + 1
+    return (None if across is None else round(across, 4), None if within is None else round(within, 4), na, nw)
+
+
 def _clusters(points: list) -> list:
     """Anchors within 2 x SCORE_TOL of a cluster's first are one cluster; left to right."""
     out: list = []

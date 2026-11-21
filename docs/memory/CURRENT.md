@@ -93,7 +93,7 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
    load screen. For B: the sound ~15 s after the onn's Home. PrivyParty's adoption only on the user's own go.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
-3. G6 (secondary): G6-STICK1 NOT MET on c4 alone (rx→decode 126 > 100; all else met; the user: "it feels a lot better. Much more smooth and responsive"; `evidence/G6_STICK1_…` §7); G6-JOIN1 part 1 done: hold any touch button 0.5 s to be P1 (the countdown the fallback), candidate `6d2fff76…` tablet only, its run pre-registered (`evidence/G6_JOIN1_…`); next: the user's run; never beside another run; the stale pairing's removal.
+3. G6 (secondary): G6-JOIN1 NOT MET as scored (c4 one 283-ms gap; c7 / c12 the right stick short) with the hold-to-join itself met (c5; the user: "worked just as expected"; `evidence/G6_JOIN1_…` §6); G6-SWAP1 part 1 done: face buttons up, right stick down (the user reversing HM1b's choice), candidate `0a631e79…` tablet only, its run pre-registered (`evidence/G6_SWAP1_…`); next: the user's run; never beside another run; the stale pairing's removal.
 
 **Open, not blocking** — the full list is `docs/KNOWN_ISSUES.md`'s open index: G8-S6 and G5-S2-L (`handoffs/QUEUE_2026-10-19N.md`,
 never run); the nightly watch's nights not written up; the overlay-down local check never scored; the reconnect over

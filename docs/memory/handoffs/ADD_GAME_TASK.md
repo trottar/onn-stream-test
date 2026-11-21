@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
 
 # ADD-GAME — one title, by its code, through the tool's five stages
@@ -204,6 +204,9 @@ python3 tools/party_add_game.py close <code>                                    
   final): read **every number of it** for each side, left to right, `_` for a blank cell, `=` before the final, sides
   joined by `-`, P1 first. T90's first save, for instance: `end_P1=9+2+2+2+_+_=15-0+0+2+0+_+_=2,9+2+2+2+_+_=15-0+0+2+0+_+_=2`.
   The final is still the result; the other numbers teach the tool every digit.
+  **Overtime (B185):** a save whose cells add up to its finals counts, whichever columns it fills. An overtime (or a
+  second overtime, an extra round) cell that no other save fills is "shown only here" on the label page — not a misread,
+  never read again, never asked of the user. **Never ask the user to replace a save whose rows add up.**
   **The tool checks every reading:**
   - the two the same;
   - the role's player ahead (an `end_P<k>` save has P<k> ahead);
@@ -222,9 +225,17 @@ python3 tools/party_add_game.py close <code>                                    
     run `label <code> <role>=<P1>-<P2>,<P1>-<P2>` (with a line score, every number as above). The whys include "P<k>'s
     cells add up to <s>, not its final <f>" (a misread cell or final) and "a glyph read as <d> is not one, at the last
     look". Nothing to the user.
-  - **"Ask the user for <role>'s numbers …"** (the same save named a second time) → say, word for word: "YOU, now: I
-    couldn't read one final score of <the game> for sure. In the match P<k> won that you saved for me, what was the
-    final score — P1's number, then P2's? Reply like 21-14." Then `label <code> <role>=<their numbers>,user`.
+  - **"Ask the user about the match player <k> won <its final as you read it>[ in overtime], saved at <time> to slot
+    <n> (or "kept at <time>"): <the cells in doubt, by column> …"** (B187: only when your two readings of that save
+    differed twice, or its cells failed to add up twice — never for a column or a digit no other save shows). The tool
+    has copied that save's picture to `logs/add_game_ask/<code>_<role>.png` in this repo (git-ignored, removed by
+    `close`). Say, word for word: "YOU, now: I couldn't read some numbers of one match of <the game> for sure: the match
+    player <k> won <its final as you read it>[ in overtime], saved at <time> to slot <n>. On its final stats screen,
+    what are <the cells in doubt, e.g. player 1's Q4>? YOU, now: ask Cowork to show you the picture of that match;
+    then reply with its scores." Never a final alone on a title with a line score: put the user's numbers into those
+    cells of your reading and run `label <code> <role>=<the whole line score>,user` (the tool refuses a final alone).
+  - **"Stop: <role> (…) after it was read again twice …"** (a reader learnt from the other saves still reads a number
+    otherwise) → nothing to the user, no new match: stop and take the line back to the chat (Cowork).
   - "<role> cannot be read as the user says … collect it again from another match …" → §1's line for one more save for
     P<k>, `register <code> … --collect <role>=<slot>`, `label <code>` (its pictures), read, label, learn.
   - none (PASS) → learn. Any other FAIL → stop.
@@ -239,8 +250,13 @@ python3 tools/party_add_game.py close <code>                                    
     after the match that shows the final score, then tell me who won." (With only the final: "… try to end it with a
     <digit> in either side's final score ….") Then `register <code> … --collect end_P<the winner>_<n>=<slot>` (the role
     the line names for that winner), `label <code>`, read the new save's pictures, `label <code> <role>=…`, the last
-    look, `learn <code>`. **learn passes only when every digit 0-9 is shown by two saves or more** (B181): the hub can
-    then read any final score.
+    look, `learn <code>`. **learn passes only when every digit 0-9 is learnt** (B181, B186): shown by two saves or more,
+    or by one save at least twice, each of its glyphs read back by that save's other glyphs (and the title's glyphs
+    drawn the same from match to match) — the hub can then read any final score. **With this line, say to the user how
+    many digits are still short and that learn may ask for one more match after this one.** The tool's line ends "<n>
+    digits are still short (<digits>); if one is still short after that match, learn asks for one more"; add to your
+    line, word for word: "<n> numbers are still missing (<digits>); if one is still missing after this match, I may
+    ask for one more." **Never say that one match is enough.**
 - **bench** → PASS or stop (it ends every kept save, each save of an ending as that ending); it needs nobody: no pad,
   no TV.
 - **rehearse** (§0 only) → as §0 says.
@@ -272,9 +288,12 @@ both bench flags are on, as T88 and T89 are; adoption is the user's own go.
 
 **`score` (B178, B181):** the same saves, rounds and lines; the user says only who won each match. The numbers on the
 final screen — the whole line score when it shows one — are read by you in the label stage. **The user is asked one
-match's final score only when your readings of it disagree twice.**
-- **Every digit 0-9 must be shown by two saves or more** (B181), so learn may ask for one more match showing the
-  digits it names.
+match's numbers only when your two readings of it disagree twice, or its cells fail to add up twice** (B187): the
+cells in doubt, never a final alone, with the picture of that match (Cowork shows it). Never for an overtime cell or a
+digit no other save shows.
+- **Every digit 0-9 must be learnt** (B181, B186): shown by two saves or more, or several times by one save, so learn
+  may ask for one more match showing the digits it names — and, if a digit is still short after it, one more.
+- **Overtime (B185):** a match that went to overtime counts like any other; the hub reads its final as any other.
 - **The least:** 6 saves, when the four end saves' line scores show every digit twice.
 - **A line score:** in practice 7-8.
 - **Only the final on its screen:** at least 7 (5 end saves at the very best), often the cap; a game whose scores

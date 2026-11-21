@@ -1,0 +1,194 @@
+diff --git a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+index b227b35e..aa6d4dbf 100644
+--- a/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
++++ b/PrivyHub/app/src/main/java/streaming/HandheldStreamActivity.kt
+@@ -243,6 +243,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
+         report.put("handheld", JSONObject()
+             .put("mode", "portrait")
+             .put("layout", "ps2")
++            .put("layout_version", Ps2TouchLayout.LAYOUT_VERSION)
+             .put("touch_live", TOUCH_LIVE)
+             .put("video_box", "${w}x${HandheldGeometry.videoBoxHeight(w, h)}")
+             .put("pad_region", "${w}x${HandheldGeometry.padRegionHeight(w, h)}")
+diff --git a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+index 5ebda140..081608bd 100644
+--- a/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
++++ b/PrivyHub/app/src/main/java/streaming/TouchPadState.kt
+@@ -103,11 +103,13 @@ class TouchPadState(private val kind: Kind = Kind.PS1) {
+         circle(Control.DPAD, 300f, 295f, Ps2TouchLayout.DPAD_R, Ps2TouchLayout.DPAD_HIT)
+         dpadR = Ps2TouchLayout.DPAD_R * sx
+         circle(Control.L3, 540f, 815f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
+-        circle(Control.TRIANGLE, 900f, 715f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+-        circle(Control.CIRCLE, 990f, 805f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+-        circle(Control.CROSS, 900f, 895f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+-        circle(Control.SQUARE, 810f, 805f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
+-        circle(Control.RSTICK, 900f, 295f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
++        // G6-SWAP1 (the user, 2026-11-21): the face diamond and the right stick trade places, as the left side's D-pad
++        // above its stick; the diamond unchanged around (900, 295), the stick at (900, 805)
++        circle(Control.TRIANGLE, 900f, 205f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.CIRCLE, 990f, 295f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.CROSS, 900f, 385f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.SQUARE, 810f, 295f, Ps2TouchLayout.FACE_R, Ps2TouchLayout.BUTTON_HIT)
++        circle(Control.RSTICK, 900f, 805f, Ps2TouchLayout.STICK_R, Ps2TouchLayout.STICK_HIT)
+         circle(Control.R3, 690f, 565f, Ps2TouchLayout.THUMB_R, Ps2TouchLayout.BUTTON_HIT)
+         rect(Control.SELECT, 400f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
+         rect(Control.START, 600f, 70f, Ps2TouchLayout.SMALL_HW, Ps2TouchLayout.SMALL_HH, Ps2TouchLayout.BUTTON_HIT)
+@@ -327,6 +329,8 @@ object Ps2TouchLayout {
+     const val BOX_GROWTH = REF_H_HM4 - REF_H
+     /** G6-SCREEN1: End's x (G6-HM4: 960). */
+     const val END_X = 1080f
++    /** G6-SWAP1: the layout's version in the handheld report (the face diamond top right, the right stick below). */
++    const val LAYOUT_VERSION = "ps2-swap1"
+     /** G6-HM4's stick radius (drawn ring = full throw). */
+     const val STICK_R_HM4 = 132f
+     /** G6-HM4b: the throw shortened to 0.875 x (the user: "10-15% smaller"); the drawn ring matches it. */
+diff --git a/PrivyHub/app/src/test/java/streaming/G6Screen1Test.kt b/PrivyHub/app/src/test/java/streaming/G6Screen1Test.kt
+index 3696e34f..b916469b 100644
+--- a/PrivyHub/app/src/test/java/streaming/G6Screen1Test.kt
++++ b/PrivyHub/app/src/test/java/streaming/G6Screen1Test.kt
+@@ -37,13 +37,13 @@ class G6Screen1Test {
+         assertEquals(0, HandheldGeometry.videoBoxHeight(0, 2000))
+     }
+ 
+-    // every control but SELECT / START at G6-HM4b's on-screen centre (box 675 + region 1325 then; 900 + 1100 now)
++    // every control but SELECT / START at G6-HM4b's on-screen centre (box 675 + region 1325 then; 900 + 1100 now).
++    // G6-SWAP1 moved the face diamond and the right stick on purpose (G6Swap1Test pins them); the rest stay here
+     @Test
+     fun theClusterDoesNotMoveOnTheScreen() {
+         val hm4b = mapOf(
+             Control.LSTICK to (300f to 1030f), Control.DPAD to (300f to 520f), Control.L3 to (540f to 1040f),
+-            Control.TRIANGLE to (900f to 940f), Control.CIRCLE to (990f to 1030f), Control.CROSS to (900f to 1120f),
+-            Control.SQUARE to (810f to 1030f), Control.RSTICK to (900f to 520f), Control.R3 to (690f to 790f),
++            Control.R3 to (690f to 790f),
+             Control.L2 to (56f to 774f), Control.L1 to (170f to 774f), Control.R1 to (1030f to 774f), Control.R2 to (1144f to 774f),
+         )
+         val now = ps2(screenW, HandheldGeometry.padRegionHeight(screenW, screenH))
+@@ -82,7 +82,9 @@ class G6Screen1Test {
+         assertEquals(1080f, Ps2TouchLayout.END_X, 0f)
+         val e = now.endRect(screenW, 1100)
+         assertEquals(listOf(1004.5f, 22.5f, 1155.5f, 117.5f), e.toList())
+-        val (rx, ry) = now.centreOf(Control.RSTICK)!!
++        // End's x was chosen against the right stick at its G6-SCREEN1 place (900, 295); G6-SWAP1 moved the stick away
++        // (G6Swap1Test checks End's clearance in the new layout)
++        val (rx, ry) = 900f to 295f
+         fun gap(left: Double, bottom: Double) = hypot(max(left - rx, 0.0), max(ry - bottom, 0.0)) - Ps2TouchLayout.STICK_PRESS_R
+         assertTrue(gap(e[0].toDouble(), e[3].toDouble()) >= 0.5 * pxCm)                 // 47.6 px at 1080
+         assertFalse(gap(1079.0 - 75.5, 117.5) >= 0.5 * pxCm)                            // 1079 is too near
+diff --git a/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt b/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
+index 7a6fc59e..4b827d83 100644
+--- a/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
++++ b/PrivyHub/app/src/test/java/streaming/G6TouchPs2Test.kt
+@@ -38,8 +38,9 @@ class G6TouchPs2Test {
+     fun theLayoutIsAddendumB2() {
+         val b2 = mapOf(
+             Control.LSTICK to (300f to 805f), Control.DPAD to (300f to 295f), Control.L3 to (540f to 815f),
+-            Control.TRIANGLE to (900f to 715f), Control.CIRCLE to (990f to 805f), Control.CROSS to (900f to 895f),
+-            Control.SQUARE to (810f to 805f), Control.RSTICK to (900f to 295f), Control.R3 to (690f to 565f),
++            // G6-SWAP1: the face diamond and the right stick trade places (G6-SCREEN1: △ 715, ○ / □ 805, ✕ 895, RS 295)
++            Control.TRIANGLE to (900f to 205f), Control.CIRCLE to (990f to 295f), Control.CROSS to (900f to 385f),
++            Control.SQUARE to (810f to 295f), Control.RSTICK to (900f to 805f), Control.R3 to (690f to 565f),
+             Control.SELECT to (400f to 70f), Control.START to (600f to 70f),
+             Control.L2 to (56f to 549f), Control.L1 to (170f to 549f), Control.R1 to (1030f to 549f), Control.R2 to (1144f to 549f),
+         )
+diff --git a/PrivyHub/app/src/test/java/streaming/G6Swap1Test.kt b/PrivyHub/app/src/test/java/streaming/G6Swap1Test.kt
+new file mode 100644
+index 00000000..126e6d70
+--- /dev/null
++++ b/PrivyHub/app/src/test/java/streaming/G6Swap1Test.kt
+@@ -0,0 +1,96 @@
++package com.safeiot.privyhub.streaming
++
++import com.safeiot.privyhub.streaming.TouchPadState.Control
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * G6-SWAP1 (the user, 2026-11-21: "swap the right face and analogs everything else remains unchanged"): the face
++ * diamond centres on (900, 295), the right stick on (900, 805); every other control where G6-JOIN1 had it.
++ * The figures: `docs/memory/evidence/g6_swap1_2026-11-21/layout_check_swap1.py`.
++ */
++class G6Swap1Test {
++
++    private val s = TouchPadState(TouchPadState.Kind.PS2).apply { layout(1200, 1100) }
++    private fun c(control: Control) = s.centreOf(control)!!
++
++    @Test
++    fun theFiveMovedControls() {
++        assertEquals(900f to 205f, c(Control.TRIANGLE))
++        assertEquals(990f to 295f, c(Control.CIRCLE))
++        assertEquals(900f to 385f, c(Control.CROSS))
++        assertEquals(810f to 295f, c(Control.SQUARE))
++        assertEquals(900f to 805f, c(Control.RSTICK))
++        // the diamond unchanged: 90 px from its centre, the right stick's old place
++        for (f in listOf(Control.TRIANGLE, Control.CIRCLE, Control.CROSS, Control.SQUARE)) {
++            val (x, y) = c(f)
++            assertEquals(f.name, 90.0, Math.hypot((x - 900f).toDouble(), (y - 295f).toDouble()), 1e-6)
++        }
++        // sizes, press areas and hit scales unchanged
++        val d = s.drawn().associateBy { it.control }
++        assertEquals(52f, d.getValue(Control.CROSS).halfW, 0f)
++        assertEquals(52f * 1.2f, d.getValue(Control.TRIANGLE).hitHalfW, 1e-4f)
++        assertEquals(115.5f, d.getValue(Control.RSTICK).halfW, 1e-3f)
++        assertEquals(158.4f, d.getValue(Control.RSTICK).hitHalfW, 1e-3f)
++    }
++
++    // every other control exactly as G6-JOIN1 (G6-SCREEN1's places)
++    @Test
++    fun everyOtherControlStaysPut() {
++        val join1 = mapOf(
++            Control.LSTICK to (300f to 805f), Control.DPAD to (300f to 295f), Control.L3 to (540f to 815f),
++            Control.R3 to (690f to 565f), Control.SELECT to (400f to 70f), Control.START to (600f to 70f),
++            Control.L2 to (56f to 549f), Control.L1 to (170f to 549f), Control.R1 to (1030f to 549f), Control.R2 to (1144f to 549f),
++        )
++        for ((control, xy) in join1) assertEquals(control.name, xy, c(control))
++        assertEquals(listOf(1004.5f, 22.5f, 1155.5f, 117.5f), s.endRect(1200, 1100).toList())   // End at (1080, 70)
++        assertEquals(15, s.drawn().size)
++    }
++
++    // the face buttons and the right stick behave as before, in their new places
++    @Test
++    fun theyWorkInTheirNewPlaces() {
++        for ((f, bit) in listOf(Control.TRIANGLE to TouchPadState.XUSB_Y, Control.CIRCLE to TouchPadState.XUSB_B,
++                                Control.CROSS to TouchPadState.XUSB_A, Control.SQUARE to TouchPadState.XUSB_X)) {
++            val (x, y) = c(f)
++            assertEquals(f, s.controlAt(x, y))
++            assertEquals(f.name, bit, s.down(1, x, y).buttons)
++            s.up(1)
++        }
++        val (rx, ry) = c(Control.RSTICK)
++        assertEquals(Control.RSTICK, s.controlAt(rx, ry - 150f))                 // the unchanged press area
++        s.down(2, rx, ry)
++        assertEquals(32767.toShort(), s.move(2, rx, ry - 115.5f).ry)              // up, full (the DS2 mapping)
++        assertEquals((-32767).toShort(), s.move(2, rx - 115.5f, ry).rx)            // left, full
++        val corner = s.move(2, rx + 100f, ry - 100f)                              // a corner: full on both axes
++        assertEquals(32767.toShort(), corner.rx); assertEquals(32767.toShort(), corner.ry)
++        assertEquals(0.toShort(), corner.lx)
++        s.up(2)
++        // L3 / R3 unchanged
++        assertEquals(TouchPadState.XUSB_RIGHT_THUMB, c(Control.R3).let { (x, y) -> s.down(3, x, y) }.buttons)
++        assertTrue(s.cancel().buttons == 0)
++    }
++
++    // End (1080, 70) keeps >= 0.5 cm to every press area; the nearest is now △ (73.9 px = 0.78 cm)
++    @Test
++    fun endKeepsItsClearance() {
++        val pxCm = 240.0 / 2.54
++        val e = s.endRect(1200, 1100)
++        fun gapTo(d: TouchPadState.Drawn): Double {
++            val dx = maxOf(maxOf(e[0] - d.cx, d.cx - e[2]).toDouble(), 0.0)
++            val dy = maxOf(maxOf(e[1] - d.cy, d.cy - e[3]).toDouble(), 0.0)
++            return if (d.halfH == 0f) Math.hypot(dx, dy) - d.hitHalfW
++            else Math.hypot(maxOf(dx - d.hitHalfW, 0.0), maxOf(dy - d.hitHalfH, 0.0))
++        }
++        val gaps = s.drawn().associate { it.control to gapTo(it) }
++        for ((control, g) in gaps) assertTrue("${control.name} $g", g >= 0.5 * pxCm)
++        assertEquals(Control.TRIANGLE, gaps.minByOrNull { it.value }!!.key)
++        assertEquals(73.9, gaps.getValue(Control.TRIANGLE), 0.05)
++    }
++
++    @Test
++    fun theLayoutVersion() {
++        assertEquals("ps2-swap1", Ps2TouchLayout.LAYOUT_VERSION)
++    }
++}

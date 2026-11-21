@@ -37,13 +37,13 @@ class G6Screen1Test {
         assertEquals(0, HandheldGeometry.videoBoxHeight(0, 2000))
     }
 
-    // every control but SELECT / START at G6-HM4b's on-screen centre (box 675 + region 1325 then; 900 + 1100 now)
+    // every control but SELECT / START at G6-HM4b's on-screen centre (box 675 + region 1325 then; 900 + 1100 now).
+    // G6-SWAP1 moved the face diamond and the right stick on purpose (G6Swap1Test pins them); the rest stay here
     @Test
     fun theClusterDoesNotMoveOnTheScreen() {
         val hm4b = mapOf(
             Control.LSTICK to (300f to 1030f), Control.DPAD to (300f to 520f), Control.L3 to (540f to 1040f),
-            Control.TRIANGLE to (900f to 940f), Control.CIRCLE to (990f to 1030f), Control.CROSS to (900f to 1120f),
-            Control.SQUARE to (810f to 1030f), Control.RSTICK to (900f to 520f), Control.R3 to (690f to 790f),
+            Control.R3 to (690f to 790f),
             Control.L2 to (56f to 774f), Control.L1 to (170f to 774f), Control.R1 to (1030f to 774f), Control.R2 to (1144f to 774f),
         )
         val now = ps2(screenW, HandheldGeometry.padRegionHeight(screenW, screenH))
@@ -82,7 +82,9 @@ class G6Screen1Test {
         assertEquals(1080f, Ps2TouchLayout.END_X, 0f)
         val e = now.endRect(screenW, 1100)
         assertEquals(listOf(1004.5f, 22.5f, 1155.5f, 117.5f), e.toList())
-        val (rx, ry) = now.centreOf(Control.RSTICK)!!
+        // End's x was chosen against the right stick at its G6-SCREEN1 place (900, 295); G6-SWAP1 moved the stick away
+        // (G6Swap1Test checks End's clearance in the new layout)
+        val (rx, ry) = 900f to 295f
         fun gap(left: Double, bottom: Double) = hypot(max(left - rx, 0.0), max(ry - bottom, 0.0)) - Ps2TouchLayout.STICK_PRESS_R
         assertTrue(gap(e[0].toDouble(), e[3].toDouble()) >= 0.5 * pxCm)                 // 47.6 px at 1080
         assertFalse(gap(1079.0 - 75.5, 117.5) >= 0.5 * pxCm)                            // 1079 is too near

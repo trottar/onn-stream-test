@@ -243,6 +243,7 @@ class HandheldStreamActivity : NativeStreamActivity() {
         report.put("handheld", JSONObject()
             .put("mode", "portrait")
             .put("layout", "ps2")
+            .put("layout_version", Ps2TouchLayout.LAYOUT_VERSION)
             .put("touch_live", TOUCH_LIVE)
             .put("video_box", "${w}x${HandheldGeometry.videoBoxHeight(w, h)}")
             .put("pad_region", "${w}x${HandheldGeometry.padRegionHeight(w, h)}")

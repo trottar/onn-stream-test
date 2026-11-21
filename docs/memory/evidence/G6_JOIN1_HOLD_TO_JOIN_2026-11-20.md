@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: RECORD — G6-JOIN1 part 1 done: holding any touch control for a real pad's join hold (500 ms) during the countdown makes the touch pad P1 at once; the 5-s countdown stays as the fallback; the joining press is not sent. Candidate 6d2fff76… tablet only; the run pre-registered (ce8fdb41…, 17:31:57Z). No hub change, no restart. The onn keeps ca53df0d…. Nothing adopted. Part 2 after the run.
+status: RECORD — G6-JOIN1 NOT MET as pre-registered (c4 gap 283 ms; c7 and c12 the right stick short); the change under test, the hold-to-join (c5), met — §6; the user: "done, worked just as expected". Part 1: holding any touch control for a real pad's join hold (500 ms) during the countdown makes the touch pad P1 at once; the 5-s countdown stays as the fallback; the joining press is not sent. Candidate 6d2fff76… tablet only; the run pre-registered (ce8fdb41…, 17:31:57Z). No hub change, no restart. The onn keeps ca53df0d…. Nothing adopted. Part 2 after the run.
 ---
 
 # G6-JOIN1 — hold any touch button to be P1 (part 1: reading, code, build, pre-registration; 2026-11-20)
@@ -104,6 +104,54 @@ on virtual controller. We can still keep the 5 seconds but if I hold a virtual b
   - one added remark: whether holding to join feels right.
 - The header note was rewritten for this run, as for every earlier new run.
 
-## 6. Part 2 — the run (after it)
+## 6. Part 2 — the run, scored (G6-JOIN1S, 2026-11-21; read only)
 
-Not run yet.
+Figures as extracted: `g6_swap1_2026-11-21/join1_part2_figures.txt`.
+
+**Pre-registration intact:** `preregistration.md` sha256 `ce8fdb41…` checks OK; hashed at 17:31:57Z.
+
+**The session** (its "Which session" rule: a report with `p1_join_via`):
+- **Skipped, older app:** 17:31:58.466Z → 17:39:15.945Z, `native_decoder_20261120_173916_032.json`
+  (`stick_mapping` present, no `p1_join_via` key: G6-STICK1's app).
+- **Scored:** launch 17:43:02Z (class `remote-direct`); `session_started` 17:43:11.058Z → `session_end_bye`
+  17:46:46.939Z (**215.9 s PLAYING**); report `native_decoder_20261120_174647_052.json` (`734c1867…`, 220 s); its
+  launch's game log `20261120-124301-ps2.log`.
+
+| Cell | Value | Bound | Verdict |
+|---|---|---|---|
+| c1 decode | `OMX.Exynos.avc.dec`, hardware true, low latency true | hardware, low latency | **MET** |
+| c2 rate | `recent_fps` 59.51 | ≥ 58 | **MET** |
+| c3 drops | decoder 8 / 13168 = 0.06 %; video 1 / 13168 = 0.01 % | each ≤ 1 % | **MET** |
+| c4 latency | `max_rx_to_decode_ms` 62; `max_output_gap_ms` **283** | ≤ 100; ≤ 250 | **NOT MET** |
+| c5 the join | `touch_slot` 0; `p1_join_via` `"hold"` (`p1_join_hold_ms` 500); `p1_join_after_release_ms` 2530 | 0; `"hold"`; < 5000 | **MET** |
+| c6 every control | `controls_pressed` 16 of 16 | all 16 | **MET** |
+| c7 sticks | left 1, 1, 1, 1; right up **0.823**, down 0.942, left **0.706**, right 1 | each ≥ 0.9 | **NOT MET** |
+| c8 End | `end_presses` 1; one bye after 215.9 s PLAYING | 1; ≥ 60 s | **MET** |
+| c9 the box | `1200x900`; `1200x1100` | as bound | **MET** |
+| c10 the crop (PS2) | `"4:3"`; `"160,0,960x720"` | as bound | **MET** |
+| c11 the hub's handheld launch | `20261120-124301-ps2.log` 17:43:01.238Z: `PS2 handheld: widescreen patch off for this launch only (the title's setting: off)` | present | **MET** |
+| c12 the diagonals | `stick_diag_max` left 1.0 (sent 32767); right **0.93** (sent 22971), end to end | each ≥ 0.95 | **NOT MET** |
+| c13 the mapping | `"ds2-square-0.75-c1.33"` | equal | **MET** |
+
+**Verdict by the pre-registered rule: G6-JOIN1 NOT MET** (c4, c7, c12). No threshold changes after the hash.
+- **The change under test, the hold-to-join (c5), was met:** joined by the hold, 2530 ms after the release.
+- **c7 and c12 are the right stick** not pushed fully up, left and into a corner in this session (figures only).
+- **Beside them, figures only:** the right stick's largest sent values (`stick_out_max`) were up 32767 (full end to end
+  under the 0.75 mapping), down 32767, left 23248 (0.945 end to end), right 32767; c7 reads the circular deflection.
+  `stick_edge_frac` left 0.729, right 0.307.
+- **c4's gap, as the report has it** (`slow_events_top_gap`: elapsed ms, rx-to-decode, feed delay, codec, codec in
+  flight, queue depth, output gap): **[50037, 7, 1, 5, 1, 0, 283]**, then [8624, 30, 13, 17, 2, 2, 80], [1606, 16, 4,
+  12, 2, 3, 78], [1339, 12, 1, 11, 1, 2, 74], [10076, 6, 0, 5, 1, 1, 73], [7570, 18, 2, 15, 1, 2, 67], [20824, 10, 0,
+  9, 1, 0, 65], [3070, 11, 3, 8, 2, 1, 61]. One gap of 283 ms at 50.0 s, with rx-to-decode 7 ms; the next largest is
+  80 ms.
+
+**Context, not cells:**
+- `touch_writes` 8486, `takeovers` 0, `back_swallowed` 0;
+- 2 lost video packets, 0 resyncs, 1 FEC group unrecoverable;
+- no link notice; class `remote-direct`.
+
+**The user's remark, verbatim (2026-11-20):** "done, worked just as expected".
+- **Not given** (recorded as not given; the user was not asked): the reach of each control without moving the grip,
+  the countdown, the status panel, the main app's 2 columns and Settings, the bigger picture, End's place, the optional
+  PS1 session, turning through the diagonals, DualShock 2 feel, anything too twitchy, whether holding to join feels
+  right (beyond the remark above).
