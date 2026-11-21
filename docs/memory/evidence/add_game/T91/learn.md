@@ -1,30 +1,26 @@
-# T91 — learn: FAIL
+# T91 — learn: PASS
 
 Written by `tools/party_add_game.py` (B157). Every cell as read / bar / met; no title, id or path.
 
 | cell | read | bar | met |
 | --- | --- | --- | --- |
-| spec usable | false | true | **no** |
-| every class separable | [] | [] | yes |
-| margin_needed | 0.1564 | ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))" | yes |
-| held-out frames read as another class | 0 | 0 | yes |
-| held-out frames read unknown (share) | 1.0 | "<= 0.105" | **no** |
-| other read as a screen | 0 | 0 | yes |
+| spec usable | true | true | yes |
+| the letters at one place in every save | "found" | "found" | yes |
+| every held-out synthetic picture read (training's own bar; never counts toward a pass) | {"held out": 32, "read wrong or not read": 0, "trained on": 64} | "<= 0 (B192: the training's own bar \u2014 every held-out synthetic picture read; it never counts toward a pass)" | yes |
 | begin: never ended | true | true | yes |
-| begin: recognised within | null | "<= 8.0 s" | **no** |
-| end_P1: ended as itself | null | "end_P1" | **no** |
-| end_P1: ended within | null | "<= 2.0 s" | **no** |
-| end_P1_2: ended as itself | null | "end_P1" | **no** |
-| end_P1_2: ended within | null | "<= 2.0 s" | **no** |
-| end_P2: ended as itself | null | "end_P2" | **no** |
-| end_P2: ended within | null | "<= 2.0 s" | **no** |
-| end_P2_2: ended as itself | null | "end_P2" | **no** |
-| end_P2_2: ended within | null | "<= 2.0 s" | **no** |
+| begin: recognised within | 0.0 | "<= 8.0 s" | yes |
+| end_P1: ended as itself | "end_P1" | "end_P1" | yes |
+| end_P1: ended within | 1.5 | "<= 2.0 s" | yes |
+| end_P1_2: ended as itself | "end_P1" | "end_P1" | yes |
+| end_P1_2: ended within | 1.5 | "<= 2.0 s" | yes |
+| end_P2: ended as itself | "end_P2" | "end_P2" | yes |
+| end_P2: ended within | 1.5 | "<= 2.0 s" | yes |
+| end_P2_2: ended as itself | "end_P2" | "end_P2" | yes |
+| end_P2_2: ended within | 2.0 | "<= 2.0 s" | yes |
 | other: never ended | true | true | yes |
+| a moving screen never ended (each end save's corners as they are, the rest of the picture taken in turn from the title's other saves every read) | "never" | "never" | yes |
+| left out: end_P1 | ["end_P1", 1.5, ["---/WOW", "---/WOW"]] | "end_P1 within <= 2.0 s, never another, letters ---/WOW" | yes |
+| left out: end_P1_2 | ["end_P1", 1.5, ["---/WOW", "---/WOW"]] | "end_P1 within <= 2.0 s, never another, letters ---/WOW" | yes |
+| left out: end_P2 | ["end_P2", 1.5, ["WOW/W--", "WOW/W--"]] | "end_P2 within <= 2.0 s, never another, letters WOW/W--" | yes |
+| left out: end_P2_2 | ["end_P2", 2.0, ["WOW/W--", "WOW/W--"]] | "end_P2 within <= 2.0 s, never another, letters WOW/W--" | yes |
 | no two saves of one ending the same picture | [] | ">= 1.0 grey (64 x 48 grey, mean |difference| of the screens that stay; H7-V1: one state run twice, 391 of 400 frames under 1.0)" | yes |
-| left out: end_P1 | null | "end_P1 within <= 2.0 s, never another" | **no** |
-| left out: end_P1_2 | null | "end_P1 within <= 2.0 s, never another" | **no** |
-| left out: end_P2 | null | "end_P2 within <= 2.0 s, never another" | **no** |
-| left out: end_P2_2 | null | "end_P2 within <= 2.0 s, never another" | **no** |
-
-One more save: end_P1_3 — the screen after a match player 1 won, from a match not saved yet (other characters or another stage than its saves kept); save it to a free slot, then register T91 … --collect end_P1_3=<slot> and learn T91 again.

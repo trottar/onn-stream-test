@@ -3,38 +3,24 @@
   {
    "bar": true,
    "cell": "spec usable",
-   "met": false,
-   "read": false
-  },
-  {
-   "bar": [],
-   "cell": "every class separable",
    "met": true,
-   "read": []
+   "read": true
   },
   {
-   "bar": ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))",
-   "cell": "margin_needed",
+   "bar": "found",
+   "cell": "the letters at one place in every save",
    "met": true,
-   "read": 0.1564
+   "read": "found"
   },
   {
-   "bar": 0,
-   "cell": "held-out frames read as another class",
+   "bar": "<= 0 (B192: the training's own bar \u2014 every held-out synthetic picture read; it never counts toward a pass)",
+   "cell": "every held-out synthetic picture read (training's own bar; never counts toward a pass)",
    "met": true,
-   "read": 0
-  },
-  {
-   "bar": "<= 0.105",
-   "cell": "held-out frames read unknown (share)",
-   "met": false,
-   "read": 1.0
-  },
-  {
-   "bar": 0,
-   "cell": "other read as a screen",
-   "met": true,
-   "read": 0
+   "read": {
+    "held out": 32,
+    "read wrong or not read": 0,
+    "trained on": 64
+   }
   },
   {
    "bar": true,
@@ -45,56 +31,56 @@
   {
    "bar": "<= 8.0 s",
    "cell": "begin: recognised within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 0.0
   },
   {
    "bar": "end_P1",
    "cell": "end_P1: ended as itself",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": "end_P1"
   },
   {
    "bar": "<= 2.0 s",
    "cell": "end_P1: ended within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 1.5
   },
   {
    "bar": "end_P1",
    "cell": "end_P1_2: ended as itself",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": "end_P1"
   },
   {
    "bar": "<= 2.0 s",
    "cell": "end_P1_2: ended within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 1.5
   },
   {
    "bar": "end_P2",
    "cell": "end_P2: ended as itself",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": "end_P2"
   },
   {
    "bar": "<= 2.0 s",
    "cell": "end_P2: ended within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 1.5
   },
   {
    "bar": "end_P2",
    "cell": "end_P2_2: ended as itself",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": "end_P2"
   },
   {
    "bar": "<= 2.0 s",
    "cell": "end_P2_2: ended within",
-   "met": false,
-   "read": null
+   "met": true,
+   "read": 2.0
   },
   {
    "bar": true,
@@ -103,43 +89,93 @@
    "read": true
   },
   {
+   "bar": "never",
+   "cell": "a moving screen never ended (each end save's corners as they are, the rest of the picture taken in turn from the title's other saves every read)",
+   "met": true,
+   "read": "never"
+  },
+  {
+   "bar": "end_P1 within <= 2.0 s, never another, letters ---/WOW",
+   "cell": "left out: end_P1",
+   "met": true,
+   "read": [
+    "end_P1",
+    1.5,
+    [
+     "---/WOW",
+     "---/WOW"
+    ]
+   ]
+  },
+  {
+   "bar": "end_P1 within <= 2.0 s, never another, letters ---/WOW",
+   "cell": "left out: end_P1_2",
+   "met": true,
+   "read": [
+    "end_P1",
+    1.5,
+    [
+     "---/WOW",
+     "---/WOW"
+    ]
+   ]
+  },
+  {
+   "bar": "end_P2 within <= 2.0 s, never another, letters WOW/W--",
+   "cell": "left out: end_P2",
+   "met": true,
+   "read": [
+    "end_P2",
+    1.5,
+    [
+     "WOW/W--",
+     "WOW/W--"
+    ]
+   ]
+  },
+  {
+   "bar": "end_P2 within <= 2.0 s, never another, letters WOW/W--",
+   "cell": "left out: end_P2_2",
+   "met": true,
+   "read": [
+    "end_P2",
+    2.0,
+    [
+     "WOW/W--",
+     "WOW/W--"
+    ]
+   ]
+  },
+  {
    "bar": ">= 1.0 grey (64 x 48 grey, mean |difference| of the screens that stay; H7-V1: one state run twice, 391 of 400 frames under 1.0)",
    "cell": "no two saves of one ending the same picture",
    "met": true,
    "read": []
-  },
-  {
-   "bar": "end_P1 within <= 2.0 s, never another",
-   "cell": "left out: end_P1",
-   "met": false,
-   "read": null
-  },
-  {
-   "bar": "end_P1 within <= 2.0 s, never another",
-   "cell": "left out: end_P1_2",
-   "met": false,
-   "read": null
-  },
-  {
-   "bar": "end_P2 within <= 2.0 s, never another",
-   "cell": "left out: end_P2",
-   "met": false,
-   "read": null
-  },
-  {
-   "bar": "end_P2 within <= 2.0 s, never another",
-   "cell": "left out: end_P2_2",
-   "met": false,
-   "read": null
   }
  ],
  "code": "T91",
- "inputs": "1b913601e4a20734250ff21f25bf8ae4e1b74cde1c9b46f2ddbcca3ebc7c1ac3",
+ "inputs": "d70377c4cf7bb65e75bfc88366634ac9b6b3e0d3225d0651151f61f24a59927c",
  "recorded": {
-  "line": "One more save: end_P1_3 \u2014 the screen after a match player 1 won, from a match not saved yet (other characters or another stage than its saves kept); save it to a free slot, then register T91 \u2026 --collect end_P1_3=<slot> and learn T91 again.",
-  "one more save": "end_P1_3"
+  "synthetic": {
+   "backgrounds": 6,
+   "held_out": 32,
+   "held_out_wrong_of": null,
+   "rounds": [
+    {
+     "held_out": 32,
+     "held_out_wrong": 0,
+     "ratio": 5,
+     "real_wrong": 0,
+     "round": 1,
+     "trained": 64
+    }
+   ],
+   "seconds": 2.39,
+   "seed": 60858810,
+   "trained": 64
+  }
  },
  "schema": 1,
  "stage": "learn",
- "verdict": "FAIL"
+ "verdict": "PASS"
 }
