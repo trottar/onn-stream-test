@@ -44,7 +44,8 @@
    "cell": "end_P1_2: the two readings the same",
    "met": true,
    "read": [
-    "35-28"
+    "7+7+7+7+7+_=35-7+7+7+7+0+_=28",
+    "7+7+7+7+7+_=35-7+7+7+7+0+_=28"
    ]
   },
   {
@@ -54,6 +55,21 @@
    "read": [
     35,
     28
+   ]
+  },
+  {
+   "bar": "each side's cells = its final",
+   "cell": "end_P1_2: the cells add up to the finals",
+   "met": true,
+   "read": [
+    [
+     35,
+     35
+    ],
+    [
+     28,
+     28
+    ]
    ]
   },
   {
@@ -158,22 +174,49 @@
   {
    "bar": "found",
    "cell": "the numbers at one place in every save",
-   "met": false,
-   "read": {
-    "1.cells": [
-     "end_P1_2"
-    ],
-    "2.cells": [
-     "end_P1_2"
-    ]
-   }
+   "met": true,
+   "read": "found"
+  },
+  {
+   "bar": "9+2+2+2+_+_=15-0+0+2+0+_+_=2, but for a digit or a column no other save shows",
+   "cell": "end_P1: read back by a reader learnt without it",
+   "met": true,
+   "read": "9+2+2+2+_+_=15-0+0+2+0+_+_=2"
+  },
+  {
+   "bar": "7+7+7+7+7+_=35-7+7+7+7+0+_=28, but for a digit or a column no other save shows",
+   "cell": "end_P1_2: read back by a reader learnt without it",
+   "met": true,
+   "read": "?+?+?+?+*+_=35-?+?+?+?+*+_=28 (shown only here: 7; P1 column 5, P2 column 5)"
+  },
+  {
+   "bar": "0+0+0+0+_+_=0-2+9+2+9+_+_=22, but for a digit or a column no other save shows",
+   "cell": "end_P2: read back by a reader learnt without it",
+   "met": true,
+   "read": "0+0+0+0+_+_=0-2+9+2+9+_+_=22"
+  },
+  {
+   "bar": "0+0+0+0+_+_=0-9+9+2+9+_+_=29, but for a digit or a column no other save shows",
+   "cell": "end_P2_2: read back by a reader learnt without it",
+   "met": true,
+   "read": "0+0+0+0+_+_=0-9+9+2+9+_+_=29"
+  },
+  {
+   "bar": "0+6+0+8+_+_=14-9+3+6+6+_+_=24, but for a digit or a column no other save shows",
+   "cell": "end_P2_3: read back by a reader learnt without it",
+   "met": true,
+   "read": "0+?+0+8+_+_=1?-9+3+?+?+_+_=2? (shown only here: 4, 6)"
+  },
+  {
+   "bar": "all",
+   "cell": "the last look: every glyph is the digit it was read as",
+   "met": true,
+   "read": "all"
   }
  ],
  "code": "T90",
- "inputs": "3501e1f175d5f286667939fbf981da73e0946ab38bee56d617e552f1fd935211",
+ "inputs": "e1d6b556d94b157e85c137800993403f238f54f5c299d3a88ac6498ceaf71155",
  "recorded": {
-  "collect again": "end_P1_2",
-  "line": "end_P1_2 cannot be read as the user says (P1's number of cells does not fit where the other saves have it): collect it again from another match P1 won, then register T90 \u2026 --collect end_P1_2=<slot>, label T90 and learn T90 again.",
   "pictures": {
    "end_P1": [
     "end_P1.1.png",
@@ -195,9 +238,38 @@
     "end_P2_3.1.png",
     "end_P2_3.2.png"
    ]
+  },
+  "sheet": {
+   "0": 16,
+   "1": 2,
+   "2": 13,
+   "3": 2,
+   "4": 2,
+   "5": 2,
+   "6": 3,
+   "7": 9,
+   "8": 2,
+   "9": 8
+  },
+  "shown only here": {
+   "end_P1_2": {
+    "columns": [
+     "P1 column 5",
+     "P2 column 5"
+    ],
+    "digits": [
+     "7"
+    ]
+   },
+   "end_P2_3": {
+    "digits": [
+     "4",
+     "6"
+    ]
+   }
   }
  },
  "schema": 1,
  "stage": "label",
- "verdict": "FAIL"
+ "verdict": "PASS"
 }
