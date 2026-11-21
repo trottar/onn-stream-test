@@ -1,0 +1,2009 @@
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 44da2e2c..20c429f7 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -72,6 +72,9 @@ B178 — a sidecar's `"result": "score"` with a version-4 spec of n sides (B178'
+ final screen): at `ended` the numbers read, port by port, as the scores (the real numbers), `"winner"` the seat of the
+ one side strictly ahead, null on a tie (the board's draw); a read without n whole numbers → given up; an unreadable
+ screen is `unknown` as today. Without the key: today.
++B191 — a sidecar's `"result": "letters"` with a version-5 spec (each player's letters read in its corner; the player
++whose letters spell the word lost): listed as B158's winner entry (end_Pk: port k won). Any other shape: not listed.
++Without the key: today.
+ B182 — a version-4 watch that sees the final screen K times with a number on it not read ends `unreadable`; the
+ mini game is given up then (why: "the final screen was seen and a number on it was not read"), no scores, no winner —
+ never the 900-s wait. Versions 2 / 3 never end so: today.
+@@ -115,6 +118,7 @@ PLANNED_GRACE_S = 3.0       # the planned-switch window stays open this long aft
+ # the onn's calls taken while a mini game is on (route → kind)
+ PLACES_VERSION = 3          # B123: an end-screen spec with a place for every player (B122)
+ SCORE_VERSION = 4           # B178: an end-screen spec with each side's number (B178)
++LETTERS_VERSION = 5         # B191: an end-screen spec reading each player's letters (the one who spelled the word lost)
+ TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
+          "stop": "end"}
+ # B127
+@@ -278,6 +282,7 @@ class PartyMinigames:
+                 more = {"cheat": cheat} if cheat is not None else {}
+                 if "result" in side:                                    # B158: winner-only (absent: today)
+                     entry = (self._score_entry(spec, side, n) if side.get("result") == "score"     # B178
++                             else self._letters_entry(spec, side, n) if side.get("result") == "letters"   # B191
+                              else self._winner_entry(spec, side, n))
+                     record = self.p._find_game_by_id(game) if entry is not None else None
+                     if entry is None or record is None:
+@@ -367,6 +372,19 @@ class PartyMinigames:
+             return None
+         return {"players": n, "scores": None, "score_read": True, "start_class": spec["start_class"]}
+ 
++    @staticmethod
++    def _letters_entry(spec: dict, side: dict, n: int) -> dict | None:
++        """B191: `{"players": 2, "result": "letters"}` with a version-5 spec whose end classes are end_P1, end_P2
++        (end_Pk: port k won — the other player's letters spelled the word) -> B158's winner entry, else None (not
++        listed). Neither or both spelled, or a corner not read, never ends (no result)."""
++        if side.get("result") != "letters" or "scores" in side or "places_to_scores" in side or n != 2:
++            return None
++        ends = [f"end_P{k}" for k in range(1, n + 1)]
++        if spec.get("version") != LETTERS_VERSION or sorted(spec.get("end_classes") or []) != ends:
++            return None
++        return {"players": n, "scores": {c: [1 if j == k else 0 for j in range(n)] for k, c in enumerate(ends)},
++                "winner_of": {c: k + 1 for k, c in enumerate(ends)}, "start_class": spec["start_class"]}
++
+     def listing(self) -> dict:
+         entries = self._entries()
+         only = self.only
+diff --git a/docs/memory/handoffs/ADD_GAME_TASK.md b/docs/memory/handoffs/ADD_GAME_TASK.md
+index e8041ec1..ad1e9a9e 100644
+--- a/docs/memory/handoffs/ADD_GAME_TASK.md
++++ b/docs/memory/handoffs/ADD_GAME_TASK.md
+@@ -9,7 +9,8 @@ status: FIXED TASK (session A, hardware) — add one party mini game by its code
+ The code (`T` + two digits) is the only name of the title in anything written. The user knows which game it is; the
+ words the user gives to find it in the library are typed into one command at run time and never written down. **The
+ tool decides every verdict; you never judge a picture, choose a threshold or edit a rule.** A stage that is not PASS
+-stops the task. **The one exception (B178, B183): a `score` title's `label` stage (§2)** — there you read each end
++stops the task. **The one exception (B178, B183; B191 for `letters`): a `score` or `letters` title's `label` stage
++(§2; §1 for letters)** — there you read each end
+ save's numbers from the pictures the tool puts out and pass them in, and give its last look at the digit sheet; the
+ tool checks every reading and decides.
+ 
+@@ -79,7 +80,9 @@ the rows `2341`, `3412`, `4123` (`--collect end_r2341=<slot>` …) before it can
+ Ask once, in this order, what the user already knows: **two players or four; who wins is shown how** — a screen that
+ says which player won (→ `winner`), or a results screen with every player's place in a row (→ `places`; four players
+ only), or **the scores (or points, a count) of each side, the winner the side with more** (→ `score`, B178: its saves
+-are `winner`'s, and the label stage after register), or **some other way (a time, a distance, only a team's or
++are `winner`'s, and the label stage after register), or **a word spelled by the player who lost (letters in each
++player's corner)** (→ `--result letters --word <the word>`, B191: two players only; its saves are `winner`'s, the label
++stage after register — below), or **some other way (a time, a distance, only a team's or
+ character's name)** → **stop here, before any save is asked** (below); **whether the game has things to unlock** (→ a
+ setup: `--setup slot1`, made by the user in Extras → Cheats, and every save below made inside it; nothing to unlock →
+ `--setup none`); **the words to find it in the library**.
+@@ -100,7 +103,10 @@ two at a time:
+ - **The match, shortest:** one round or one life, items off, the shortest time the game offers — the same settings
+   for every save.
+ - **`begin`:** the screen just before a match, nobody picked yet, nothing moving when nobody presses (two players:
+-  the select screen; four: the character select screen). Under a setup: its slot 1.
++  the select screen; four: the character select screen). Under a setup: its slot 1. **B190: when the user has made
++  their own start (the players and settings already chosen, every match played from it), that start is the begin** —
++  it serves when it holds still while nobody presses (T91's did: one picture for 20 s); keep it in slot 1 and ask the
++  other saves to slots 2 and 3, never "with other characters". Never ask the user to change how the game is set up.
+ - **`other`:** the middle of a match (a fight, a race) — anything that is not a begin or an end screen.
+ - **`winner`, n players (B171): two saves of every ending from the start** — `end_P1`, `end_P1_2`, … `end_Pn`,
+   `end_Pn_2`: for each player, **two matches that player won, each from a different match with other characters (or
+@@ -117,7 +123,27 @@ two at a time:
+   on 2026-11-20) stay: run `register <code> … --result score` with no `--collect` first and ask only for what its page
+   names missing; then `label <code>`.
+ 
+-**The rounds, two players, `winner` or `score` (B171): begin, other, `end_P1`, `end_P1_2`, `end_P2`, `end_P2_2`.**
++- **`letters` (B191), two players: the same saves as `winner`** — two wins for each player, each from a different
++  match, saved on the screen after the match that shows each player's letters in its corner. `--word` is the word as
++  the user set it (T91: `WOW`). The user says only who won; the letters are read later by you in the label stage. Saves
++  already kept under the code (T91's six, taken under `winner` on 2026-11-21) stay: run `register <code> … --result
++  letters --word <the word>` with no `--collect` first and ask only for what its page names missing; then `label
++  <code>`. **The label lines for letters, word for word:**
++  - your readings: `label <code> end_P1=<P1>/<P2>,<P1>/<P2> end_P1_2=… end_P2=… end_P2_2=…` — each player's corner,
++    P1 first, joined by `/`: the letters left to right in capitals, `-` for each not-yet mark, `_` when the corner
++    shows nothing; the first reading from `<role>.1.png`, the second from `<role>.2.png` (T91's end_P1: `---/WOW`).
++  - **"Look at label/letters.png …"** → open it: a row for each letter (`-` the not-yet marks), every glyph read as that
++    letter, numbered. Every tile its row's letter: `label <code> look=all`; else `label <code> look=<letter>:<tile
++    numbers joined by '.'>` for each such row.
++  - **"Read again: <role> (<why>) …"** → look at that save's two pictures again and run `label <code>
++    <role>=<P1>/<P2>,<P1>/<P2>`. **"Stop: <role> … take this line back to the chat (Cowork)."** → stop; never ask the
++    user for a letters reading and never ask for another match.
++  - learn's own line for a letters title, passed on as it says: a save named for a corner or a letter only that save
++    shows (the usual "one more save", §1's line), or "back to the chat" when synthetic training could not reach every
++    held-out picture (more saves would not help) — never more saves than the line names.
++
++**The rounds, two players, `winner`, `score` or `letters` (B171): begin, other, `end_P1`, `end_P1_2`, `end_P2`,
++`end_P2_2`.**
+ 
+ - **No setup — rounds of three slots:** round 1 `--collect begin=1 --collect other=2 --collect end_P1=3`; round 2
+   `--collect end_P2=1 --collect end_P1_2=2 --collect end_P2_2=3`.
+@@ -194,7 +220,8 @@ python3 tools/party_add_game.py close <code>
+ 
+ - **register** FAIL "missing: …" → ask the user for exactly those saves (the role's line above), collect, run again.
+   Any other FAIL → stop (below).
+-- **label** (B178, `--result score` only; after register's PASS, before learn) — **the one picture you read.** Run
++- **label** (B178, `--result score`; B191, `--result letters` — its lines are §1's; after register's PASS, before
++  learn) — **the one picture you read.** Run
+   `label <code>`: it puts two pictures of every end save's final screen, two ticks apart, in the title's add_game folder
+   (`~/privyhub_h7/add_game/<code>/label/`, off the repo: `<role>.1.png`, `<role>.2.png`; once the places are known,
+   each side's number cut out, `<role>.P1.png`, `<role>.P2.png`). Open each with your own vision; read each side's
+diff --git a/tools/h7_endscreen.py b/tools/h7_endscreen.py
+index 02f279b4..ab8a7821 100644
+--- a/tools/h7_endscreen.py
++++ b/tools/h7_endscreen.py
+@@ -64,6 +64,23 @@ B178 — each side's number on the final screen (spec version 4, only when every
+   a read   — the screen as version 3; on `end` every side's number, or `unknown` when any glyph is not read (never
+            the nearest digit by itself). `EndedScore`: K agreeing reads of the class and every number.
+ 
++B191 / B192 — a word spelled by the player who lost (spec version 5, `learn_letters`, called by the add-a-game tool with
++the word and each end save's corners as the session read them; never from labels alone):
++  the start — B122's one-screen learner on the begin's own still picture against the mid-match save's and the end
++           saves' pictures, B137's top-right corner (200 x 70) black in every picture, at learn and at every read.
++  a corner — each player's letters (P1 the left third, P2 the right third; top or bottom), found from two cues — the
++           pixels the same in two saves showing that player's same letters over different pictures, and the pixels off
++           a plain corner's commonest colour (never the end screens' fixed pixels, never a dark one) — as a string of
++           as many glyphs as the session read, at one place in the most saves; the box around it fits the whole word.
++           Its colours: chromaticity bins as common among the letters' pixels as `ratio` x among the backgrounds'.
++  a letter — the glyph's pixels in a 36 x 40 window; a template per letter (shared by the players: one font); the mean
++           |difference| least over +/-3 px; thresholds halfway to the nearest other letter; the margin.
++  B192    — synthetic pictures to train, never to prove: the letters' pixels of each real end save put over patches
++           cut from the title's own pictures (shifted, scaled, a fixed seed from the saves); held-out pictures made
++           first; rounds of training pictures until every held-out one is read (`trained`, with its counts).
++  a read  — start; else both corners: exactly one spelled -> end_P<the other>; none -> other; both -> unknown; one not
++           read beside a spelled one -> unknown (`end_unread`); a moving screen never the same end twice in a row.
++
+ usage: h7_endscreen.py learn <runs> <labels> [<runs> <labels> ...] <out.endscreen.json> [--half first]
+        h7_endscreen.py score <runs> <labels> [<runs> <labels> ...] <spec.endscreen.json> [--half second]
+        h7_endscreen.py read  <spec.endscreen.json> <picture>
+@@ -1383,6 +1400,561 @@ def _learn_v4(paths, ids, per_source, aspect, start_class, name, n, t0):
+     return spec, arrays, report
+ 
+ 
++# --- B191 / B192: a word spelled by the player who lost (spec version 5) ---------------------------------------------
++VERSION_LETTERS = 5
++LETTERS_SIDE = re.compile(r"^(?:[A-Z-]{1,12}|_)$")    # a corner as read: its letters, '-' a not-yet mark, '_' nothing
++LETTERS_WORD = re.compile(r"^[A-Z]{2,12}$")
++LETTERS_SIZE = (640, 480)        # the corners are read on the game's area at this size, in colour
++LETTERS_EQ = 12                  # levels (the largest channel): a pixel the same in two saves
++LETTERS_DIFFER = 0.5             # two saves are different pictures when fewer than this share of their pixels is the same
++LETTERS_FLAT, LETTERS_FLAT_DIST, LETTERS_QF = 0.5, 48, 16   # a plain corner: this share within this of its commonest colour
++LETTERS_FILL = 150               # R+G+B: under this a pixel is the letters' shadow (dark backgrounds share it)
++LETTERS_PART = 6                 # px: a glyph's part
++LETTERS_TOUCH = 1                # px: parts this close in x are one glyph
++LETTERS_SPECK = 0.4              # a glyph under this share of the smallest labelled glyph's pixels is a speck
++LETTERS_NB = 32                  # chromaticity bins per axis (r, g of r+g+b)
++LETTERS_VMIN = 90                # R+G+B: darker pixels have no colour
++LETTERS_TMIN = 0.002             # a colour is the letters' only when at least this share of their pixels
++LETTERS_RATIOS = (5, 10, 20, 40)  # ... and this many times as common among them as among the backgrounds (the least
++#                                  that reads every real save and every held-out synthetic picture)
++LETTERS_PAD = 8                  # px around a corner's box
++LETTERS_PLACE_TOL = 8            # px: two saves' strings at one place
++LETTERS_FIXED = 0.9              # a string whose cut pixels stay this much the same under other letters is fixed text
++LETTERS_FOUND_PX = 20            # px: each glyph of a string found by the cut at least this (a speck is not a letter)
++LETTERS_CELL = (36, 40)          # a glyph's window (no resizing: one font size in a title)
++LETTERS_SHIFT = 3                # px: a glyph compared within +/- this
++LETTERS_CORNER = (200, 70)       # B137's LABEL_BOX: RetroArch's "Paused." corner, black for the start test
++LETTERS_MOVED = (16, 0.20)       # B140's BEGIN_MOVED bar: >= 20 % of the 64 x 48 cells moved by > 16 levels (in colour:
++#                                  the largest channel)
++SYN_HELD, SYN_PER_ROUND, SYN_ROUNDS = 8, 16, 4        # B192: per end save: held out, added a round; rounds at most
++SYN_SCALE, SYN_SHIFT = (1.0, 1.4), 2
++SYN_OWN = 0.85                   # a training glyph teaches its letter's shape only when this share of it is pasted letter
++
++
++def letters_area(img: Image.Image) -> np.ndarray:
++    """The game's area in colour at LETTERS_SIZE (B104's bar cut)."""
++    return np.asarray(game_area(img.convert("RGB")).resize(LETTERS_SIZE, Image.BILINEAR), dtype=np.float32)
++
++
++def corner_black(img: Image.Image) -> Image.Image:
++    """B137's corner painted black (the start test's picture, paused or not)."""
++    out = img.convert("RGB").copy()
++    w = out.size[0]
++    out.paste((0, 0, 0), (max(0, w - LETTERS_CORNER[0]), 0, w, min(out.size[1], LETTERS_CORNER[1])))
++    return out
++
++
++def letters_zones(n: int) -> dict:
++    """The corners each player's letters are looked for in: P1 the left third, P2 the right third; top and bottom."""
++    w, h = LETTERS_SIZE[0] // 3, LETTERS_SIZE[1] // 3
++    W, H = LETTERS_SIZE
++    return {1: [(0, 0, w, h), (0, H - h, w, H)], 2: [(W - w, 0, W, h), (W - w, H - h, W, H)]}
++
++
++def _lparts(m: np.ndarray) -> list:
++    return [c for c in _components(m) if c[4] >= LETTERS_PART]
++
++
++def _merge_touch(cs: list) -> list:
++    """Reading a corner: parts overlapping in x, or touching (a gap of at most LETTERS_TOUCH px), are one glyph; left
++    to right. (A letter's thin join can be lost to the colour cut; a font's letters stand further apart: T91's 3 px
++    and more.) The corner search keeps B178's overlap rule: there the cut's shadows would join letters."""
++    gl: list = []
++    for c in sorted(cs, key=lambda c: (c[1], c[0])):
++        if gl and c[1] <= gl[-1][3] + 1 + LETTERS_TOUCH:
++            g = gl[-1]
++            gl[-1] = (min(g[0], c[0]), g[1], max(g[2], c[2]), max(g[3], c[3]), g[4] + c[4])
++        else:
++            gl.append(c)
++    return gl
++
++
++def letter_strings(m: np.ndarray, x0: int = 0, y0: int = 0) -> list:
++    """Strings of glyphs: parts on one line (their spans overlap by half the smaller), parts overlapping in x one glyph,
++    a string split where the gap is wider than a glyph (at least 12 px)."""
++    lines: list = []
++    for c in sorted(_lparts(m), key=lambda c: -(c[2] - c[0])):
++        for ln in lines:
++            if min(ln[1], c[2]) - max(ln[0], c[0]) >= 0.5 * min(ln[1] - ln[0], c[2] - c[0]):
++                ln[2].append(c)
++                ln[0], ln[1] = min(ln[0], c[0]), max(ln[1], c[2])
++                break
++        else:
++            lines.append([c[0], c[2], [c]])
++    out = []
++    for _t, _b, grp in lines:
++        gl = _merge_x(grp)                                # the search: overlapping parts only
++        cur = [gl[0]]
++        for g in gl[1:]:
++            if g[1] - cur[-1][3] - 1 <= max(12, cur[-1][2] - cur[-1][0]):
++                cur.append(g)
++            else:
++                out.append(cur)
++                cur = [g]
++        out.append(cur)
++    return [[(t + y0, l + x0, b + y0, r + x0, n) for t, l, b, r, n in s] for s in out]
++
++
++def _cue(A: dict, sides: dict, p: int, e: str, zone, fixed: np.ndarray) -> np.ndarray:
++    """B191's cut in one corner of one save: the pixels the same in another save showing this player's same letters
++    over a different picture, and the pixels off a plain corner's commonest colour; never a dark one. (The end
++    screens' fixed text is left to the string search: a string of the side's length, at one place in the most saves.)"""
++    x0, y0, x1, y1 = zone
++    m = np.zeros((y1 - y0, x1 - x0), bool)
++    for f in A:
++        if f == e or sides[f][p] != sides[e][p]:
++            continue
++        eq = np.abs(A[e] - A[f]).max(axis=2) <= LETTERS_EQ
++        if eq.mean() < LETTERS_DIFFER:
++            m |= eq[y0:y1, x0:x1]
++    a = A[e][y0:y1, x0:x1]
++    q = (a // LETTERS_QF).astype(np.int64)
++    k = q[..., 0] * 256 + q[..., 1] * 16 + q[..., 2]
++    u, cnt = np.unique(k, return_counts=True)
++    mode = int(u[np.argmax(cnt)])
++    mc = (np.array([mode // 256, mode // 16 % 16, mode % 16]) + 0.5) * LETTERS_QF
++    far = np.abs(a - mc).max(axis=2) > LETTERS_FLAT_DIST
++    if (~far).mean() >= LETTERS_FLAT:
++        m |= far
++    del fixed                    # not excluded: where two saves' letters overlap in one colour it would cut the letters
++    return m & (a.sum(axis=2) >= LETTERS_FILL)
++
++
++def letters_colour(a: np.ndarray) -> np.ndarray:
++    """Each pixel's chromaticity bin (r, g of r+g+b, LETTERS_NB each); -1 for a pixel too dark to have a colour."""
++    s = a.sum(axis=2) + 1e-6
++    r = np.clip((a[..., 0] / s * LETTERS_NB).astype(np.int64), 0, LETTERS_NB - 1)
++    g = np.clip((a[..., 1] / s * LETTERS_NB).astype(np.int64), 0, LETTERS_NB - 1)
++    k = r * LETTERS_NB + g
++    k[s < LETTERS_VMIN] = -1
++    return k
++
++
++def _lhist(k: np.ndarray) -> np.ndarray:
++    k = k[k >= 0]
++    return np.bincount(k, minlength=LETTERS_NB * LETTERS_NB).astype(np.float64)
++
++
++def letters_bins(text: np.ndarray, bg: np.ndarray, ratio: float) -> np.ndarray:
++    """A colour is the letters' when it is at least LETTERS_TMIN of their pixels and `ratio` x as common among them as
++    among the backgrounds' pixels."""
++    tt, bb = text / max(float(text.sum()), 1.0), bg / max(float(bg.sum()), 1.0)
++    return (tt >= LETTERS_TMIN) & (tt >= ratio * bb)
++
++
++def letters_mask(a: np.ndarray, box, bins: np.ndarray) -> np.ndarray:
++    x0, y0, x1, y1 = box
++    k = letters_colour(a[y0:y1, x0:x1])
++    m = np.zeros(k.shape, bool)
++    m[k >= 0] = bins[k[k >= 0]]
++    return m
++
++
++def letters_glyphs(a: np.ndarray, box, bins: np.ndarray, glyph_min: float, want: int | None = None) -> tuple:
++    """The box's glyphs in its own coordinates, left to right (parts overlapping in x one glyph; specks dropped). When
++    that is not `want` glyphs, parts touching in x are joined too (`_merge_touch`), and taken only if that is `want`."""
++    m = letters_mask(a, box, bins)
++    parts = _lparts(m)
++    gl = [g for g in _merge_x(parts) if g[4] >= glyph_min]
++    if want is not None and len(gl) != want:
++        gt = [g for g in _merge_touch(parts) if g[4] >= glyph_min]
++        if len(gt) == want:
++            gl = gt
++    return m, gl
++
++
++def letter_cell(m: np.ndarray, g) -> np.ndarray:
++    """The glyph's pixels (its own box only) in a LETTERS_CELL window on its centre."""
++    ch, cw = LETTERS_CELL
++    t, l, b, r = g[0], g[1], g[2], g[3]
++    sub = np.zeros(m.shape, np.float32)
++    sub[t:b + 1, l:r + 1] = m[t:b + 1, l:r + 1]
++    ys, xs = (t + b) // 2 - ch // 2, (l + r) // 2 - cw // 2
++    out = np.zeros(LETTERS_CELL, np.float32)
++    y_a, y_b = max(0, ys), min(m.shape[0], ys + ch)
++    x_a, x_b = max(0, xs), min(m.shape[1], xs + cw)
++    if y_b > y_a and x_b > x_a:
++        out[y_a - ys:y_b - ys, x_a - xs:x_b - xs] = sub[y_a:y_b, x_a:x_b]
++    return out
++
++
++def _shifts(c: np.ndarray):
++    p = np.pad(c, LETTERS_SHIFT)
++    for dy in range(-LETTERS_SHIFT, LETTERS_SHIFT + 1):
++        for dx in range(-LETTERS_SHIFT, LETTERS_SHIFT + 1):
++            yield p[LETTERS_SHIFT + dy:LETTERS_SHIFT + dy + c.shape[0], LETTERS_SHIFT + dx:LETTERS_SHIFT + dx + c.shape[1]]
++
++
++def letter_dists(refs: np.ndarray, c: np.ndarray) -> np.ndarray:
++    """Each template's distance to a glyph: the mean |difference|, the least over +/- LETTERS_SHIFT px."""
++    best = np.full(len(refs), np.inf, np.float32)
++    for sh in _shifts(c):
++        best = np.minimum(best, np.abs(refs - sh[None]).mean(axis=(1, 2)))
++    return best
++
++
++def _aligned_mean(cs: list) -> np.ndarray:
++    ref = cs[0]
++    out = []
++    for c in cs:
++        out.append(min(_shifts(c), key=lambda sh: float(np.abs(ref - sh).mean())))
++    return np.mean(out, axis=0)
++
++
++def fit_letters(cells: dict) -> dict:
++    """Each letter's template (its glyphs aligned and averaged), its threshold halfway from its own spread to the
++    nearest other letter's glyph (separable with a gap >= MIN_GAP), margin_needed half the least margin seen."""
++    keys = sorted(cells)
++    if not keys:
++        return {"keys": [], "refs": np.zeros((0,) + LETTERS_CELL, np.float32), "thresholds": {}, "separable": {},
++                "margin_needed": None}
++    refs = np.stack([_aligned_mean(cells[k]) for k in keys]).astype(np.float32)
++    ds = {k: [letter_dists(refs, c) for c in cells[k]] for k in keys}
++    thr, sep, margins = {}, {}, []
++    for i, k in enumerate(keys):
++        own = max(float(d[i]) for d in ds[k])
++        foreign = min([float(d[i]) for k2 in keys if k2 != k for d in ds[k2]] or [1.0])
++        g = _gap(own, foreign, MIN_GAP)
++        sep[k] = g["verdict"] == "separable"
++        thr[k] = g["threshold"]
++        for d in ds[k]:
++            if len(keys) > 1:
++                margins.append(float(np.sort(d)[1] - d[i]))
++    need = round(SAFETY * min(margins), 4) if margins else (0.0 if len(keys) == 1 else None)
++    return {"keys": keys, "refs": refs, "thresholds": thr, "separable": sep, "margin_needed": need}
++
++
++def read_corner(a: np.ndarray, box, bins: np.ndarray, fitted: dict, word: str, glyph_min: float,
++                blank_ok: bool = False):
++    """One corner as letters, or None (not read): as many glyphs as the word has letters (none: '_' when the title
++    shows nothing there), each one letter under its threshold with the margin, and that letter the word's at its place
++    or '-'. Never the nearest letter by itself."""
++    m, gl = letters_glyphs(a, box, bins, glyph_min, len(word))
++    if not gl:
++        return "_" if blank_ok else None
++    if len(gl) != len(word) or not fitted["keys"]:
++        return None
++    out = []
++    need = fitted["margin_needed"]
++    for i, g in enumerate(gl):
++        dd = letter_dists(fitted["refs"], letter_cell(m, g))
++        o = np.argsort(dd)
++        k = fitted["keys"][int(o[0])]
++        margin = float(dd[o[1]] - dd[o[0]]) if len(dd) > 1 else float("inf")
++        t = fitted["thresholds"].get(k)
++        if t is None or need is None or float(dd[o[0]]) > t or margin < need or k not in (word[i], "-"):
++            return None
++        out.append(k)
++    return "".join(out)
++
++
++def _letters_places(A: dict, sides: dict, word: str, n: int) -> tuple:
++    """-> ({p: box}, {p: [(save, string, cut, zone)]}) or (None, why)."""
++    ends = sorted(A)
++    fixed = np.all([np.abs(A[e] - A[ends[0]]).max(axis=2) <= LETTERS_EQ for e in ends], axis=0) \
++        if len(ends) > 1 else np.zeros(A[ends[0]].shape[:2], bool)
++    found = {}
++    for p in range(1, n + 1):
++        cands = []
++        for zone in letters_zones(n)[p]:
++            for e in ends:
++                want = 0 if sides[e][p - 1] == "_" else len(sides[e][p - 1])
++                if not want:
++                    continue
++                m = _cue(A, sides, p - 1, e, zone, fixed)
++                for s in letter_strings(m, zone[0], zone[1]):
++                    if len(s) == want and min(g[4] for g in s) >= LETTERS_FOUND_PX:
++                        cands.append((e, s, m, zone))
++        clusters: list = []
++        for c in cands:
++            cx = (c[1][0][1] + c[1][-1][3]) / 2.0
++            cy = (min(g[0] for g in c[1]) + max(g[2] for g in c[1])) / 2.0
++            for cl in clusters:
++                if abs(cl["cx"] - cx) <= LETTERS_PLACE_TOL and abs(cl["cy"] - cy) <= LETTERS_PLACE_TOL:
++                    cl["m"].append(c)
++                    break
++            else:
++                clusters.append({"cx": cx, "cy": cy, "m": [c]})
++        def fixed_text(cl) -> bool:
++            """The end screens' own text: its pixels stay the same (LETTERS_FIXED of them) in a save the session read
++            other letters for this player in — letters change with the reading."""
++            e, s, m, zone = cl["m"][0]
++            t, b_ = min(g[0] for g in s), max(g[2] for g in s)
++            l_, r_ = s[0][1], s[-1][3]
++            cut = m[t - zone[1]:b_ - zone[1] + 1, l_ - zone[0]:r_ - zone[0] + 1]
++            if not cut.any():
++                return False
++            for f in ends:
++                if sides[f][p - 1] != sides[e][p - 1]:
++                    eq = np.abs(A[e][t:b_ + 1, l_:r_ + 1] - A[f][t:b_ + 1, l_:r_ + 1]).max(axis=2) <= LETTERS_EQ
++                    if float(eq[cut].mean()) >= LETTERS_FIXED:
++                        return True
++            return False
++        clusters = [cl for cl in clusters if not fixed_text(cl)]
++        if not clusters:
++            return None, f"P{p}'s letters were found in no save"
++        saves_of = lambda cl: len({c[0] for c in cl["m"]})
++        clusters.sort(key=lambda cl: (-saves_of(cl), -sum(g[4] for c in cl["m"] for g in c[1])))
++        if len(clusters) > 1 and saves_of(clusters[0]) == saves_of(clusters[1]):
++            return None, f"P{p}'s letters were found at two places as often"
++        found[p] = clusters[0]
++    gw = max(g[3] - g[1] + 1 for cl in found.values() for c in cl["m"] for g in c[1])
++    gh = max(g[2] - g[0] + 1 for cl in found.values() for c in cl["m"] for g in c[1])
++    W, H = LETTERS_SIZE
++    places = {}
++    for p, cl in found.items():
++        half = (len(word) * gw + (len(word) - 1) * 6) / 2.0 + LETTERS_PAD
++        top = min(g[0] for c in cl["m"] for g in c[1])
++        bot = max(g[2] for c in cl["m"] for g in c[1])
++        if bot - top + 1 < gh:
++            top, bot = (top + bot) / 2.0 - gh / 2.0, (top + bot) / 2.0 + gh / 2.0
++        places[p] = [int(max(0, cl["cx"] - half)), int(max(0, top - 3)), int(min(W, cl["cx"] + half)),
++                     int(min(H, bot + 4))]
++    return places, found
++
++
++def _corner_text(a: np.ndarray, box, bins: np.ndarray, glyph_min: float) -> np.ndarray:
++    m, gl = letters_glyphs(a, box, bins, glyph_min)
++    keep = np.zeros_like(m)
++    for g in gl:
++        keep[g[0]:g[2] + 1, g[1]:g[3] + 1] = m[g[0]:g[2] + 1, g[1]:g[3] + 1]
++    return keep
++
++
++def _texty(src: np.ndarray, sy: int, sx: int, ph: int, pw: int, bins: dict, glyph_min: float) -> bool:
++    """A patch holding a letter-sized shape in any player's letters' colours (the game's other text)."""
++    for b in bins.values():
++        m = letters_mask(src, (sx, sy, sx + pw, sy + ph), b)
++        if any(c[4] >= glyph_min for c in _components(m)):
++            return True
++    return False
++
++
++def letters_seed(items: list) -> int:
++    """B192: the same saves (their pictures and readings) always give the same synthetic set."""
++    h = hashlib.sha256()
++    for a, sides in items:
++        h.update(np.ascontiguousarray(a[::8, ::8]).astype(np.uint8).tobytes())
++        h.update("/".join(sides).encode())
++    return int(h.hexdigest()[:8], 16)
++
++
++def synthetic_letters(places: dict, bins: dict, items: list, frames: list, fixed: np.ndarray, rng, per: int,
++                      cuts: list, glyph_min: float) -> list:
++    """B192: each real end save's letters over other backgrounds — each corner's box given a patch cut from one of the
++    title's own pictures at a random place and scale (never overlapping a letters box or the end screens' fixed text,
++    never a patch holding the game's other text), the save's own letter pixels put back at their place moved by up to
++    SYN_SHIFT px. -> [(picture, sides, {p: the pasted pixels})]. Training only: never read by a gate."""
++    W, H = LETTERS_SIZE
++    out = []
++    for i, (a, sides) in enumerate(items):
++        for _j in range(per):
++            b = a.copy()
++            pasted = {}
++            for p, box in places.items():
++                x0, y0, x1, y1 = box
++                h, w = y1 - y0, x1 - x0
++                src, sy, sx, ph, pw = frames[0], 0, 0, h, w
++                for _try in range(60):
++                    src = frames[int(rng.integers(len(frames)))]
++                    s = float(rng.uniform(*SYN_SCALE))
++                    ph, pw = max(2, int(round(h / s))), max(2, int(round(w / s)))
++                    sy, sx = int(rng.integers(0, H - ph)), int(rng.integers(0, W - pw))
++                    if fixed[sy:sy + ph, sx:sx + pw].any():
++                        continue
++                    if any(not (sx + pw <= q[0] or q[2] <= sx or sy + ph <= q[1] or q[3] <= sy) for q in places.values()):
++                        continue
++                    if _texty(src, sy, sx, ph, pw, bins, glyph_min):
++                        continue
++                    break
++                patch = Image.fromarray(np.clip(src[sy:sy + ph, sx:sx + pw], 0, 255).astype(np.uint8))
++                b[y0:y1, x0:x1] = np.asarray(patch.resize((w, h), Image.BILINEAR), dtype=np.float32)
++                dy, dx = (int(v) for v in rng.integers(-SYN_SHIFT, SYN_SHIFT + 1, 2))
++                ys, xs = np.nonzero(cuts[i][p])
++                yy, xx = ys + dy, xs + dx
++                ok = (yy >= 0) & (yy < h) & (xx >= 0) & (xx < w)
++                b[yy[ok] + y0, xx[ok] + x0] = a[ys[ok] + y0, xs[ok] + x0]
++                pm = np.zeros((h, w), bool)
++                pm[yy[ok], xx[ok]] = True
++                pasted[p] = pm
++            out.append((b, list(sides), pasted))
++    return out
++
++
++def _letter_cells(places: dict, bins: dict, items: list, word: str, glyph_min: float) -> tuple:
++    cells: dict = {}
++    bad = []
++    for i, it in enumerate(items):
++        a, sides = it[0], it[1]
++        pasted = it[2] if len(it) > 2 else None              # B192: a training picture's own letter pixels
++        for p, box in places.items():
++            st = sides[p - 1]
++            m, gl = letters_glyphs(a, box, bins[p], glyph_min, 0 if st == "_" else len(st))
++            if st == "_":
++                if gl:
++                    bad.append((i, p))
++                continue
++            if len(gl) != len(st):
++                bad.append((i, p))
++                continue
++            for ch, g in zip(st, gl):
++                if pasted is not None:                       # a glyph a background speck joined teaches no shape
++                    own = m[g[0]:g[2] + 1, g[1]:g[3] + 1]
++                    if own.any() and float(pasted[p][g[0]:g[2] + 1, g[1]:g[3] + 1][own].mean()) < SYN_OWN:
++                        continue
++                cells.setdefault(ch, []).append(letter_cell(m, g))
++    return cells, bad
++
++
++def _read_sides(places: dict, bins: dict, fitted: dict, word: str, glyph_min: float, blank: dict, a) -> list:
++    return [read_corner(a, places[p], bins[p], fitted, word, glyph_min, blank.get(p, False)) for p in sorted(places)]
++
++
++def learn_letters(starts: list, others: list, ends: dict, sides: dict, word: str, players: int, name: str = "",
++                  start_class: str = START) -> tuple:
++    """B191 / B192: starts / others — picture paths of the begin's and the mid-match save's screens; ends — {role:
++    [picture paths]} (the label stage's two of each end save); sides — {role: [P1's corner, P2's, ...]} as the session
++    read them; word — the user's. -> (spec, arrays, report). Synthetic pictures only train; nothing here proves."""
++    t0 = time.perf_counter()
++    if not LETTERS_WORD.match(word or ""):
++        raise ValueError("the word is 2-12 letters A-Z")
++    if players != 2:
++        raise ValueError("a letters title has two players")
++    roles = sorted(ends)
++    report: dict = {"word_length": len(word), "end_saves": len(roles)}
++    # the start: B122's one-screen learner on the begin's own still picture, B137's corner black
++    def grey(p):
++        with Image.open(p) as im:
++            return _final(mid(corner_black(im)))
++    st = np.stack([grey(p) for p in starts]).astype(np.float32)
++    foreign = [np.stack([grey(p) for p in others]).astype(np.float32)] if others else []
++    foreign.append(np.stack([grey(p) for r in roles for p in ends[r]]).astype(np.float32))
++    smask, sref, sgap = _learn_one_screen(st, foreign)
++    arrays = {f"{start_class}_mask": smask, f"{start_class}_ref": sref}
++    # the corners
++    def colour(p):
++        with Image.open(p) as im:
++            return letters_area(im)
++    A = {r: colour(ends[r][0]) for r in roles}
++    items = [(A[r], list(sides[r])) for r in roles]                      # B192: one picture of each end save
++    checks = items + [(colour(p), list(sides[r])) for r in roles for p in ends[r][1:]]   # every picture read right
++    frames = [colour(p) for p in list(starts[:1]) + list(others[:1])] + [A[r] for r in roles]
++    places, found = _letters_places(A, sides, word, players)
++    spec = {"version": VERSION_LETTERS, "kind": "privyhub-h7-endscreen", "measure": MEASURE, "size": list(SIZE),
++            "classes": [start_class] + [f"end_P{k}" for k in range(1, players + 1)], "start_class": start_class,
++            "end_classes": [f"end_P{k}" for k in range(1, players + 1)], "k": K,
++            "screens": {start_class: {"threshold": sgap["threshold"], "own_worst": sgap["worst_own"],
++                                      "mask_px": sgap["mask_px"]}},
++            "letters": {"word": word, "players": players, "found": places is not None,
++                        "not_found": None if places is not None else found, "size": list(LETTERS_SIZE),
++                        "cell": list(LETTERS_CELL), "shift": LETTERS_SHIFT, "corner": list(LETTERS_CORNER),
++                        "moved": list(LETTERS_MOVED)},
++            "usable": False, "arrays": f"{name}.endscreen.npz" if name else None, "arrays_sha256": None}
++    report["start"] = sgap
++    if places is None:
++        report["letters"] = {"not_found": found}
++        report["learn_s"] = round(time.perf_counter() - t0, 2)
++        return spec, arrays, report
++    fixed = np.all([np.abs(A[e] - A[roles[0]]).max(axis=2) <= LETTERS_EQ for e in roles], axis=0) \
++        if len(roles) > 1 else np.zeros(A[roles[0]].shape[:2], bool)
++    # the colours: the found strings' pixels against every picture's pixels outside the boxes
++    bg = np.zeros(LETTERS_NB * LETTERS_NB)
++    for a in frames + [colour(p) for p in starts[1:2]]:
++        k = letters_colour(a)
++        for b in places.values():
++            k[b[1]:b[3], b[0]:b[2]] = -1
++        bg += _lhist(k)
++    text = {}
++    smallest = []
++    for p, cl in found.items():
++        t = np.zeros(LETTERS_NB * LETTERS_NB)
++        for e, s, m, zone in cl["m"]:
++            for g in s:
++                sub = m[g[0] - zone[1]:g[2] - zone[1] + 1, g[1] - zone[0]:g[3] - zone[0] + 1]
++                k = letters_colour(A[e][g[0]:g[2] + 1, g[1]:g[3] + 1])
++                t += _lhist(np.where(sub, k, -1))
++                smallest.append(g[4])
++        text[p] = t
++    glyph_min = max(float(LETTERS_PART), LETTERS_SPECK * float(min(smallest)))
++    blank = {p: any(sides[r][p - 1] == "_" for r in roles) for p in places}
++    # B192: held-out pictures first, then rounds of training pictures until every held-out one is read
++    seed = letters_seed(items)
++    rng = np.random.default_rng(seed)
++    first = {p: letters_bins(text[p], bg, LETTERS_RATIOS[1]) for p in places}
++    cuts = [{p: _corner_text(a, places[p], first[p], glyph_min) for p in places} for a, _s in items]
++    held = synthetic_letters(places, first, items, frames, fixed, rng, SYN_HELD, cuts, glyph_min)
++    ttext = {p: text[p].copy() for p in places}
++    tbg = {p: bg.copy() for p in places}
++    trained: list = []
++    rounds, best, done = [], None, None
++    for rnd in range(1, SYN_ROUNDS + 1):
++        batch = synthetic_letters(places, first, items, frames, fixed, rng, SYN_PER_ROUND, cuts, glyph_min)
++        trained += batch
++        for b, _s, pasted in batch:
++            for p, box in places.items():
++                x0, y0, x1, y1 = box
++                k = letters_colour(b[y0:y1, x0:x1])
++                ttext[p] += _lhist(np.where(pasted[p], k, -1))
++                tbg[p] += _lhist(np.where(pasted[p], -1, k))
++        row = {"round": rnd, "trained": len(trained), "held_out": len(held)}
++        for ratio in LETTERS_RATIOS:
++            bins = {p: letters_bins(ttext[p], tbg[p], ratio) for p in places}
++            cells, bad = _letter_cells(places, bins, checks, word, glyph_min)
++            if bad:
++                continue
++            c2, _bad2 = _letter_cells(places, bins, trained, word, glyph_min)     # (picture, sides, pasted)
++            real = fit_letters(cells)
++            for k2, v in c2.items():                     # a training glyph teaches a letter only when the real saves'
++                if k2 not in real["keys"]:               # own reader reads it as that letter by distance
++                    continue
++                i2, t2 = real["keys"].index(k2), real["thresholds"].get(k2)
++                cells[k2].extend(c for c in v if t2 is not None and float(letter_dists(real["refs"], c)[i2]) <= t2)
++            fitted = fit_letters(cells)
++            if not fitted["keys"] or not all(fitted["separable"].values()) or fitted["margin_needed"] is None:
++                continue
++            real_wrong = sum(_read_sides(places, bins, fitted, word, glyph_min, blank, a) != list(s) for a, s in checks)
++            held_wrong = [i for i, (a, s, _p) in enumerate(held)
++                          if _read_sides(places, bins, fitted, word, glyph_min, blank, a) != list(s)]
++            cand = (real_wrong, len(held_wrong), ratio, bins, fitted, held_wrong)
++            if best is None or cand[:2] < best[:2]:
++                best = cand
++            if not real_wrong and not held_wrong:
++                done = cand
++                break
++        row.update({"ratio": best[2] if best else None, "real_wrong": best[0] if best else None,
++                    "held_out_wrong": best[1] if best else None})
++        rounds.append(row)
++        if done:
++            break
++    trained_rep = {"seed": seed, "held_out": len(held), "trained": len(trained),
++                   "backgrounds": len(frames), "rounds": rounds, "per_end_save": {"held_out": SYN_HELD,
++                                                                                "a_round": SYN_PER_ROUND},
++                   "held_out_wrong": best[1] if best else None, "real_wrong": best[0] if best else None,
++                   "every_held_out_read": done is not None}
++    if best is not None and best[5]:                       # which saves' letters the unread held-out pictures carried
++        trained_rep["held_out_wrong_of"] = sorted({roles[i // SYN_HELD] for i in best[5]})
++    report["synthetic"] = trained_rep
++    if best is None:
++        spec["letters"]["trained"] = trained_rep
++        report["learn_s"] = round(time.perf_counter() - t0, 2)
++        return spec, arrays, report
++    _rw, _hw, ratio, bins, fitted, _hl = best
++    spec["letters"].update({
++        "places": {str(p): list(b) for p, b in places.items()}, "ratio": ratio, "glyph_min": round(glyph_min, 2),
++        "blank": {str(p): v for p, v in blank.items()}, "keys": fitted["keys"],
++        "thresholds": {k: v for k, v in fitted["thresholds"].items()}, "margin_needed": fitted["margin_needed"],
++        "separable": fitted["separable"], "trained": trained_rep,
++        "found_in": {str(p): sorted({c[0] for c in cl["m"]}) for p, cl in found.items()}})
++    arrays["letters_bins"] = np.stack([bins[p] for p in sorted(places)])
++    arrays["letters_refs"] = fitted["refs"]
++    spec["usable"] = bool(sgap["threshold"] is not None and fitted["keys"] and fitted["margin_needed"] is not None
++                          and all(fitted["separable"].values()))
++    report["letters"] = {"places": places, "keys": fitted["keys"], "thresholds": fitted["thresholds"],
++                         "margin_needed": fitted["margin_needed"], "ratio": ratio}
++    report["learn_s"] = round(time.perf_counter() - t0, 2)
++    return spec, arrays, report
++
++
+ # --- the spec on disk ---------------------------------------------------------------------------------------------
+ def _npz_bytes(arrays: dict) -> bytes:
+     buf = io.BytesIO()
+@@ -1409,8 +1981,11 @@ def check_spec(spec: dict) -> None:
+         raise ValueError("not an end-screen spec this tool reads")
+     if spec.get("version") == 1:
+         raise ValueError(OLD_MEASURE)
+-    if spec.get("version") not in (VERSION, VERSION_PLACES, VERSION_SCORE) or spec.get("measure") != MEASURE:
++    if spec.get("version") not in (VERSION, VERSION_PLACES, VERSION_SCORE, VERSION_LETTERS) \
++            or spec.get("measure") != MEASURE:
+         raise ValueError("not an end-screen spec this tool reads")
++    if spec.get("version") == VERSION_LETTERS and not isinstance(spec.get("letters"), dict):    # B191
++        raise ValueError("a version-5 spec names its letters")
+     if spec.get("version") == VERSION_PLACES and not isinstance(spec.get("places"), dict):
+         raise ValueError("a version-3 spec names its places")
+     if spec.get("version") == VERSION_SCORE and not isinstance(spec.get("score"), dict):     # B178
+@@ -1429,6 +2004,17 @@ def load_spec(json_path) -> tuple[dict, dict]:
+         raise ValueError("the spec's arrays file does not match the spec")
+     v3 = spec.get("version") == VERSION_PLACES
+     v4 = spec.get("version") == VERSION_SCORE                                   # B178
++    if spec.get("version") == VERSION_LETTERS:                                  # B191
++        st = spec["start_class"]
++        keys = (f"{st}_mask", f"{st}_ref") + (("letters_bins", "letters_refs") if "places" in spec["letters"] else ())
++        with np.load(io.BytesIO(data), allow_pickle=False) as z:
++            arrays = {k: z[k] for k in keys}
++        lt = spec["letters"]
++        if arrays[f"{st}_mask"].shape != (SIZE[1], SIZE[0]) or ("places" in lt and (
++                arrays["letters_bins"].shape != (len(lt["places"]), LETTERS_NB * LETTERS_NB)
++                or arrays["letters_refs"].shape != (len(lt["keys"]),) + tuple(lt["cell"]))):
++            raise ValueError("the spec's arrays do not fit the spec")
++        return spec, arrays
+     keys = (tuple(f"{c}_{k}" for c in spec["classes"] for k in ("mask", "ref")) + ("place_mask", "place_refs")
+             if v3 else tuple(f"{c}_{k}" for c in spec["classes"] for k in ("mask", "ref")) + ("digit_refs",)
+             if v4 else ("screen_mask", "screen_ref", "outcome_mask", "refs"))
+@@ -1463,6 +2049,8 @@ class Reader:
+             return super().__new__(ReaderPlaces)
+         if cls is Reader and isinstance(spec, dict) and spec.get("version") == VERSION_SCORE:    # B178
+             return super().__new__(ReaderScore)
++        if cls is Reader and isinstance(spec, dict) and spec.get("version") == VERSION_LETTERS:  # B191
++            return super().__new__(ReaderLetters)
+         return super().__new__(cls)
+ 
+     def __init__(self, spec: dict, arrays: dict, clock=time.monotonic):
+@@ -1684,6 +2272,68 @@ class ReaderScore(ReaderPlaces):
+         return out
+ 
+ 
++class ReaderLetters(Reader):
++    """B191: a version-5 spec — each player's corner read as letters: the player whose letters spell the whole word
++    lost, the other won (`end_P<the other>`); both -> unknown; a word spelled is never the begin; with none spelled, the
++    start by its own still picture (B137's corner black), else other; a corner not read while the other spelled -> unknown with `end_unread` (B182); a moving
++    screen (B140's measure against the read before) never reads as the same end twice in a row."""
++
++    def __init__(self, spec: dict, arrays: dict, clock=time.monotonic):
++        check_spec(spec)
++        self.spec, self.clock = spec, clock
++        self.classes = list(spec["classes"])
++        self.start = spec["start_class"]
++        self.smask = arrays[f"{self.start}_mask"].astype(bool)
++        self.sref = arrays[f"{self.start}_ref"][self.smask].astype(np.float32)
++        self.sthr = spec["screens"][self.start]["threshold"]
++        lt = spec["letters"]
++        self.word = lt["word"]
++        self.found = bool(lt.get("found")) and "places" in lt
++        if self.found:
++            self.places = {int(p): tuple(b) for p, b in lt["places"].items()}
++            self.bins = {p: arrays["letters_bins"][i].astype(bool) for i, p in enumerate(sorted(self.places))}
++            self.fitted = {"keys": list(lt["keys"]), "refs": arrays["letters_refs"].astype(np.float32),
++                           "thresholds": dict(lt["thresholds"]), "margin_needed": lt["margin_needed"]}
++            self.glyph_min = float(lt["glyph_min"])
++            self.blank = {int(p): bool(v) for p, v in (lt.get("blank") or {}).items()}
++        self.align = IDENTITY
++        self.last_search = None
++        self.prev_small = None
++        self.prev_class = None
++
++    def sides(self, img: Image.Image) -> list:
++        a = letters_area(img)
++        return _read_sides(self.places, self.bins, self.fitted, self.word, self.glyph_min, self.blank, a)
++
++    def read(self, img: Image.Image, now: float | None = None, search: bool = True) -> dict:
++        small = np.asarray(img.convert("RGB").resize((64, 48)), dtype=np.int16)        # in colour: two scenes of one
++        moved = self.prev_small is not None and float(                                # grey level still differ
++            (np.abs(small - self.prev_small).max(axis=2) > LETTERS_MOVED[0]).mean()) >= LETTERS_MOVED[1]
++        self.prev_small = small
++        r, flat = ranks(_final(mid(corner_black(img))), self.smask)
++        sd = _screen_dist(r, flat, self.smask, self.sref)
++        out = {"screen": False, "class": OTHER, "distances": {self.start: round(sd, 4)}, "margin": None,
++               "flat": bool(flat), "align": [1.0, 0.0, 0.0], "searched": False, "letters": None, "moved": moved}
++        got = self.sides(img) if self.found else None
++        spelled = [s == self.word for s in got] if got else []
++        if got is not None:
++            out["letters"] = got
++        if any(spelled):                                   # a word spelled is never the begin
++            if all(s is not None for s in got):
++                if sum(spelled) == 1:
++                    out.update(screen=True, **{"class": f"end_P{2 if spelled[0] else 1}"})
++                else:
++                    out["class"] = UNKNOWN                 # both spelled: no result
++            else:
++                out.update(**{"class": UNKNOWN}, end_unread=True)   # B182: a corner not read beside a spelled one
++            if out["class"] in self.spec["end_classes"] and moved and self.prev_class == out["class"]:
++                out["class"] = UNKNOWN                     # a moving screen: never the same end twice in a row
++        elif self.sthr is not None and sd <= self.sthr:
++            out.update(screen=True, **{"class": self.start})
++        self.prev_class = out["class"]
++        return out
++
++
+ def read(spec: dict, arrays: dict, img: Image.Image) -> dict:
+     """One picture, read by a fresh Reader (a non-screen picture gets the full search)."""
+     return Reader(spec, arrays).read(img)
+@@ -1691,6 +2341,10 @@ def read(spec: dict, arrays: dict, img: Image.Image) -> dict:
+ 
+ def thresholds(spec: dict) -> dict:
+     """What a read's distances are held against (B105's `last`)."""
++    if spec.get("version") == VERSION_LETTERS:             # B191
++        lt = spec["letters"]
++        return {"screens": {c: v["threshold"] for c, v in spec["screens"].items()},
++                "letters": dict(lt.get("thresholds") or {}), "margin_needed": lt.get("margin_needed")}
+     if spec.get("version") == VERSION_SCORE:               # B178
+         sc = spec["score"]
+         return {"screens": {c: v["threshold"] for c, v in spec["screens"].items()},
+diff --git a/tools/party_add_game.py b/tools/party_add_game.py
+index 7e02726a..29ee8978 100644
+--- a/tools/party_add_game.py
++++ b/tools/party_add_game.py
+@@ -1,13 +1,15 @@
+ #!/usr/bin/env python3
+ """B157: add a party mini game by one scripted path — one command per stage, for a title known only by its code.
+ 
+-    python3 tools/party_add_game.py register <code> --players N --system ps1|n64|snes --result winner|places|score
++    python3 tools/party_add_game.py register <code> --players N --system ps1|n64|snes
++                                             --result winner|places|score|letters [--word <the word>]
+                                              (--find <words> | --rules-players N) [--setup none|slot1]
+                                              [--collect role=slot ...] [--check]
+     python3 tools/party_add_game.py label <code> [<role>=<P1>-<P2>,<P1>-<P2> ...] [<role>=<P1>-<P2>,user]
+                                              (B178: a `score` title — the session reads each end save's final score
+                                              from <role>.1.png / <role>.2.png in the title's add_game folder, label/;
+-                                             the tool checks every reading)
++                                             the tool checks every reading; B191: a `letters` title —
++                                             <role>=<P1>/<P2>,<P1>/<P2>, each player's corner)
+     python3 tools/party_add_game.py learn <code> [--check]
+     python3 tools/party_add_game.py rehearse <code> [--collect role=slot ...]   (B163: a title already in the rules
+                                              folder; a role its kept folder lacks taken from the user's slot, read only)
+@@ -40,6 +42,14 @@ and the title's own digits (h7_endscreen's spec version 4), reads every save wit
+ for a save showing a digit the others do not. The sidecar `{"players": n, "result": "score"}`; the hub passes the real
+ numbers, the winner the side ahead, a tie a draw.
+ 
++B191 / B192: `--result letters --word <the word>` — a title whose match is lost by the player whose letters (one per
++miss, in that player's corner) spell the word; the other player won. Two players only (four: refused, the line says
++why). The label stage as the score kind's: the session reads each player's corner on two pictures of every end save;
++the tool checks the two readings, each corner against the word, the role (end_Pk: the other player spelled it), the
++corners at one place, a reader learnt without each save, and the last look (label/letters.png). learn learns h7_endscreen's
++version-5 spec with B192's synthetic training (training only; every gate reads the real saves); the sidecar
++`{"players": 2, "result": "letters"}`: the hub's winner entry.
++
+ Run-time places (each replaceable, for the tests): PRIVYHUB_H7_RULES (the rules folder), PRIVYHUB_ADD_GAME_HOME
+ (~/privyhub_h7/add_game), PRIVYHUB_ADD_GAME_EVIDENCE (the repo's docs/memory/evidence/add_game),
+ PRIVYHUB_ADD_GAME_PROJECT (the hub's project root: logs, slot indexes, the session config), PRIVYHUB_ADD_GAME_HUB
+@@ -104,6 +114,8 @@ BARS = {
+     "switches_read_min": (4, "B162: four read (a practice in and out, the go, the end)"),
+     "flag_lines_task": (20, "PP-H4: twenty lines with the two flags"),
+     "flag_lines_found": (18, "the eighteen adopted lines"),
++    "synthetic_held_wrong_max": (0, "B192: the training's own bar — every held-out synthetic picture read; it never "
++                                    "counts toward a pass"),
+ }
+ CAPTURE_SECONDS, CAPTURE_EVERY = 20.0, 0.5             # H7-V1's cadence; 40 pictures a state
+ MOVED_SHARE, MOVED_GREY = 0.20, 16                     # B140's BEGIN_MOVED: the screen moved on (64x48 cells)
+@@ -309,7 +321,8 @@ def kept_states(code: str) -> dict[str, str]:
+ 
+ def register_inputs(b: dict, kept: dict) -> str:
+     return digest({"code": b["code"], "players": b["players"], "system": b["system"], "result": b["result"],
+-                   "setup": bool(b.get("cheat")), "kept": kept, "game": hashlib.sha256(b["game"].encode()).hexdigest()})
++                   "setup": bool(b.get("cheat")), "kept": kept, "game": hashlib.sha256(b["game"].encode()).hexdigest(),
++                   **({"word": b.get("word")} if b["result"] == "letters" else {})})     # B191
+ 
+ 
+ # --- register ------------------------------------------------------------------------------------------------------------
+@@ -384,7 +397,7 @@ def ps1_four_on(game: str) -> bool:
+ def _roles_needed(players: int, result: str, per_ending: int = 2) -> list[str]:
+     """B171: two saves of every ending from the start (`winner`), each from a different match; rehearse asks one for
+     learn to run at all (per_ending=1). `places`: the rows that cover every place (each row another match already)."""
+-    if result not in ("winner", "score"):                    # B178: a score title's saves as a winner title's
++    if result not in ("winner", "score", "letters"):         # B178 / B191: as a winner title's
+         return ["begin", "other"]
+     return ["begin", "other"] + [f"end_P{k}" + ("" if n == 1 else f"_{n}") for k in range(1, players + 1)
+                                  for n in range(1, per_ending + 1)]
+@@ -415,6 +428,11 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+     players, system, result = int(a["players"]), str(a["system"]).casefold(), str(a["result"])
+     check = a["check"]
+     cells = Cells()
++    word = str(a.get("word") or "").upper()
++    if a.get("word") and result != "letters":
++        raise Usage("--word is for --result letters")
++    if result == "letters" and not word:
++        raise Usage("--result letters needs --word <the word>")
+     if a.get("rules_players"):                              # a title already in the rules folder (T88 / T89)
+         n = int(a["rules_players"])
+         sides = [p for p in sorted(rules_folder().glob("*.party.json"))
+@@ -438,7 +456,13 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+     if system in NOT_YET:
+         cells.add("why not", NOT_YET[system], "-", False)
+     cells.add("players", players, "2 or 4 (the board has no three-player hub game)", players in (2, 4))
+-    cells.add("result kind", result, ["winner", "places", "score"], result in ("winner", "places", "score"))
++    cells.add("result kind", result, ["winner", "places", "score", "letters"],
++              result in ("winner", "places", "score", "letters"))
++    if result == "letters":                                   # B191
++        b["word"] = word
++        cells.add("the word", word, "2-12 letters A-Z", bool(re.match(r"^[A-Z]{2,12}$", word)))
++        if not cells.add("a letters title has two players", players, 2, players == 2):
++            cells.add("why not", FOUR_LETTERS, "-", False)
+     if system == "ps1" and players == 4 and not b.get("described"):
+         on = ps1_four_on(b["game"])
+         cells.add("four-player PS1: the title's four-player setting on", on, True, on)
+@@ -482,7 +506,8 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+             cells.add("results rows: every place in every column", sorted(ok_rows), "each column sees 1..n",
+                       bool(ok_rows) and len(ok_rows) == len(rows) and cover)
+         ends = {f"end_P{i}" for i in range(1, players + 1)}                       # B171: a third / fourth save allowed
+-        extra = [k for k in kept if k.startswith("end_") and _role_class(k) not in ends and result in ("winner", "score")]
++        extra = [k for k in kept if k.startswith("end_") and _role_class(k) not in ends
++                 and result in ("winner", "score", "letters")]
+         cells.add("no ending of another kind", extra, [], not extra)
+     flag_lines = _companion_lines()
+     b["found_lines"] = digest(flag_lines)
+@@ -632,6 +657,11 @@ def _anchor_held(small: list, times: list) -> int:
+     return _anchor(small)
+ 
+ 
++def _for_reader(im, spec: dict):
++    """The picture as a reader takes it: grey, as today; in colour for a version-5 spec (B191: the corners' colours)."""
++    return im.convert("RGB") if spec.get("version") == 5 else im.convert("L")
++
++
+ def _matches(pics: Path, kept) -> tuple[dict, list]:
+     """B176: each ending's saves grouped by match — two saves whose screens that stay are the same picture (under
+     SAME_PICTURE) are one match. -> ({role: the first role of its match}, [[a, b, mean difference] for each such pair])."""
+@@ -714,7 +744,7 @@ def _replay_cells(cells: Cells, es, spec: dict, arrays: dict, pics: Path, kept:
+         for t, f in rows:
+             now[0] = t
+             with Image.open(pics / role / f) as im:
+-                r = reader.read(im.convert("L"), now=t)
++                r = reader.read(_for_reader(im, spec), now=t)
+             if r["class"] == "start" and first_start is None:
+                 first_start = t
+             done = ended.feed(r["class"], r.get("places"))
+@@ -748,7 +778,7 @@ def _replay_all(es, spec: dict, arrays: dict, run: Path) -> list:
+     for t, f in rows:
+         now[0] = t
+         with Image.open(run / f) as im:
+-            r = reader.read(im.convert("L"), now=t)
++            r = reader.read(_for_reader(im, spec), now=t)
+         done = ended.feed(r["class"], r.get("places"))
+         if done:
+             said.append((round(t - rows[0][0], 2), done, list(ended.places) if ended.places else None))
+@@ -814,7 +844,7 @@ def _held_out_wrong(es, spec: dict, arrays: dict, pics: Path, labels: dict, kept
+         for c, fs in es.labelled_frames(pics, lab, "second").items():
+             for f in fs:
+                 with Image.open(f) as im:
+-                    got = es.read(spec, arrays, im.convert("L"))["class"]
++                    got = es.read(spec, arrays, _for_reader(im, spec))["class"]
+                 if got in ends and got != cls:
+                     out.setdefault(role, got)
+     return out
+@@ -915,6 +945,8 @@ def _sidecar(b: dict, spec: dict) -> dict:
+         side["result"] = "winner"                            # B158
+     if b["result"] == "score":
+         side["result"] = "score"                             # B178
++    if b["result"] == "letters":
++        side["result"] = "letters"                           # B191
+     if b.get("cheat"):
+         side["cheat"] = b["cheat"]
+     return side
+@@ -950,12 +982,13 @@ def cmd_learn(code: str, a: dict) -> int:
+         n = side.get("players")
+         ok = (n == b["players"] and (("scores" in side and sorted(side["scores"]) == sorted(spec["end_classes"]))
+                                      or spec.get("version") == es.VERSION_PLACES or side.get("result") == "winner"
+-                                     or (side.get("result") == "score" and spec.get("version") == SCORE_VERSION)))
++                                     or (side.get("result") == "score" and spec.get("version") == SCORE_VERSION)
++                                     or (side.get("result") == "letters" and spec.get("version") == es.VERSION_LETTERS)))
+         cells.add("sidecar as the listing needs it", ok, True, ok)
+         return finish(code, "learn", cells, learn_inputs(code, b), write=not a["check"])
+     kept = kept_states(code)
+     require(code, "register", register_inputs(b, kept))
+-    if b["result"] == "score":                               # B178: the label stage's PASS for these readings
++    if b["result"] in ("score", "letters"):                  # B178 / B191: the label stage's PASS for these readings
+         require(code, "label", label_inputs(code, b))
+     try:
+         pics = _pictures(code, b, kept)
+@@ -964,6 +997,8 @@ def cmd_learn(code: str, a: dict) -> int:
+         return finish(code, "learn", cells, learn_inputs(code, b))
+     if b["result"] == "score":                               # B178: each side's number
+         return _learn_score(code, b, kept, pics, es)
++    if b["result"] == "letters":                             # B191: each player's letters
++        return _learn_letters(code, b, kept, pics, es)
+     labels = _labels(pics, kept, es)
+     write_if_changed(pics / "labels.json", json.dumps(labels, sort_keys=True))
+     r = rules_folder()
+@@ -1044,7 +1079,7 @@ def cmd_learn(code: str, a: dict) -> int:
+ def learn_inputs(code: str, b: dict) -> str:
+     if b.get("described"):
+         return digest({"register": b["register_inputs"], "described": True})
+-    if b.get("result") == "score":                           # B178: the readings the label stage checked
++    if b.get("result") in ("score", "letters"):              # B178 / B191: the readings the label stage checked
+         return digest({"register": b["register_inputs"], "kept": kept_states(code), "labels": readings(code)})
+     return digest({"register": b["register_inputs"], "kept": kept_states(code)})
+ 
+@@ -1186,7 +1221,7 @@ def _replay_scores(es, spec: dict, arrays: dict, run: Path) -> list:
+     for t, f in rows:
+         now[0] = t
+         with Image.open(run / f) as im:
+-            r = reader.read(im.convert("L"), now=t)
++            r = reader.read(_for_reader(im, spec), now=t)
+         done = ended.feed(r["class"], r.get("scores"))
+         if done:
+             said.append((round(t - rows[0][0], 2), done, list(ended.scores) if ended.scores is not None else None, f))
+@@ -1501,8 +1536,10 @@ def _ask_line(code: str, b: dict, rec: dict, role: str, why: str, texts: dict, f
+ 
+ def cmd_label(code: str, a: dict) -> int:
+     b = load_binding(code)
++    if b.get("result") == "letters":                         # B191
++        return _label_letters(code, b, a)
+     if b.get("result") != "score":
+-        raise Refused("label is for a title registered with --result score")
++        raise Refused("label is for a title registered with --result score or letters")
+     kept = kept_states(code)
+     require(code, "register", register_inputs(b, kept))
+     _private_paths()
+@@ -1765,7 +1802,7 @@ def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
+             for t, f in rows:
+                 now[0] = t
+                 with Image.open(pics / role / f) as im:
+-                    rd = reader.read(im.convert("L"), now=t)
++                    rd = reader.read(_for_reader(im, spec), now=t)
+                 first = t if rd["class"] == "start" and first is None else first
+                 if ended.feed(rd["class"], rd.get("scores")) and got is None:
+                     got = t
+@@ -1886,6 +1923,426 @@ def _score_line(b: dict, cells: Cells, kept, only: dict, group: dict, pairs: lis
+ 
+ 
+ 
++# --- B191 / B192: a word spelled by the player who lost (`--result letters --word <the word>`) ---------------------------
++LETTERS_READING = re.compile(r"^(?:[A-Z-]{1,12}|_)(?:/(?:[A-Z-]{1,12}|_)){1,3}$")
++LOOK_LETTERS = re.compile(r"^look=(all|[A-Z-]:\d+(?:\.\d+)*)$")
++FOUR_LETTERS = ("a four-player letters title is not built: the player who spelled the word lost, but which of the other "
++                "three won is not on that screen — winner-only would name a winner the game never showed; the hub "
++                "could honestly report only \"port k lost\", and the board has no such result")
++
++
++def _letters_side_fits(side: str, word: str) -> bool:
++    """A corner as read fits the word: '_' (nothing shown), or as long as the word with each place its letter or '-'."""
++    return side == "_" or (len(side) == len(word) and all(c in (w, "-") for c, w in zip(side, word)))
++
++
++def parse_letters(items: list[str], players: int) -> dict:
++    """role=<P1>/<P2>,<P1>/<P2> — each player's corner, its letters left to right ('-' a not-yet mark, '_' nothing),
++    from <role>.1.png and <role>.2.png."""
++    got = {}
++    for item in items:
++        role, _, val = item.partition("=")
++        parts = val.split(",")
++        if not (ROLE.match(role) and role.startswith("end_P")) or len(parts) != 2:
++            raise Usage(f"label <code> <role>=<P1>/<P2>,<P1>/<P2>: {item}")
++        if not all(LETTERS_READING.match(x) for x in parts):
++            raise Usage(f"a reading is each player's letters, P1 first, joined by '/' (capitals; '-' for a not-yet "
++                        f"mark, '_' when the corner shows nothing): {item}")
++        if any(len(x.split("/")) != players for x in parts):
++            raise Usage(f"a reading names {players} players: {item}")
++        got[role] = {"readings": parts, "by": "session"}
++    return got
++
++
++def _letters_inputs_of(pics: Path, kept: dict) -> tuple:
++    """The begin's and the mid-match save's screen pictures (learn's own labels: the frames near each run's anchor),
++    and each end save's two label pictures."""
++    labels = _labels(pics, kept, _endscreen())
++    def frames(role, want):
++        rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((pics / role / "index.csv").open())]
++        ranges = labels["runs"][role]
++        return [str(pics / role / f) for t, f in rows
++                if any(x["label"] == want and x["from"] - 1e-6 <= t <= x["to"] + 1e-6 for x in ranges)]
++    starts = frames("begin", "start")
++    others = [p for role in sorted(kept) if role.startswith("other") for p in frames(role, "other")]
++    ends = {r: [str(pics / r / f) for f in _two_pictures(pics, r)] for r in sorted(kept) if r.startswith("end_P")}
++    return starts, others, ends
++
++
++def _learn_letters_spec(es, b: dict, pics: Path, kept: dict, sides: dict, without=(), name: str = ""):
++    starts, others, ends = _letters_inputs_of(pics, kept)
++    use = {r: p for r, p in ends.items() if r not in without}
++    return es.learn_letters(starts, others, use, {r: sides[r] for r in use}, b["word"], b["players"], name=name)
++
++
++def _letters_sides_of(code: str) -> dict:
++    rec = label_record(code)
++    return {r: v["readings"][0].split("/") for r, v in rec["saves"].items() if v.get("readings")}
++
++
++def _letters_read(es, spec: dict, arrays: dict, path) -> list | None:
++    """One picture's corners as a fresh reader reads them (None: the spec has no corners)."""
++    from PIL import Image
++    rd = es.Reader(spec, arrays)
++    if not getattr(rd, "found", False):
++        return None
++    with Image.open(path) as im:
++        return rd.sides(im.convert("RGB"))
++
++
++def _letters_sheet(es, spec: dict, arrays: dict, ends: dict, sides: dict, folder: Path) -> dict:
++    """B191's last look: every glyph of every labelled corner (one picture of each save), grouped by the letter it was
++    read as, in one picture (label/letters.png): a row per letter, its tiles numbered 1… -> {letter: [save of each]}."""
++    from PIL import Image, ImageDraw, ImageFont
++    import numpy as np
++    lt = spec["letters"]
++    rd = es.Reader(spec, arrays)
++    tiles: dict = {}
++    for role in sorted(ends):
++        with Image.open(ends[role][0]) as im:
++            a = es.letters_area(im)
++        for p in sorted(rd.places):
++            st = sides[role][p - 1]
++            m, gl = es.letters_glyphs(a, rd.places[p], rd.bins[p], rd.glyph_min)
++            if st == "_" or len(gl) != len(st):
++                continue
++            x0, y0, _x1, _y1 = rd.places[p]
++            for ch, g in zip(st, gl):
++                crop = a[max(0, y0 + g[0] - 2):y0 + g[2] + 3, max(0, x0 + g[1] - 2):x0 + g[3] + 3]
++                tiles.setdefault(ch, []).append((role, crop))
++    if not tiles:
++        return {}
++    s_ = 2
++    th = max(c.shape[0] for v in tiles.values() for _r, c in v) * s_
++    tw = max(c.shape[1] for v in tiles.values() for _r, c in v) * s_
++    font = ImageFont.load_default(size=22)
++    small = ImageFont.load_default(size=14)
++    width = 60 + max(len(v) for v in tiles.values()) * (tw + 10)
++    sheet = Image.new("RGB", (width, len(tiles) * (th + 30) + 10), (255, 255, 255))
++    d = ImageDraw.Draw(sheet)
++    for i, ch in enumerate(sorted(tiles)):
++        y = 6 + i * (th + 30)
++        d.text((10, y + th // 2 - 12), ch, fill=(0, 0, 0), font=font)
++        for j, (_r, crop) in enumerate(tiles[ch]):
++            x = 60 + j * (tw + 10)
++            sheet.paste(Image.fromarray(np.clip(crop, 0, 255).astype("uint8")).resize(
++                (crop.shape[1] * s_, crop.shape[0] * s_), Image.NEAREST), (x, y))
++            d.text((x, y + th + 4), str(j + 1), fill=(0, 0, 0), font=small)
++    sheet.save(folder / "letters.png")
++    del lt
++    return {ch: [r for r, _c in v] for ch, v in sorted(tiles.items())}
++
++
++def _label_letters(code: str, b: dict, a: dict) -> int:
++    kept = kept_states(code)
++    require(code, "register", register_inputs(b, kept))
++    es = _endscreen()
++    word, n = b["word"], b["players"]
++    rec = label_record(code)
++    ends = sorted(r for r in kept if r.startswith("end_P"))
++    items = a.get("readings") or []
++    looks = [x for x in items if x.startswith("look=")]
++    for x in looks:
++        if not LOOK_LETTERS.match(x):
++            raise Usage(f"the last look: look=all, or look=<letter>:<tile numbers joined by '.'>: {x}")
++    given = parse_letters([x for x in items if not x.startswith("look=")], n)
++    for role in given:
++        if role not in kept:
++            raise Usage(f"{role} is not a kept end save")
++    for role in list(rec["saves"]):
++        if rec["saves"][role].get("sha") != kept.get(role):
++            del rec["saves"][role]
++    for role, v in given.items():
++        old = rec["saves"].get(role) or {}
++        rec["saves"][role] = {"sha": kept[role], "readings": v["readings"], "by": "session",
++                              "named": old.get("named", 0), "named_for": dict(old.get("named_for") or {})}
++    cells = Cells()
++    try:
++        pics = _pictures(code, b, kept)
++    except PicturesFailed as exc:
++        cells.add("pictures made", exc.read(), "every kept state's pictures", False)
++        return finish(code, "label", cells, label_inputs(code, b))
++    folder = label_folder(code)
++    folder.mkdir(parents=True, exist_ok=True)
++    from PIL import Image
++    for role in ends:
++        for i, f in enumerate(_two_pictures(pics, role), 1):
++            with Image.open(pics / role / f) as im:
++                im.convert("RGB").save(folder / f"{role}.{i}.png")
++    missing = [r for r in ends if r not in rec["saves"]]
++    cells.add("every end save read", missing, [], not missing)
++    named: dict = {}
++    reason: dict = {}
++
++    def name(role_: str, words_: str, why_: str) -> None:
++        if role_ not in named:
++            named[role_], reason[role_] = words_, why_
++    for role in ends:
++        v = rec["saves"].get(role)
++        if not v:
++            continue
++        rd = v["readings"]
++        if not cells.add(f"{role}: the two readings the same", rd, "the same letters from both pictures", rd[0] == rd[1]):
++            name(role, "its two readings differ", "readings")
++        sd = rd[0].split("/")
++        fits = all(_letters_side_fits(s, word) for s in sd)
++        if not cells.add(f"{role}: each corner fits the word", sd,
++                         f"{len(word)} places, each the word's letter there or '-' (or '_': nothing shown)", fits):
++            name(role, "a corner does not fit the word", "fits")
++        k = int(role[5])
++        spelled = [s == word for s in sd]
++        agree = (not spelled[k - 1]) and sum(spelled) == 1
++        if not cells.add(f"{role}: the role agreeing", ["spelled" if x else "not spelled" for x in spelled],
++                         f"P{k} won: the other player's letters spell the word, P{k}'s do not", agree):
++            name(role, f"its letters do not say P{k} won", "role")
++    sides = {r: rec["saves"][r]["readings"][0].split("/") for r in ends if r in rec["saves"]}
++    recorded: dict = {"pictures": {r: [f"{r}.1.png", f"{r}.2.png"] for r in ends}}
++    look_for = digest({r: sides.get(r) for r in ends})
++    if not missing and not named:
++        spec, arrays, rep = _learn_letters_spec(es, b, pics, kept, sides)
++        lt = spec["letters"]
++        found = bool(lt.get("found")) and "places" in lt
++        cells.add("the letters at one place in every save", "found" if found else lt.get("not_found") or "not learnt",
++                  "found", found)
++        if found:
++            starts, others, all_ends = _letters_inputs_of(pics, kept)
++            for role in ends:                                # read back by a reader learnt without it (real only)
++                s2, a2, _r2 = _learn_letters_spec(es, b, pics, kept, sides, without=(role,))
++                got = None
++                if s2["letters"].get("found") and "places" in s2["letters"]:
++                    got = [_letters_read(es, s2, a2, p) for p in all_ends[role]]
++                ok = got is not None and all(g == sides[role] for g in got)
++                if not cells.add(f"{role}: read back by a reader learnt without it",
++                                 "not learnt without it" if got is None else ["/".join(x if x else "?" for x in g)
++                                                                             for g in got],
++                                 "/".join(sides[role]), ok):
++                    name(role, "a reader learnt from the other saves "
++                         + ("cannot be learnt without it" if got is None else "reads it otherwise"), "read back")
++            rows = _letters_sheet(es, spec, arrays, all_ends, sides, folder)
++            if looks and rec.get("tiles", {}).get("for") == look_for:
++                bad: dict = {}
++                for x in looks:
++                    ans = x[len("look="):]
++                    if ans == "all":
++                        continue
++                    ch, _, idx = ans.partition(":")
++                    for i in idx.split("."):
++                        if ch not in rows or not 1 <= int(i) <= len(rows[ch]):
++                            raise Usage(f"no tile {i} in the row of {ch} at the last look")
++                        bad.setdefault(ch, []).append(int(i))
++                rec["look"] = {"for": look_for, "bad": {c_: sorted(set(v)) for c_, v in bad.items()}}
++            rec["tiles"] = {"for": look_for, "rows": rows}
++            look = rec.get("look") if (rec.get("look") or {}).get("for") == look_for else None
++            if look is None:
++                cells.add("the last look: every glyph is the letter it was read as", "not given (label/letters.png)",
++                          "look=all", False)
++            else:
++                cells.add("the last look: every glyph is the letter it was read as", look["bad"] or "all", "all",
++                          not look["bad"])
++                for ch, idx in sorted(look["bad"].items()):
++                    for i in idx:
++                        name(rows[ch][i - 1], f"a glyph read as {ch} is not one, at the last look", "look")
++            recorded["sheet"] = {c_: len(v) for c_, v in rows.items()}
++    for role in ends:
++        v = rec["saves"].get(role)
++        if v is not None and role in named and role in given:
++            v["named"] = v.get("named", 0) + 1
++            v.setdefault("named_for", {})[reason[role]] = v.get("named_for", {}).get(reason[role], 0) + 1
++    if named and (rec.get("look") or {}).get("bad"):
++        rec.pop("look", None)
++    write_if_changed(label_path(code), json.dumps(rec, indent=1, sort_keys=True) + "\n")
++    form = "/".join(f"<P{i}>" for i in range(1, n + 1))
++    line = ""
++    if missing:
++        line = (f"Read each player's letters in its corner on each end save's two pictures in the title's add_game "
++                f"folder, label/ (<role>.1.png and <role>.2.png), P1 first, joined by '/': the letters left to right in "
++                f"capitals, '-' for each not-yet mark, '_' if the corner shows nothing; then label {code} "
++                + " ".join(f"{r}={form},{form}" for r in missing) + " (the first reading from .1, the second from .2).")
++        recorded["read"] = missing
++    elif named:
++        twice = [r for r in sorted(named) if (rec["saves"][r].get("named_for") or {}).get(reason[r], 0) >= LEFT_OUT_TRIES]
++        if twice:
++            r = twice[0]
++            line = (f"Stop: {r} ({named[r]}) after it was read again twice. Do not ask the user and do not ask for "
++                    f"another match: take this line back to the chat (Cowork).")
++            recorded["back to the chat"] = r
++        else:
++            line = ("Read again: " + "; ".join(f"{r} ({named[r]})" for r in sorted(named)) + ". Their pictures in "
++                    f"label/ (<role>.1.png, <role>.2.png); then label {code} "
++                    + " ".join(f"{r}={form},{form}" for r in sorted(named)) + ".")
++            recorded["read again"] = sorted(named)
++    elif not cells.passed and any(r["cell"].startswith("the last look") and not r["met"] for r in cells.rows):
++        line = (f"Look at label/letters.png: a row for each letter ('-' the not-yet marks), every glyph read as that "
++                f"letter, numbered under it. If every glyph in every row is its row's letter: label {code} look=all. "
++                f"Else name the ones that are not: label {code} look=<letter>:<numbers joined by '.'> (one look= for "
++                f"each such row).")
++        recorded["look"] = "asked"
++    if line:
++        recorded["line"] = line
++    rc = finish(code, "label", cells, label_inputs(code, b), note=line, recorded=recorded)
++    if line:
++        out(line)
++    return rc
++
++
++def _letters_replay(es, spec: dict, arrays: dict, run: Path, start_loaded: bool, scenes: list | None = None) -> tuple:
++    """A run's pictures through one fresh reader and B102's Ended, in colour (B191) -> (first start read s, [(s, end)]).
++    `scenes`: the moving-screen gate — every read, the run's own corners' boxes kept and the rest of the picture taken
++    in turn from these (the title's other saves' pictures): a screen that changes under letters that stay."""
++    from PIL import Image
++    import numpy as np
++    rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader((run / "index.csv").open())]
++    now = [0.0]
++    reader = es.Reader(spec, arrays, clock=lambda: now[0])
++    ended = es.Ended(spec)
++    if start_loaded:
++        ended.start_loaded()
++    first_start, said = None, []
++    for i, (t, f) in enumerate(rows):
++        now[0] = t
++        with Image.open(run / f) as im:
++            im = im.convert("RGB")
++            if scenes:
++                im = _scene_under(es, spec, im, scenes[i % len(scenes)])
++            r = reader.read(im, now=t)
++        if r["class"] == spec["start_class"] and first_start is None:
++            first_start = round(t - rows[0][0], 2)
++        done = ended.feed(r["class"], None)
++        if done and not said:
++            said.append((round(t - rows[0][0], 2), done))
++    return first_start, said
++
++
++def _scene_under(es, spec: dict, im, scene: Path):
++    """The picture's corners' boxes (at the game's area) over another real picture of the title."""
++    from PIL import Image
++    import numpy as np
++    a = es.letters_area(im)
++    with Image.open(scene) as sc:
++        b = es.letters_area(sc)
++    for box in (spec["letters"].get("places") or {}).values():
++        x0, y0, x1, y1 = box
++        b[y0:y1, x0:x1] = a[y0:y1, x0:x1]
++    return Image.fromarray(np.clip(b, 0, 255).astype("uint8"))
++
++
++def _learn_letters(code: str, b: dict, kept: dict, pics: Path, es) -> int:
++    cells = Cells()
++    sides = _letters_sides_of(code)
++    r = rules_folder()
++    spec_path = r / f"{b['game']}.endscreen.json"
++    spec, arrays, rep = _learn_letters_spec(es, b, pics, kept, sides, name=b["game"])
++    lt = spec["letters"]
++    found = bool(lt.get("found")) and "places" in lt
++    cells.add("spec usable", bool(spec.get("usable")), True, bool(spec.get("usable")))
++    cells.add("the letters at one place in every save", "found" if found else lt.get("not_found"), "found", found)
++    tr = rep.get("synthetic") or {}
++    recorded: dict = {"synthetic": {k: tr.get(k) for k in ("seed", "held_out", "trained", "backgrounds", "rounds",
++                                                           "held_out_wrong_of")} | {"seconds": rep.get("learn_s")}}
++    held_wrong = tr.get("held_out_wrong")
++    cells.add("every held-out synthetic picture read (training's own bar; never counts toward a pass)",
++              {"held out": tr.get("held_out"), "read wrong or not read": held_wrong, "trained on": tr.get("trained")},
++              f"<= {BARS['synthetic_held_wrong_max'][0]} ({BARS['synthetic_held_wrong_max'][1]})",
++              held_wrong is not None and held_wrong <= BARS["synthetic_held_wrong_max"][0])
++    ends = sorted(x for x in kept if x.startswith("end_P"))
++    if found:
++        for role in sorted(kept):                            # the real saves' own pictures, as the hub reads them
++            cls = _role_class(role)
++            first_start, said = _letters_replay(es, spec, arrays, pics / role, cls != "start")
++            if cls == "start":
++                cells.add(f"{role}: never ended", not said, True, not said)
++                cells.add(f"{role}: recognised within", first_start, f"<= {BARS['start_within_s'][0]} s",
++                          first_start is not None and first_start <= BARS["start_within_s"][0])
++            elif cls == "other":
++                cells.add(f"{role}: never ended", not said, True, not said)
++            else:
++                cells.add(f"{role}: ended as itself", said[0][1] if said else None, cls, bool(said) and said[0][1] == cls)
++                cells.add(f"{role}: ended within", said[0][0] if said else None, f"<= {BARS['ended_within_s'][0]} s",
++                          bool(said) and said[0][0] <= BARS["ended_within_s"][0])
++        moving = {}
++        firsts = {x: pics / x / _two_pictures(pics, x)[0] for x in sorted(kept)}
++        for role in ends:                                   # a moving screen never ended
++            scenes = [firsts[x] for x in sorted(firsts) if x != role]
++            _fs, said = _letters_replay(es, spec, arrays, pics / role, True, scenes=scenes)
++            if said:
++                moving[role] = said[0][1]
++        cells.add("a moving screen never ended (each end save's corners as they are, the rest of the picture taken in "
++                  "turn from the title's other saves every read)", moving or "never", "never", not moving)
++        _starts, _others, all_ends = _letters_inputs_of(pics, kept)
++        for role in ends:                                   # left out: a spec learnt without it, its real pictures
++            s2, a2, _r2 = _learn_letters_spec(es, b, pics, kept, sides, without=(role,))
++            cls = _role_class(role)
++            ok2 = bool(s2["letters"].get("found")) and "places" in s2["letters"] and bool(s2.get("usable"))
++            got_l = [_letters_read(es, s2, a2, p) for p in all_ends[role]] if ok2 else None
++            _fs, said = _letters_replay(es, s2, a2, pics / role, True) if ok2 else (None, [])
++            right = (ok2 and bool(said) and said[0][1] == cls and said[0][0] <= BARS["ended_within_s"][0]
++                     and all(g == sides[role] for g in got_l))
++            cells.add(f"left out: {role}",
++                      "not learnt without it" if not ok2 else [said[0][1] if said else None,
++                                                               said[0][0] if said else None,
++                                                               ["/".join(x if x else "?" for x in g) for g in got_l]],
++                      f"{cls} within <= {BARS['ended_within_s'][0]} s, never another, letters {'/'.join(sides[role])}",
++                      right)
++    group, pairs = _matches(pics, kept)
++    cells.add("no two saves of one ending the same picture", pairs,
++              f">= {SAME_PICTURE[0]} grey ({SAME_PICTURE[1]})", not pairs)
++    inputs = learn_inputs(code, b)
++    if cells.passed:
++        begin = r / _begin_name(b)
++        side_path = r / f"{b['game']}.party.json"
++        side = json.dumps(_sidecar(b, spec), indent=1, sort_keys=True) + "\n"
++        made = b.get("learnt") or {}
++        for p, want in ((begin, (kept_folder(code) / "begin.state").read_bytes()), (side_path, side.encode())):
++            if p.exists() and p.read_bytes() != want and not made:
++                cells.add("rules folder: no other title's file overwritten", False, True, False)
++                return finish(code, "learn", cells, inputs, recorded=recorded)
++        es.save_spec(spec, arrays, spec_path)
++        write_if_changed(begin, (kept_folder(code) / "begin.state").read_bytes())
++        write_if_changed(side_path, side)
++        b["learnt"] = {"from": digest(kept), "spec": sha(spec_path)}
++        write_if_changed(binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
++        return finish(code, "learn", cells, inputs, recorded=recorded)
++    line, rec2 = _letters_line(b, cells, kept, tr, pairs)
++    recorded.update(rec2)
++    rc = finish(code, "learn", cells, inputs, note=line, recorded=recorded)
++    out(line)
++    return rc
++
++
++def _letters_line(b: dict, cells: Cells, kept, tr: dict, pairs: list) -> tuple[str, dict]:
++    """One plain line: what learn asks of a letters title, and why — and whether synthetic training could cover it."""
++    code = b["code"]
++    bad = [x["cell"] for x in cells.rows if not x["met"]]
++    for a_, b_, _d in pairs or []:
++        line = f"{a_} and {b_} look like the same match saved twice: save {b_} again from another match."
++        return line, {"same match twice": [a_, b_], "line": line}
++    if any(c.startswith("the letters at one place") for c in bad):
++        line = ("No corner could be cut clean from these saves (no two saves show a player's same letters over "
++                "different pictures, and no corner is plain): synthetic training cannot make that, it only trains on "
++                "letters already cut. One more save: a match either player won whose corners show the same letters "
++                "as another save's over another background — save the screen after it to a free slot, then register "
++                f"{code} … --collect <role>=<slot> (end_P1_<n> if P1 won, end_P2_<n> if P2 won), label {code} and "
++                f"learn {code} again.")
++        return line, {"line": line, "one more save": "a corner cut clean"}
++    if any(c.startswith("every held-out synthetic") for c in bad):
++        who = ", ".join(tr.get("held_out_wrong_of") or []) or "the saves"
++        line = (f"Synthetic training did not reach every held-out picture (the letters of {who} over some of the "
++                "title's own backgrounds): a background in the letters' own colours hides them. More saves of these "
++                "backgrounds would not fix it; take this line back to the chat (Cowork). At the hub such a match ends "
++                "with no result, never a guess.")
++        return line, {"line": line, "back to the chat": "synthetic"}
++    lo = [c[len("left out: "):] for c in bad if c.startswith("left out: ")]
++    if lo:
++        line = (f"{', '.join(lo)}: a reader learnt without {'it' if len(lo) == 1 else 'each'} does not read "
++                f"{'it' if len(lo) == 1 else 'them'} as {'its' if len(lo) == 1 else 'their'} own. Synthetic training "
++                "already covers new backgrounds; what is missing is a letter or a corner only that save shows. One "
++                f"more save: a match whose corners show the same letters as {lo[0]}'s, saved to a free slot, then "
++                f"register {code} … --collect <role>=<slot>, label {code} and learn {code} again.")
++        return line, {"line": line, "one more save": lo}
++    line = ("learn did not meet: " + "; ".join(bad) + ". Take this line back to the chat (Cowork).")
++    return line, {"line": line, "back to the chat": bad}
++
++
+ # --- B163: rehearse — learn's whole real path on a title already added, into a scratch rules folder --------------------------
+ SCRATCH_ENV = ("PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE", "PRIVYHUB_ADD_GAME_LOGS")
+ 
+@@ -1935,7 +2392,7 @@ def _read_run(es, spec: dict, arrays: dict, run: Path):
+     for t, f in rows:
+         now[0] = t
+         with Image.open(run / f) as im:
+-            r = reader.read(im.convert("L"), now=t)
++            r = reader.read(_for_reader(im, spec), now=t)
+         done = ended.feed(r["class"], r.get("places"))
+         if done:
+             return [done, list(ended.places) if ended.places else None]
+@@ -2800,7 +3257,8 @@ def parse(argv: list[str]) -> tuple[str, str, dict]:
+             a[k[2:]] = True
+             i += 1
+             continue
+-        if k in ("--players", "--system", "--result", "--find", "--rules-players", "--setup", "--collect", "--winner") \
++        if k in ("--players", "--system", "--result", "--find", "--rules-players", "--setup", "--collect", "--winner",
++                 "--word") \
+                 and i + 1 < len(rest):
+             key = k[2:].replace("-", "_")
+             if key == "collect":
+diff --git a/tests/b191_letters/letters_capture.py b/tests/b191_letters/letters_capture.py
+new file mode 100644
+index 00000000..4645802f
+--- /dev/null
++++ b/tests/b191_letters/letters_capture.py
+@@ -0,0 +1,122 @@
++"""B191 / B192 (tests): a made-up letters title's pictures — no title, nothing from the hub.
++
++Two players' letters in the top corners (P1 blue, P2 pink, a dark shadow), a made-up 5 x 7 font at 3x for W, O and the
++not-yet mark '-', each corner's string centred under its player's header; every match's end screen over a background of
++its own (`bg`: plain, stripes, blocks, noise — none in the letters' colours unless a test asks); the begin and the
++mid-match screen over one fixed scene with different middle text; the end screens' fixed text (a banner) the same in
++every end save. A state file is JSON: {"kind": "begin" | "other" | "end", "l": ["---", "WOW"], "bg": n, ...}.
++
++`capture` is the add-a-game tool's picture source (PARTY_ADD_GAME_CAPTURE=letters_capture:capture)."""
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++import numpy as np
++from PIL import Image
++
++W, H = 640, 480
++P1, P2 = (90, 96, 206), (206, 118, 158)
++SHADOW = (12, 10, 18)
++FONT = {
++    "W": ["10001", "10001", "10001", "10101", "10101", "10101", "01010"],
++    "O": ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
++    "-": ["00000", "00000", "00000", "11111", "11111", "00000", "00000"],
++    "X": ["10001", "01010", "00100", "00100", "00100", "01010", "10001"],
++}
++S = 3                    # px per font unit
++CENTRES = {1: 106, 2: 530}
++TOP = 88
++
++
++def glyph(ch: str) -> np.ndarray:
++    return np.kron(np.array([[c == "1" for c in row] for row in FONT[ch]]), np.ones((S, S), bool))
++
++
++def background(bg: int, rng) -> np.ndarray:
++    """Every match's own background: plain, stripes, blocks or noise (from `bg`), never in the letters' colours."""
++    r = np.random.default_rng(1000 + bg)
++    kind = bg % 4
++    a = np.ones((H, W, 3), np.float32) * r.integers(40, 200, 3).astype(np.float32)
++    if kind == 1:                                            # stripes
++        w = int(r.integers(6, 20))
++        a[:, (np.arange(W) // w) % 2 == 1] = r.integers(20, 220, 3)
++    elif kind == 2:                                          # blocks
++        for _ in range(40):
++            y, x = int(r.integers(0, H - 40)), int(r.integers(0, W - 60))
++            a[y:y + int(r.integers(10, 40)), x:x + int(r.integers(10, 60))] = r.integers(20, 220, 3)
++    elif kind == 3:                                          # noise
++        a += r.normal(0, 30, (H, W, 3))
++    a[H // 2:] *= 0.6                                         # a ground
++    a = np.clip(a, 0, 255)
++    hue = (a[..., 2] > a[..., 0] + 25) | ((a[..., 0] > a[..., 1] + 40) & (a[..., 2] > a[..., 1] + 15))
++    a[hue] = a[hue].mean(axis=1, keepdims=True)               # the letters' colours left to the letters
++    return a
++
++
++def scene() -> np.ndarray:
++    a = np.zeros((H, W, 3), np.float32)
++    a[: H // 2] = (205, 170, 110)
++    a[H // 2:] = (70, 90, 60)
++    return a
++
++
++def put(a: np.ndarray, ch: str, x: int, y: int, colour) -> None:
++    g = glyph(ch)
++    h, w = g.shape
++    a[y + 2:y + 2 + h, x + 2:x + 2 + w][g] = SHADOW
++    a[y:y + h, x:x + w][g] = colour
++
++
++def corner(a: np.ndarray, p: int, text: str, colour=None) -> None:
++    if text == "_":
++        return
++    adv = 5 * S + 6
++    x = CENTRES[p] - (len(text) * adv - 6) // 2
++    for i, ch in enumerate(text):
++        put(a, ch, x + i * adv, TOP if ch != "-" else TOP, colour or (P1 if p == 1 else P2))
++
++
++def header(a: np.ndarray, p: int) -> None:
++    c = P1 if p == 1 else P2
++    x = CENTRES[p] - 50
++    for i in range(6):                                       # "PLAYER n": six blocks
++        a[60:78, x + i * 17:x + i * 17 + 13] = c
++
++
++def picture(st: dict, t: float = 0.0, k: int = 0, rng=None) -> Image.Image:
++    rng = rng or np.random.default_rng(0)
++    kind = st["kind"]
++    if kind in ("begin", "other"):
++        a = scene()
++        a[200:220, 180:460] = (60, 60, 160) if kind == "begin" else (60, 60, 160)
++        if kind == "other":
++            a[230:250, 260:380] = (60, 60, 160)                # the mid-match screen's extra line
++        else:
++            a[200:220, 400:460] = (230, 230, 230)
++    else:
++        a = background(int(st.get("bg", 0)), rng)
++        a[150:180, 220:420] = (240, 200, 40)                 # the end screens' fixed banner
++        a[156:174, 226:414] = (60, 30, 10)
++    for p in (1, 2):
++        header(a, p)
++        corner(a, p, st.get("l", ["---", "---"])[p - 1], tuple(st["colour"][p - 1]) if st.get("colour") and
++               st["colour"][p - 1] else None)
++    if st.get("blobs"):                                      # a test's background shapes in a player's colour
++        for p, x, y, w_, h_ in st["blobs"]:
++            a[y:y + h_, x:x + w_] = P1 if p == 1 else P2
++    noise = np.random.default_rng(7 + int(st.get("n", 0)) + k).integers(-2, 3, a.shape)
++    return Image.fromarray(np.clip(a + noise, 0, 255).astype(np.uint8))
++
++
++def capture(state_path, binding, out_dir, seconds, every):
++    st = json.loads(Path(state_path).read_text())
++    rows = []
++    for k in range(int(seconds / every) + 1):
++        if k % 2:
++            continue
++        t = round(k * every, 2)
++        name = f"f{k:04d}.png"
++        picture(st, t, 0).save(Path(out_dir) / name)          # a still screen: the same picture every tick
++        rows.append((t, name))
++    return rows
+diff --git a/tests/b191_letters/test_b191.py b/tests/b191_letters/test_b191.py
+new file mode 100644
+index 00000000..ff2d5d92
+--- /dev/null
++++ b/tests/b191_letters/test_b191.py
+@@ -0,0 +1,379 @@
++#!/usr/bin/env python3
++"""B191 / B192 (host): the `letters` kind — a word spelled by the player who lost, read in each player's corner — and its
++synthetic training, never synthetic proof. Every picture made-up (`letters_capture.py`); no title, nothing read from the
++hub's own folders, the hub never reached (port 9), no systemctl (`true`).
++
++- `Learner`: a made-up title whose every match has its own background — B102's whole-screen `winner` spec fails on it;
++  `learn_letters` reads it, every held-out synthetic picture read, each real end read as its role; a letter no save
++  shows never read.
++- `Tool`: register --result letters --word (options refused as they should be; four players refused, said why) ->
++  label (the line, the readings, the last look) -> learn PASS on the real saves (left-out included), the sidecar and the
++  version-5 spec in the rules folder; label refusals (readings differ, a corner not fitting the word, the role not
++  agreeing); a save a reader learnt without it cannot read fails learn's left-out cell though synthetic training reads
++  every held-out picture.
++- `Reads`: neither spelled -> other, never ended; both -> unknown; a corner not read beside a spelled one -> unknown +
++  end_unread; background shapes in a player's colour never read as letters; a moving screen never ended; the begin
++  with B137's corner black -> start.
++- `Hub`: the listing — `letters` with a version-5 spec is B158's winner entry; any other shape not listed.
++Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b191_letters -v
++"""
++from __future__ import annotations
++
++import contextlib
++import io
++import json
++import os
++import shutil
++import sys
++import tempfile
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "companion"), str(HERE)]
++
++import numpy as np                                          # noqa: E402
++from PIL import Image                                       # noqa: E402
++
++import letters_capture as lc                                # noqa: E402
++
++ENV_KEYS = ("PRIVYHUB_ADD_GAME_HOME", "PRIVYHUB_ADD_GAME_EVIDENCE", "PRIVYHUB_H7_RULES", "PRIVYHUB_ADD_GAME_LOGS",
++            "PARTY_ADD_GAME_CAPTURE", "PRIVYHUB_ADD_GAME_HUB", "PRIVYHUB_ADD_GAME_DROPINS", "PRIVYHUB_ADD_GAME_ASK",
++            "PRIVYHUB_ADD_GAME_PROJECT", "PRIVYHUB_ADD_GAME_SYSTEMCTL")
++B, O = {"kind": "begin"}, {"kind": "other"}
++
++
++def end(p1: str, p2: str, bg: int, **more) -> dict:
++    return {"kind": "end", "l": [p1, p2], "bg": bg, **more}
++
++
++# T91's shape: the loser's corner WOW, the winner's --- or W--; two saves of each ending, each its own background
++TITLE = {"begin": B, "other": O,
++         "end_P1": end("---", "WOW", 1), "end_P1_2": end("---", "WOW", 6),
++         "end_P2": end("WOW", "W--", 3), "end_P2_2": end("WOW", "W--", 8)}
++# one save's player-1 letters in another colour (a highlight no other save shows): no reader learnt without it reads it
++ODD = dict(TITLE, end_P2_2=end("WOW", "W--", 8, colour=[[60, 200, 70], None]))
++READ = {r: f"{st['l'][0]}/{st['l'][1]}" for r, st in TITLE.items() if r.startswith("end_")}
++
++
++class Made(unittest.TestCase):
++    N = [0]
++
++    @classmethod
++    def setUpClass(cls):
++        cls.tmp = Path(tempfile.mkdtemp(prefix="b191_"))
++        cls.old = {k: os.environ.get(k) for k in ENV_KEYS}
++        os.environ.update({"PRIVYHUB_ADD_GAME_HOME": str(cls.tmp / "home"), "PRIVYHUB_ADD_GAME_EVIDENCE": str(cls.tmp / "ev"),
++                           "PRIVYHUB_H7_RULES": str(cls.tmp / "rules"), "PRIVYHUB_ADD_GAME_LOGS": str(cls.tmp / "logs"),
++                           "PARTY_ADD_GAME_CAPTURE": "letters_capture:capture",
++                           "PRIVYHUB_ADD_GAME_HUB": "http://127.0.0.1:9",
++                           "PRIVYHUB_ADD_GAME_DROPINS": str(cls.tmp / "dropins"),
++                           "PRIVYHUB_ADD_GAME_ASK": str(cls.tmp / "project" / "logs" / "add_game_ask"),
++                           "PRIVYHUB_ADD_GAME_PROJECT": str(cls.tmp / "project"),
++                           "PRIVYHUB_ADD_GAME_SYSTEMCTL": "true"})
++        (cls.tmp / "rules").mkdir()
++        (cls.tmp / "project").mkdir()
++        import party_add_game as pag
++        import h7_endscreen as es
++        cls.pag, cls.es = pag, es
++
++    @classmethod
++    def tearDownClass(cls):
++        for k, v in cls.old.items():
++            if v is None:
++                os.environ.pop(k, None)
++            else:
++                os.environ[k] = v
++        shutil.rmtree(cls.tmp, ignore_errors=True)
++
++    def setUp(self):
++        """The made-up noise follows a state counter; every test starts it at 0, so a test reads the same pictures
++        whatever ran before (disclosed: at some counters the odd-colour title's second save's left-out also fails)."""
++        self.N[0] = 0
++
++    def put(self, code: str, saves: dict, word: str = "WOW") -> None:
++        """The kept states and the binding as register leaves them (register's PASS written for them)."""
++        pag = self.pag
++        kf = pag.kept_folder(code)
++        kf.mkdir(parents=True, exist_ok=True)
++        for role, st in saves.items():
++            self.N[0] += 1
++            (kf / f"{role}.state").write_text(json.dumps({**st, "n": self.N[0]}))
++        b = {"code": code, "game": "madeup" + code.lower(), "players": 2, "system": "ps1", "result": "letters",
++             "word": word, "cheat": None, "relative_path": "", "title": "", "content": ""}
++        b["register_inputs"] = pag.register_inputs(b, pag.kept_states(code))
++        pag.binding_path(code).write_text(json.dumps(b))
++        pag.verdict_path(code, "register").parent.mkdir(parents=True, exist_ok=True)
++        pag.verdict_path(code, "register").write_text(json.dumps({"verdict": "PASS", "inputs": b["register_inputs"]}))
++
++    def tool(self, *argv) -> tuple[int, str]:
++        buf, err = io.StringIO(), io.StringIO()
++        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
++            rc = self.pag.main([str(a) for a in argv])
++        return rc, buf.getvalue() + err.getvalue()
++
++    def verdict(self, code: str, stage: str) -> dict:
++        v = self.pag.load_verdict(code, stage) or {}
++        return {"verdict": v.get("verdict"), "bad": [c["cell"] for c in v.get("cells", []) if not c["met"]],
++                "cells": {c["cell"]: c["read"] for c in v.get("cells", [])}, "recorded": v.get("recorded") or {}}
++
++    def label_all(self, code: str, reads: dict) -> tuple[int, str]:
++        rc, out = self.tool("label", code, *[f"{r}={t},{t}" for r, t in sorted(reads.items())])
++        if rc == 1 and "Look at label/letters.png" in out:
++            rc, out = self.tool("label", code, "look=all")
++        return rc, out
++
++    def pics(self, code: str) -> Path:
++        return self.pag.home(code) / "pictures"
++
++
++def _paths(folder: Path, role: str) -> list[str]:
++    import csv
++    rows = list(csv.DictReader((folder / role / "index.csv").open()))
++    return [str(folder / role / r["file"]) for r in rows]
++
++
++class Learner(Made):
++    def test_1_whole_screen_fails_letters_passes(self):
++        """B102's whole-screen learner on a title whose every match has its own background: not usable, or every
++        held-out frame not read as its ending. The letters kind reads it from the same saves."""
++        self.put("T61", TITLE)
++        pag, es = self.pag, self.es
++        kept = pag.kept_states("T61")
++        pics = pag._pictures("T61", pag.load_binding("T61"), kept)
++        labels = pag._labels(pics, kept, es)
++        (pics / "labels.json").write_text(json.dumps(labels))
++        spec, arrays, _rep = es.learn(pics, pics / "labels.json", "first", name="x")
++        if spec.get("usable"):
++            sc = es.score(pics, pics / "labels.json", spec, arrays, "second")
++            held = {c: row for c, row in (sc.get("confusion") or {}).items() if c.startswith("end_")}
++            right = sum(row.get(c, 0) for c, row in held.items())
++            total = sum(sum(row.values()) for row in held.values())
++            self.assertLess(right / max(total, 1), 1 - pag.BARS["unknown_share_max"][0])
++        starts, others, ends = pag._letters_inputs_of(pics, kept)
++        sides = {r: TITLE[r]["l"] for r in ends}
++        spec, arrays, rep = es.learn_letters(starts, others, ends, sides, "WOW", 2)
++        self.assertTrue(spec["usable"], json.dumps(rep, default=str)[:600])
++        self.assertTrue(rep["synthetic"]["every_held_out_read"])
++        self.assertEqual(rep["synthetic"]["held_out"], 4 * es.SYN_HELD)
++        for role in ends:
++            with Image.open(ends[role][0]) as im:
++                r = es.Reader(spec, arrays).read(im.convert("RGB"))
++            self.assertEqual(r["class"], pag._role_class(role))
++            self.assertEqual(r["letters"], TITLE[role]["l"])
++        # the same saves always give the same synthetic set
++        _s2, _a2, rep2 = es.learn_letters(starts, others, ends, sides, "WOW", 2)
++        self.assertEqual(rep2["synthetic"]["seed"], rep["synthetic"]["seed"])
++        self.assertEqual(rep2["synthetic"]["rounds"], rep["synthetic"]["rounds"])
++
++    def test_2_a_letter_no_save_shows_is_never_read(self):
++        """X (a letter of no save) drawn in a corner: no template, never read as the nearest letter."""
++        self.put("T62", TITLE)
++        pag, es = self.pag, self.es
++        kept = pag.kept_states("T62")
++        pics = pag._pictures("T62", pag.load_binding("T62"), kept)
++        starts, others, ends = pag._letters_inputs_of(pics, kept)
++        spec, arrays, _rep = es.learn_letters(starts, others, ends, {r: TITLE[r]["l"] for r in ends}, "WOW", 2)
++        im = lc.picture(end("WXW", "WOW", 11))
++        r = es.Reader(spec, arrays).read(im)
++        self.assertIsNone(r["letters"][0])
++        self.assertEqual(r["class"], es.UNKNOWN)
++        self.assertTrue(r.get("end_unread"))
++
++
++class Tool(Made):
++    def test_1_register_options(self):
++        rc, out = self.tool("register", "T63", "--players", 2, "--system", "ps1", "--result", "letters",
++                            "--rules-players", 2)
++        self.assertEqual(rc, 2)
++        self.assertIn("--result letters needs --word", out)
++        rc, out = self.tool("register", "T63", "--players", 2, "--system", "ps1", "--result", "winner", "--word", "WOW",
++                            "--rules-players", 2)
++        self.assertEqual(rc, 2)
++        self.assertIn("--word is for --result letters", out)
++
++    def test_2_register_four_players_refused_and_said_why(self):
++        pag = self.pag
++        a = {"players": 4, "system": "ps1", "result": "letters", "word": "wow", "check": True, "collect": [],
++             "find": "x"}
++        orig = pag._find_title
++        pag._find_title = lambda system, words: {"game": "madeupt64", "relative_path": "", "title": "", "content": ""}
++        try:
++            cells, b, _i = pag._register("T64", a)
++        finally:
++            pag._find_title = orig
++        rows = {r["cell"]: r for r in cells.rows}
++        self.assertEqual(b["word"], "WOW")
++        self.assertFalse(rows["a letters title has two players"]["met"])
++        self.assertIn("winner-only would name a winner the game never showed", rows["why not"]["read"])
++
++    def test_3_label_learn_pass(self):
++        self.put("T65", TITLE)
++        rc, out = self.tool("learn", "T65")
++        self.assertEqual(rc, 2)                                 # label first
++        rc, out = self.tool("label", "T65")
++        self.assertEqual(rc, 1)
++        self.assertIn("Read each player's letters in its corner", out)
++        self.assertEqual(sorted(p.name for p in (self.pag.home("T65") / "label").iterdir()),
++                         sorted(f"{r}.{i}.png" for r in READ for i in (1, 2)))
++        rc, out = self.label_all("T65", READ)
++        lv = self.verdict("T65", "label")
++        self.assertEqual(rc, 0, out + json.dumps(lv["bad"]))
++        self.assertEqual(lv["recorded"]["sheet"], {"-": 10, "O": 4, "W": 10})
++        self.assertEqual(lv["cells"]["end_P2: read back by a reader learnt without it"], ["WOW/W--", "WOW/W--"])
++        rc, out = self.tool("learn", "T65")
++        v = self.verdict("T65", "learn")
++        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
++        self.assertEqual(v["cells"]["left out: end_P1_2"][0], "end_P1")
++        self.assertEqual(v["cells"]["left out: end_P2"][2], ["WOW/W--", "WOW/W--"])
++        self.assertEqual(v["recorded"]["synthetic"]["held_out"], 32)
++        rules = Path(os.environ["PRIVYHUB_H7_RULES"])
++        self.assertEqual(json.loads((rules / "madeupt65.party.json").read_text()), {"players": 2, "result": "letters"})
++        spec, _arrays = self.es.load_spec(rules / "madeupt65.endscreen.json")
++        self.assertEqual(spec["version"], 5)
++        self.assertEqual(spec["letters"]["word"], "WOW")
++
++    def test_4_label_refusals(self):
++        self.put("T66", TITLE)
++        bad = dict(READ, end_P1="---/WOW", end_P2="WOX/W--", end_P2_2="---/WOW")
++        rc, out = self.tool("label", "T66", "end_P1=---/WOW,---/WO-", *[f"{r}={t},{t}" for r, t in sorted(bad.items())
++                                                                      if r != "end_P1"])
++        lv = self.verdict("T66", "label")
++        self.assertEqual(rc, 1)
++        self.assertIn("end_P1: the two readings the same", lv["bad"])
++        self.assertIn("end_P2: each corner fits the word", lv["bad"])
++        self.assertIn("end_P2_2: the role agreeing", lv["bad"])
++        self.assertIn("Read again: end_P1 (its two readings differ); end_P2 (a corner does not fit the word); "
++                      "end_P2_2 (its letters do not say P2 won)", out)
++        self.assertNotIn("the letters at one place in every save", lv["cells"])     # nothing learnt from them
++
++    def test_5_left_out_reads_the_real_save(self):
++        """end_P2_2's player-1 letters in a colour no other save shows: synthetic training reads every held-out picture
++        (it pastes that save's own pixels), but a reader learnt without the save cannot read the real save — learn
++        FAILs on its left-out cell. A synthetic picture never counts toward a pass."""
++        self.put("T67", ODD)
++        pag = self.pag
++        rec = {"saves": {r: {"sha": pag.kept_states("T67")[r], "readings": [READ[r], READ[r]], "by": "session"}
++                         for r in READ}}
++        pag.label_path("T67").write_text(json.dumps(rec))     # the label stage's PASS for these readings
++        b = pag.load_binding("T67")
++        pag.verdict_path("T67", "label").write_text(json.dumps({"verdict": "PASS", "inputs": pag.label_inputs("T67", b)}))
++        rc, out = self.tool("learn", "T67")
++        v = self.verdict("T67", "learn")
++        self.assertEqual(rc, 1, out)
++        self.assertIn("left out: end_P2_2", v["bad"], json.dumps(v["cells"], default=str)[:800])
++        self.assertTrue(all(c.startswith("left out: ") for c in v["bad"]), v["bad"])   # (at some noise seeds a second
++        #                                     save's left-out cannot be trained either: that colour is in one save only)
++        self.assertEqual(v["cells"]["every held-out synthetic picture read (training's own bar; never counts toward a "
++                                    "pass)"]["read wrong or not read"], 0)
++        self.assertIn("end_P2_2: a reader learnt without it does not read it", out)
++        self.assertFalse((Path(os.environ["PRIVYHUB_H7_RULES"]) / "madeupt67.party.json").exists())
++
++
++class Reads(Made):
++    @classmethod
++    def setUpClass(cls):
++        super().setUpClass()
++        cls.N[0] = 1000
++        self_ = cls("test_1_neither_spelled_never_ends")
++        self_.put("T68", TITLE)
++        pag, es = cls.pag, cls.es
++        kept = pag.kept_states("T68")
++        pics = pag._pictures("T68", pag.load_binding("T68"), kept)
++        starts, others, ends = pag._letters_inputs_of(pics, kept)
++        cls.spec, cls.arrays, _r = es.learn_letters(starts, others, ends, {r: TITLE[r]["l"] for r in ends}, "WOW", 2)
++        cls.starts = starts
++
++    def run_of(self, pictures, start_loaded=True):
++        es = self.es
++        rd, ended = es.Reader(self.spec, self.arrays), es.Ended(self.spec)
++        if start_loaded:
++            ended.start_loaded()
++        reads = [rd.read(im) for im in pictures]
++        done = None
++        for r in reads:
++            done = ended.feed(r["class"], None) or done
++        return reads, done
++
++    def test_1_neither_spelled_never_ends(self):
++        reads, done = self.run_of([lc.picture(end("W--", "WO-", 12))] * 6)
++        self.assertEqual({r["class"] for r in reads}, {"other"})
++        self.assertEqual(reads[0]["letters"], ["W--", "WO-"])
++        self.assertIsNone(done)
++
++    def test_2_both_spelled_no_result(self):
++        reads, done = self.run_of([lc.picture(end("WOW", "WOW", 13))] * 6)
++        self.assertEqual({r["class"] for r in reads}, {"unknown"})
++        self.assertIsNone(done)
++
++    def test_3_a_corner_not_read_beside_a_spelled_one(self):
++        st = end("WOW", "W--", 14, blobs=[[2, 470, 84, 120, 28]])     # P2's corner covered in its own colour
++        reads, done = self.run_of([lc.picture(st)] * 4)
++        self.assertEqual(reads[0]["letters"], ["WOW", None])
++        self.assertEqual({r["class"] for r in reads}, {"unknown"})
++        self.assertTrue(all(r.get("end_unread") for r in reads))
++        self.assertIsNone(done)
++
++    def test_4_background_shapes_never_letters(self):
++        """Three bars in player 1's colour where its letters sit, a little larger than its not-yet marks: not marks."""
++        st = end("_", "WOW", 15, blobs=[[1, 72, 95, 21, 12], [1, 98, 95, 21, 12], [1, 124, 95, 21, 12]])
++        reads, done = self.run_of([lc.picture(st)] * 4)
++        self.assertIsNone(reads[0]["letters"][0])
++        self.assertNotIn("end_P1", {r["class"] for r in reads})
++        self.assertIsNone(done)
++
++    def test_5_a_moving_screen_never_ends(self):
++        base = lc.picture(end("---", "WOW", 16))
++        moved = []
++        for i in range(8):
++            a = np.asarray(base).copy()
++            sc = np.roll(np.asarray(lc.background(17 + i, None), dtype=np.uint8), 0, axis=1)
++            keep = np.zeros(a.shape[:2], bool)
++            for b in self.spec["letters"]["places"].values():
++                keep[b[1]:b[3], b[0]:b[2]] = True
++            a[~keep] = sc[~keep]                              # the scene changes every read; the corners stay
++            moved.append(Image.fromarray(a))
++        reads, done = self.run_of(moved)
++        self.assertIn("end_P1", {r["class"] for r in reads})  # it reads the letters ...
++        self.assertIsNone(done)                               # ... and never ends on a moving screen
++        _reads, done = self.run_of([base] * 3)
++        self.assertEqual(done, "end_P1")                      # the same picture held: ended
++
++    def test_6_the_begin_with_the_corner_black(self):
++        with Image.open(self.starts[0]) as im:
++            r1 = self.es.Reader(self.spec, self.arrays).read(im.convert("RGB"))
++            black = im.convert("RGB").copy()
++        w = black.size[0]
++        black.paste((0, 0, 0), (w - 200, 0, w, 70))
++        r2 = self.es.Reader(self.spec, self.arrays).read(black)
++        self.assertEqual((r1["class"], r2["class"]), ("start", "start"))
++        _reads, done = self.run_of([black] * 5, start_loaded=False)
++        self.assertIsNone(done)
++
++
++class Hub(unittest.TestCase):
++    def test_listing(self):
++        import party_minigame as pm
++        cls = pm.PartyMinigames if hasattr(pm, "PartyMinigames") else None
++        fn = None
++        for name in dir(pm):
++            obj = getattr(pm, name)
++            if isinstance(obj, type) and hasattr(obj, "_letters_entry"):
++                fn = obj._letters_entry
++        self.assertIsNotNone(fn)
++        del cls
++        v5 = {"version": 5, "start_class": "start", "end_classes": ["end_P1", "end_P2"]}
++        e = fn(v5, {"players": 2, "result": "letters"}, 2)
++        self.assertEqual(e["winner_of"], {"end_P1": 1, "end_P2": 2})
++        self.assertEqual(e["scores"], {"end_P1": [1, 0], "end_P2": [0, 1]})
++        self.assertIsNone(fn(dict(v5, version=2), {"players": 2, "result": "letters"}, 2))
++        self.assertIsNone(fn(v5, {"players": 2, "result": "letters", "scores": {}}, 2))
++        self.assertIsNone(fn(dict(v5, end_classes=["end_P1", "end_P2", "end_P3", "end_P4"]),
++                             {"players": 4, "result": "letters"}, 4))
++
++
++if __name__ == "__main__":
++    unittest.main()

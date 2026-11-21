@@ -9,7 +9,8 @@ status: FIXED TASK (session A, hardware) — add one party mini game by its code
 The code (`T` + two digits) is the only name of the title in anything written. The user knows which game it is; the
 words the user gives to find it in the library are typed into one command at run time and never written down. **The
 tool decides every verdict; you never judge a picture, choose a threshold or edit a rule.** A stage that is not PASS
-stops the task. **The one exception (B178, B183): a `score` title's `label` stage (§2)** — there you read each end
+stops the task. **The one exception (B178, B183; B191 for `letters`): a `score` or `letters` title's `label` stage
+(§2; §1 for letters)** — there you read each end
 save's numbers from the pictures the tool puts out and pass them in, and give its last look at the digit sheet; the
 tool checks every reading and decides.
 
@@ -79,7 +80,9 @@ the rows `2341`, `3412`, `4123` (`--collect end_r2341=<slot>` …) before it can
 Ask once, in this order, what the user already knows: **two players or four; who wins is shown how** — a screen that
 says which player won (→ `winner`), or a results screen with every player's place in a row (→ `places`; four players
 only), or **the scores (or points, a count) of each side, the winner the side with more** (→ `score`, B178: its saves
-are `winner`'s, and the label stage after register), or **some other way (a time, a distance, only a team's or
+are `winner`'s, and the label stage after register), or **a word spelled by the player who lost (letters in each
+player's corner)** (→ `--result letters --word <the word>`, B191: two players only; its saves are `winner`'s, the label
+stage after register — below), or **some other way (a time, a distance, only a team's or
 character's name)** → **stop here, before any save is asked** (below); **whether the game has things to unlock** (→ a
 setup: `--setup slot1`, made by the user in Extras → Cheats, and every save below made inside it; nothing to unlock →
 `--setup none`); **the words to find it in the library**.
@@ -100,7 +103,10 @@ two at a time:
 - **The match, shortest:** one round or one life, items off, the shortest time the game offers — the same settings
   for every save.
 - **`begin`:** the screen just before a match, nobody picked yet, nothing moving when nobody presses (two players:
-  the select screen; four: the character select screen). Under a setup: its slot 1.
+  the select screen; four: the character select screen). Under a setup: its slot 1. **B190: when the user has made
+  their own start (the players and settings already chosen, every match played from it), that start is the begin** —
+  it serves when it holds still while nobody presses (T91's did: one picture for 20 s); keep it in slot 1 and ask the
+  other saves to slots 2 and 3, never "with other characters". Never ask the user to change how the game is set up.
 - **`other`:** the middle of a match (a fight, a race) — anything that is not a begin or an end screen.
 - **`winner`, n players (B171): two saves of every ending from the start** — `end_P1`, `end_P1_2`, … `end_Pn`,
   `end_Pn_2`: for each player, **two matches that player won, each from a different match with other characters (or
@@ -117,7 +123,27 @@ two at a time:
   on 2026-11-20) stay: run `register <code> … --result score` with no `--collect` first and ask only for what its page
   names missing; then `label <code>`.
 
-**The rounds, two players, `winner` or `score` (B171): begin, other, `end_P1`, `end_P1_2`, `end_P2`, `end_P2_2`.**
+- **`letters` (B191), two players: the same saves as `winner`** — two wins for each player, each from a different
+  match, saved on the screen after the match that shows each player's letters in its corner. `--word` is the word as
+  the user set it (T91: `WOW`). The user says only who won; the letters are read later by you in the label stage. Saves
+  already kept under the code (T91's six, taken under `winner` on 2026-11-21) stay: run `register <code> … --result
+  letters --word <the word>` with no `--collect` first and ask only for what its page names missing; then `label
+  <code>`. **The label lines for letters, word for word:**
+  - your readings: `label <code> end_P1=<P1>/<P2>,<P1>/<P2> end_P1_2=… end_P2=… end_P2_2=…` — each player's corner,
+    P1 first, joined by `/`: the letters left to right in capitals, `-` for each not-yet mark, `_` when the corner
+    shows nothing; the first reading from `<role>.1.png`, the second from `<role>.2.png` (T91's end_P1: `---/WOW`).
+  - **"Look at label/letters.png …"** → open it: a row for each letter (`-` the not-yet marks), every glyph read as that
+    letter, numbered. Every tile its row's letter: `label <code> look=all`; else `label <code> look=<letter>:<tile
+    numbers joined by '.'>` for each such row.
+  - **"Read again: <role> (<why>) …"** → look at that save's two pictures again and run `label <code>
+    <role>=<P1>/<P2>,<P1>/<P2>`. **"Stop: <role> … take this line back to the chat (Cowork)."** → stop; never ask the
+    user for a letters reading and never ask for another match.
+  - learn's own line for a letters title, passed on as it says: a save named for a corner or a letter only that save
+    shows (the usual "one more save", §1's line), or "back to the chat" when synthetic training could not reach every
+    held-out picture (more saves would not help) — never more saves than the line names.
+
+**The rounds, two players, `winner`, `score` or `letters` (B171): begin, other, `end_P1`, `end_P1_2`, `end_P2`,
+`end_P2_2`.**
 
 - **No setup — rounds of three slots:** round 1 `--collect begin=1 --collect other=2 --collect end_P1=3`; round 2
   `--collect end_P2=1 --collect end_P1_2=2 --collect end_P2_2=3`.
@@ -194,7 +220,8 @@ python3 tools/party_add_game.py close <code>                                    
 
 - **register** FAIL "missing: …" → ask the user for exactly those saves (the role's line above), collect, run again.
   Any other FAIL → stop (below).
-- **label** (B178, `--result score` only; after register's PASS, before learn) — **the one picture you read.** Run
+- **label** (B178, `--result score`; B191, `--result letters` — its lines are §1's; after register's PASS, before
+  learn) — **the one picture you read.** Run
   `label <code>`: it puts two pictures of every end save's final screen, two ticks apart, in the title's add_game folder
   (`~/privyhub_h7/add_game/<code>/label/`, off the repo: `<role>.1.png`, `<role>.2.png`; once the places are known,
   each side's number cut out, `<role>.P1.png`, `<role>.P2.png`). Open each with your own vision; read each side's

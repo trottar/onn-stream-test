@@ -1,0 +1,7 @@
+Queue BJ mutations (scripts/run_mutations.py; each in a copy of the work copy, the test that must catch it run once).
+M1_a_synthetic_picture_counted_as_proof: CAUGHT (Ran 1 test in 71.752s FAILED (failures=1))
+M2_a_background_read_as_a_letter: CAUGHT (Ran 1 test in 23.936s FAILED (failures=1))
+M4_a_moving_screen_taken: CAUGHT (Ran 1 test in 24.011s FAILED (failures=1))
+M3_a_guess_when_neither_spelled: CAUGHT (Ran 1 test in 23.708s FAILED (failures=1))
+Disclosed: M3's first form (one change: 'sum(spelled) == 1' -> '<= 1') ran and was NOT CAUGHT — its line had become reachable only when a word is spelled (B191's reader reads the letters before the start test, addendum 5), so it guessed nothing; rewritten as two changes (every fully read pair of corners taken, the win given when fewer than two spelled) and run again: CAUGHT. The first run's lines: tests_mutations_first_run.txt.
+temp dirs left: 0

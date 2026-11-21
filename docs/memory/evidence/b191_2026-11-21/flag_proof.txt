@@ -1,0 +1,44 @@
+Queue BJ — switch / flag proof (read from the tree; no flag set, no companion restarted).
+
+1. The hub's listing change lives in companion/party_minigame.py, imported only with PRIVYHUB_PARTY=1 (and H7):
+140:# B108: the board game listed as one entry of its own system (Godot), only with PRIVYHUB_PARTY=1. Absent = today:
+143:if (os.environ.get("PRIVYHUB_PARTY") or "").strip() == "1":
+146:# B110: the party mini game (an emulator title played from inside the board), only with PRIVYHUB_PARTY=1 and
+148:_party_minigame = None
+150:    import party_minigame as _party_minigame
+3514:        # B110: the party mini games and the current one's result (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 only)
+3540:        """B110: one party mini-game layer per plugin (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 only)."""
+4430:        # B110: a party mini game started / ended by the board (PRIVYHUB_PARTY=1 and PRIVYHUB_H7=1 only)
+
+2. Its letters entry is reached only for a sidecar "result": "letters" (absent = today; winner / score paths unchanged):
+284:                    entry = (self._score_entry(spec, side, n) if side.get("result") == "score"     # B178
+285:                             else self._letters_entry(spec, side, n) if side.get("result") == "letters"   # B191
+376:    def _letters_entry(spec: dict, side: dict, n: int) -> dict | None:
+
+3. A version-5 spec is made only by learn_letters, called only for a binding registered --result letters:
+tools/h7_endscreen.py:1813:def learn_letters(starts: list, others: list, ends: dict, sides: dict, word: str, players: int, name: str = "",
+tools/party_add_game.py:1001:        return _learn_letters(code, b, kept, pics, es)
+tools/party_add_game.py:1975:    return es.learn_letters(starts, others, use, {r: sides[r] for r in use}, b["word"], b["players"], name=name)
+tools/party_add_game.py:2229:def _learn_letters(code: str, b: dict, kept: dict, pics: Path, es) -> int:
+325:                   **({"word": b.get("word")} if b["result"] == "letters" else {})})     # B191
+948:    if b["result"] == "letters":
+1000:    if b["result"] == "letters":                             # B191: each player's letters
+1539:    if b.get("result") == "letters":                         # B191
+
+4. Versions 2 / 3 / 4: check_spec, load_spec, Reader, thresholds keep their branches; version 5 is a new branch each:
+1404:VERSION_LETTERS = 5
+1843:    spec = {"version": VERSION_LETTERS, "kind": "privyhub-h7-endscreen", "measure": MEASURE, "size": list(SIZE),
+1984:    if spec.get("version") not in (VERSION, VERSION_PLACES, VERSION_SCORE, VERSION_LETTERS) \
+1987:    if spec.get("version") == VERSION_LETTERS and not isinstance(spec.get("letters"), dict):    # B191
+2007:    if spec.get("version") == VERSION_LETTERS:                                  # B191
+2052:        if cls is Reader and isinstance(spec, dict) and spec.get("version") == VERSION_LETTERS:  # B191
+2344:    if spec.get("version") == VERSION_LETTERS:             # B191
+
+5. Every spec in the real rules folder (read only): versions
+  a spec: version 3
+  a spec: version 4
+  a spec: version 2
+  (none is 5: today's titles read as today)
+
+6. The template:
+aadccb04052d09d28fc5e2523d82e921b08e8034014ede6d8f84846c24db876e

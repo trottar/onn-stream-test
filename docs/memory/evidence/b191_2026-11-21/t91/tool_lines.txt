@@ -1,0 +1,13 @@
+$ register T91 --players 2 --system ps1 --result letters --word WOW --setup none --find <the words, in process>
+register T91: PASS (10 cells)
+rc=0
+$ label T91 end_P1=---/WOW,---/WOW end_P1_2=---/WOW,---/WOW end_P2=WOW/W--,WOW/W-- end_P2_2=WOW/W--,WOW/W--
+label T91: PASS (19 cells)
+rc=0
+$ label T91 look=all
+label T91: PASS (19 cells)
+rc=0
+$ learn T91
+learn T91: PASS (20 cells)
+18.88 s
+rc=0

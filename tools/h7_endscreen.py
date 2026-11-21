@@ -64,6 +64,23 @@ B178 — each side's number on the final screen (spec version 4, only when every
   a read   — the screen as version 3; on `end` every side's number, or `unknown` when any glyph is not read (never
            the nearest digit by itself). `EndedScore`: K agreeing reads of the class and every number.
 
+B191 / B192 — a word spelled by the player who lost (spec version 5, `learn_letters`, called by the add-a-game tool with
+the word and each end save's corners as the session read them; never from labels alone):
+  the start — B122's one-screen learner on the begin's own still picture against the mid-match save's and the end
+           saves' pictures, B137's top-right corner (200 x 70) black in every picture, at learn and at every read.
+  a corner — each player's letters (P1 the left third, P2 the right third; top or bottom), found from two cues — the
+           pixels the same in two saves showing that player's same letters over different pictures, and the pixels off
+           a plain corner's commonest colour (never the end screens' fixed pixels, never a dark one) — as a string of
+           as many glyphs as the session read, at one place in the most saves; the box around it fits the whole word.
+           Its colours: chromaticity bins as common among the letters' pixels as `ratio` x among the backgrounds'.
+  a letter — the glyph's pixels in a 36 x 40 window; a template per letter (shared by the players: one font); the mean
+           |difference| least over +/-3 px; thresholds halfway to the nearest other letter; the margin.
+  B192    — synthetic pictures to train, never to prove: the letters' pixels of each real end save put over patches
+           cut from the title's own pictures (shifted, scaled, a fixed seed from the saves); held-out pictures made
+           first; rounds of training pictures until every held-out one is read (`trained`, with its counts).
+  a read  — start; else both corners: exactly one spelled -> end_P<the other>; none -> other; both -> unknown; one not
+           read beside a spelled one -> unknown (`end_unread`); a moving screen never the same end twice in a row.
+
 usage: h7_endscreen.py learn <runs> <labels> [<runs> <labels> ...] <out.endscreen.json> [--half first]
        h7_endscreen.py score <runs> <labels> [<runs> <labels> ...] <spec.endscreen.json> [--half second]
        h7_endscreen.py read  <spec.endscreen.json> <picture>
@@ -1383,6 +1400,561 @@ def _learn_v4(paths, ids, per_source, aspect, start_class, name, n, t0):
     return spec, arrays, report
 
 
+# --- B191 / B192: a word spelled by the player who lost (spec version 5) ---------------------------------------------
+VERSION_LETTERS = 5
+LETTERS_SIDE = re.compile(r"^(?:[A-Z-]{1,12}|_)$")    # a corner as read: its letters, '-' a not-yet mark, '_' nothing
+LETTERS_WORD = re.compile(r"^[A-Z]{2,12}$")
+LETTERS_SIZE = (640, 480)        # the corners are read on the game's area at this size, in colour
+LETTERS_EQ = 12                  # levels (the largest channel): a pixel the same in two saves
+LETTERS_DIFFER = 0.5             # two saves are different pictures when fewer than this share of their pixels is the same
+LETTERS_FLAT, LETTERS_FLAT_DIST, LETTERS_QF = 0.5, 48, 16   # a plain corner: this share within this of its commonest colour
+LETTERS_FILL = 150               # R+G+B: under this a pixel is the letters' shadow (dark backgrounds share it)
+LETTERS_PART = 6                 # px: a glyph's part
+LETTERS_TOUCH = 1                # px: parts this close in x are one glyph
+LETTERS_SPECK = 0.4              # a glyph under this share of the smallest labelled glyph's pixels is a speck
+LETTERS_NB = 32                  # chromaticity bins per axis (r, g of r+g+b)
+LETTERS_VMIN = 90                # R+G+B: darker pixels have no colour
+LETTERS_TMIN = 0.002             # a colour is the letters' only when at least this share of their pixels
+LETTERS_RATIOS = (5, 10, 20, 40)  # ... and this many times as common among them as among the backgrounds (the least
+#                                  that reads every real save and every held-out synthetic picture)
+LETTERS_PAD = 8                  # px around a corner's box
+LETTERS_PLACE_TOL = 8            # px: two saves' strings at one place
+LETTERS_FIXED = 0.9              # a string whose cut pixels stay this much the same under other letters is fixed text
+LETTERS_FOUND_PX = 20            # px: each glyph of a string found by the cut at least this (a speck is not a letter)
+LETTERS_CELL = (36, 40)          # a glyph's window (no resizing: one font size in a title)
+LETTERS_SHIFT = 3                # px: a glyph compared within +/- this
+LETTERS_CORNER = (200, 70)       # B137's LABEL_BOX: RetroArch's "Paused." corner, black for the start test
+LETTERS_MOVED = (16, 0.20)       # B140's BEGIN_MOVED bar: >= 20 % of the 64 x 48 cells moved by > 16 levels (in colour:
+#                                  the largest channel)
+SYN_HELD, SYN_PER_ROUND, SYN_ROUNDS = 8, 16, 4        # B192: per end save: held out, added a round; rounds at most
+SYN_SCALE, SYN_SHIFT = (1.0, 1.4), 2
+SYN_OWN = 0.85                   # a training glyph teaches its letter's shape only when this share of it is pasted letter
+
+
+def letters_area(img: Image.Image) -> np.ndarray:
+    """The game's area in colour at LETTERS_SIZE (B104's bar cut)."""
+    return np.asarray(game_area(img.convert("RGB")).resize(LETTERS_SIZE, Image.BILINEAR), dtype=np.float32)
+
+
+def corner_black(img: Image.Image) -> Image.Image:
+    """B137's corner painted black (the start test's picture, paused or not)."""
+    out = img.convert("RGB").copy()
+    w = out.size[0]
+    out.paste((0, 0, 0), (max(0, w - LETTERS_CORNER[0]), 0, w, min(out.size[1], LETTERS_CORNER[1])))
+    return out
+
+
+def letters_zones(n: int) -> dict:
+    """The corners each player's letters are looked for in: P1 the left third, P2 the right third; top and bottom."""
+    w, h = LETTERS_SIZE[0] // 3, LETTERS_SIZE[1] // 3
+    W, H = LETTERS_SIZE
+    return {1: [(0, 0, w, h), (0, H - h, w, H)], 2: [(W - w, 0, W, h), (W - w, H - h, W, H)]}
+
+
+def _lparts(m: np.ndarray) -> list:
+    return [c for c in _components(m) if c[4] >= LETTERS_PART]
+
+
+def _merge_touch(cs: list) -> list:
+    """Reading a corner: parts overlapping in x, or touching (a gap of at most LETTERS_TOUCH px), are one glyph; left
+    to right. (A letter's thin join can be lost to the colour cut; a font's letters stand further apart: T91's 3 px
+    and more.) The corner search keeps B178's overlap rule: there the cut's shadows would join letters."""
+    gl: list = []
+    for c in sorted(cs, key=lambda c: (c[1], c[0])):
+        if gl and c[1] <= gl[-1][3] + 1 + LETTERS_TOUCH:
+            g = gl[-1]
+            gl[-1] = (min(g[0], c[0]), g[1], max(g[2], c[2]), max(g[3], c[3]), g[4] + c[4])
+        else:
+            gl.append(c)
+    return gl
+
+
+def letter_strings(m: np.ndarray, x0: int = 0, y0: int = 0) -> list:
+    """Strings of glyphs: parts on one line (their spans overlap by half the smaller), parts overlapping in x one glyph,
+    a string split where the gap is wider than a glyph (at least 12 px)."""
+    lines: list = []
+    for c in sorted(_lparts(m), key=lambda c: -(c[2] - c[0])):
+        for ln in lines:
+            if min(ln[1], c[2]) - max(ln[0], c[0]) >= 0.5 * min(ln[1] - ln[0], c[2] - c[0]):
+                ln[2].append(c)
+                ln[0], ln[1] = min(ln[0], c[0]), max(ln[1], c[2])
+                break
+        else:
+            lines.append([c[0], c[2], [c]])
+    out = []
+    for _t, _b, grp in lines:
+        gl = _merge_x(grp)                                # the search: overlapping parts only
+        cur = [gl[0]]
+        for g in gl[1:]:
+            if g[1] - cur[-1][3] - 1 <= max(12, cur[-1][2] - cur[-1][0]):
+                cur.append(g)
+            else:
+                out.append(cur)
+                cur = [g]
+        out.append(cur)
+    return [[(t + y0, l + x0, b + y0, r + x0, n) for t, l, b, r, n in s] for s in out]
+
+
+def _cue(A: dict, sides: dict, p: int, e: str, zone, fixed: np.ndarray) -> np.ndarray:
+    """B191's cut in one corner of one save: the pixels the same in another save showing this player's same letters
+    over a different picture, and the pixels off a plain corner's commonest colour; never a dark one. (The end
+    screens' fixed text is left to the string search: a string of the side's length, at one place in the most saves.)"""
+    x0, y0, x1, y1 = zone
+    m = np.zeros((y1 - y0, x1 - x0), bool)
+    for f in A:
+        if f == e or sides[f][p] != sides[e][p]:
+            continue
+        eq = np.abs(A[e] - A[f]).max(axis=2) <= LETTERS_EQ
+        if eq.mean() < LETTERS_DIFFER:
+            m |= eq[y0:y1, x0:x1]
+    a = A[e][y0:y1, x0:x1]
+    q = (a // LETTERS_QF).astype(np.int64)
+    k = q[..., 0] * 256 + q[..., 1] * 16 + q[..., 2]
+    u, cnt = np.unique(k, return_counts=True)
+    mode = int(u[np.argmax(cnt)])
+    mc = (np.array([mode // 256, mode // 16 % 16, mode % 16]) + 0.5) * LETTERS_QF
+    far = np.abs(a - mc).max(axis=2) > LETTERS_FLAT_DIST
+    if (~far).mean() >= LETTERS_FLAT:
+        m |= far
+    del fixed                    # not excluded: where two saves' letters overlap in one colour it would cut the letters
+    return m & (a.sum(axis=2) >= LETTERS_FILL)
+
+
+def letters_colour(a: np.ndarray) -> np.ndarray:
+    """Each pixel's chromaticity bin (r, g of r+g+b, LETTERS_NB each); -1 for a pixel too dark to have a colour."""
+    s = a.sum(axis=2) + 1e-6
+    r = np.clip((a[..., 0] / s * LETTERS_NB).astype(np.int64), 0, LETTERS_NB - 1)
+    g = np.clip((a[..., 1] / s * LETTERS_NB).astype(np.int64), 0, LETTERS_NB - 1)
+    k = r * LETTERS_NB + g
+    k[s < LETTERS_VMIN] = -1
+    return k
+
+
+def _lhist(k: np.ndarray) -> np.ndarray:
+    k = k[k >= 0]
+    return np.bincount(k, minlength=LETTERS_NB * LETTERS_NB).astype(np.float64)
+
+
+def letters_bins(text: np.ndarray, bg: np.ndarray, ratio: float) -> np.ndarray:
+    """A colour is the letters' when it is at least LETTERS_TMIN of their pixels and `ratio` x as common among them as
+    among the backgrounds' pixels."""
+    tt, bb = text / max(float(text.sum()), 1.0), bg / max(float(bg.sum()), 1.0)
+    return (tt >= LETTERS_TMIN) & (tt >= ratio * bb)
+
+
+def letters_mask(a: np.ndarray, box, bins: np.ndarray) -> np.ndarray:
+    x0, y0, x1, y1 = box
+    k = letters_colour(a[y0:y1, x0:x1])
+    m = np.zeros(k.shape, bool)
+    m[k >= 0] = bins[k[k >= 0]]
+    return m
+
+
+def letters_glyphs(a: np.ndarray, box, bins: np.ndarray, glyph_min: float, want: int | None = None) -> tuple:
+    """The box's glyphs in its own coordinates, left to right (parts overlapping in x one glyph; specks dropped). When
+    that is not `want` glyphs, parts touching in x are joined too (`_merge_touch`), and taken only if that is `want`."""
+    m = letters_mask(a, box, bins)
+    parts = _lparts(m)
+    gl = [g for g in _merge_x(parts) if g[4] >= glyph_min]
+    if want is not None and len(gl) != want:
+        gt = [g for g in _merge_touch(parts) if g[4] >= glyph_min]
+        if len(gt) == want:
+            gl = gt
+    return m, gl
+
+
+def letter_cell(m: np.ndarray, g) -> np.ndarray:
+    """The glyph's pixels (its own box only) in a LETTERS_CELL window on its centre."""
+    ch, cw = LETTERS_CELL
+    t, l, b, r = g[0], g[1], g[2], g[3]
+    sub = np.zeros(m.shape, np.float32)
+    sub[t:b + 1, l:r + 1] = m[t:b + 1, l:r + 1]
+    ys, xs = (t + b) // 2 - ch // 2, (l + r) // 2 - cw // 2
+    out = np.zeros(LETTERS_CELL, np.float32)
+    y_a, y_b = max(0, ys), min(m.shape[0], ys + ch)
+    x_a, x_b = max(0, xs), min(m.shape[1], xs + cw)
+    if y_b > y_a and x_b > x_a:
+        out[y_a - ys:y_b - ys, x_a - xs:x_b - xs] = sub[y_a:y_b, x_a:x_b]
+    return out
+
+
+def _shifts(c: np.ndarray):
+    p = np.pad(c, LETTERS_SHIFT)
+    for dy in range(-LETTERS_SHIFT, LETTERS_SHIFT + 1):
+        for dx in range(-LETTERS_SHIFT, LETTERS_SHIFT + 1):
+            yield p[LETTERS_SHIFT + dy:LETTERS_SHIFT + dy + c.shape[0], LETTERS_SHIFT + dx:LETTERS_SHIFT + dx + c.shape[1]]
+
+
+def letter_dists(refs: np.ndarray, c: np.ndarray) -> np.ndarray:
+    """Each template's distance to a glyph: the mean |difference|, the least over +/- LETTERS_SHIFT px."""
+    best = np.full(len(refs), np.inf, np.float32)
+    for sh in _shifts(c):
+        best = np.minimum(best, np.abs(refs - sh[None]).mean(axis=(1, 2)))
+    return best
+
+
+def _aligned_mean(cs: list) -> np.ndarray:
+    ref = cs[0]
+    out = []
+    for c in cs:
+        out.append(min(_shifts(c), key=lambda sh: float(np.abs(ref - sh).mean())))
+    return np.mean(out, axis=0)
+
+
+def fit_letters(cells: dict) -> dict:
+    """Each letter's template (its glyphs aligned and averaged), its threshold halfway from its own spread to the
+    nearest other letter's glyph (separable with a gap >= MIN_GAP), margin_needed half the least margin seen."""
+    keys = sorted(cells)
+    if not keys:
+        return {"keys": [], "refs": np.zeros((0,) + LETTERS_CELL, np.float32), "thresholds": {}, "separable": {},
+                "margin_needed": None}
+    refs = np.stack([_aligned_mean(cells[k]) for k in keys]).astype(np.float32)
+    ds = {k: [letter_dists(refs, c) for c in cells[k]] for k in keys}
+    thr, sep, margins = {}, {}, []
+    for i, k in enumerate(keys):
+        own = max(float(d[i]) for d in ds[k])
+        foreign = min([float(d[i]) for k2 in keys if k2 != k for d in ds[k2]] or [1.0])
+        g = _gap(own, foreign, MIN_GAP)
+        sep[k] = g["verdict"] == "separable"
+        thr[k] = g["threshold"]
+        for d in ds[k]:
+            if len(keys) > 1:
+                margins.append(float(np.sort(d)[1] - d[i]))
+    need = round(SAFETY * min(margins), 4) if margins else (0.0 if len(keys) == 1 else None)
+    return {"keys": keys, "refs": refs, "thresholds": thr, "separable": sep, "margin_needed": need}
+
+
+def read_corner(a: np.ndarray, box, bins: np.ndarray, fitted: dict, word: str, glyph_min: float,
+                blank_ok: bool = False):
+    """One corner as letters, or None (not read): as many glyphs as the word has letters (none: '_' when the title
+    shows nothing there), each one letter under its threshold with the margin, and that letter the word's at its place
+    or '-'. Never the nearest letter by itself."""
+    m, gl = letters_glyphs(a, box, bins, glyph_min, len(word))
+    if not gl:
+        return "_" if blank_ok else None
+    if len(gl) != len(word) or not fitted["keys"]:
+        return None
+    out = []
+    need = fitted["margin_needed"]
+    for i, g in enumerate(gl):
+        dd = letter_dists(fitted["refs"], letter_cell(m, g))
+        o = np.argsort(dd)
+        k = fitted["keys"][int(o[0])]
+        margin = float(dd[o[1]] - dd[o[0]]) if len(dd) > 1 else float("inf")
+        t = fitted["thresholds"].get(k)
+        if t is None or need is None or float(dd[o[0]]) > t or margin < need or k not in (word[i], "-"):
+            return None
+        out.append(k)
+    return "".join(out)
+
+
+def _letters_places(A: dict, sides: dict, word: str, n: int) -> tuple:
+    """-> ({p: box}, {p: [(save, string, cut, zone)]}) or (None, why)."""
+    ends = sorted(A)
+    fixed = np.all([np.abs(A[e] - A[ends[0]]).max(axis=2) <= LETTERS_EQ for e in ends], axis=0) \
+        if len(ends) > 1 else np.zeros(A[ends[0]].shape[:2], bool)
+    found = {}
+    for p in range(1, n + 1):
+        cands = []
+        for zone in letters_zones(n)[p]:
+            for e in ends:
+                want = 0 if sides[e][p - 1] == "_" else len(sides[e][p - 1])
+                if not want:
+                    continue
+                m = _cue(A, sides, p - 1, e, zone, fixed)
+                for s in letter_strings(m, zone[0], zone[1]):
+                    if len(s) == want and min(g[4] for g in s) >= LETTERS_FOUND_PX:
+                        cands.append((e, s, m, zone))
+        clusters: list = []
+        for c in cands:
+            cx = (c[1][0][1] + c[1][-1][3]) / 2.0
+            cy = (min(g[0] for g in c[1]) + max(g[2] for g in c[1])) / 2.0
+            for cl in clusters:
+                if abs(cl["cx"] - cx) <= LETTERS_PLACE_TOL and abs(cl["cy"] - cy) <= LETTERS_PLACE_TOL:
+                    cl["m"].append(c)
+                    break
+            else:
+                clusters.append({"cx": cx, "cy": cy, "m": [c]})
+        def fixed_text(cl) -> bool:
+            """The end screens' own text: its pixels stay the same (LETTERS_FIXED of them) in a save the session read
+            other letters for this player in — letters change with the reading."""
+            e, s, m, zone = cl["m"][0]
+            t, b_ = min(g[0] for g in s), max(g[2] for g in s)
+            l_, r_ = s[0][1], s[-1][3]
+            cut = m[t - zone[1]:b_ - zone[1] + 1, l_ - zone[0]:r_ - zone[0] + 1]
+            if not cut.any():
+                return False
+            for f in ends:
+                if sides[f][p - 1] != sides[e][p - 1]:
+                    eq = np.abs(A[e][t:b_ + 1, l_:r_ + 1] - A[f][t:b_ + 1, l_:r_ + 1]).max(axis=2) <= LETTERS_EQ
+                    if float(eq[cut].mean()) >= LETTERS_FIXED:
+                        return True
+            return False
+        clusters = [cl for cl in clusters if not fixed_text(cl)]
+        if not clusters:
+            return None, f"P{p}'s letters were found in no save"
+        saves_of = lambda cl: len({c[0] for c in cl["m"]})
+        clusters.sort(key=lambda cl: (-saves_of(cl), -sum(g[4] for c in cl["m"] for g in c[1])))
+        if len(clusters) > 1 and saves_of(clusters[0]) == saves_of(clusters[1]):
+            return None, f"P{p}'s letters were found at two places as often"
+        found[p] = clusters[0]
+    gw = max(g[3] - g[1] + 1 for cl in found.values() for c in cl["m"] for g in c[1])
+    gh = max(g[2] - g[0] + 1 for cl in found.values() for c in cl["m"] for g in c[1])
+    W, H = LETTERS_SIZE
+    places = {}
+    for p, cl in found.items():
+        half = (len(word) * gw + (len(word) - 1) * 6) / 2.0 + LETTERS_PAD
+        top = min(g[0] for c in cl["m"] for g in c[1])
+        bot = max(g[2] for c in cl["m"] for g in c[1])
+        if bot - top + 1 < gh:
+            top, bot = (top + bot) / 2.0 - gh / 2.0, (top + bot) / 2.0 + gh / 2.0
+        places[p] = [int(max(0, cl["cx"] - half)), int(max(0, top - 3)), int(min(W, cl["cx"] + half)),
+                     int(min(H, bot + 4))]
+    return places, found
+
+
+def _corner_text(a: np.ndarray, box, bins: np.ndarray, glyph_min: float) -> np.ndarray:
+    m, gl = letters_glyphs(a, box, bins, glyph_min)
+    keep = np.zeros_like(m)
+    for g in gl:
+        keep[g[0]:g[2] + 1, g[1]:g[3] + 1] = m[g[0]:g[2] + 1, g[1]:g[3] + 1]
+    return keep
+
+
+def _texty(src: np.ndarray, sy: int, sx: int, ph: int, pw: int, bins: dict, glyph_min: float) -> bool:
+    """A patch holding a letter-sized shape in any player's letters' colours (the game's other text)."""
+    for b in bins.values():
+        m = letters_mask(src, (sx, sy, sx + pw, sy + ph), b)
+        if any(c[4] >= glyph_min for c in _components(m)):
+            return True
+    return False
+
+
+def letters_seed(items: list) -> int:
+    """B192: the same saves (their pictures and readings) always give the same synthetic set."""
+    h = hashlib.sha256()
+    for a, sides in items:
+        h.update(np.ascontiguousarray(a[::8, ::8]).astype(np.uint8).tobytes())
+        h.update("/".join(sides).encode())
+    return int(h.hexdigest()[:8], 16)
+
+
+def synthetic_letters(places: dict, bins: dict, items: list, frames: list, fixed: np.ndarray, rng, per: int,
+                      cuts: list, glyph_min: float) -> list:
+    """B192: each real end save's letters over other backgrounds — each corner's box given a patch cut from one of the
+    title's own pictures at a random place and scale (never overlapping a letters box or the end screens' fixed text,
+    never a patch holding the game's other text), the save's own letter pixels put back at their place moved by up to
+    SYN_SHIFT px. -> [(picture, sides, {p: the pasted pixels})]. Training only: never read by a gate."""
+    W, H = LETTERS_SIZE
+    out = []
+    for i, (a, sides) in enumerate(items):
+        for _j in range(per):
+            b = a.copy()
+            pasted = {}
+            for p, box in places.items():
+                x0, y0, x1, y1 = box
+                h, w = y1 - y0, x1 - x0
+                src, sy, sx, ph, pw = frames[0], 0, 0, h, w
+                for _try in range(60):
+                    src = frames[int(rng.integers(len(frames)))]
+                    s = float(rng.uniform(*SYN_SCALE))
+                    ph, pw = max(2, int(round(h / s))), max(2, int(round(w / s)))
+                    sy, sx = int(rng.integers(0, H - ph)), int(rng.integers(0, W - pw))
+                    if fixed[sy:sy + ph, sx:sx + pw].any():
+                        continue
+                    if any(not (sx + pw <= q[0] or q[2] <= sx or sy + ph <= q[1] or q[3] <= sy) for q in places.values()):
+                        continue
+                    if _texty(src, sy, sx, ph, pw, bins, glyph_min):
+                        continue
+                    break
+                patch = Image.fromarray(np.clip(src[sy:sy + ph, sx:sx + pw], 0, 255).astype(np.uint8))
+                b[y0:y1, x0:x1] = np.asarray(patch.resize((w, h), Image.BILINEAR), dtype=np.float32)
+                dy, dx = (int(v) for v in rng.integers(-SYN_SHIFT, SYN_SHIFT + 1, 2))
+                ys, xs = np.nonzero(cuts[i][p])
+                yy, xx = ys + dy, xs + dx
+                ok = (yy >= 0) & (yy < h) & (xx >= 0) & (xx < w)
+                b[yy[ok] + y0, xx[ok] + x0] = a[ys[ok] + y0, xs[ok] + x0]
+                pm = np.zeros((h, w), bool)
+                pm[yy[ok], xx[ok]] = True
+                pasted[p] = pm
+            out.append((b, list(sides), pasted))
+    return out
+
+
+def _letter_cells(places: dict, bins: dict, items: list, word: str, glyph_min: float) -> tuple:
+    cells: dict = {}
+    bad = []
+    for i, it in enumerate(items):
+        a, sides = it[0], it[1]
+        pasted = it[2] if len(it) > 2 else None              # B192: a training picture's own letter pixels
+        for p, box in places.items():
+            st = sides[p - 1]
+            m, gl = letters_glyphs(a, box, bins[p], glyph_min, 0 if st == "_" else len(st))
+            if st == "_":
+                if gl:
+                    bad.append((i, p))
+                continue
+            if len(gl) != len(st):
+                bad.append((i, p))
+                continue
+            for ch, g in zip(st, gl):
+                if pasted is not None:                       # a glyph a background speck joined teaches no shape
+                    own = m[g[0]:g[2] + 1, g[1]:g[3] + 1]
+                    if own.any() and float(pasted[p][g[0]:g[2] + 1, g[1]:g[3] + 1][own].mean()) < SYN_OWN:
+                        continue
+                cells.setdefault(ch, []).append(letter_cell(m, g))
+    return cells, bad
+
+
+def _read_sides(places: dict, bins: dict, fitted: dict, word: str, glyph_min: float, blank: dict, a) -> list:
+    return [read_corner(a, places[p], bins[p], fitted, word, glyph_min, blank.get(p, False)) for p in sorted(places)]
+
+
+def learn_letters(starts: list, others: list, ends: dict, sides: dict, word: str, players: int, name: str = "",
+                  start_class: str = START) -> tuple:
+    """B191 / B192: starts / others — picture paths of the begin's and the mid-match save's screens; ends — {role:
+    [picture paths]} (the label stage's two of each end save); sides — {role: [P1's corner, P2's, ...]} as the session
+    read them; word — the user's. -> (spec, arrays, report). Synthetic pictures only train; nothing here proves."""
+    t0 = time.perf_counter()
+    if not LETTERS_WORD.match(word or ""):
+        raise ValueError("the word is 2-12 letters A-Z")
+    if players != 2:
+        raise ValueError("a letters title has two players")
+    roles = sorted(ends)
+    report: dict = {"word_length": len(word), "end_saves": len(roles)}
+    # the start: B122's one-screen learner on the begin's own still picture, B137's corner black
+    def grey(p):
+        with Image.open(p) as im:
+            return _final(mid(corner_black(im)))
+    st = np.stack([grey(p) for p in starts]).astype(np.float32)
+    foreign = [np.stack([grey(p) for p in others]).astype(np.float32)] if others else []
+    foreign.append(np.stack([grey(p) for r in roles for p in ends[r]]).astype(np.float32))
+    smask, sref, sgap = _learn_one_screen(st, foreign)
+    arrays = {f"{start_class}_mask": smask, f"{start_class}_ref": sref}
+    # the corners
+    def colour(p):
+        with Image.open(p) as im:
+            return letters_area(im)
+    A = {r: colour(ends[r][0]) for r in roles}
+    items = [(A[r], list(sides[r])) for r in roles]                      # B192: one picture of each end save
+    checks = items + [(colour(p), list(sides[r])) for r in roles for p in ends[r][1:]]   # every picture read right
+    frames = [colour(p) for p in list(starts[:1]) + list(others[:1])] + [A[r] for r in roles]
+    places, found = _letters_places(A, sides, word, players)
+    spec = {"version": VERSION_LETTERS, "kind": "privyhub-h7-endscreen", "measure": MEASURE, "size": list(SIZE),
+            "classes": [start_class] + [f"end_P{k}" for k in range(1, players + 1)], "start_class": start_class,
+            "end_classes": [f"end_P{k}" for k in range(1, players + 1)], "k": K,
+            "screens": {start_class: {"threshold": sgap["threshold"], "own_worst": sgap["worst_own"],
+                                      "mask_px": sgap["mask_px"]}},
+            "letters": {"word": word, "players": players, "found": places is not None,
+                        "not_found": None if places is not None else found, "size": list(LETTERS_SIZE),
+                        "cell": list(LETTERS_CELL), "shift": LETTERS_SHIFT, "corner": list(LETTERS_CORNER),
+                        "moved": list(LETTERS_MOVED)},
+            "usable": False, "arrays": f"{name}.endscreen.npz" if name else None, "arrays_sha256": None}
+    report["start"] = sgap
+    if places is None:
+        report["letters"] = {"not_found": found}
+        report["learn_s"] = round(time.perf_counter() - t0, 2)
+        return spec, arrays, report
+    fixed = np.all([np.abs(A[e] - A[roles[0]]).max(axis=2) <= LETTERS_EQ for e in roles], axis=0) \
+        if len(roles) > 1 else np.zeros(A[roles[0]].shape[:2], bool)
+    # the colours: the found strings' pixels against every picture's pixels outside the boxes
+    bg = np.zeros(LETTERS_NB * LETTERS_NB)
+    for a in frames + [colour(p) for p in starts[1:2]]:
+        k = letters_colour(a)
+        for b in places.values():
+            k[b[1]:b[3], b[0]:b[2]] = -1
+        bg += _lhist(k)
+    text = {}
+    smallest = []
+    for p, cl in found.items():
+        t = np.zeros(LETTERS_NB * LETTERS_NB)
+        for e, s, m, zone in cl["m"]:
+            for g in s:
+                sub = m[g[0] - zone[1]:g[2] - zone[1] + 1, g[1] - zone[0]:g[3] - zone[0] + 1]
+                k = letters_colour(A[e][g[0]:g[2] + 1, g[1]:g[3] + 1])
+                t += _lhist(np.where(sub, k, -1))
+                smallest.append(g[4])
+        text[p] = t
+    glyph_min = max(float(LETTERS_PART), LETTERS_SPECK * float(min(smallest)))
+    blank = {p: any(sides[r][p - 1] == "_" for r in roles) for p in places}
+    # B192: held-out pictures first, then rounds of training pictures until every held-out one is read
+    seed = letters_seed(items)
+    rng = np.random.default_rng(seed)
+    first = {p: letters_bins(text[p], bg, LETTERS_RATIOS[1]) for p in places}
+    cuts = [{p: _corner_text(a, places[p], first[p], glyph_min) for p in places} for a, _s in items]
+    held = synthetic_letters(places, first, items, frames, fixed, rng, SYN_HELD, cuts, glyph_min)
+    ttext = {p: text[p].copy() for p in places}
+    tbg = {p: bg.copy() for p in places}
+    trained: list = []
+    rounds, best, done = [], None, None
+    for rnd in range(1, SYN_ROUNDS + 1):
+        batch = synthetic_letters(places, first, items, frames, fixed, rng, SYN_PER_ROUND, cuts, glyph_min)
+        trained += batch
+        for b, _s, pasted in batch:
+            for p, box in places.items():
+                x0, y0, x1, y1 = box
+                k = letters_colour(b[y0:y1, x0:x1])
+                ttext[p] += _lhist(np.where(pasted[p], k, -1))
+                tbg[p] += _lhist(np.where(pasted[p], -1, k))
+        row = {"round": rnd, "trained": len(trained), "held_out": len(held)}
+        for ratio in LETTERS_RATIOS:
+            bins = {p: letters_bins(ttext[p], tbg[p], ratio) for p in places}
+            cells, bad = _letter_cells(places, bins, checks, word, glyph_min)
+            if bad:
+                continue
+            c2, _bad2 = _letter_cells(places, bins, trained, word, glyph_min)     # (picture, sides, pasted)
+            real = fit_letters(cells)
+            for k2, v in c2.items():                     # a training glyph teaches a letter only when the real saves'
+                if k2 not in real["keys"]:               # own reader reads it as that letter by distance
+                    continue
+                i2, t2 = real["keys"].index(k2), real["thresholds"].get(k2)
+                cells[k2].extend(c for c in v if t2 is not None and float(letter_dists(real["refs"], c)[i2]) <= t2)
+            fitted = fit_letters(cells)
+            if not fitted["keys"] or not all(fitted["separable"].values()) or fitted["margin_needed"] is None:
+                continue
+            real_wrong = sum(_read_sides(places, bins, fitted, word, glyph_min, blank, a) != list(s) for a, s in checks)
+            held_wrong = [i for i, (a, s, _p) in enumerate(held)
+                          if _read_sides(places, bins, fitted, word, glyph_min, blank, a) != list(s)]
+            cand = (real_wrong, len(held_wrong), ratio, bins, fitted, held_wrong)
+            if best is None or cand[:2] < best[:2]:
+                best = cand
+            if not real_wrong and not held_wrong:
+                done = cand
+                break
+        row.update({"ratio": best[2] if best else None, "real_wrong": best[0] if best else None,
+                    "held_out_wrong": best[1] if best else None})
+        rounds.append(row)
+        if done:
+            break
+    trained_rep = {"seed": seed, "held_out": len(held), "trained": len(trained),
+                   "backgrounds": len(frames), "rounds": rounds, "per_end_save": {"held_out": SYN_HELD,
+                                                                                "a_round": SYN_PER_ROUND},
+                   "held_out_wrong": best[1] if best else None, "real_wrong": best[0] if best else None,
+                   "every_held_out_read": done is not None}
+    if best is not None and best[5]:                       # which saves' letters the unread held-out pictures carried
+        trained_rep["held_out_wrong_of"] = sorted({roles[i // SYN_HELD] for i in best[5]})
+    report["synthetic"] = trained_rep
+    if best is None:
+        spec["letters"]["trained"] = trained_rep
+        report["learn_s"] = round(time.perf_counter() - t0, 2)
+        return spec, arrays, report
+    _rw, _hw, ratio, bins, fitted, _hl = best
+    spec["letters"].update({
+        "places": {str(p): list(b) for p, b in places.items()}, "ratio": ratio, "glyph_min": round(glyph_min, 2),
+        "blank": {str(p): v for p, v in blank.items()}, "keys": fitted["keys"],
+        "thresholds": {k: v for k, v in fitted["thresholds"].items()}, "margin_needed": fitted["margin_needed"],
+        "separable": fitted["separable"], "trained": trained_rep,
+        "found_in": {str(p): sorted({c[0] for c in cl["m"]}) for p, cl in found.items()}})
+    arrays["letters_bins"] = np.stack([bins[p] for p in sorted(places)])
+    arrays["letters_refs"] = fitted["refs"]
+    spec["usable"] = bool(sgap["threshold"] is not None and fitted["keys"] and fitted["margin_needed"] is not None
+                          and all(fitted["separable"].values()))
+    report["letters"] = {"places": places, "keys": fitted["keys"], "thresholds": fitted["thresholds"],
+                         "margin_needed": fitted["margin_needed"], "ratio": ratio}
+    report["learn_s"] = round(time.perf_counter() - t0, 2)
+    return spec, arrays, report
+
+
 # --- the spec on disk ---------------------------------------------------------------------------------------------
 def _npz_bytes(arrays: dict) -> bytes:
     buf = io.BytesIO()
@@ -1409,8 +1981,11 @@ def check_spec(spec: dict) -> None:
         raise ValueError("not an end-screen spec this tool reads")
     if spec.get("version") == 1:
         raise ValueError(OLD_MEASURE)
-    if spec.get("version") not in (VERSION, VERSION_PLACES, VERSION_SCORE) or spec.get("measure") != MEASURE:
+    if spec.get("version") not in (VERSION, VERSION_PLACES, VERSION_SCORE, VERSION_LETTERS) \
+            or spec.get("measure") != MEASURE:
         raise ValueError("not an end-screen spec this tool reads")
+    if spec.get("version") == VERSION_LETTERS and not isinstance(spec.get("letters"), dict):    # B191
+        raise ValueError("a version-5 spec names its letters")
     if spec.get("version") == VERSION_PLACES and not isinstance(spec.get("places"), dict):
         raise ValueError("a version-3 spec names its places")
     if spec.get("version") == VERSION_SCORE and not isinstance(spec.get("score"), dict):     # B178
@@ -1429,6 +2004,17 @@ def load_spec(json_path) -> tuple[dict, dict]:
         raise ValueError("the spec's arrays file does not match the spec")
     v3 = spec.get("version") == VERSION_PLACES
     v4 = spec.get("version") == VERSION_SCORE                                   # B178
+    if spec.get("version") == VERSION_LETTERS:                                  # B191
+        st = spec["start_class"]
+        keys = (f"{st}_mask", f"{st}_ref") + (("letters_bins", "letters_refs") if "places" in spec["letters"] else ())
+        with np.load(io.BytesIO(data), allow_pickle=False) as z:
+            arrays = {k: z[k] for k in keys}
+        lt = spec["letters"]
+        if arrays[f"{st}_mask"].shape != (SIZE[1], SIZE[0]) or ("places" in lt and (
+                arrays["letters_bins"].shape != (len(lt["places"]), LETTERS_NB * LETTERS_NB)
+                or arrays["letters_refs"].shape != (len(lt["keys"]),) + tuple(lt["cell"]))):
+            raise ValueError("the spec's arrays do not fit the spec")
+        return spec, arrays
     keys = (tuple(f"{c}_{k}" for c in spec["classes"] for k in ("mask", "ref")) + ("place_mask", "place_refs")
             if v3 else tuple(f"{c}_{k}" for c in spec["classes"] for k in ("mask", "ref")) + ("digit_refs",)
             if v4 else ("screen_mask", "screen_ref", "outcome_mask", "refs"))
@@ -1463,6 +2049,8 @@ class Reader:
             return super().__new__(ReaderPlaces)
         if cls is Reader and isinstance(spec, dict) and spec.get("version") == VERSION_SCORE:    # B178
             return super().__new__(ReaderScore)
+        if cls is Reader and isinstance(spec, dict) and spec.get("version") == VERSION_LETTERS:  # B191
+            return super().__new__(ReaderLetters)
         return super().__new__(cls)
 
     def __init__(self, spec: dict, arrays: dict, clock=time.monotonic):
@@ -1684,6 +2272,68 @@ class ReaderScore(ReaderPlaces):
         return out
 
 
+class ReaderLetters(Reader):
+    """B191: a version-5 spec — each player's corner read as letters: the player whose letters spell the whole word
+    lost, the other won (`end_P<the other>`); both -> unknown; a word spelled is never the begin; with none spelled, the
+    start by its own still picture (B137's corner black), else other; a corner not read while the other spelled -> unknown with `end_unread` (B182); a moving
+    screen (B140's measure against the read before) never reads as the same end twice in a row."""
+
+    def __init__(self, spec: dict, arrays: dict, clock=time.monotonic):
+        check_spec(spec)
+        self.spec, self.clock = spec, clock
+        self.classes = list(spec["classes"])
+        self.start = spec["start_class"]
+        self.smask = arrays[f"{self.start}_mask"].astype(bool)
+        self.sref = arrays[f"{self.start}_ref"][self.smask].astype(np.float32)
+        self.sthr = spec["screens"][self.start]["threshold"]
+        lt = spec["letters"]
+        self.word = lt["word"]
+        self.found = bool(lt.get("found")) and "places" in lt
+        if self.found:
+            self.places = {int(p): tuple(b) for p, b in lt["places"].items()}
+            self.bins = {p: arrays["letters_bins"][i].astype(bool) for i, p in enumerate(sorted(self.places))}
+            self.fitted = {"keys": list(lt["keys"]), "refs": arrays["letters_refs"].astype(np.float32),
+                           "thresholds": dict(lt["thresholds"]), "margin_needed": lt["margin_needed"]}
+            self.glyph_min = float(lt["glyph_min"])
+            self.blank = {int(p): bool(v) for p, v in (lt.get("blank") or {}).items()}
+        self.align = IDENTITY
+        self.last_search = None
+        self.prev_small = None
+        self.prev_class = None
+
+    def sides(self, img: Image.Image) -> list:
+        a = letters_area(img)
+        return _read_sides(self.places, self.bins, self.fitted, self.word, self.glyph_min, self.blank, a)
+
+    def read(self, img: Image.Image, now: float | None = None, search: bool = True) -> dict:
+        small = np.asarray(img.convert("RGB").resize((64, 48)), dtype=np.int16)        # in colour: two scenes of one
+        moved = self.prev_small is not None and float(                                # grey level still differ
+            (np.abs(small - self.prev_small).max(axis=2) > LETTERS_MOVED[0]).mean()) >= LETTERS_MOVED[1]
+        self.prev_small = small
+        r, flat = ranks(_final(mid(corner_black(img))), self.smask)
+        sd = _screen_dist(r, flat, self.smask, self.sref)
+        out = {"screen": False, "class": OTHER, "distances": {self.start: round(sd, 4)}, "margin": None,
+               "flat": bool(flat), "align": [1.0, 0.0, 0.0], "searched": False, "letters": None, "moved": moved}
+        got = self.sides(img) if self.found else None
+        spelled = [s == self.word for s in got] if got else []
+        if got is not None:
+            out["letters"] = got
+        if any(spelled):                                   # a word spelled is never the begin
+            if all(s is not None for s in got):
+                if sum(spelled) == 1:
+                    out.update(screen=True, **{"class": f"end_P{2 if spelled[0] else 1}"})
+                else:
+                    out["class"] = UNKNOWN                 # both spelled: no result
+            else:
+                out.update(**{"class": UNKNOWN}, end_unread=True)   # B182: a corner not read beside a spelled one
+            if out["class"] in self.spec["end_classes"] and moved and self.prev_class == out["class"]:
+                out["class"] = UNKNOWN                     # a moving screen: never the same end twice in a row
+        elif self.sthr is not None and sd <= self.sthr:
+            out.update(screen=True, **{"class": self.start})
+        self.prev_class = out["class"]
+        return out
+
+
 def read(spec: dict, arrays: dict, img: Image.Image) -> dict:
     """One picture, read by a fresh Reader (a non-screen picture gets the full search)."""
     return Reader(spec, arrays).read(img)
@@ -1691,6 +2341,10 @@ def read(spec: dict, arrays: dict, img: Image.Image) -> dict:
 
 def thresholds(spec: dict) -> dict:
     """What a read's distances are held against (B105's `last`)."""
+    if spec.get("version") == VERSION_LETTERS:             # B191
+        lt = spec["letters"]
+        return {"screens": {c: v["threshold"] for c, v in spec["screens"].items()},
+                "letters": dict(lt.get("thresholds") or {}), "margin_needed": lt.get("margin_needed")}
     if spec.get("version") == VERSION_SCORE:               # B178
         sc = spec["score"]
         return {"screens": {c: v["threshold"] for c, v in spec["screens"].items()},

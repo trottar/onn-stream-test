@@ -1,0 +1,30 @@
+1. Does each picture hold still? (64 x 48 grey; B140's moved share: cells moved > 16 levels; H7-V1's same-picture measure: mean |difference| < 1.0)
+  begin: 21 pictures over 19.5 s; steps (mean |diff|) max 0.00, first 0.00; moved share max 0.000; identical from 0.0 s on
+  other: 20 pictures over 19.0 s; steps (mean |diff|) max 86.01, first 0.00; moved share max 0.989; identical from 3.0 s on
+  end_P1: 21 pictures over 19.5 s; steps (mean |diff|) max 5.00, first 5.00; moved share max 0.004; identical from 0.5 s on
+  end_P1_2: 21 pictures over 19.5 s; steps (mean |diff|) max 5.31, first 5.31; moved share max 0.014; identical from 0.5 s on
+  end_P2: 21 pictures over 19.5 s; steps (mean |diff|) max 0.00, first 0.00; moved share max 0.000; identical from 0.0 s on
+  end_P2_2: 20 pictures over 19.0 s; steps (mean |diff|) max 3.12, first 3.12; moved share max 0.003; identical from 1.0 s on
+2. Why the begin was never recognised under `winner` (B102's whole-screen learner on the labels learn used)
+  screen mask 1852 px (9.7%); the screens' own worst distance 0.221 vs the nearest `other` picture 0.093 -> gap -0.1281: not separable from these frames; spec usable False (no screen threshold: every read `other`, so nothing is unknown or an end, the begin included)
+3. The begin as its own still picture (B122's one-screen learner against the mid-match save and the end saves)
+  B137's corner as it is: own worst 0.0, nearest other picture 0.2736, gap 0.2736, threshold 0.1368 (separable); mask 360 px, 18840 px it shares with them left out
+  B137's corner black: own worst 0.0, nearest other picture 0.2651, gap 0.2651, threshold 0.1326 (separable); mask 347 px, 18853 px it shares with them left out
+4. Where each player's letters sit, how big; how the backgrounds differ (the letters learner, all four end saves)
+  places (x0, y0, x1, y1 at 640 x 480): {"1": [45, 81, 166, 113], "2": [469, 80, 590, 112]}; found in: {"1": ["end_P1_2", "end_P2", "end_P2_2"], "2": ["end_P1", "end_P2"]}
+  end_P1 P1 (---/WOW): glyphs 8x6 px at x 90-97, y 89-94, 8x6 px at x 102-109, y 88-93, 8x5 px at x 115-122, y 89-93
+  end_P1 P2 (---/WOW): glyphs 29x22 px at x 489-517, y 85-106, 19x22 px at x 521-539, y 84-105, 27x21 px at x 543-569, y 86-106
+  end_P1_2 P1 (---/WOW): glyphs 9x7 px at x 89-97, y 88-94, 9x6 px at x 102-110, y 88-93, 8x6 px at x 115-122, y 88-93
+  end_P1_2 P2 (---/WOW): glyphs 31x23 px at x 488-518, y 85-107, 19x22 px at x 521-539, y 84-105, 28x24 px at x 542-569, y 84-107
+  end_P2 P1 (WOW/W--): glyphs 28x22 px at x 64-91, y 86-107, 18x21 px at x 97-114, y 85-105, 28x22 px at x 118-145, y 86-107
+  end_P2 P2 (WOW/W--): glyphs 27x22 px at x 505-531, y 86-107, 8x4 px at x 537-544, y 94-97, 8x5 px at x 550-557, y 93-97
+  end_P2_2 P1 (WOW/W--): glyphs 28x22 px at x 64-91, y 86-107, 18x21 px at x 97-114, y 85-105, 28x22 px at x 118-145, y 86-107
+  end_P2_2 P2 (WOW/W--): glyphs 27x22 px at x 505-531, y 86-107, 8x4 px at x 537-544, y 94-97, 8x5 px at x 550-557, y 93-97
+  pixels the same (within 12 levels) in two end saves, whole picture / each corner's box:
+    end_P1 / end_P1_2: 0.318 / P1 0.075, P2 0.436
+    end_P1 / end_P2: 0.248 / P1 0.032, P2 0.043
+    end_P1 / end_P2_2: 0.320 / P1 0.032, P2 0.044
+    end_P1_2 / end_P2: 0.206 / P1 0.018, P2 0.024
+    end_P1_2 / end_P2_2: 0.194 / P1 0.018, P2 0.028
+    end_P2 / end_P2_2: 0.589 / P1 0.999, P2 0.690
+  synthetic training: {"held_out": 32, "trained": 64, "rounds": [{"round": 1, "trained": 64, "held_out": 32, "ratio": 5, "real_wrong": 0, "held_out_wrong": 0}], "every_held_out_read": true}; learn 1.96 s

@@ -72,6 +72,9 @@ B178 — a sidecar's `"result": "score"` with a version-4 spec of n sides (B178'
 final screen): at `ended` the numbers read, port by port, as the scores (the real numbers), `"winner"` the seat of the
 one side strictly ahead, null on a tie (the board's draw); a read without n whole numbers → given up; an unreadable
 screen is `unknown` as today. Without the key: today.
+B191 — a sidecar's `"result": "letters"` with a version-5 spec (each player's letters read in its corner; the player
+whose letters spell the word lost): listed as B158's winner entry (end_Pk: port k won). Any other shape: not listed.
+Without the key: today.
 B182 — a version-4 watch that sees the final screen K times with a number on it not read ends `unreadable`; the
 mini game is given up then (why: "the final screen was seen and a number on it was not read"), no scores, no winner —
 never the 900-s wait. Versions 2 / 3 never end so: today.
@@ -115,6 +118,7 @@ PLANNED_GRACE_S = 3.0       # the planned-switch window stays open this long aft
 # the onn's calls taken while a mini game is on (route → kind)
 PLACES_VERSION = 3          # B123: an end-screen spec with a place for every player (B122)
 SCORE_VERSION = 4           # B178: an end-screen spec with each side's number (B178)
+LETTERS_VERSION = 5         # B191: an end-screen spec reading each player's letters (the one who spelled the word lost)
 TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
          "stop": "end"}
 # B127
@@ -278,6 +282,7 @@ class PartyMinigames:
                 more = {"cheat": cheat} if cheat is not None else {}
                 if "result" in side:                                    # B158: winner-only (absent: today)
                     entry = (self._score_entry(spec, side, n) if side.get("result") == "score"     # B178
+                             else self._letters_entry(spec, side, n) if side.get("result") == "letters"   # B191
                              else self._winner_entry(spec, side, n))
                     record = self.p._find_game_by_id(game) if entry is not None else None
                     if entry is None or record is None:
@@ -366,6 +371,19 @@ class PartyMinigames:
         if spec.get("version") != SCORE_VERSION or int((spec.get("score") or {}).get("sides", 0)) != n:
             return None
         return {"players": n, "scores": None, "score_read": True, "start_class": spec["start_class"]}
+
+    @staticmethod
+    def _letters_entry(spec: dict, side: dict, n: int) -> dict | None:
+        """B191: `{"players": 2, "result": "letters"}` with a version-5 spec whose end classes are end_P1, end_P2
+        (end_Pk: port k won — the other player's letters spelled the word) -> B158's winner entry, else None (not
+        listed). Neither or both spelled, or a corner not read, never ends (no result)."""
+        if side.get("result") != "letters" or "scores" in side or "places_to_scores" in side or n != 2:
+            return None
+        ends = [f"end_P{k}" for k in range(1, n + 1)]
+        if spec.get("version") != LETTERS_VERSION or sorted(spec.get("end_classes") or []) != ends:
+            return None
+        return {"players": n, "scores": {c: [1 if j == k else 0 for j in range(n)] for k, c in enumerate(ends)},
+                "winner_of": {c: k + 1 for k, c in enumerate(ends)}, "start_class": spec["start_class"]}
 
     def listing(self) -> dict:
         entries = self._entries()
