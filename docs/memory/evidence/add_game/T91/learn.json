@@ -1,0 +1,145 @@
+{
+ "cells": [
+  {
+   "bar": true,
+   "cell": "spec usable",
+   "met": false,
+   "read": false
+  },
+  {
+   "bar": [],
+   "cell": "every class separable",
+   "met": true,
+   "read": []
+  },
+  {
+   "bar": ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))",
+   "cell": "margin_needed",
+   "met": true,
+   "read": 0.1564
+  },
+  {
+   "bar": 0,
+   "cell": "held-out frames read as another class",
+   "met": true,
+   "read": 0
+  },
+  {
+   "bar": "<= 0.105",
+   "cell": "held-out frames read unknown (share)",
+   "met": false,
+   "read": 1.0
+  },
+  {
+   "bar": 0,
+   "cell": "other read as a screen",
+   "met": true,
+   "read": 0
+  },
+  {
+   "bar": true,
+   "cell": "begin: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": "<= 8.0 s",
+   "cell": "begin: recognised within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "end_P1",
+   "cell": "end_P1: ended as itself",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P1: ended within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "end_P1",
+   "cell": "end_P1_2: ended as itself",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P1_2: ended within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "end_P2",
+   "cell": "end_P2: ended as itself",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2: ended within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "end_P2",
+   "cell": "end_P2_2: ended as itself",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2_2: ended within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": true,
+   "cell": "other: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": ">= 1.0 grey (64 x 48 grey, mean |difference| of the screens that stay; H7-V1: one state run twice, 391 of 400 frames under 1.0)",
+   "cell": "no two saves of one ending the same picture",
+   "met": true,
+   "read": []
+  },
+  {
+   "bar": "end_P1 within <= 2.0 s, never another",
+   "cell": "left out: end_P1",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "end_P1 within <= 2.0 s, never another",
+   "cell": "left out: end_P1_2",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "end_P2 within <= 2.0 s, never another",
+   "cell": "left out: end_P2",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "end_P2 within <= 2.0 s, never another",
+   "cell": "left out: end_P2_2",
+   "met": false,
+   "read": null
+  }
+ ],
+ "code": "T91",
+ "inputs": "1b913601e4a20734250ff21f25bf8ae4e1b74cde1c9b46f2ddbcca3ebc7c1ac3",
+ "recorded": {
+  "line": "One more save: end_P1_3 \u2014 the screen after a match player 1 won, from a match not saved yet (other characters or another stage than its saves kept); save it to a free slot, then register T91 \u2026 --collect end_P1_3=<slot> and learn T91 again.",
+  "one more save": "end_P1_3"
+ },
+ "schema": 1,
+ "stage": "learn",
+ "verdict": "FAIL"
+}
