@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture; B198 / B199 a score title's highest score, `--max-score`, and whether a match can end level). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
 
 # ADD-GAME — one title, by its code, through the tool's five stages
@@ -122,6 +122,20 @@ two at a time:
   unless the tool asks for one save's numbers. **Saves already kept under the code** (T90's six, taken under `winner`
   on 2026-11-20) stay: run `register <code> … --result score` with no `--collect` first and ask only for what its page
   names missing; then `label <code>`.
+  - **B199 — two more questions for `score`, once, right after "who wins is shown how" answers score (before any
+    save):** first, word for word: "YOU, now: what's the highest score one side will reach in a match at the settings
+    you play (for example 5)? I only need the digits up to that." — the number the user gives is passed as `register
+    <code> … --result score --max-score <N>` on every register run for the code (B198: learn then needs only the
+    digits 0..N can show; a final above N is given up at the hub, never read). No number, or "it can go high" → no
+    `--max-score` (every digit 0-9, as before). Then, word for word: "Can a match end level, or does it go to extra
+    time / penalties until someone wins?" Record both answers in your page in the user's words.
+  - **When a match can end level**, add to your next line to the user, word for word: "If a match ends level, the
+    hub reads both scores and the board counts it as a draw: nobody wins it, and each player gets half of the winner's
+    coins (5 by default) — a duel's draw pays nothing." (The board's rule as the PC side's note of 2026-11-20 sets it.)
+    When it always goes on until someone wins, say nothing more.
+  - **With `--max-score <N>`, tell the user once, word for word:** "The hub gives up a match only when a side ends
+    above <N>, so expect that about as often as your matches end above <N>. A match it gives up shows no winner, and
+    the board counts it as a draw."
 
 - **`letters` (B191), two players: the same saves as `winner`** — two wins for each player, each from a different
   match, saved on the screen after the match that shows each player's letters in its corner. `--word` is the word as
@@ -277,9 +291,10 @@ python3 tools/party_add_game.py close <code>                                    
     after the match that shows the final score, then tell me who won." (With only the final: "… try to end it with a
     <digit> in either side's final score ….") Then `register <code> … --collect end_P<the winner>_<n>=<slot>` (the role
     the line names for that winner), `label <code>`, read the new save's pictures, `label <code> <role>=…`, the last
-    look, `learn <code>`. **learn passes only when every digit 0-9 is learnt** (B181, B186): shown by two saves or more,
+    look, `learn <code>`. **learn passes only when every digit 0-9 is learnt** — with `--max-score <N>` (B198),
+    every digit a number 0..N can show; the line then names only those (B181, B186): shown by two saves or more,
     or by one save at least twice, each of its glyphs read back by that save's other glyphs (and the title's glyphs
-    drawn the same from match to match) — the hub can then read any final score. **With this line, say to the user how
+    drawn the same from match to match) — the hub can then read any final score (up to N). **With this line, say to the user how
     many digits are still short and that learn may ask for one more match after this one.** The tool's line ends "<n>
     digits are still short (<digits>); if one is still short after that match, learn asks for one more"; add to your
     line, word for word: "<n> numbers are still missing (<digits>); if one is still missing after this match, I may
@@ -326,6 +341,8 @@ cells in doubt, never a final alone, with the picture of that match (Cowork show
 digit no other save shows.
 - **Every digit 0-9 must be learnt** (B181, B186): shown by two saves or more, or several times by one save, so learn
   may ask for one more match showing the digits it names — and, if a digit is still short after it, one more.
+  **B198: with the highest score the user named (`--max-score <N>`), only the digits 0..N can show** (N = 5: 0-5);
+  the others are recorded as not expected, and a final above N is given up at the hub, never read.
 - **Overtime (B185):** a match that went to overtime counts like any other; the hub reads its final as any other.
 - **The least:** 6 saves, when the four end saves' line scores show every digit twice.
 - **A line score:** in practice 7-8.

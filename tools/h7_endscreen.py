@@ -1990,6 +1990,10 @@ def check_spec(spec: dict) -> None:
         raise ValueError("a version-3 spec names its places")
     if spec.get("version") == VERSION_SCORE and not isinstance(spec.get("score"), dict):     # B178
         raise ValueError("a version-4 spec names its scores")
+    if spec.get("version") == VERSION_SCORE and "max_score" in spec["score"]:                 # B198
+        m = spec["score"]["max_score"]
+        if isinstance(m, bool) or not isinstance(m, int) or m < 0:
+            raise ValueError("a version-4 spec's max_score is a whole number")
 
 
 def load_spec(json_path) -> tuple[dict, dict]:
@@ -2225,7 +2229,8 @@ class ReaderPlaces(Reader):
 
 class ReaderScore(ReaderPlaces):
     """B178: a version-4 spec — one screen per class (start, end, as version 3), each side's number on the end screen.
-    `end` only with every side's number read; else `unknown` (scores null). Never a digit by nearness alone."""
+    `end` only with every side's number read; else `unknown` (scores null). Never a digit by nearness alone. B198: a
+    spec with `score.max_score` reads a final above it as `unknown` with `end_unread` (and `above_max`)."""
 
     def __init__(self, spec: dict, arrays: dict, clock=time.monotonic):
         check_spec(spec)
@@ -2264,9 +2269,13 @@ class ReaderScore(ReaderPlaces):
                 return out
             sr = read_scores(score_picture(img, self.align), self.score, self.digit_refs)
             out.update(score_read=sr["read"], margin=sr["margin"])
+            top = self.score.get("max_score")
             if sr["scores"] is None:
                 out["class"] = UNKNOWN
                 out["end_unread"] = True                  # B182: the final screen, a number on it not read
+            elif top is not None and max(sr["scores"]) > int(top):
+                out["class"] = UNKNOWN                    # B198: a final above the title's highest score: never a
+                out.update(end_unread=True, above_max=True)   # result (given up by B182's rule)
             else:
                 out["scores"] = sr["scores"]
         return out

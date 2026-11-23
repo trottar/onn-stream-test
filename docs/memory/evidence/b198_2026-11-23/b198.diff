@@ -1,0 +1,592 @@
+diff --git a/docs/memory/handoffs/ADD_GAME_TASK.md b/docs/memory/handoffs/ADD_GAME_TASK.md
+index 4384dd2e..be14347d 100644
+--- a/docs/memory/handoffs/ADD_GAME_TASK.md
++++ b/docs/memory/handoffs/ADD_GAME_TASK.md
+@@ -1,7 +1,7 @@
+ ---
+ memory_schema: 1
+ as_of: 2026-11-20
+-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
++status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture; B198 / B199 a score title's highest score, `--max-score`, and whether a match can end level). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+ ---
+ 
+ # ADD-GAME — one title, by its code, through the tool's five stages
+@@ -122,6 +122,20 @@ two at a time:
+   unless the tool asks for one save's numbers. **Saves already kept under the code** (T90's six, taken under `winner`
+   on 2026-11-20) stay: run `register <code> … --result score` with no `--collect` first and ask only for what its page
+   names missing; then `label <code>`.
++  - **B199 — two more questions for `score`, once, right after "who wins is shown how" answers score (before any
++    save):** first, word for word: "YOU, now: what's the highest score one side will reach in a match at the settings
++    you play (for example 5)? I only need the digits up to that." — the number the user gives is passed as `register
++    <code> … --result score --max-score <N>` on every register run for the code (B198: learn then needs only the
++    digits 0..N can show; a final above N is given up at the hub, never read). No number, or "it can go high" → no
++    `--max-score` (every digit 0-9, as before). Then, word for word: "Can a match end level, or does it go to extra
++    time / penalties until someone wins?" Record both answers in your page in the user's words.
++  - **When a match can end level**, add to your next line to the user, word for word: "If a match ends level, the
++    hub reads both scores and the board counts it as a draw: nobody wins it, and each player gets half of the winner's
++    coins (5 by default) — a duel's draw pays nothing." (The board's rule as the PC side's note of 2026-11-20 sets it.)
++    When it always goes on until someone wins, say nothing more.
++  - **With `--max-score <N>`, tell the user once, word for word:** "The hub gives up a match only when a side ends
++    above <N>, so expect that about as often as your matches end above <N>. A match it gives up shows no winner, and
++    the board counts it as a draw."
+ 
+ - **`letters` (B191), two players: the same saves as `winner`** — two wins for each player, each from a different
+   match, saved on the screen after the match that shows each player's letters in its corner. `--word` is the word as
+@@ -277,9 +291,10 @@ python3 tools/party_add_game.py close <code>
+     after the match that shows the final score, then tell me who won." (With only the final: "… try to end it with a
+     <digit> in either side's final score ….") Then `register <code> … --collect end_P<the winner>_<n>=<slot>` (the role
+     the line names for that winner), `label <code>`, read the new save's pictures, `label <code> <role>=…`, the last
+-    look, `learn <code>`. **learn passes only when every digit 0-9 is learnt** (B181, B186): shown by two saves or more,
++    look, `learn <code>`. **learn passes only when every digit 0-9 is learnt** — with `--max-score <N>` (B198),
++    every digit a number 0..N can show; the line then names only those (B181, B186): shown by two saves or more,
+     or by one save at least twice, each of its glyphs read back by that save's other glyphs (and the title's glyphs
+-    drawn the same from match to match) — the hub can then read any final score. **With this line, say to the user how
++    drawn the same from match to match) — the hub can then read any final score (up to N). **With this line, say to the user how
+     many digits are still short and that learn may ask for one more match after this one.** The tool's line ends "<n>
+     digits are still short (<digits>); if one is still short after that match, learn asks for one more"; add to your
+     line, word for word: "<n> numbers are still missing (<digits>); if one is still missing after this match, I may
+@@ -326,6 +341,8 @@ cells in doubt, never a final alone, with the picture of that match (Cowork show
+ digit no other save shows.
+ - **Every digit 0-9 must be learnt** (B181, B186): shown by two saves or more, or several times by one save, so learn
+   may ask for one more match showing the digits it names — and, if a digit is still short after it, one more.
++  **B198: with the highest score the user named (`--max-score <N>`), only the digits 0..N can show** (N = 5: 0-5);
++  the others are recorded as not expected, and a final above N is given up at the hub, never read.
+ - **Overtime (B185):** a match that went to overtime counts like any other; the hub reads its final as any other.
+ - **The least:** 6 saves, when the four end saves' line scores show every digit twice.
+ - **A line score:** in practice 7-8.
+diff --git a/tools/h7_endscreen.py b/tools/h7_endscreen.py
+index ab8a7821..0c2feb3a 100644
+--- a/tools/h7_endscreen.py
++++ b/tools/h7_endscreen.py
+@@ -1990,6 +1990,10 @@ def check_spec(spec: dict) -> None:
+         raise ValueError("a version-3 spec names its places")
+     if spec.get("version") == VERSION_SCORE and not isinstance(spec.get("score"), dict):     # B178
+         raise ValueError("a version-4 spec names its scores")
++    if spec.get("version") == VERSION_SCORE and "max_score" in spec["score"]:                 # B198
++        m = spec["score"]["max_score"]
++        if isinstance(m, bool) or not isinstance(m, int) or m < 0:
++            raise ValueError("a version-4 spec's max_score is a whole number")
+ 
+ 
+ def load_spec(json_path) -> tuple[dict, dict]:
+@@ -2225,7 +2229,8 @@ class ReaderPlaces(Reader):
+ 
+ class ReaderScore(ReaderPlaces):
+     """B178: a version-4 spec — one screen per class (start, end, as version 3), each side's number on the end screen.
+-    `end` only with every side's number read; else `unknown` (scores null). Never a digit by nearness alone."""
++    `end` only with every side's number read; else `unknown` (scores null). Never a digit by nearness alone. B198: a
++    spec with `score.max_score` reads a final above it as `unknown` with `end_unread` (and `above_max`)."""
+ 
+     def __init__(self, spec: dict, arrays: dict, clock=time.monotonic):
+         check_spec(spec)
+@@ -2264,9 +2269,13 @@ class ReaderScore(ReaderPlaces):
+                 return out
+             sr = read_scores(score_picture(img, self.align), self.score, self.digit_refs)
+             out.update(score_read=sr["read"], margin=sr["margin"])
++            top = self.score.get("max_score")
+             if sr["scores"] is None:
+                 out["class"] = UNKNOWN
+                 out["end_unread"] = True                  # B182: the final screen, a number on it not read
++            elif top is not None and max(sr["scores"]) > int(top):
++                out["class"] = UNKNOWN                    # B198: a final above the title's highest score: never a
++                out.update(end_unread=True, above_max=True)   # result (given up by B182's rule)
+             else:
+                 out["scores"] = sr["scores"]
+         return out
+diff --git a/tools/party_add_game.py b/tools/party_add_game.py
+index 841f6fa6..c543655d 100644
+--- a/tools/party_add_game.py
++++ b/tools/party_add_game.py
+@@ -3,6 +3,7 @@
+ 
+     python3 tools/party_add_game.py register <code> --players N --system ps1|n64|snes
+                                              --result winner|places|score|letters [--word <the word>]
++                                             [--max-score N]  (B198: a score title's highest final one side reaches)
+                                              (--find <words> | --rules-players N) [--setup none|slot1]
+                                              [--collect role=slot ...] [--check]
+     python3 tools/party_add_game.py label <code> [<role>=<P1>-<P2>,<P1>-<P2> ...] [<role>=<P1>-<P2>,user]
+@@ -42,6 +43,11 @@ and the title's own digits (h7_endscreen's spec version 4), reads every save wit
+ for a save showing a digit the others do not. The sidecar `{"players": n, "result": "score"}`; the hub passes the real
+ numbers, the winner the side ahead, a tie a draw.
+ 
++B198: `--max-score N` (score only, kept in the binding) — the highest final one side reaches at the user's settings.
++learn's every-digit cell then needs only the digits a number 0..N can show (finals and line-score cells, each learnt
++as today); the others are recorded "not expected", never a cell; its line names only expected digits. The spec carries
++N: at the hub a final above N is unknown (`end_unread`), given up by B182's rule, never a guess. Without it: today.
++
+ B191 / B192: `--result letters --word <the word>` — a title whose match is lost by the player whose letters (one per
+ miss, in that player's corner) spell the word; the other player won. Two players only (four: refused, the line says
+ why). The label stage as the score kind's: the session reads each player's corner on two pictures of every end save;
+@@ -324,7 +330,8 @@ def kept_states(code: str) -> dict[str, str]:
+ def register_inputs(b: dict, kept: dict) -> str:
+     return digest({"code": b["code"], "players": b["players"], "system": b["system"], "result": b["result"],
+                    "setup": bool(b.get("cheat")), "kept": kept, "game": hashlib.sha256(b["game"].encode()).hexdigest(),
+-                   **({"word": b.get("word")} if b["result"] == "letters" else {})})     # B191
++                   **({"word": b.get("word")} if b["result"] == "letters" else {}),      # B191
++                   **({"max_score": b["max_score"]} if b.get("max_score") is not None else {})})   # B198: only when given
+ 
+ 
+ # --- register ------------------------------------------------------------------------------------------------------------
+@@ -435,6 +442,9 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+         raise Usage("--word is for --result letters")
+     if result == "letters" and not word:
+         raise Usage("--result letters needs --word <the word>")
++    max_score = a.get("max_score")                            # B198: a score title's highest final, one side
++    if max_score is not None and result != "score":
++        raise Usage("--max-score is for --result score")
+     if a.get("rules_players"):                              # a title already in the rules folder (T88 / T89)
+         n = int(a["rules_players"])
+         sides = [p for p in sorted(rules_folder().glob("*.party.json"))
+@@ -460,6 +470,11 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
+     cells.add("players", players, "2 or 4 (the board has no three-player hub game)", players in (2, 4))
+     cells.add("result kind", result, ["winner", "places", "score", "letters"],
+               result in ("winner", "places", "score", "letters"))
++    if max_score is not None:                                # B198
++        ok = bool(re.match(r"^[0-9]{1,4}$", str(max_score))) and 1 <= int(max_score) <= 9999
++        cells.add("the highest score one side reaches (--max-score)", str(max_score), "a whole number 1-9999", ok)
++        if ok:
++            b["max_score"] = int(max_score)
+     if result == "letters":                                   # B191
+         b["word"] = word
+         cells.add("the word", word, "2-12 letters A-Z", bool(re.match(r"^[A-Z]{2,12}$", word)))
+@@ -1754,6 +1769,22 @@ def cmd_label(code: str, a: dict) -> int:
+ 
+ 
+ # --- B178: learn for a `score` title ------------------------------------------------------------------------------------
++def expected_digits(b: dict) -> list[str]:
++    """B198: the digits a number 0..N can show (N the binding's `max_score`); without it every digit 0-9 (today)."""
++    n = b.get("max_score")
++    if n is None:
++        return list("0123456789")
++    return sorted({c for k in range(int(n) + 1) for c in str(k)})
++
++
++def _every_digit_cell(b: dict) -> str:
++    """learn's every-digit cell: today's name without `--max-score`; B198's with it."""
++    if b.get("max_score") is None:
++        return "every digit 0-9 read by a reader learnt without each save that shows it"
++    return (f"every digit that can occur up to {int(b['max_score'])} ({', '.join(expected_digits(b))}) read by a reader "
++            "learnt without each save that shows it")
++
++
+ def _score_spec_cells(cells: Cells, spec: dict) -> None:
+     sc = spec.get("score") or {}
+     cells.add("spec usable", bool(spec.get("usable")), True, bool(spec.get("usable")))
+@@ -1775,11 +1806,14 @@ def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
+     r = rules_folder()
+     spec_path = r / f"{b['game']}.endscreen.json"
+     made = b.get("learnt") or {}
+-    key = digest({"kept": kept, "labels": readings(code)})
++    key = digest({"kept": kept, "labels": readings(code),
++                  **({"max_score": b["max_score"]} if b.get("max_score") is not None else {})})   # B198: only when given
+     if made.get("from") == key and spec_path.is_file() and sha(spec_path) == made.get("spec"):
+         spec, arrays = es.load_spec(spec_path)
+     else:
+         spec, arrays, _rep = es.learn(pics, pics / "labels.json", "first", name=b["game"])
++        if b.get("max_score") is not None and isinstance(spec.get("score"), dict):
++            spec["score"]["max_score"] = int(b["max_score"])  # B198: the hub gives up a final above it
+     _score_spec_cells(cells, spec)
+     sc = es.score_scores(pics, pics / "labels.json", spec, arrays, "second")
+     held = {c: row for c, row in sc["rows"].items() if c != "other"}
+@@ -1857,19 +1891,27 @@ def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
+                 only[role] = here
+     learnt = sorted(k[-1] for k in (spec.get("score") or {}).get("keys") or [])
+     shows = {d: sum(1 for t in texts.values() if d in _digits_of(t)) for d in "0123456789"}
+-    few = [d for d in "0123456789" if shows[d] < 2 and d not in from_one]
++    expected = expected_digits(b)                             # B198: only the digits 0..N can show (0-9 without it)
++    few = [d for d in expected if shows[d] < 2 and d not in from_one]
+     read_ = {"shown by fewer than two saves": few}
++    if b.get("max_score") is not None:
++        read_["not expected (above the highest score)"] = [d for d in "0123456789" if d not in expected]
+     if one["digits"]:                                        # B186: what one save alone showed, and the spread
+         read_["learnt from one save"] = {d: f"{v['glyphs']} glyphs in {v['save']}, {v['read back']} read back"
+                                          + ("" if v["learnt"] else " — not learnt") for d, v in one["digits"].items()}
+         read_["across-save spread"] = one["spread"]
+-    cells.add("every digit 0-9 read by a reader learnt without each save that shows it",
+-              read_, {"shown by fewer than two saves": []}, not few)   # B181 / B186
++    cells.add(_every_digit_cell(b), read_, {"shown by fewer than two saves": []}, not few)   # B181 / B186 / B198
+     recorded = {"digits": {"in two saves or more": [d for d in "0123456789" if shows[d] >= 2],
+                            "in one save": [d for d in "0123456789" if shows[d] == 1],
+                            "learnt from one save": sorted(from_one),
+                            "never": [d for d in "0123456789" if shows[d] == 0]},
+                 "digits learnt": learnt}
++    if b.get("max_score") is not None:                       # B198: recorded, never a cell
++        recorded["digits"]["expected"] = expected
++        recorded["digits"]["not expected"] = [d for d in "0123456789" if d not in expected]
++        above = sorted(r_ for r_, t_ in texts.items() if any(x > int(b["max_score"]) for x in _all_numbers(t_)))
++        if above:
++            recorded["above the highest score"] = above
+     if shown_here:
+         recorded["shown only here"] = shown_here
+     inputs = learn_inputs(code, b)
+@@ -1907,6 +1949,7 @@ def _score_line(b: dict, cells: Cells, kept, only: dict, group: dict, pairs: lis
+         line = f"{a_} and {b_} look like the same match saved twice: save {b_} again from another match."
+         return line, {"same match twice": [a_, b_], "line": line}
+     digits = sorted(set(few or []) | set().union(*[set(v) for v in only.values()] or [set()]))
++    digits = [d for d in digits if d in expected_digits(b)]  # B198: only digits that can occur
+     if digits:
+         endings = [f"end_P{k}" for k in range(1, b["players"] + 1)]
+         roles = [x for x in (next_role(e, kept) for e in endings) if x]
+@@ -3324,7 +3367,7 @@ def parse(argv: list[str]) -> tuple[str, str, dict]:
+             i += 1
+             continue
+         if k in ("--players", "--system", "--result", "--find", "--rules-players", "--setup", "--collect", "--winner",
+-                 "--word") \
++                 "--word", "--max-score") \
+                 and i + 1 < len(rest):
+             key = k[2:].replace("-", "_")
+             if key == "collect":
+diff --git a/tests/b198_max_score/low_capture.py b/tests/b198_max_score/low_capture.py
+new file mode 100644
+index 00000000..444bbc54
+--- /dev/null
++++ b/tests/b198_max_score/low_capture.py
+@@ -0,0 +1,72 @@
++"""B198's tests: a made-up low-scoring title's final screen (no title; every picture made-up). The add-a-game tool's
++picture source for it (PARTY_ADD_GAME_CAPTURE=low_capture:capture). A made-up kept state is JSON:
++
++  {"kind": "end_low", "s": [P1's final, P2's final], "look": m}
++        the final screen: a heading of six blocks and each side's name as four blocks (strings of several glyphs);
++        eight emblems whose place, size and grey change by match (`look`); each side's final large (B178's 5 x 7
++        font x4) on the plain background, P1 left, P2 right. Held, then a loading screen, then the game moves on
++        (score_capture's timing).
++  begin / other / ...  as score_capture.
++
++Disclosed (the record): no fixed single shape but the two numbers. On B178's own made-up final screen (a dark panel
++under each number, fixed emblems) single-digit finals are not found: B178's place choice takes a fixed single shape
++(a panel) — every reading fits it, and it is the tallest. That is B178's limit, not B198's; T92 may meet it."""
++from __future__ import annotations
++
++import json
++import sys
++from pathlib import Path
++
++import numpy as np
++from PIL import Image, ImageDraw
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "b178_score_kind"))
++import score_capture as sc  # noqa: E402
++
++W, H = sc.W, sc.H
++FINAL_X = (200, 440)
++TOP = 260
++
++
++def low_screen(s, look: int, rng) -> Image.Image:
++    im = Image.fromarray(sc.BACK.copy(), "L")
++    d = ImageDraw.Draw(im)
++    for i in range(6):                                                  # the heading: six blocks, one string
++        d.rectangle((150 + 58 * i, 20, 194 + 58 * i, 50), fill=210)
++    for cx in FINAL_X:                                                  # the sides' names: four blocks each
++        for i in range(4):
++            d.rectangle((cx - 64 + 34 * i, 200, cx - 42 + 34 * i, 214), fill=170)
++    m = np.random.default_rng(9800 + look)
++    for _k in range(4):                                                 # the emblems: place and size by match
++        x, y, r = int(m.integers(10, 480)), int(m.integers(64, 150)), int(m.integers(30, 75))
++        d.ellipse((x, y, x + 2 * r, y + min(r, 45)), fill=int(m.integers(20, 240)))
++        x, y = int(m.integers(10, 560)), int(m.integers(330, 400))      # and below the numbers
++        d.rectangle((x, y, x + int(m.integers(30, 80)), y + int(m.integers(20, 60))), fill=int(m.integers(20, 240)))
++    for cx, v in zip(FINAL_X, s):
++        sc.number(d, cx, TOP, str(int(v)))
++    a = np.asarray(im, dtype=np.int16) + rng.integers(-2, 3, size=(H, W))
++    return Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), "L")
++
++
++def picture(st: dict, t: float, k: int, rng) -> Image.Image:
++    if st["kind"] == "end_low":
++        if t >= sc.HOLD_S + sc.LOADING_S:
++            return sc.other_screen(k, rng)
++        if t >= sc.HOLD_S:
++            return sc.loading_screen(rng)
++        return low_screen(st["s"], st.get("look", 0), rng)
++    return sc.picture(st, t, k, rng)
++
++
++def capture(state_path, binding, out_dir, seconds, every):
++    st = json.loads(Path(state_path).read_text())
++    rng = np.random.default_rng(198 + 7 * int(st.get("look", 0)) + 101 * int(st.get("n", 0)) + len(st["kind"]))
++    rows = []
++    for k in range(int(seconds / every) + 1):
++        if k % 2:
++            continue
++        t = round(k * every, 2)
++        name = f"f{k:04d}.png"
++        picture(st, t, k, rng).save(Path(out_dir) / name)
++        rows.append((t, name))
++    return rows
+diff --git a/tests/b198_max_score/test_b198.py b/tests/b198_max_score/test_b198.py
+new file mode 100644
+index 00000000..68bc7e97
+--- /dev/null
++++ b/tests/b198_max_score/test_b198.py
+@@ -0,0 +1,270 @@
++#!/usr/bin/env python3
++"""B198 (host): `register --max-score N` for a `score` title whose scores stay low. Every picture made-up
++(`low_capture.py`; B181's `line_capture.py` for `Limit`); no title, nothing read from the hub's own folders.
++
++- `Low`: a made-up low-scoring title (`low_capture.py`: its finals only, large) — five end saves (B171: a third save of
++  P1's ending), finals 0-4, each of 0-4 shown by two saves, none of 5-9:
++  - `--max-score 4` -> label and learn PASS; the every-digit cell names 0-4; 5-9 recorded "not expected";
++  - `--max-score 5` -> learn FAIL on the every-digit cell alone, its line naming only 5 (never 6-9); two more saves
++    showing a 5 -> PASS, 6-9 never shown;
++  - no flag -> today: FAIL on today's cell, naming 5-9.
++  (The queue's "finals 0-4, --max-score 5, passes" cannot pass under its own rule: 5 can occur from 0 to 5 and no save
++  shows it — disclosed in the record.)
++- `Hub`: the spec learnt with N: a final of 7 (a digit never learnt) -> `unknown` with `end_unread`, never `end`,
++  never any number; a final above N with every digit learnt -> the same (`above_max`); a final within N -> `end` with
++  the numbers. Through B182's watch (`companion/h7_minigame.py`'s `_run`, its picture and its game stubbed): the final
++  of 7 -> `unreadable`, one `final_unreadable` row, no scores.
++- `Register`: `--max-score` only with `--result score`; its cell; kept in the binding; the inputs digest today's
++  without it.
++- `Limit` (B178's, disclosed — not B198's): a line score whose finals and cells are all single digits (B181's
++  `line_capture`) -> label FAIL "the numbers at one place in every save": the final's place not told from a cell
++  column's. Never a PASS, never a guess.
++Temp dirs removed.
++
++    python3 -m unittest discover -s tests/b198_max_score -v
++"""
++from __future__ import annotations
++
++import json
++import os
++import shutil
++import sys
++import tempfile
++import threading
++import time
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path[:0] = [str(ROOT / "tools"), str(HERE), str(ROOT / "tests" / "b181_every_digit"),
++                str(ROOT / "tests" / "b178_score_kind")]
++import low_capture as lo  # noqa: E402
++import test_b181 as b181  # noqa: E402  (its Made: the tool, the made-up saves, the label stage as the session gives it)
++
++_ = None
++LOW = {"begin": {"kind": "begin"}, "other": {"kind": "other"},
++       "end_P1": {"kind": "end_low", "s": [1, 0], "look": 1}, "end_P1_2": {"kind": "end_low", "s": [3, 2], "look": 2},
++       "end_P1_3": {"kind": "end_low", "s": [4, 1], "look": 3}, "end_P2": {"kind": "end_low", "s": [0, 4], "look": 4},
++       "end_P2_2": {"kind": "end_low", "s": [2, 3], "look": 5}}
++FIVES = {"end_P1_4": {"kind": "end_low", "s": [5, 2], "look": 6}, "end_P2_3": {"kind": "end_low", "s": [3, 5], "look": 7}}
++LINE_LOW = {"begin": {"kind": "begin"}, "other": {"kind": "other"},     # B178's limit: single digits everywhere
++            "end_P1": {"kind": "end_line", "q": [[1, 0, 2, 1, _, _], [0, 1, 0, 0, _, _]], "s": [4, 1], "look": 1},
++            "end_P1_2": {"kind": "end_line", "q": [[0, 3, 0, 0, _, _], [0, 0, 0, 0, _, _]], "s": [3, 0], "look": 2},
++            "end_P2": {"kind": "end_line", "q": [[0, 0, 1, 0, _, _], [1, 1, 0, 1, _, _]], "s": [1, 3], "look": 3},
++            "end_P2_2": {"kind": "end_line", "q": [[2, 0, 0, 0, _, _], [0, 4, 0, 0, _, _]], "s": [2, 4], "look": 4}}
++TODAY_CELL = "every digit 0-9 read by a reader learnt without each save that shows it"
++
++
++def cell(n: int, digits: str) -> str:
++    return f"every digit that can occur up to {n} ({', '.join(digits)}) read by a reader learnt without each save that shows it"
++
++
++class Made(b181.Made):
++    @classmethod
++    def setUpClass(cls):
++        super().setUpClass()
++        os.environ["PARTY_ADD_GAME_CAPTURE"] = "low_capture:capture"     # restored by B181's tearDownClass
++
++    def put_max(self, code: str, saves: dict, max_score: int | None) -> None:
++        """B181's made-up saves; the binding as register writes it with --max-score N (and its inputs digest)."""
++        self.put(code, saves)
++        pag = self.pag
++        bp = pag.binding_path(code)
++        b = json.loads(bp.read_text())
++        if max_score is None:
++            b.pop("max_score", None)
++        else:
++            b["max_score"] = max_score
++        b["register_inputs"] = pag.register_inputs(b, pag.kept_states(code))
++        bp.write_text(json.dumps(b))
++        pag.verdict_path(code, "register").write_text(json.dumps({"verdict": "PASS", "inputs": b["register_inputs"]}))
++
++    def learnt(self, code: str, saves: dict, max_score: int | None) -> tuple[int, str, dict]:
++        self.put_max(code, saves, max_score)
++        rc, out = self.label_all(code, saves)
++        self.assertEqual(rc, 0, out + json.dumps(self.verdict(code, "label")["bad"]))
++        rc, out = self.tool("learn", code)
++        return rc, out, self.verdict(code, "learn")
++
++
++class Low(Made):
++    def test_1_max_4_passes_without_5_to_9(self):
++        rc, out, v = self.learnt("T81", LOW, 4)
++        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
++        self.assertEqual(v["cells"][cell(4, "01234")], {"shown by fewer than two saves": [],
++                                                       "not expected (above the highest score)": list("56789")})
++        d = v["recorded"]["digits"]
++        self.assertEqual((d["expected"], d["not expected"], d["never"]), (list("01234"), list("56789"), list("56789")))
++        spec = json.loads((Path(os.environ["PRIVYHUB_H7_RULES"]) / "madeupt81.endscreen.json").read_text())
++        self.assertEqual(spec["score"]["max_score"], 4)
++        self.assertNotIn(TODAY_CELL, v["cells"])
++
++    def test_2_max_5_asks_only_for_5_then_passes(self):
++        rc, out, v = self.learnt("T82", LOW, 5)
++        self.assertEqual(rc, 1, out)
++        self.assertEqual(v["bad"], [cell(5, "012345")])
++        self.assertEqual(v["cells"][cell(5, "012345")]["shown by fewer than two saves"], ["5"])
++        self.assertIn("whose final score shows 5 (either side's number)", out)
++        for d in "6789":                                       # the line names only expected digits
++            self.assertNotIn(d, out.split("whose final score shows ", 1)[1].split(";", 1)[0])
++        self.assertIn("1 digit is still short (5)", out)
++        self.put_max("T82", FIVES, 5)
++        rc, out = self.tool("label", "T82", *[f"{r}={b181.text(st)},{b181.text(st)}" for r, st in sorted(FIVES.items())])
++        if rc == 1 and "Look at label/digits.png" in out:
++            rc, out = self.tool("label", "T82", "look=all")
++        self.assertEqual(rc, 0, out)
++        rc, out = self.tool("learn", "T82")
++        v = self.verdict("T82", "learn")
++        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
++        self.assertEqual(v["recorded"]["digits"]["never"], list("6789"))
++
++    def test_3_no_flag_is_today(self):
++        rc, out, v = self.learnt("T83", LOW, None)
++        self.assertEqual(rc, 1, out)
++        self.assertEqual(v["bad"], [TODAY_CELL])
++        self.assertEqual(v["cells"][TODAY_CELL], {"shown by fewer than two saves": list("56789")})
++        self.assertNotIn("expected", v["recorded"]["digits"])
++        self.assertIn("whose final score shows 5, 6, 7, 8 or 9", out)
++
++
++class Hub(Made):
++    @classmethod
++    def setUpClass(cls):
++        super().setUpClass()
++        t = cls("run")
++        try:
++            rc, out, v = t.learnt("T84", {**LOW, **FIVES}, 5)
++            assert rc == 0, out + json.dumps(v["bad"])
++        except BaseException:
++            cls.tearDownClass()                              # its temp dir removed even when the set-up fails
++            raise
++        import h7_endscreen as es
++        cls.es = es
++        cls.spec, cls.arrays = es.load_spec(Path(os.environ["PRIVYHUB_H7_RULES"]) / "madeupt84.endscreen.json")
++
++    def reads(self, s, spec=None, n: int = 6) -> list[dict]:
++        import numpy as np
++        rng = np.random.default_rng(198)
++        reader = self.es.Reader(spec or self.spec, self.arrays, clock=lambda: 0.0)
++        return [reader.read(lo.low_screen(s, 9, rng), now=float(k)) for k in range(n)]
++
++    def ended(self, reads: list[dict], spec=None):
++        e = self.es.Ended(spec or self.spec)
++        e.start_loaded()
++        for r in reads:
++            e.feed(r["class"], r.get("scores"))
++        return e
++
++    def test_1_a_final_of_7_never_read(self):
++        self.assertEqual(self.spec["score"]["max_score"], 5)
++        rs = self.reads([7, 1])
++        self.assertEqual({r["class"] for r in rs}, {"unknown"}, rs)
++        self.assertTrue(all(r.get("end_unread") for r in rs))
++        self.assertEqual({r.get("scores") for r in rs}, {None})
++        e = self.ended(rs)
++        self.assertEqual((e.ended, e.scores), (None, None))
++
++    def test_2_within_n_read(self):
++        rs = self.reads([5, 1])
++        e = self.ended(rs)
++        self.assertEqual((e.ended, e.scores), ("end", [5, 1]))
++
++    def test_3_above_n_with_every_digit_learnt_given_up(self):
++        spec4 = json.loads(json.dumps(self.spec))
++        spec4["score"]["max_score"] = 4                        # the same spec, its N one lower: 5 is above it
++        rs = self.reads([5, 1], spec4)
++        self.assertEqual({r["class"] for r in rs}, {"unknown"}, rs)
++        self.assertTrue(all(r.get("end_unread") and r.get("above_max") for r in rs))
++        self.assertEqual(self.ended(rs, spec4).ended, None)
++        rs = self.reads([10, 0])                                 # a two-digit final above 5
++        self.assertEqual({r["class"] for r in rs}, {"unknown"}, rs)
++        self.assertTrue(all(r.get("end_unread") for r in rs))
++
++    def test_4_the_watch_gives_up(self):
++        """B182's watch on the reads of a final of 7: `unreadable`, one `final_unreadable` row, no scores."""
++        sys.path.insert(0, str(ROOT / "companion"))
++        import numpy as np
++        import h7_minigame as hm
++        log = self.tmp / "watch" / "h7.jsonl"
++        mg = hm.MiniGame(None, None, lambda rel: log, environ={}, clock=time.monotonic)
++        mg.read_every = 0.01
++        rng = np.random.default_rng(7)
++
++        class Live:
++            def _running(self):
++                return "madeupt84", "ps1", "x"
++
++        class Pic:
++            def grab(self):
++                return lo.low_screen([7, 1], 9, rng).convert("RGB")
++
++        mg._live, mg.picture = Live(), Pic()
++        token = object()
++        reader, ended = self.es.Reader(self.spec, self.arrays), self.es.Ended(self.spec)
++        ended.start_loaded()
++        mg._watch = {"state": "watching", "game": "madeupt84", "class": None, "seen_start": True, "recognised": True,
++                     "reads": 0, "last": None, "loaded": True, "picture_failures": 0, "keep": None,
++                     "t0": time.monotonic(), "token": token, "_keep_dir": None, "_recognise_s": 30.0}
++        th = threading.Thread(target=mg._run, args=(token, "madeupt84", reader, ended, self.spec), daemon=True)
++        th.start()
++        th.join(60)
++        self.assertFalse(th.is_alive())
++        w = mg._watch
++        self.assertEqual(w["state"], "unreadable", w)
++        self.assertNotIn("scores", w)
++        rows = [json.loads(x) for x in log.read_text().splitlines()]
++        self.assertEqual([r["step"] for r in rows if r["step"] in ("final_unreadable", "ended")], ["final_unreadable"])
++
++
++class Register(Made):
++    def setUp(self):
++        r = Path(os.environ["PRIVYHUB_H7_RULES"])
++        (r / "madeupreg.party.json").write_text(json.dumps({"players": 2, "result": "score"}))
++        Path(os.environ["PRIVYHUB_ADD_GAME_DROPINS"]).mkdir(parents=True, exist_ok=True)
++
++    def reg(self, code: str, *more) -> tuple[int, str]:
++        return self.tool("register", code, "--players", 2, "--system", "ps1", "--rules-players", 2, *more)
++
++    def test_1_only_with_score(self):
++        import contextlib
++        import io
++        with contextlib.redirect_stderr(io.StringIO()):
++            rc, _out = self.reg("T85", "--result", "winner", "--max-score", 5)
++        self.assertEqual(rc, 2)
++
++    def test_2_kept_in_the_binding_and_the_inputs(self):
++        self.reg("T86", "--result", "score", "--max-score", 5)
++        b = json.loads(self.pag.binding_path("T86").read_text())
++        v = self.verdict("T86", "register")
++        self.assertEqual(v["cells"]["the highest score one side reaches (--max-score)"], "5")
++        self.assertEqual(b["max_score"], 5)
++        self.reg("T86", "--result", "score")                  # again without it: dropped, the digest today's
++        b2 = json.loads(self.pag.binding_path("T86").read_text())
++        self.assertNotIn("max_score", b2)
++        self.assertNotEqual(b["register_inputs"], b2["register_inputs"])
++        self.assertNotIn("the highest score one side reaches (--max-score)", self.verdict("T86", "register")["cells"])
++        today = self.pag.digest({"code": b2["code"], "players": b2["players"], "system": b2["system"],
++                                 "result": b2["result"], "setup": bool(b2.get("cheat")), "kept": {},
++                                 "game": __import__("hashlib").sha256(b2["game"].encode()).hexdigest()})
++        self.assertEqual(b2["register_inputs"], today)
++
++    def test_3_not_a_whole_number(self):
++        self.reg("T87", "--result", "score", "--max-score", "five")
++        v = self.verdict("T87", "register")
++        self.assertIn("the highest score one side reaches (--max-score)", v["bad"])
++        self.assertNotIn("max_score", json.loads(self.pag.binding_path("T87").read_text()))
++
++
++class Limit(b181.Made):
++    def test_single_digits_in_a_line_score_not_placed(self):
++        """B178's place choice (disclosed, not changed here): finals and cells all single digits -> the final's place
++        not told from a cell column's; label FAIL on the place cell, never a PASS."""
++        self.put("T79", LINE_LOW)
++        rc, out = self.label_all("T79", LINE_LOW)
++        self.assertEqual(rc, 1, out)
++        self.assertIn("the numbers at one place in every save", self.verdict("T79", "label")["bad"])
++
++
++if __name__ == "__main__":
++    unittest.main()

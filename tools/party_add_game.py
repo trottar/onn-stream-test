@@ -3,6 +3,7 @@
 
     python3 tools/party_add_game.py register <code> --players N --system ps1|n64|snes
                                              --result winner|places|score|letters [--word <the word>]
+                                             [--max-score N]  (B198: a score title's highest final one side reaches)
                                              (--find <words> | --rules-players N) [--setup none|slot1]
                                              [--collect role=slot ...] [--check]
     python3 tools/party_add_game.py label <code> [<role>=<P1>-<P2>,<P1>-<P2> ...] [<role>=<P1>-<P2>,user]
@@ -41,6 +42,11 @@ names a save to read again, or, the second time, asks for the user's numbers. le
 and the title's own digits (h7_endscreen's spec version 4), reads every save with a spec learnt without it, and asks
 for a save showing a digit the others do not. The sidecar `{"players": n, "result": "score"}`; the hub passes the real
 numbers, the winner the side ahead, a tie a draw.
+
+B198: `--max-score N` (score only, kept in the binding) — the highest final one side reaches at the user's settings.
+learn's every-digit cell then needs only the digits a number 0..N can show (finals and line-score cells, each learnt
+as today); the others are recorded "not expected", never a cell; its line names only expected digits. The spec carries
+N: at the hub a final above N is unknown (`end_unread`), given up by B182's rule, never a guess. Without it: today.
 
 B191 / B192: `--result letters --word <the word>` — a title whose match is lost by the player whose letters (one per
 miss, in that player's corner) spell the word; the other player won. Two players only (four: refused, the line says
@@ -324,7 +330,8 @@ def kept_states(code: str) -> dict[str, str]:
 def register_inputs(b: dict, kept: dict) -> str:
     return digest({"code": b["code"], "players": b["players"], "system": b["system"], "result": b["result"],
                    "setup": bool(b.get("cheat")), "kept": kept, "game": hashlib.sha256(b["game"].encode()).hexdigest(),
-                   **({"word": b.get("word")} if b["result"] == "letters" else {})})     # B191
+                   **({"word": b.get("word")} if b["result"] == "letters" else {}),      # B191
+                   **({"max_score": b["max_score"]} if b.get("max_score") is not None else {})})   # B198: only when given
 
 
 # --- register ------------------------------------------------------------------------------------------------------------
@@ -435,6 +442,9 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
         raise Usage("--word is for --result letters")
     if result == "letters" and not word:
         raise Usage("--result letters needs --word <the word>")
+    max_score = a.get("max_score")                            # B198: a score title's highest final, one side
+    if max_score is not None and result != "score":
+        raise Usage("--max-score is for --result score")
     if a.get("rules_players"):                              # a title already in the rules folder (T88 / T89)
         n = int(a["rules_players"])
         sides = [p for p in sorted(rules_folder().glob("*.party.json"))
@@ -460,6 +470,11 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
     cells.add("players", players, "2 or 4 (the board has no three-player hub game)", players in (2, 4))
     cells.add("result kind", result, ["winner", "places", "score", "letters"],
               result in ("winner", "places", "score", "letters"))
+    if max_score is not None:                                # B198
+        ok = bool(re.match(r"^[0-9]{1,4}$", str(max_score))) and 1 <= int(max_score) <= 9999
+        cells.add("the highest score one side reaches (--max-score)", str(max_score), "a whole number 1-9999", ok)
+        if ok:
+            b["max_score"] = int(max_score)
     if result == "letters":                                   # B191
         b["word"] = word
         cells.add("the word", word, "2-12 letters A-Z", bool(re.match(r"^[A-Z]{2,12}$", word)))
@@ -1754,6 +1769,22 @@ def cmd_label(code: str, a: dict) -> int:
 
 
 # --- B178: learn for a `score` title ------------------------------------------------------------------------------------
+def expected_digits(b: dict) -> list[str]:
+    """B198: the digits a number 0..N can show (N the binding's `max_score`); without it every digit 0-9 (today)."""
+    n = b.get("max_score")
+    if n is None:
+        return list("0123456789")
+    return sorted({c for k in range(int(n) + 1) for c in str(k)})
+
+
+def _every_digit_cell(b: dict) -> str:
+    """learn's every-digit cell: today's name without `--max-score`; B198's with it."""
+    if b.get("max_score") is None:
+        return "every digit 0-9 read by a reader learnt without each save that shows it"
+    return (f"every digit that can occur up to {int(b['max_score'])} ({', '.join(expected_digits(b))}) read by a reader "
+            "learnt without each save that shows it")
+
+
 def _score_spec_cells(cells: Cells, spec: dict) -> None:
     sc = spec.get("score") or {}
     cells.add("spec usable", bool(spec.get("usable")), True, bool(spec.get("usable")))
@@ -1775,11 +1806,14 @@ def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
     r = rules_folder()
     spec_path = r / f"{b['game']}.endscreen.json"
     made = b.get("learnt") or {}
-    key = digest({"kept": kept, "labels": readings(code)})
+    key = digest({"kept": kept, "labels": readings(code),
+                  **({"max_score": b["max_score"]} if b.get("max_score") is not None else {})})   # B198: only when given
     if made.get("from") == key and spec_path.is_file() and sha(spec_path) == made.get("spec"):
         spec, arrays = es.load_spec(spec_path)
     else:
         spec, arrays, _rep = es.learn(pics, pics / "labels.json", "first", name=b["game"])
+        if b.get("max_score") is not None and isinstance(spec.get("score"), dict):
+            spec["score"]["max_score"] = int(b["max_score"])  # B198: the hub gives up a final above it
     _score_spec_cells(cells, spec)
     sc = es.score_scores(pics, pics / "labels.json", spec, arrays, "second")
     held = {c: row for c, row in sc["rows"].items() if c != "other"}
@@ -1857,19 +1891,27 @@ def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
                 only[role] = here
     learnt = sorted(k[-1] for k in (spec.get("score") or {}).get("keys") or [])
     shows = {d: sum(1 for t in texts.values() if d in _digits_of(t)) for d in "0123456789"}
-    few = [d for d in "0123456789" if shows[d] < 2 and d not in from_one]
+    expected = expected_digits(b)                             # B198: only the digits 0..N can show (0-9 without it)
+    few = [d for d in expected if shows[d] < 2 and d not in from_one]
     read_ = {"shown by fewer than two saves": few}
+    if b.get("max_score") is not None:
+        read_["not expected (above the highest score)"] = [d for d in "0123456789" if d not in expected]
     if one["digits"]:                                        # B186: what one save alone showed, and the spread
         read_["learnt from one save"] = {d: f"{v['glyphs']} glyphs in {v['save']}, {v['read back']} read back"
                                          + ("" if v["learnt"] else " — not learnt") for d, v in one["digits"].items()}
         read_["across-save spread"] = one["spread"]
-    cells.add("every digit 0-9 read by a reader learnt without each save that shows it",
-              read_, {"shown by fewer than two saves": []}, not few)   # B181 / B186
+    cells.add(_every_digit_cell(b), read_, {"shown by fewer than two saves": []}, not few)   # B181 / B186 / B198
     recorded = {"digits": {"in two saves or more": [d for d in "0123456789" if shows[d] >= 2],
                            "in one save": [d for d in "0123456789" if shows[d] == 1],
                            "learnt from one save": sorted(from_one),
                            "never": [d for d in "0123456789" if shows[d] == 0]},
                 "digits learnt": learnt}
+    if b.get("max_score") is not None:                       # B198: recorded, never a cell
+        recorded["digits"]["expected"] = expected
+        recorded["digits"]["not expected"] = [d for d in "0123456789" if d not in expected]
+        above = sorted(r_ for r_, t_ in texts.items() if any(x > int(b["max_score"]) for x in _all_numbers(t_)))
+        if above:
+            recorded["above the highest score"] = above
     if shown_here:
         recorded["shown only here"] = shown_here
     inputs = learn_inputs(code, b)
@@ -1907,6 +1949,7 @@ def _score_line(b: dict, cells: Cells, kept, only: dict, group: dict, pairs: lis
         line = f"{a_} and {b_} look like the same match saved twice: save {b_} again from another match."
         return line, {"same match twice": [a_, b_], "line": line}
     digits = sorted(set(few or []) | set().union(*[set(v) for v in only.values()] or [set()]))
+    digits = [d for d in digits if d in expected_digits(b)]  # B198: only digits that can occur
     if digits:
         endings = [f"end_P{k}" for k in range(1, b["players"] + 1)]
         roles = [x for x in (next_role(e, kept) for e in endings) if x]
@@ -3324,7 +3367,7 @@ def parse(argv: list[str]) -> tuple[str, str, dict]:
             i += 1
             continue
         if k in ("--players", "--system", "--result", "--find", "--rules-players", "--setup", "--collect", "--winner",
-                 "--word") \
+                 "--word", "--max-score") \
                 and i + 1 < len(rest):
             key = k[2:].replace("-", "_")
             if key == "collect":

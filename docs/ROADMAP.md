@@ -3281,6 +3281,8 @@ start and result; **the PrivyParty probe on the hub**.
 
 **A word spelled by the player who lost (2026-11-21; queue BJ).** T91 is played in a mode where every miss earns a letter and the player who spells the word loses; its end screen is shot from wherever the match ended, so the background is different every time and the whole-screen reader could not learn it — it could not even tell the begin, because the mid-match screen is the same picture with other text in the middle. As the user set it out, the hub now reads only each player's letters in its corner: the tool finds the corners from the saves the session labels, learns the letters' colours and shapes, and trains on many made-up pictures of those same letters over other parts of the title's own screens until it reads every one it was not trained on; whether it passes is still decided only on the real saves. The user's own start (players and settings already chosen) serves as the begin. With this, T91 passes learn on the six saves the user already made (checked in a scratch); no new match is needed. Two players only; no bar was lowered.
 
+**T90 and T91 added end to end (2026-11-21 / 2026-11-23).** T90 (`score`) and T91 (`letters`) each passed every stage — register, label, learn, bench, solo with the user at the TV, close; next, T92, a two-player sport whose scores stay low (queue BL: the user names the highest score, `--max-score`, and learn needs only the digits up to it).
+
 **Carries over:** pads on the onn; hold-to-join for up to four; parity for anything shown on the onn; one flag, absent
 = today; no project-supplied game content, so mini games match what the house has.
 
