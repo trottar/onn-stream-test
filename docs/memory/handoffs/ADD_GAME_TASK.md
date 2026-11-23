@@ -159,8 +159,11 @@ two at a time:
 **The rounds, two players, `winner`, `score` or `letters` (B171): begin, other, `end_P1`, `end_P1_2`, `end_P2`,
 `end_P2_2`.**
 
-- **No setup — rounds of three slots:** round 1 `--collect begin=1 --collect other=2 --collect end_P1=3`; round 2
-  `--collect end_P2=1 --collect end_P1_2=2 --collect end_P2_2=3`.
+- **No setup — the user's slot 1 is the select screen and is never saved over (the user's standing rule, T90: "I
+  don't want to overwrite the selection screen. 2 and 3 remain can be overwritten"):** round 1 `--collect begin=1
+  --collect other=2 --collect end_P1=3`; round 2 `--collect end_P2=2 --collect end_P1_2=3`; round 3 `--collect
+  end_P2_2=2`. **The user usually has round 1 made already when the session starts: ask only whether slots 1-3 hold
+  those three, never ask them to be made again.**
 - **Under a setup — slot 1 is never used by the user** (it is the setup's own start, the begin): round 1 `--collect
   begin=1 --collect other=2 --collect end_P1=3`; round 2 `--collect end_P2=2 --collect end_P1_2=3`; round 3 `--collect
   end_P2_2=2`.
@@ -171,9 +174,10 @@ Lines for the user, word for word (the game named by the name the user gave, in 
   after the match that shows P1 won. Reply ok." Under a setup: "YOU, now: start <the game> from Games with its Extras
   setup and set it to its shortest match (one round, items off). Don't save to slot 1. Start a match and save to slot 2
   in the middle of it; let P1 win and save to slot 3 on the screen after the match that shows P1 won. Reply ok."
-- Round 2, no setup: "YOU, now: play three more matches, each with other characters (or another stage) than any match
-  saved so far: P2 wins the first — save to slot 1 on the screen after it that shows P2 won; P1 wins the second — save to
-  slot 2; P2 wins the third — save to slot 3. Reply ok."
+- Round 2, no setup: "YOU, now: play two more matches, each with other characters (or another stage) than any match
+  saved so far: P2 wins the first — save to slot 2 on the screen after it that shows P2 won; P1 wins the second — save to
+  slot 3. Never slot 1. Reply ok." Round 3: "YOU, now: play one more match P2 wins, with other characters (or another
+  stage) than any match saved so far, and save to slot 2 on the screen after it that shows P2 won. Reply ok."
 - Round 2 under a setup: "YOU, now: play two more matches, each with other characters (or another stage) than any match
   saved so far: P2 wins the first — save to slot 2 on the screen after it that shows P2 won; P1 wins the second — save to
   slot 3. Never slot 1. Reply ok." Round 3: "YOU, now: play one more match P2 wins, with other characters (or another
@@ -221,7 +225,8 @@ end_r<its row>_<n> when that row is kept already".)
 ```
 python3 tools/party_add_game.py register <code> --players <2|4> --system <ps1|n64|snes> --result <winner|places|score> \
         --find "<the user's words>" --setup <none|slot1> --collect begin=1 --collect other=2 --collect end_P1=3
-python3 tools/party_add_game.py register <code> … --collect end_P2=1 --collect end_P1_2=2 --collect end_P2_2=3  # round 2
+python3 tools/party_add_game.py register <code> … --collect end_P2=2 --collect end_P1_2=3  # round 2 (slot 1 never)
+python3 tools/party_add_game.py register <code> … --collect end_P2_2=2                       # round 3
 python3 tools/party_add_game.py label <code>                                    # score only (B178): the pictures
 python3 tools/party_add_game.py label <code> end_P1=<P1>-<P2>,<P1>-<P2> …      # score only: your two readings each
 python3 tools/party_add_game.py learn <code>
@@ -363,8 +368,8 @@ again, not added.
 3. Set the shortest match (one round, items off), the same for every save.
 4. Round 1 — no setup: slot 1 the select screen before anyone picks, slot 2 the middle of a match, slot 3 after a match
    P1 won. Under a setup: never slot 1; slot 2 the middle of a match, slot 3 after a P1 win.
-5. Round 2 — each match with other characters (or another stage) than any saved so far: no setup, P2 wins → slot 1,
-   P1 wins → slot 2, P2 wins → slot 3; under a setup, P2 wins → slot 2, P1 wins → slot 3, then one more P2 win → slot 2.
+5. Round 2 — each match with other characters (or another stage) than any saved so far, **never slot 1** (it is the
+   select screen, with or without a setup): P2 wins → slot 2, P1 wins → slot 3, then one more P2 win → slot 2.
 6. Then as the session asks, one line at a time: one more win for a player (other characters again; up to four wins each);
    a win saved again under the right player; a win saved again from another match.
 7. Nothing during bench.
