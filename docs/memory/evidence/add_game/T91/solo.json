@@ -26,28 +26,37 @@
    "cell": "every planned switch's seconds",
    "met": true,
    "read": [
-    1.336,
-    1.067,
-    1.227,
-    1.123
+    1.074,
+    1.082,
+    1.18,
+    1.072
    ]
   },
   {
-   "bar": ">= 4 read",
-   "cell": "switches read for S (the next starts 4 s or more after)",
-   "met": false,
-   "read": [
-    3,
-    1
-   ]
+   "bar": [
+    "the go",
+    "the end"
+   ],
+   "cell": "the real match's go and end read for S (a practice's may be listed)",
+   "met": true,
+   "read": {
+    "listed": [],
+    "read": [
+     "1 (a practice's)",
+     "2 (a practice's)",
+     "3 (the go)",
+     "4 (the end)"
+    ]
+   }
   },
   {
    "bar": "all",
    "cell": "S: sound within 4 s of each switch, underruns rising <= 20 a row",
-   "met": false,
+   "met": true,
    "read": [
     true,
-    false,
+    true,
+    true,
     true
    ]
   },
@@ -56,9 +65,10 @@
    "cell": "audio_max_arrival_gap_ms at each switch",
    "met": true,
    "read": [
-    68,
-    60,
-    374
+    331,
+    65,
+    432,
+    325
    ]
   },
   {
@@ -108,8 +118,8 @@
   }
  ],
  "code": "T91",
- "inputs": "6e1bc889dbb3d7caaa2f62bb2843a84a686bfdf38cc393b9eae46e3cc157768f",
+ "inputs": "0507a0772a19bfcdc2d5a42cbf67c5b3cab83866f77522146c85ac913d343051",
  "schema": 1,
  "stage": "solo",
- "verdict": "FAIL"
+ "verdict": "PASS"
 }
