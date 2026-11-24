@@ -63,6 +63,10 @@ B178 — each side's number on the final screen (spec version 4, only when every
            labelled has no template.
   a read   — the screen as version 3; on `end` every side's number, or `unknown` when any glyph is not read (never
            the nearest digit by itself). `EndedScore`: K agreeing reads of the class and every number.
+  B200    — a number as drawn (`Drawn`: its value an int, its glyphs its text — "03" is 3 with the glyphs 0 and 3);
+           a place whose glyphs are the same shape in saves labelled with different digits is never taken
+           (`_shapes_explained`); a line-score column off its final's line (a box of small cells) found anywhere on
+           the picture, its glyphs in their own group when another size.
 
 B191 / B192 — a word spelled by the player who lost (spec version 5, `learn_letters`, called by the add-a-game tool with
 the word and each end save's corners as the session read them; never from labels alone):
@@ -740,17 +744,38 @@ def score_sides(classes) -> int | None:
     return ns.pop()
 
 
+class Drawn(int):
+    """B200: a number as the screen draws it — its value for every check (`int`), its glyphs for every glyph count and
+    every glyph's label (`str`): Drawn("03") == 3, str() "03". JSON writes the value."""
+
+    def __new__(cls, text):
+        text = str(text)
+        obj = super().__new__(cls, int(text))
+        obj.text = text
+        return obj
+
+    def __str__(self) -> str:
+        return self.text
+
+    def __format__(self, spec: str) -> str:
+        return self.text if not spec else int(self).__format__(spec)
+
+    def __reduce__(self):
+        return (Drawn, (self.text,))
+
+
 def score_numbers(label: str) -> list[int]:
-    """Each side's final (the result), P1 first."""
-    return [int(side.rpartition("=")[2]) for side in SCORE_LABEL.match(label).group(1).split("-")]
+    """Each side's final (the result), P1 first; B200: as drawn (`Drawn`)."""
+    return [Drawn(side.rpartition("=")[2]) for side in SCORE_LABEL.match(label).group(1).split("-")]
 
 
 def score_cells(label: str) -> list[list]:
-    """B181: each side's line-score cells left to right (an int, or None for a blank cell); [] for a final alone."""
+    """B181: each side's line-score cells left to right (a number — B200: as drawn — or None for a blank cell); [] for
+    a final alone."""
     out = []
     for side in SCORE_LABEL.match(label).group(1).split("-"):
         cells, eq, _fin = side.rpartition("=")
-        out.append([None if x == "_" else int(x) for x in cells.split("+")] if eq else [])
+        out.append([None if x == "_" else Drawn(x) for x in cells.split("+")] if eq else [])
     return out
 
 
@@ -876,10 +901,12 @@ _ANCHOR = {"centre": lambda d: (d["x0"] + d["x1"]) / 2.0, "left": lambda d: floa
            "right": lambda d: float(d["x1"])}
 
 
-def _find_place(strs: dict, digits: dict) -> tuple[list, list]:
+def _find_place(strs: dict, digits: dict, ok=None) -> tuple[list, list]:
     """One side's places: a string with that side's number of digits in every save, at one place (top / bottom within
     SCORE_TOL, the anchor within 2 x SCORE_TOL). -> (every such place, best first: the tallest, the least spread …;
-    the saves where the place that holds in the most saves breaks, when none holds in all)."""
+    the saves where the place that holds in the most saves breaks, when none holds in all). B200: `ok(place)` ->
+    (taken, the saves that refuse it): a place it refuses is never taken (before one variant per screen place is
+    kept); when it refuses every place, the saves it names."""
     runs = sorted(strs)
     best, best_cover = [], (-1, None)
     for r0 in runs:
@@ -908,6 +935,18 @@ def _find_place(strs: dict, digits: dict) -> tuple[list, list]:
                     best.append((rank, place))
                 if miss and len(got) > best_cover[0]:
                     best_cover = (len(got), sorted(miss))
+    refused: list = []
+    if best and ok is not None:                          # B200: a place whose shapes the labels do not explain
+        fine = []
+        for x in sorted(best, key=lambda x: x[0]):
+            took, who = ok(x[1])
+            if took:
+                fine.append(x)
+            elif not refused:
+                refused = sorted(who) or runs
+        if not fine:
+            return [], refused
+        best = fine
     if best:
         kept: list = []                                  # one entry per place on the screen: its best variant
         for _r, b_ in sorted(best, key=lambda x: x[0]):
@@ -922,6 +961,52 @@ def _overlap(a: dict, b: dict) -> bool:
 
 
 SCORE_CHOICES = 4                # each side's best places weighed against each other (when the lengths do not decide)
+SCORE_SAME_SHAPE = 0.5           # B200: glyphs labelled with different digits this near (or nearer than two labelled
+#                                  alike) are one shape: the place is not a number (measured: alike <= 0.492, different
+#                                  >= 0.719 on T90's and T92's real places; 0.034 at the hollow of T92's leading 0s)
+
+
+def _shape_cells(first: dict, place: dict, want: dict) -> list | None:
+    """B200: every labelled glyph's cell at a place, on each save's picture -> [(its drawn digit, save, cell, its
+    index in the number)]; None when a save's number does not fit the place (as many glyphs as it is drawn with).
+    `want`: {save: its number as drawn, or None for a blank (skipped)}."""
+    out = []
+    for r, v in want.items():
+        if v is None:
+            continue
+        gl = place_glyphs(first[r], place)
+        if gl is None or len(gl) != len(str(v)):
+            return None
+        out += [(ch, r, glyph_cell(first[r], g, place), i) for i, (ch, g) in enumerate(zip(str(v), gl))]
+    return out
+
+
+def _shapes_explained(cells: list) -> tuple[bool, list]:
+    """B200 (BL item 1): the labels explain a place's shapes when the nearest two glyphs labelled with different digits
+    are farther apart than the farther of (the farthest two labelled alike, SCORE_SAME_SHAPE) — a panel, a heading's
+    glyph, the hollow of a leading 0, a stats cell is the same shape in saves labelled with different digits. With one
+    save left out it may hold while the other saves still show different digits there (that save's own reading may be
+    wrong: label's read-back names it); else the place is never taken. -> (explained, the saves of the nearest such
+    pair)."""
+    pairs = []
+    for x in range(len(cells)):
+        for y in range(x + 1, len(cells)):
+            a, b = cells[x], cells[y]
+            pairs.append((float(cell_dists(a[2], b[2][None])[0]), a[0] == b[0], a[1], b[1]))
+
+    def holds(skip) -> bool:
+        use = [q for q in pairs if skip not in (q[2], q[3])]
+        alike = max([q[0] for q in use if q[1]] or [0.0])
+        unlike = [q[0] for q in use if not q[1]]
+        if not unlike:                                        # one digit only: nothing to judge — left out, no proof
+            return skip is None
+        return min(unlike) > max(alike, SCORE_SAME_SHAPE)
+    if holds(None):
+        return True, []
+    if any(holds(r) for r in sorted({c_[1] for c_ in cells})):
+        return True, ["excused"]                              # explained only with one save left out
+    near = min((q for q in pairs if not q[1]), key=lambda q: q[0])
+    return False, sorted({near[2], near[3]})
 
 
 def _agreement(places: list, firsts: dict, nums: dict) -> float | None:
@@ -1030,8 +1115,8 @@ def read_scores(a: np.ndarray, score: dict, refs: np.ndarray) -> dict:
             out.append(None)
             read.append(None)
             continue
-        idx = [i for i, k in enumerate(keys) if k.startswith(place["group"])]
-        digs = ""
+        idx = [i for i, k in enumerate(keys) if k[:-1] == place["group"]]     # B200: its own group only ("" is
+        digs = ""                                                             # no longer every key's prefix)
         for g in gl:
             if not idx:
                 digs += "?"
@@ -1047,7 +1132,7 @@ def read_scores(a: np.ndarray, score: dict, refs: np.ndarray) -> dict:
             if ok and len(idx) > 1:
                 least = margin if least is None else min(least, margin)
         read.append(digs)
-        out.append(int(digs) if digs and "?" not in digs else None)
+        out.append(Drawn(digs) if digs and "?" not in digs else None)        # B200: as drawn ("03": 3)
     return {"scores": None if None in out else out, "read": read,
             "margin": round(least, 4) if least is not None else None}
 
@@ -1085,7 +1170,7 @@ def _stat_score(keys, gaps, need) -> dict:
 def _read_digits(a: np.ndarray, gl: list, place: dict, score: dict, refs: np.ndarray) -> str:
     """The glyphs at a place read as digits ('?' for one not read) — B178's rule."""
     keys = list(score["keys"])
-    idx = [i for i, k in enumerate(keys) if k.startswith(place["group"])]
+    idx = [i for i, k in enumerate(keys) if k[:-1] == place["group"]]         # B200: its own group only
     need = score.get("margin_needed")
     digs = ""
     for g in gl:
@@ -1119,7 +1204,7 @@ def read_columns(a: np.ndarray, score: dict, refs: np.ndarray) -> list[list]:
                 row.append("_")
                 continue
             digs = _read_digits(a, gl, pl, score, refs)
-            row.append(int(digs) if "?" not in digs else digs)
+            row.append(Drawn(digs) if "?" not in digs else digs)
         out.append(row)
     return out
 
@@ -1203,9 +1288,71 @@ def _clusters(points: list) -> list:
     return out
 
 
-def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, refs1: np.ndarray) -> tuple:
+def _offline_column(first: dict, want: dict, taken: list) -> tuple[list, list]:
+    """B200: a filled column with no place on its final's line, looked for anywhere on the picture as a final is: a
+    string with as many glyphs as each save's cell is drawn with, at one place in every save that fills it, its shapes
+    explained by the labels, overlapping no place already taken, no number there in a save whose cell is blank. ->
+    (its candidates, best first: [(how well its glyphs fit their labels — `_agreement` — , place, explained only
+    with a save left out)], or [] and the saves where it breaks)."""
+    fill = sorted(r for r in want if want[r] is not None)
+    blank = [r for r in want if want[r] is None]
+
+    excused: list = []
+
+    def ok(pl):
+        if any(_overlap(pl, t) for t in taken):
+            return False, []
+        if any(place_glyphs(first[r], pl) is not None for r in blank):
+            return False, blank
+        cells = _shape_cells(first, pl, {r: want[r] for r in fill})
+        got = _shapes_explained(cells) if cells is not None else (False, [])
+        if got[0] and got[1] == ["excused"]:
+            excused.append(pl)
+        return got[0], ([] if got[0] else got[1])
+    found, miss = _find_place({r: score_strings(first[r]) for r in fill}, {r: len(str(want[r])) for r in fill}, ok)
+    fits = [(_agreement([pl], {r: first[r] for r in fill}, {r: [want[r]] for r in fill}), i, pl)
+            for i, pl in enumerate(found)]
+    fits = sorted((f for f in fits if f[0] is not None),       # one the labels explain with no save excused first
+                  key=lambda f: (any(f[2] is e for e in excused), round(f[0], 4), f[1]))
+    if not fits:
+        return [], (miss if not found else fill)
+    return [(round(f[0], 4), {**f[2], "align": "centre", "offline": True}, any(f[2] is e for e in excused))
+            for f in fits], []
+
+
+def _before(a: dict, b: dict) -> bool:
+    """B200: place a is drawn after place b in reading order (a row lower, or the same row further right)."""
+    if abs(a["top"] - b["top"]) <= SCORE_TOL:
+        return a["x0"] < b["x0"]
+    return a["top"] < b["top"]
+
+
+def _choose_offline(cands: dict) -> dict:
+    """B200: a side's off-line columns chosen together — none overlapping another, the periods in the order they are
+    drawn (a later column never before an earlier one in reading order) first, then the fewest explained only with a
+    save left out, then the glyphs' fit summed, then each column's own order. {column: candidates} -> {column: place} (empty when no choice holds)."""
+    import itertools
+    cols = sorted(cands)
+    best = None
+    for combo in itertools.product(*[cands[c][:SCORE_CHOICES] for c in cols]):
+        pls = [x[1] for x in combo]
+        if any(_overlap(a_, b_) for i, a_ in enumerate(pls) for b_ in pls[i + 1:]):
+            continue
+        out_of_order = sum(1 for i in range(len(pls)) for j in range(i + 1, len(pls)) if _before(pls[j], pls[i]))
+        key = (out_of_order, sum(1 for x in combo if x[2]), round(sum(x[0] for x in combo), 4),
+               [cands[c].index(x) for c, x in zip(cols, combo)])
+        if best is None or key < best[0]:
+            best = (key, {c: dict(x[1]) for c, x in zip(cols, combo)})
+    return best[1] if best else {}
+
+
+def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, refs1: np.ndarray,
+                  taken: list | None = None) -> tuple:
     """B181: side k's line-score columns, left to right, on its final's line (section B181 of the design). ->
-    ([place or None per column], {column: the saves where it breaks} for a labelled column with no place)."""
+    ([place or None per column], {column: the saves where it breaks} for a labelled column with no place). B200: a
+    place whose shapes its labels do not explain is never taken; a column with no place on the line is looked for off
+    it (`_offline_column`; `taken`: the places already taken, every side's)."""
+    taken = list(taken or [])
     runs = sorted(first)
     ncol = len(saves[runs[0]][1][k])
     row = {r: [s_ for s_ in score_strings(first[r]) if s_["pol"] == fin["pol"] and s_["r"] == fin["r"]
@@ -1214,6 +1361,7 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
     clusters = _clusters([((s_["x0"] + s_["x1"]) / 2.0, (r, s_)) for r in runs for s_ in row[r]])
     need = score1.get("margin_needed")
     cols, broken, prev = [], {}, None
+    off: dict = {}                                            # B200: the off-line columns' candidates
     for c in range(ncol):
         want = {r: saves[r][1][k][c] for r in runs}
         if all(v is None for v in want.values()):
@@ -1235,6 +1383,8 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
             got = [s_ for r in runs if want[r] is not None for s_ in by[r] if s_["n"] == len(str(want[r]))]
             pl = {"pol": fin["pol"], "r": fin["r"], "align": "centre", "group": fin["group"], "top": fin["top"],
                   "bot": fin["bot"], "x0": int(min(g["x0"] for g in got)), "x1": int(max(g["x1"] for g in got))}
+            if any(_overlap(pl, t) for t in taken):           # B200: another side's final on the same line
+                continue
             glyphs, agree, ok = [], 0, True
             for r in runs:
                 if want[r] is None:
@@ -1249,13 +1399,20 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
             if ok and need is not None:                       # a separator: the same glyph whatever the label
                 ok = not any(a_[0] != b_[0] and float(cell_dists(a_[1], b_[1][None])[0]) < need
                              for i, a_ in enumerate(glyphs) for b_ in glyphs[i + 1:])
+            if ok:                                            # B200: not one shape whatever the label
+                ok = _shapes_explained(_shape_cells(first, pl, want) or [])[0]
             if ok:
                 valid.append((cx, agree, pl))
-        if not valid:
-            broken[str(c + 1)] = [Path(r).name for r in cover[1]]
+        if not valid:                                         # B200: off the final's line
+            got, miss = _offline_column(first, want, taken + [p_ for p_ in cols if p_ is not None])
+            if got:
+                off[c] = got
+                cols.append(None)                             # chosen with the side's other off-line columns
+                continue
+            broken[str(c + 1)] = [Path(r).name for r in (cover[1] if cover[0] >= 0 else miss or runs)]
             cols.append(None)
             continue
-        done = [((p_["x0"] + p_["x1"]) / 2.0, i) for i, p_ in enumerate(cols) if p_ is not None]
+        done = [((p_["x0"] + p_["x1"]) / 2.0, i) for i, p_ in enumerate(cols) if p_ is not None and not p_.get("offline")]
         if len(done) >= 2:                                    # the place the other columns' spacing predicts
             (x_a, i_a), (x_b, i_b) = done[-2], done[-1]
             guess = x_b + (x_b - x_a) / (i_b - i_a) * (c - i_b)
@@ -1264,6 +1421,15 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
         best = min(valid, key=lambda v: (-v[1], abs(v[0] - guess) if guess is not None else 0.0, v[0]))
         cols.append(best[2])
         prev = best[0]
+    if off:                                                   # B200: the side's off-line columns, together
+        line = [p_ for p_ in cols if p_ is not None]
+        off = {c: [x for x in v if not any(_overlap(x[1], q) for q in line)] for c, v in off.items()}
+        chosen = _choose_offline(off) if all(off.values()) else {}
+        for c in sorted(off):
+            if c in chosen:
+                cols[c] = chosen[c]
+            else:
+                broken[str(c + 1)] = [Path(r).name for r in runs]
     return cols, broken
 
 
@@ -1280,7 +1446,12 @@ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
     strs = {r: score_strings(first[r]) for r in runs}
     cands, broken = [], {}
     for k in range(n):
-        found, miss = _find_place(strs, {r: len(str(saves[r][0][k])) for r in runs})
+        want = {r: saves[r][0][k] for r in runs}
+
+        def ok(pl, want=want):                                # B200: the labels explain the place's shapes
+            cells = _shape_cells(first, pl, want)
+            return _shapes_explained(cells) if cells is not None else (False, [])
+        found, miss = _find_place(strs, {r: len(str(saves[r][0][k])) for r in runs}, ok)
         if not found:
             broken[str(k + 1)] = [Path(r).name for r in miss]
         cands.append(found)
@@ -1336,10 +1507,22 @@ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
     if any(saves[r][1][k] for r in runs for k in range(n)):   # B181: the line score's columns
         score1 = _stat_score(keys, gaps, need)
         for k in range(n):
-            cols, br = _find_columns(first, saves, k, places[k], score1, refs)
+            taken = places + [p_ for row in columns for p_ in row if p_ is not None]
+            cols, br = _find_columns(first, saves, k, places[k], score1, refs, taken)
             columns.append(cols)
             for c, who in br.items():
                 cbroken[f"{k + 1}.{c}"] = who
+        def hgt(p_):
+            return p_["bot"] - p_["top"]
+        other = [(k, p_) for k, row in enumerate(columns) for p_ in row          # B200: an off-line column of
+                 if p_ is not None and p_.get("offline") and abs(hgt(p_) - hgt(places[k])) > SCORE_TOL]   # another size
+        one = bool(other) and max(hgt(p_) for _k, p_ in other) - min(hgt(p_) for _k, p_ in other) <= SCORE_TOL
+        for k, row in enumerate(columns):                     # one of the final's size: the final's glyphs
+            for p_ in row:
+                if p_ is not None and p_.get("offline"):
+                    p_["group"] = places[k]["group"]
+        for k, p_ in other:                                   # ... another size: its own glyphs
+            p_["group"] = "c:" if one else f"c{k + 1}:"
         if cbroken:
             return ({**base, "found": False, "not_found": cbroken, "pooled": pooled, "columns": columns},
                     {"digit_refs": empty}, {"found": False, "not_found": cbroken})
@@ -2426,7 +2609,7 @@ class EndedScore(Ended):
                 self.seen_start = True
             elif cls in self.ends and self.seen_start and scores is not None:
                 self.ended = cls
-                self.scores = [int(x) for x in scores]
+                self.scores = [x if isinstance(x, int) else int(x) for x in scores]   # B200: as read (Drawn)
         return self.ended
 
 

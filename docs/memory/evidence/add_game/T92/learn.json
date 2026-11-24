@@ -1,0 +1,277 @@
+{
+ "cells": [
+  {
+   "bar": true,
+   "cell": "spec usable",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": "found",
+   "cell": "the score places found",
+   "met": true,
+   "read": "found"
+  },
+  {
+   "bar": [],
+   "cell": "every digit separable",
+   "met": true,
+   "read": []
+  },
+  {
+   "bar": ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))",
+   "cell": "digit margin_needed",
+   "met": true,
+   "read": 0.2473
+  },
+  {
+   "bar": 0,
+   "cell": "held-out frames read as another class",
+   "met": true,
+   "read": 0
+  },
+  {
+   "bar": "<= 0.105",
+   "cell": "held-out frames read unknown (share)",
+   "met": true,
+   "read": 0.0
+  },
+  {
+   "bar": 0,
+   "cell": "other read as a screen",
+   "met": true,
+   "read": 0
+  },
+  {
+   "bar": true,
+   "cell": "begin: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": "<= 8.0 s",
+   "cell": "begin: recognised within",
+   "met": true,
+   "read": 0.0
+  },
+  {
+   "bar": [
+    2,
+    0
+   ],
+   "cell": "end_P1: ended as itself",
+   "met": true,
+   "read": [
+    2,
+    0
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P1: ended within",
+   "met": true,
+   "read": 1.5
+  },
+  {
+   "bar": [
+    5,
+    4
+   ],
+   "cell": "end_P1_2: ended as itself",
+   "met": true,
+   "read": [
+    5,
+    4
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P1_2: ended within",
+   "met": true,
+   "read": 1.5
+  },
+  {
+   "bar": [
+    2,
+    3
+   ],
+   "cell": "end_P2: ended as itself",
+   "met": true,
+   "read": [
+    2,
+    3
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2: ended within",
+   "met": true,
+   "read": 2.0
+  },
+  {
+   "bar": [
+    0,
+    2
+   ],
+   "cell": "end_P2_2: ended as itself",
+   "met": true,
+   "read": [
+    0,
+    2
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2_2: ended within",
+   "met": true,
+   "read": 2.0
+  },
+  {
+   "bar": true,
+   "cell": "other: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": ">= 1.0 grey (64 x 48 grey, mean |difference| of the screens that stay; H7-V1: one state run twice, 391 of 400 frames under 1.0)",
+   "cell": "no two saves of one ending the same picture",
+   "met": true,
+   "read": []
+  },
+  {
+   "bar": "02+_+_+_+_=02-00+_+_+_+_=00 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)",
+   "cell": "left out: end_P1",
+   "met": true,
+   "read": [
+    "02+_+_+_+_=02-00+_+_+_+_=00",
+    1.5
+   ]
+  },
+  {
+   "bar": "05+_+_+_+_=05-04+_+_+_+_=04 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)",
+   "cell": "left out: end_P1_2",
+   "met": false,
+   "read": [
+    "0?+_+_+_+_=0?-0?+_+_+_+_=0?",
+    "1.5 (the full reader's)"
+   ]
+  },
+  {
+   "bar": "02+_+_+_+_=02-03+_+_+_+_=03 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)",
+   "cell": "left out: end_P2",
+   "met": false,
+   "read": [
+    "02+_+_+_+_=02-0?+_+_+_+_=0?",
+    "2.0 (the full reader's)"
+   ]
+  },
+  {
+   "bar": "00+_+_+_+_=00-02+_+_+_+_=02 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)",
+   "cell": "left out: end_P2_2",
+   "met": true,
+   "read": [
+    "00+_+_+_+_=00-02+_+_+_+_=02",
+    2.0
+   ]
+  },
+  {
+   "bar": {
+    "shown by fewer than two saves": []
+   },
+   "cell": "every digit that can occur up to 5 (0, 1, 2, 3, 4, 5) read by a reader learnt without each save that shows it",
+   "met": false,
+   "read": {
+    "across-save spread": {
+     "across": 0.3259,
+     "bar": "across <= within + 0.05",
+     "met": true,
+     "pairs": [
+      40,
+      8
+     ],
+     "within": 0.3268
+    },
+    "learnt from one save": {
+     "3": "1 glyphs in end_P2, 0 read back \u2014 not learnt",
+     "4": "1 glyphs in end_P1_2, 0 read back \u2014 not learnt",
+     "5": "1 glyphs in end_P1_2, 0 read back \u2014 not learnt"
+    },
+    "not expected (above the highest score)": [
+     "6",
+     "7",
+     "8",
+     "9"
+    ],
+    "shown by fewer than two saves": [
+     "1",
+     "3",
+     "4",
+     "5"
+    ]
+   }
+  }
+ ],
+ "code": "T92",
+ "inputs": "5e39ceb2d2954b761fefbbc4d74f89f39864583a26304a41d59010ed5c4a7cbe",
+ "recorded": {
+  "digits": {
+   "expected": [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5"
+   ],
+   "in one save": [
+    "3",
+    "4",
+    "5"
+   ],
+   "in two saves or more": [
+    "0",
+    "2"
+   ],
+   "learnt from one save": [],
+   "never": [
+    "1",
+    "6",
+    "7",
+    "8",
+    "9"
+   ],
+   "not expected": [
+    "6",
+    "7",
+    "8",
+    "9"
+   ]
+  },
+  "digits asked": [
+   "1",
+   "3",
+   "4",
+   "5"
+  ],
+  "digits learnt": [
+   "0",
+   "0",
+   "2",
+   "2",
+   "3",
+   "3",
+   "4",
+   "4",
+   "5",
+   "5"
+  ],
+  "line": "One more save: a match either player won whose line score shows 1, 3, 4 or 5 (in any quarter, overtime or final, either side); the more of them the better \u2014 save the screen after it to a free slot, then register T92 \u2026 --collect <role>=<slot> with the role of the player who won (end_P1_3 if P1 won, end_P2_3 if P2 won), label T92 and learn T92 again. 4 digits are still short (1, 3, 4 or 5); if one is still short after that match, learn asks for one more.",
+  "one more save": [
+   "end_P1_3",
+   "end_P2_3"
+  ]
+ },
+ "schema": 1,
+ "stage": "learn",
+ "verdict": "FAIL"
+}

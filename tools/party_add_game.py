@@ -48,6 +48,16 @@ learn's every-digit cell then needs only the digits a number 0..N can show (fina
 as today); the others are recorded "not expected", never a cell; its line names only expected digits. The spec carries
 N: at the hub a final above N is unknown (`end_unread`), given up by B182's rule, never a guess. Without it: today.
 
+B200: a `score` title's numbers as drawn — a reading keeps a drawn leading 0 ("03": the value 3, the glyphs 0 and 3;
+the label stage's line says so), each glyph labelled by its drawn digit (a leading 0 is a 0 shown); a place whose
+glyphs are the same shape in saves labelled with different digits is never taken; a line score's cells off the
+final's line (a box of small cells) found where they are; learn counts the digits of the finals and of the cells
+read in a final's size only (the hub reads finals).
+
+B201: `--find <words>` — the tool lists the system's titles (the library's `q` applies only to its search view) and
+takes the user's words as said: the whole name, the name without its bracketed parts, or every word in it; one title,
+or the candidates' names on stderr for the chat only (never written), or none.
+
 B191 / B192: `--result letters --word <the word>` — a title whose match is lost by the player whose letters (one per
 miss, in that player's corner) spell the word; the other player won. Two players only (four: refused, the line says
 why). The label stage as the score kind's: the session reads each player's corner on two pictures of every end save;
@@ -347,17 +357,67 @@ def _companion_lines() -> list[str]:
     return sorted(lines)
 
 
+FIND_NAMED = 6                                          # B201: at most this many candidates named (chat only)
+
+
+def _plain(text: str) -> str:
+    """B201: a name as words — case, spacing and punctuation ignored ("'" dropped, the rest a space)."""
+    t = str(text or "").casefold().replace("'", "").replace("\u2019", "")
+    return " ".join(re.sub(r"[^0-9a-z]+", " ", t).split())
+
+
+def _base(name: str) -> str:
+    """B201: a name without its bracketed parts ("(USA)", "[!]", "(Disc 1)")."""
+    return _plain(re.sub(r"\([^)]*\)|\[[^\]]*\]", " ", str(name or "")))
+
+
+def _library(system: str) -> list[dict]:
+    """B201: every title of the system as the hub's library lists it, page by page (`offset` / `limit` until `total`);
+    the library's own `q` applies only with `view=search` (across every system), so the tool matches the words
+    itself."""
+    nodes: dict = {}
+    offset, total = 0, None
+    while total is None or offset < total:
+        r = hub("GET", "games", {"system": system, "offset": offset, "limit": 80})
+        if r["code"] != 200:
+            raise Refused("the hub did not answer the library (is the companion up?)")
+        page = [n for n in (r["body"].get("nodes") or []) if n.get("node_type") == "game"]
+        total = int(r["body"].get("total") or 0)
+        for n in page:
+            nodes.setdefault(str(n.get("id")), n)            # one game listed twice is one game
+        if not page:
+            break
+        offset += len(page)
+    return list(nodes.values())
+
+
+def _match_title(nodes: list[dict], words: str) -> list[dict]:
+    """B201: the user's words as the user says them — the whole name; else the name without its bracketed parts; else
+    every word in the name. The first rule that matches any title decides."""
+    want = _plain(words)
+    if not want:
+        return []
+    name = {id(n): str(n.get("name") or n.get("title") or "") for n in nodes}
+    for rule in (lambda n: _plain(name[id(n)]) == want, lambda n: _base(name[id(n)]) == want,
+                 lambda n: all(w in _plain(name[id(n)]) for w in want.split())):
+        got = [n for n in nodes if rule(n)]
+        if got:
+            return got
+    return []
+
+
 def _find_title(system: str, words: str) -> dict:
-    r = hub("GET", "games", {"system": system, "q": words})
-    nodes = list({str(n.get("id")): n for n in (r["body"].get("nodes") or [])
-                  if n.get("node_type") == "game"}.values())   # one game listed twice is one game
-    if r["code"] != 200:
-        raise Refused("the hub did not answer the library (is the companion up?)")
-    exact = [n for n in nodes if str(n.get("name") or n.get("title") or "").casefold() == words.casefold()]
-    nodes = exact if len(exact) == 1 else nodes             # the whole name given: that one
-    if len(nodes) != 1:
-        raise Refused(f"{len(nodes)} titles match: give more (or less) of the name")
-    n = nodes[0]
+    found = _match_title(_library(system), words)
+    GUARD.add(*[n.get("name") or n.get("title") for n in found])     # every name it matched: never printed or written
+    if not found:
+        raise Refused("no title of the system matches those words: give the name as the library shows it, or a part")
+    if len(found) > 1:
+        if len(found) <= FIND_NAMED:                         # B201: named for the chat only, never written
+            print("for the chat only — never write these: " + " | ".join(
+                sorted(str(n.get("name") or n.get("title") or "") for n in found)), file=sys.stderr)
+        raise Refused(f"{len(found)} titles match: " + ("ask the user which one (their names: stderr, for the chat "
+                      "only)" if len(found) <= FIND_NAMED else "give more of the name"))
+    n = found[0]
     d = hub("GET", "details", {"id": n["id"]})["body"]
     rel = str(d.get("relative_path") or "")
     return {"game": str(n["id"]), "title": str(n.get("name") or d.get("title") or ""), "relative_path": rel,
@@ -542,9 +602,15 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
 
 # --- learn ---------------------------------------------------------------------------------------------------------------
 def _endscreen():
-    sys.path.insert(0, str(TOOLS))
+    if str(TOOLS) not in sys.path:
+        sys.path.insert(0, str(TOOLS))
     import h7_endscreen
     return h7_endscreen
+
+
+def _drawn(text):
+    """B200: a number as drawn (h7_endscreen.Drawn: its value an int, its glyphs its text — "03" is 3)."""
+    return _endscreen().Drawn(text)
 
 
 def _capture_fn():
@@ -1142,16 +1208,18 @@ def label_inputs(code: str, b: dict) -> str:
 
 
 def _sides(text: str) -> list[tuple[list, int]]:
-    """B181: a reading's sides, P1 first: (its cells left to right — int, or None for a blank — , its final)."""
+    """B181: a reading's sides, P1 first: (its cells left to right — a number, or None for a blank — , its final);
+    B200: every number as drawn (`_drawn`: "03" is 3, its glyphs 0 and 3)."""
     out = []
     for side in text.split("-"):
         cells, eq, fin = side.rpartition("=")
-        out.append(([None if x == "_" else int(x) for x in cells.split("+")] if eq else [], int(fin)))
+        out.append(([None if x == "_" else _drawn(x) for x in cells.split("+")] if eq else [], _drawn(fin)))
     return out
 
 
 def _text(sides) -> str:
-    return "-".join(("+".join("_" if c is None else str(int(c)) for c in cells) + "=" if cells else "") + str(int(fin))
+    """B200: every number as given (a drawn leading 0 kept; a number without one as today)."""
+    return "-".join(("+".join("_" if c is None else str(c) for c in cells) + "=" if cells else "") + str(fin)
                     for cells, fin in sides)
 
 
@@ -1266,7 +1334,7 @@ def _read_all(es, spec: dict, arrays: dict, run: Path, want: str, direct: bool =
         f = two[0]
         with Image.open(run / f) as im:
             rd = es.read_scores(es.score_picture(im), spec["score"], arrays["digit_refs"])["read"]
-        finals = [("_" if not x else int(x) if "?" not in x else x) for x in rd]
+        finals = [("_" if not x else _drawn(x) if "?" not in x else x) for x in rd]
     sides = _sides(want)
     cols = None
     if any(cells for cells, _fin in sides):
@@ -1331,14 +1399,31 @@ def _fill(want: str, got, mine) -> list | None:
         for w, g in [*zip(wc, gc), (wf, gf)]:
             if isinstance(g, str) and "?" in g and w is not None and len(g) == len(str(w)):
                 t = "".join(wch if gch == "?" and wch in mine else gch for gch, wch in zip(g, str(w)))
-                g = int(t) if "?" not in t else t
+                g = _drawn(t) if "?" not in t else t
             row.append(g)
         out.append((row[:-1], row[-1]))
     return out
 
 
 def _digits_of(text: str) -> set:
-    return {c for x in _all_numbers(text) for c in str(int(x))}
+    """Every digit the numbers are drawn with (B200: a leading 0 shows a 0)."""
+    return {c for x in _all_numbers(text) for c in str(x)}
+
+
+def _counted_digits(text: str, spec: dict) -> set:
+    """B200: the digits a reading teaches the hub's reader — its finals' and those of its columns read in a final's
+    group; a column of another size (its own group) checks the reading but teaches no final's digit."""
+    sc = (spec or {}).get("score") or {}
+    fg = {p.get("group") for p in sc.get("places") or []}
+    cols = sc.get("columns") or []
+    out: set = set()
+    for k, (cells, fin) in enumerate(_sides(text)):
+        out |= set(str(fin))
+        for c, x in enumerate(cells):
+            pl = cols[k][c] if k < len(cols) and c < len(cols[k]) else None
+            if x is not None and (pl is None or pl.get("group") in fg):
+                out |= set(str(x))
+    return out
 
 
 def _only_here(role: str, members, texts: dict) -> list[str]:
@@ -1381,15 +1466,17 @@ def _one_save_digits(es, spec: dict, pics: Path, labels: dict, texts: dict) -> d
             if p_.parent.name in texts:
                 paths.setdefault(p_.parent.name, []).append(p_)
     glyphs = {}
-    for role, ps in paths.items():
+    fg = {p_.get("group") for p_ in sc.get("places") or []}      # B200: a final's group only (a column of another size
+    for role, ps in paths.items():                                # teaches no final's digit)
         sides = _sides(texts[role])
-        glyphs[role] = es.save_glyphs(sc, [fin for _c, fin in sides], [cl for cl, _f in sides], sorted(ps))
+        glyphs[role] = [g for g in es.save_glyphs(sc, [fin for _c, fin in sides], [cl for cl, _f in sides], sorted(ps))
+                        if g[3][:-1] in fg]
     across, within, na, nw = es.spread_across_within(
         {r: [(g[3], g[4]) for g in gs if g[0] == 0] for r, gs in glyphs.items()})
     met = across is not None and within is not None and across <= within + ACROSS_MARGIN
     spread = {"across": across, "within": within, "pairs": [na, nw],
               "bar": f"across <= within + {ACROSS_MARGIN}", "met": met}
-    shows = {d: [r for r, t in texts.items() if d in _digits_of(t)] for d in "0123456789"}
+    shows = {d: [r for r, t in texts.items() if d in _counted_digits(t, spec)] for d in "0123456789"}
     out = {}
     for d in "0123456789":
         if len(shows[d]) != 1 or shows[d][0] not in glyphs:
@@ -1427,11 +1514,15 @@ def _mend(w, g):
     """What the other saves' reader read, its unread glyphs ("?") and its columns with no place ("*") as labelled."""
     if g == "_":
         return None
-    if g == NO_PLACE or not isinstance(g, str):
-        return w if g == NO_PLACE else g
-    if w is None or len(g) != len(str(w)):
+    if g == NO_PLACE:
         return w
-    return int("".join(wch if gch == "?" else gch for gch, wch in zip(g, str(w))))
+    if not isinstance(g, str):
+        if w is None or isinstance(g, _endscreen().Drawn):
+            return g
+        return w if int(g) == int(w) else _drawn(str(int(g)).zfill(len(str(w))))   # B200: a final's value, as wide
+    if w is None or len(g) != len(str(w)):                                          # as its label is drawn
+        return w
+    return _drawn("".join(wch if gch == "?" else gch for gch, wch in zip(g, str(w))))
 
 
 def _culprit(es, b: dict, pics: Path, kept: dict, ends: list, texts: dict, contradicted: dict) -> str | None:
@@ -1439,8 +1530,8 @@ def _culprit(es, b: dict, pics: Path, kept: dict, ends: list, texts: dict, contr
     save read back as labelled; None when no single one does."""
     for x in sorted(contradicted):
         got = contradicted[x]
-        mended = [([_mend(w, g) for w, g in zip(wc, gc)], _mend(wf, gf))
-                  for (wc, wf), (gc, gf) in zip(_sides(texts[x]), got)]
+        mended = [([_mend(w, g) for w, g in zip(wc, gc)], wf if _mend(wf, gf) is None else _mend(wf, gf))
+                  for (wc, wf), (gc, gf) in zip(_sides(texts[x]), got)]   # B200: a final read blank keeps its label
         t2 = {**texts, x: _text(mended)}
         labels2 = _labels(pics, kept, es, {r: _score_class(t2[r]) for r in ends})
         if all(_judge(t2[y], _read_back(es, b, pics, labels2, y, t2[y]), _only_here(y, [y], t2))[0] == "same"
@@ -1723,7 +1814,8 @@ def cmd_label(code: str, a: dict) -> int:
     words = _side_words(n, lined)
     if missing:
         line = (f"Read the final score on each end save's two pictures in the title's add_game folder, label/ "
-                f"(<role>.1.png and <role>.2.png), each side's number, P1 first — with a line score, each side's cells "
+                f"(<role>.1.png and <role>.2.png), each side's number, P1 first, each number as drawn, leading zeros "
+                f"included (a drawn 03 is 03, not 3) — with a line score, each side's cells "
                 f"left to right joined by '+' ('_' for a blank cell) then '=' and its final; then label {code} "
                 + " ".join(f"{r}={words},{words}" for r in missing) + " (the first reading from .1, the second from .2).")
         recorded["read"] = missing
@@ -1752,7 +1844,9 @@ def cmd_label(code: str, a: dict) -> int:
             line = ("Read again: " + "; ".join(f"{r} ({named[r]})" for r in sorted(named)) + ". Their pictures in "
                     "label/ (<role>.1.png, <role>.2.png" + (", and each side's number cut out: <role>.P1.png, <role>.P2.png" if crops
                                                     else "") + f"); then label {code} "
-                    + " ".join(f"{r}={words},{words}" for r in sorted(named)) + ".")
+                    + " ".join(f"{r}={words},{words}" for r in sorted(named)) + "."
+                    + (" Each number as drawn, leading zeros included (a drawn 03 is 03, not 3)."      # B200
+                       if any(reason[r] == "place" for r in named) else ""))
             recorded["read again"] = sorted(named)
     elif not cells.passed and any(r["cell"].startswith("the last look") and not r["met"] for r in cells.rows):
         line = (f"Look at label/digits.png: a row for each digit, every glyph read as that digit, numbered under it. "
@@ -1890,7 +1984,7 @@ def _learn_score(code: str, b: dict, kept: dict, pics: Path, es) -> int:
             if not ok:
                 only[role] = here
     learnt = sorted(k[-1] for k in (spec.get("score") or {}).get("keys") or [])
-    shows = {d: sum(1 for t in texts.values() if d in _digits_of(t)) for d in "0123456789"}
+    shows = {d: sum(1 for t in texts.values() if d in _counted_digits(t, spec)) for d in "0123456789"}   # B200
     expected = expected_digits(b)                             # B198: only the digits 0..N can show (0-9 without it)
     few = [d for d in expected if shows[d] < 2 and d not in from_one]
     read_ = {"shown by fewer than two saves": few}

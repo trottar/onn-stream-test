@@ -1,7 +1,10 @@
 ---
 memory_schema: 1
 as_of: 2026-11-20
-status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture; B198 / B199 a score title's highest score, `--max-score`, and whether a match can end level). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture; B198 / B199 a score title's highest score, `--max-score`, and whether a match can end level; B200 a score title's
+numbers read as drawn, leading zeros included; B201 `--find` takes the user's words as said; B202 the user's saves asked
+only after register names them missing, no "other teams / characters" for score and letters, the highest score's later
+change taken as said). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
 
 # ADD-GAME — one title, by its code, through the tool's five stages
@@ -85,7 +88,10 @@ player's corner)** (→ `--result letters --word <the word>`, B191: two players 
 stage after register — below), or **some other way (a time, a distance, only a team's or
 character's name)** → **stop here, before any save is asked** (below); **whether the game has things to unlock** (→ a
 setup: `--setup slot1`, made by the user in Extras → Cheats, and every save below made inside it; nothing to unlock →
-`--setup none`); **the words to find it in the library**.
+`--setup none`); **the words to find it in the library**. **B201: pass the user's words to `--find` exactly as the user
+says them** (a part of the name, or the name without its region): the tool finds one title, or says "<n> titles match"
+and prints their names on stderr — **for the chat only, never written**: ask the user which one in a reply, then run
+register again with that one's whole name as the user confirms it. Never ask the user to type the library's name.
 
 **The stop at the questions (B179) — when the answer to "who wins is shown how" is none of the three kinds** (a time, a
 distance, a lap count read as a time, only a team's or a character's name, two numbers where the smaller wins, or
@@ -96,7 +102,12 @@ then "YOU, now: commit". **The same stop for any answer the tool has no kind for
 the three the answer is: stop and ask Cowork, never fit a title to the nearest kind.
 
 Then the saves, three at a time (the onn's SAVE, slots 1-3; slot 9 and slot 0 are the hub's), each round followed by
-`register … --collect role=slot …` (the tool copies them; the user may then save over them). **With a setup, never
+`register … --collect role=slot …` (the tool copies them; the user may then save over them). **B202: never ask the user
+to make a save before register has said it is missing.** The user usually keeps round 1 in slots 1-3 already (slot 1
+the select screen, slot 2 the middle of a match, slot 3 the screen after a P1 win; under a setup, slots 2 and 3): **run
+register with round 1's collects first**, before any line about saves. Only a "missing" cell, or a refusal "slot <n> is
+empty", leads to a line to the user — naming exactly the saves it names, with the round's line below for those saves
+alone. A round's line is said only for saves register named missing. **With a setup, never
 slot 1 for anything but the begin** (a setup's slot 1 is the title's own start): the other saves go to slots 2 and 3,
 two at a time:
 
@@ -118,7 +129,11 @@ two at a time:
 
 - **`score` (B178), n players: the same saves as `winner`** — two wins for each player from the start, each from a
   different match, saved on the screen after the match that shows each side's number (the final score, the stats
-  screen). The user says only who won; the numbers are read later by you in the label stage, never typed by the user
+  screen). **B202: never "other teams" or "other characters" for a `score` or `letters` title** (the user's rule, T92:
+  "Teams shouldn't matter. You only care about the score that's all the vision model should see"): the reader looks at
+  the numbers (or letters) only. Every line below that says "with other characters (or another stage) than any match
+  saved so far" (or "with other teams (or characters)") says, for these two kinds, **"another match"** instead, and
+  nothing about teams. The user says only who won; the numbers are read later by you in the label stage, never typed by the user
   unless the tool asks for one save's numbers. **Saves already kept under the code** (T90's six, taken under `winner`
   on 2026-11-20) stay: run `register <code> … --result score` with no `--collect` first and ask only for what its page
   names missing; then `label <code>`.
@@ -136,6 +151,11 @@ two at a time:
   - **With `--max-score <N>`, tell the user once, word for word:** "The hub gives up a match only when a side ends
     above <N>, so expect that about as often as your matches end above <N>. A match it gives up shows no winner, and
     the board counts it as a draw."
+  - **B202 — the highest score is asked once.** When the user later names another number (T92: "I went up to score of
+    5 just to be safe"), take it as said, without a question or an argument: the next register run passes the new
+    `--max-score <N>` (no `--collect` when no save is new), then `label <code>` (no new readings: the kept ones stand)
+    and `learn <code>` run again — the binding and learn's expected digits follow it. Say one line: "YOU, now: noted —
+    the highest score is now <N>; I need the digits 0 to <N>." Never ask for it again.
 
 - **`letters` (B191), two players: the same saves as `winner`** — two wins for each player, each from a different
   match, saved on the screen after the match that shows each player's letters in its corner. `--word` is the word as
@@ -162,8 +182,8 @@ two at a time:
 - **No setup — the user's slot 1 is the select screen and is never saved over (the user's standing rule, T90: "I
   don't want to overwrite the selection screen. 2 and 3 remain can be overwritten"):** round 1 `--collect begin=1
   --collect other=2 --collect end_P1=3`; round 2 `--collect end_P2=2 --collect end_P1_2=3`; round 3 `--collect
-  end_P2_2=2`. **The user usually has round 1 made already when the session starts: ask only whether slots 1-3 hold
-  those three, never ask them to be made again.**
+  end_P2_2=2`. **The user usually has round 1 made already when the session starts (B202): run register with round
+  1's collects at once — do not ask; its page says what is missing, and only that is asked.**
 - **Under a setup — slot 1 is never used by the user** (it is the setup's own start, the begin): round 1 `--collect
   begin=1 --collect other=2 --collect end_P1=3`; round 2 `--collect end_P2=2 --collect end_P1_2=3`; round 3 `--collect
   end_P2_2=2`.
@@ -208,7 +228,10 @@ two. The spec the hub uses is still learnt from every save.
   match that P<k> wins and save to slot <2 or 3> on the screen after it that shows P<k> won. Reply ok." (`<k>` from the
   role, `<j>` from the other ending.) Then `register <code> … --collect <role>=<slot>` (it replaces that save) and
   `learn <code>`. **Ask for no other save until learn no longer says it.**
-- **"<a> and <b> look like the same match saved twice: save <b> again from another match."** — say, word for word:
+- **"<a> and <b> look like the same match saved twice: save <b> again from another match."** (B202: it stays for
+  `score` and `letters` — two saves of one match show its glyphs once, not twice — and the tool tells it from the
+  whole held screen, the numbers, the stats and the moving background, never the teams; for those kinds the line
+  below says "another match", nothing about teams) — say, word for word:
   "YOU, now: two of the saves of <the game> for P<k>'s win look like the same match. Play another match that P<k> wins,
   with other characters (or another stage) than any match saved so far, and save to slot <2 or 3> on the screen after it
   that shows P<k> won. Reply ok." (`<k>` from `<b>`.) Then `register <code> … --collect <b>=<slot>` (it replaces `<b>`)
@@ -267,6 +290,9 @@ python3 tools/party_add_game.py close <code>                                    
     row's digit: `label <code> look=all`. Else, for each row holding a tile that is not its digit: `label <code>
     look=<the row's digit>:<the tile numbers joined by '.'>` (e.g. `look=9:2.5`). The tool then names the saves those
     tiles came from: read them again as below. Nothing to the user.
+  - **B200: read every number as drawn, leading zeros included** — a screen that draws 03 is read `03`, not `3`
+    (T92's: `end_P1=02+_+_+_+_=02-00+_+_+_+_=00,…`); a screen that draws 3 is read `3`. The tool counts each drawn
+    glyph (the leading 0 is a 0 it learns) and checks the values (03 is 3).
   - **"Read again: <role> (<why>) …"** → open that save's pictures again (and its cut-out numbers), read them afresh,
     run `label <code> <role>=<P1>-<P2>,<P1>-<P2>` (with a line score, every number as above). The whys include "P<k>'s
     cells add up to <s>, not its final <f>" (a misread cell or final) and "a glyph read as <d> is not one, at the last

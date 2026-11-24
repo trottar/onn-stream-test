@@ -263,7 +263,9 @@ class Limit(b181.Made):
         self.put("T79", LINE_LOW)
         rc, out = self.label_all("T79", LINE_LOW)
         self.assertEqual(rc, 1, out)
-        self.assertIn("the numbers at one place in every save", self.verdict("T79", "label")["bad"])
+        bad = self.verdict("T79", "label")["bad"]               # B200 (queue BM): the places may now be found; the
+        self.assertTrue("the numbers at one place in every save" in bad      # label still fails, on the place cell
+                        or any("read back by a reader learnt without it" in b for b in bad), bad)   # or the read-back
 
 
 if __name__ == "__main__":

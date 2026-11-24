@@ -11,8 +11,8 @@
    "cell": "end_P1: the two readings the same",
    "met": true,
    "read": [
-    "2+_+_+_+_=2-0+_+_+_+_=0",
-    "2+_+_+_+_=2-0+_+_+_+_=0"
+    "02+_+_+_+_=02-00+_+_+_+_=00",
+    "02+_+_+_+_=02-00+_+_+_+_=00"
    ]
   },
   {
@@ -44,8 +44,8 @@
    "cell": "end_P1_2: the two readings the same",
    "met": true,
    "read": [
-    "5+_+_+_+_=5-4+_+_+_+_=4",
-    "5+_+_+_+_=5-4+_+_+_+_=4"
+    "05+_+_+_+_=05-04+_+_+_+_=04",
+    "05+_+_+_+_=05-04+_+_+_+_=04"
    ]
   },
   {
@@ -77,8 +77,8 @@
    "cell": "end_P2: the two readings the same",
    "met": true,
    "read": [
-    "2+_+_+_+_=2-3+_+_+_+_=3",
-    "2+_+_+_+_=2-3+_+_+_+_=3"
+    "02+_+_+_+_=02-03+_+_+_+_=03",
+    "02+_+_+_+_=02-03+_+_+_+_=03"
    ]
   },
   {
@@ -110,8 +110,8 @@
    "cell": "end_P2_2: the two readings the same",
    "met": true,
    "read": [
-    "0+_+_+_+_=0-2+_+_+_+_=2",
-    "0+_+_+_+_=0-2+_+_+_+_=2"
+    "00+_+_+_+_=00-02+_+_+_+_=02",
+    "00+_+_+_+_=00-02+_+_+_+_=02"
    ]
   },
   {
@@ -141,21 +141,43 @@
   {
    "bar": "found",
    "cell": "the numbers at one place in every save",
-   "met": false,
-   "read": {
-    "2.1": [
-     "end_P1",
-     "end_P2",
-     "end_P2_2"
-    ]
-   }
+   "met": true,
+   "read": "found"
+  },
+  {
+   "bar": "02+_+_+_+_=02-00+_+_+_+_=00, but for a digit or a column no other save shows",
+   "cell": "end_P1: read back by a reader learnt without it",
+   "met": true,
+   "read": "02+_+_+_+_=02-00+_+_+_+_=00"
+  },
+  {
+   "bar": "05+_+_+_+_=05-04+_+_+_+_=04, but for a digit or a column no other save shows",
+   "cell": "end_P1_2: read back by a reader learnt without it",
+   "met": true,
+   "read": "0?+_+_+_+_=0?-0?+_+_+_+_=0? (shown only here: 4, 5)"
+  },
+  {
+   "bar": "02+_+_+_+_=02-03+_+_+_+_=03, but for a digit or a column no other save shows",
+   "cell": "end_P2: read back by a reader learnt without it",
+   "met": true,
+   "read": "02+_+_+_+_=02-0?+_+_+_+_=0? (shown only here: 3)"
+  },
+  {
+   "bar": "00+_+_+_+_=00-02+_+_+_+_=02, but for a digit or a column no other save shows",
+   "cell": "end_P2_2: read back by a reader learnt without it",
+   "met": true,
+   "read": "00+_+_+_+_=00-02+_+_+_+_=02"
+  },
+  {
+   "bar": "all",
+   "cell": "the last look: every glyph is the digit it was read as",
+   "met": true,
+   "read": "all"
   }
  ],
  "code": "T92",
- "inputs": "b5eae8cced1e0ca3f88394114fd03147c4c704f82d6326dc6d1dd0e1f178470f",
+ "inputs": "5e39ceb2d2954b761fefbbc4d74f89f39864583a26304a41d59010ed5c4a7cbe",
  "recorded": {
-  "back to the chat": "end_P1",
-  "line": "Stop: end_P1 (P2's cell 1 does not fit where the other saves have it) after it was read again twice. Do not ask the user and do not ask for another match: take this line back to the chat (Cowork).",
   "pictures": {
    "end_P1": [
     "end_P1.1.png",
@@ -173,9 +195,29 @@
     "end_P2_2.1.png",
     "end_P2_2.2.png"
    ]
+  },
+  "sheet": {
+   "0": 20,
+   "2": 6,
+   "3": 2,
+   "4": 2,
+   "5": 2
+  },
+  "shown only here": {
+   "end_P1_2": {
+    "digits": [
+     "4",
+     "5"
+    ]
+   },
+   "end_P2": {
+    "digits": [
+     "3"
+    ]
+   }
   }
  },
  "schema": 1,
  "stage": "label",
- "verdict": "FAIL"
+ "verdict": "PASS"
 }
