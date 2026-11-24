@@ -139,6 +139,39 @@
    ]
   },
   {
+   "bar": "the same numbers from both pictures",
+   "cell": "end_P2_3: the two readings the same",
+   "met": true,
+   "read": [
+    "05+_+_+_+_=05:00.00.00.00.00.00-06+_+_+_+_=06:00.00.00.00.00.00",
+    "05+_+_+_+_=05:00.00.00.00.00.00-06+_+_+_+_=06:00.00.00.00.00.00"
+   ]
+  },
+  {
+   "bar": "P2 more than every other side",
+   "cell": "end_P2_3: the role's player ahead",
+   "met": true,
+   "read": [
+    5,
+    6
+   ]
+  },
+  {
+   "bar": "each side's cells = its final",
+   "cell": "end_P2_3: the cells add up to the finals",
+   "met": true,
+   "read": [
+    [
+     5,
+     5
+    ],
+    [
+     6,
+     6
+    ]
+   ]
+  },
+  {
    "bar": "found",
    "cell": "the numbers at one place in every save",
    "met": true,
@@ -147,14 +180,14 @@
   {
    "bar": "02+_+_+_+_=02:13.00.00.00.01.00-00+_+_+_+_=00:00.00.00.00.00.00, but for a digit or a column no other save shows",
    "cell": "end_P1: read back by a reader learnt without it",
-   "met": true,
-   "read": "02+_+_+_+_+?3+00+00+00+0?+00=02-00+_+_+_+_+00+00+00+00+00+00=00 (shown only here: 1)"
+   "met": false,
+   "read": "02+_+_+_+_+??+00+00+00+0?+00=02-00+_+_+_+_+00+00+00+00+00+00=00 (shown only here: 1)"
   },
   {
    "bar": "05+_+_+_+_=05:00.00.00.00.00.00-04+_+_+_+_=04:00.00.00.00.00.00, but for a digit or a column no other save shows",
    "cell": "end_P1_2: read back by a reader learnt without it",
    "met": true,
-   "read": "0?+_+_+_+_+00+00+00+00+00+00=0?-0?+_+_+_+_+00+00+00+00+00+00=0? (shown only here: 4, 5)"
+   "read": "05+_+_+_+_+00+00+00+00+00+00=05-0?+_+_+_+_+00+00+00+00+00+00=0? (shown only here: 4)"
   },
   {
    "bar": "02+_+_+_+_=02:00.00.00.00.00.00-03+_+_+_+_=03:00.00.00.00.00.00, but for a digit or a column no other save shows",
@@ -169,15 +202,23 @@
    "read": "00+_+_+_+_+00+00+00+00+00+00=00-02+_+_+_+_+00+00+00+00+00+00=02"
   },
   {
-   "bar": "all",
-   "cell": "the last look: every glyph is the digit it was read as",
+   "bar": "05+_+_+_+_=05:00.00.00.00.00.00-06+_+_+_+_=06:00.00.00.00.00.00, but for a digit or a column no other save shows",
+   "cell": "end_P2_3: read back by a reader learnt without it",
    "met": true,
-   "read": "all"
+   "read": "05+_+_+_+_+00+00+00+00+00+00=05-0?+_+_+_+_+00+00+00+00+00+00=0? (shown only here: 6)"
+  },
+  {
+   "bar": "look=all",
+   "cell": "the last look: every glyph is the digit it was read as",
+   "met": false,
+   "read": "not given (label/digits.png)"
   }
  ],
  "code": "T92",
- "inputs": "cfad96739a6689ed834e465977a272afda5f111fb07a2785c613bed50e900676",
+ "inputs": "d76e455bb68d3abea7446284867f1dbd258942826dc0b4c9f06d55a865f8ba33",
  "recorded": {
+  "back to the chat": "end_P1",
+  "line": "Stop: end_P1 (a reader learnt from the other saves does not read it) after it was read again twice. Do not ask the user and do not ask for another match: take this line back to the chat (Cowork).",
   "pictures": {
    "end_P1": [
     "end_P1.1.png",
@@ -194,15 +235,20 @@
    "end_P2_2": [
     "end_P2_2.1.png",
     "end_P2_2.2.png"
+   ],
+   "end_P2_3": [
+    "end_P2_3.1.png",
+    "end_P2_3.2.png"
    ]
   },
   "sheet": {
-   "0": 113,
+   "0": 141,
    "1": 2,
    "2": 6,
    "3": 3,
    "4": 2,
-   "5": 2
+   "5": 4,
+   "6": 2
   },
   "shown only here": {
    "end_P1": {
@@ -212,13 +258,17 @@
    },
    "end_P1_2": {
     "digits": [
-     "4",
-     "5"
+     "4"
+    ]
+   },
+   "end_P2_3": {
+    "digits": [
+     "6"
     ]
    }
   }
  },
  "schema": 1,
  "stage": "label",
- "verdict": "PASS"
+ "verdict": "FAIL"
 }
