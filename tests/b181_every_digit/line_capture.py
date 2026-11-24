@@ -1,3 +1,4 @@
+# Frozen with T90's old score path (queue BQ, B217): this suite's made-up noise is exactly the pre-BP fixture (one generator per run, the shared save counter); the per-picture noise is for the new path's suites only.
 """B181's tests: made-up final screens with a line score (no title; every picture made-up). The add-a-game tool's
 picture source for made-up `score` titles (PARTY_ADD_GAME_CAPTURE=line_capture:capture). A made-up kept state is JSON:
 
@@ -81,14 +82,14 @@ def _still(rng) -> Image.Image:
 
 def capture(state_path, binding, out_dir, seconds, every):
     st = json.loads(Path(state_path).read_text())
-    seed = [181, int(st.get("look", 0)), int(st.get("n", 0)), len(st["kind"])]   # B212: noise drawn per picture
+    rng = np.random.default_rng(181 + 7 * int(st.get("look", 0)) + 101 * int(st.get("n", 0)) + len(st["kind"]))
     rows = []
     for k in range(int(seconds / every) + 1):
         if k % 2:
             continue
         t = round(k * every, 2)
         name = f"f{k:04d}.png"
-        picture(st, t, k, np.random.default_rng(seed + [k])).save(Path(out_dir) / name)
+        picture(st, t, k, rng).save(Path(out_dir) / name)
         rows.append((t, name))
     return rows
 

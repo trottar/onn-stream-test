@@ -36,6 +36,9 @@ SURVEY_SCALE = 2            # the boxes picture is drawn at this scale
 REGION_ZOOM = 4             # the regions picture: each region at this scale
 SYN_PER_GLYPH = 8           # synthetic variants of each real glyph (training and gate 2)
 SYN_DX, SYN_DY = 3, 1       # px: the synthetic shift's range
+VARIANTS_NEEDED = 8         # B214: valid test variants the once rule reads (each the glyph that was pasted)
+VARIANT_DRAWS = 24          # B214: at most this many draws a glyph
+SYN_OWN = 0.85              # B214: B192's share — a variant's cut ink at least this much pasted ink
 RECT = re.compile(r"^(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})$")
 SCORE_LABEL = re.compile(r"^\d{1,4}(?:-\d{1,4}){1,3}$")
 
@@ -611,12 +614,23 @@ def cmd_plan(code: str, a: dict) -> int:
     texts = texts_of(code)
     syms = plan_symbols(b, texts)
     counts = shown_counts(s["kind"], texts, syms)
-    never = [x for x in syms if counts[x] == 0]
     cells = pag.Cells()
-    hold_cell(cells, code, regions_hold(code, b, kept))
-    line = ask_line(s["kind"], never)
+    held = regions_hold(code, b, kept)
+    hold_cell(cells, code, held)
     rows = {x: ("twice or more" if counts[x] >= 2 else "once" if counts[x] == 1 else "never") for x in syms}
-    recorded = {"symbols": rows, "pictures showing": counts, "ask": line}
+    gates = pag.Cells()                                       # B215: train's gates 2-3, nothing written
+    g = (score_gates if s["kind"] == "score" else letters_gates)(code, b, kept, gates) if not held else {}
+    if "stop" in g:
+        cells.add("train's gates can run", g["stop"], "yes", False)
+    ask = g.get("ask") if "ask" in g else [x for x in syms if counts[x] == 0]
+    line = ask_line(s["kind"], ask)
+    for x in g.get("seen_once", []):
+        rows[x] = "once (counted: seen once)"
+    for x in g.get("dropped", []):
+        rows[x] = "once (not counted: asked)"
+    recorded = {"symbols": rows, "pictures showing": counts, "ask": line,
+                "train's gates": {"seen once": g.get("seen_once"), "not counted": g.get("dropped"),
+                                  "once": g.get("once"), "rigidity": g.get("rig")}}
     note = "\n".join(["| symbol | real pictures showing it in a result region |", "| --- | --- |"]
                      + [f"| {x} | {counts[x]} ({rows[x]}) |" for x in syms] + ["", line])
     rc = pag.finish(code, "plan", cells, plan_inputs(code, b), note=note, recorded=recorded)
@@ -840,32 +854,76 @@ def cmd_train(code: str, a: dict) -> int:
 
 
 def _once_rule(kind: str, sym: str, rig: dict, variants: list, real_others: list, read) -> tuple[bool, dict]:
-    """The user's once rule: (a) the font rigid, (b) every synthetic variant read as itself, (c) no other symbol's
-    real glyph read as it."""
+    """The user's once rule: (a) the font rigid, (b) every test variant read as itself — VARIANTS_NEEDED of them, valid
+    (B214), else "variants could not be made" — (c) no other symbol's real glyph read as it."""
     bar = pag.BARS.get("rigid_min", (None,))[0]               # B211: absent until T90 and T91 set it
     a_ = bar is not None and rig.get("rigidity") is not None and rig["rigidity"] >= bar
     got = [read(c) for c in variants]
-    b_ = bool(got) and all(g == sym for g in got)
+    enough = len(variants) >= VARIANTS_NEEDED
+    b_ = enough and all(g == sym for g in got)
     c_ = [o for o, c in real_others if read(c) == sym]
-    return bool(a_ and b_ and not c_), {"rigid": rig.get("rigidity"), "bar": bar,
-                                         "synthetic read as itself": f"{sum(g == sym for g in got)} of {len(got)}",
-                                         "other symbols' real glyphs read as it": len(c_)}
+    read_as: dict = {}
+    for g in got:
+        read_as[g] = read_as.get(g, 0) + 1
+    row = {"rigid": rig.get("rigidity"), "bar": bar,
+           "variants read as itself": f"{sum(g == sym for g in got)} of {len(got)}",
+           "variants read as": dict(sorted(read_as.items())),
+           "other symbols' real glyphs read as it": len(c_)}
+    if not enough:
+        row["variants"] = f"variants could not be made ({len(variants)} valid of {VARIANTS_NEEDED} needed)"
+    return bool(a_ and b_ and not c_), row
 
 
-def train_score(code: str, b: dict, kept: dict) -> int:
+def test_variants(a, g, backgrounds: list, place: dict, region: list, rng) -> tuple[list, int]:
+    """B214: the once rule's test variants of one real glyph — its ink pasted on an erased background region at a
+    shift (BP's paste), **valid only when** cut as exactly one glyph with at least SYN_OWN of the cut's ink pasted
+    ink; an invalid one thrown away and the next drawn from the same stream; at most VARIANT_DRAWS draws, stopping at
+    VARIANTS_NEEDED valid. -> (the valid cells, the draws made)."""
     import numpy as np
     E = es()
+    t, l, bt, r_ = g[0], g[1], g[2], g[3]
+    ink = E._ink(a, place["pol"], int(place["r"]), E._contrast(a))[t:bt + 1, l:r_ + 1]
+    pix = a[t:bt + 1, l:r_ + 1]
+    h, w = bt - t + 1, r_ - l + 1
+    valid, draws = [], 0
+    while draws < VARIANT_DRAWS and len(valid) < VARIANTS_NEEDED:
+        draws += 1
+        bg = backgrounds[int(rng.integers(len(backgrounds)))]
+        dx, dy = int(rng.integers(-SYN_DX, SYN_DX + 1)), int(rng.integers(-SYN_DY, SYN_DY + 1))
+        cx = (region[0] + region[2]) // 2 - w // 2 + dx
+        ty = t + dy
+        if cx < 0 or ty < 0 or cx + w > bg.shape[1] or ty + h > bg.shape[0]:
+            continue
+        pic = bg.copy()
+        pic[ty:ty + h, cx:cx + w][ink] = pix[ink]
+        pasted = np.zeros(pic.shape, bool)
+        pasted[ty:ty + h, cx:cx + w] = ink
+        gl = E.place_glyphs(pic, place)
+        if not gl or len(gl) != 1:
+            continue
+        c = gl[0]
+        cut = E._ink(pic, place["pol"], int(place["r"]), E._contrast(pic))[c[0]:c[2] + 1, c[1]:c[3] + 1]
+        own = pasted[c[0]:c[2] + 1, c[1]:c[3] + 1]
+        if not cut.any() or float((cut & own).sum()) / float(cut.sum()) < SYN_OWN:
+            continue
+        valid.append(E.glyph_cell(pic, c, place))
+    return valid, draws
+
+
+def score_gates(code: str, b: dict, kept: dict, cells: pag.Cells) -> dict:
+    """B215: train's gates 1-3 for a score title, writing nothing — the cells added to `cells`, and the ask (never
+    seen, or seen once and not counted). plan and train both call it."""
+    import numpy as np
     s = b["survey"]
     texts = texts_of(code)
     ends = end_roles(kept)
     places = score_places(code, b, kept)
-    cells = pag.Cells()
+    out: dict = {"places": places, "texts": texts}
     if any(p is None for p in places):
         k = places.index(None) + 1
         cells.add("a number in every region", f"none in P{k}'s on {s['from']}", "a number", False)
-        rc = pag.finish(code, "train", cells, train_inputs(code, b))
-        pag.out(f"{code}: no number in P{k}'s region on {s['from']} — mark it again (survey {code} again P{k})")
-        return rc
+        out["stop"] = f"{code}: no number in P{k}'s region on {s['from']} — mark it again (survey {code} again P{k})"
+        return out
     items = [it for it in glyph_items(code, b, kept) if it[5] is not None]
     pics = {role: [grey(p) for p in final_pictures(code, b, kept, role)] for role in ends}
     syms = plan_symbols(b, texts)
@@ -874,18 +932,21 @@ def train_score(code: str, b: dict, kept: dict) -> int:
     for it in items:
         real.setdefault(it[4], []).append(it)
     shown = {k: len({it[0] for it in v}) for k, v in real.items()}
-    rng = np.random.default_rng(seed_of(texts))
+    seed = seed_of(texts)
+    rng_t, rng_v = np.random.default_rng([seed, 0]), np.random.default_rng([seed, 1])   # B214: two streams
     backgrounds = {k: [(role, erase(a, places[k], s["regions"][k])) for role in ends for a in pics[role]]
                    for k in range(len(places))}
-    syn: dict = {}                                            # item index -> [variant cells]
+    syn: dict = {}                                            # item index -> [template cells] (stream 0 only)
+    src: dict = {}
     for i, it in enumerate(items):
         if it[1] != 0:
             continue
-        role, _pi, k, j = it[0], it[1], it[2] - 1, it[3]
+        role, k, j = it[0], it[2] - 1, it[3]
         a = pics[role][0]
         g = region_glyphs(a, places[k])[j]
         bgs = [bg for r_, bg in backgrounds[k] if r_ != role] or [bg for _r, bg in backgrounds[k]]
-        syn[i] = synthetic_glyphs([(a, g)], bgs, places[k], s["regions"][k], rng, SYN_PER_GLYPH)[0]
+        src[i] = (a, g, bgs, k)
+        syn[i] = synthetic_glyphs([(a, g)], bgs, places[k], s["regions"][k], rng_t, SYN_PER_GLYPH)[0]
 
     def fit(without=(), drop=()):
         rc_ = {k: [it[5] for it in v if it[0] not in without] for k, v in real.items() if k not in drop}
@@ -898,8 +959,7 @@ def train_score(code: str, b: dict, kept: dict) -> int:
         return fit_score(rc_, sh, tr)
 
     full, refs = fit()
-    # gate 1: two or more real samples, each read by a reader learnt without its save
-    wrong = []
+    wrong = []                                                # gate 1
     for role in ends:
         sc, rf = fit(without=(role,))
         for it in items:
@@ -914,49 +974,69 @@ def train_score(code: str, b: dict, kept: dict) -> int:
               full.get("margin_needed") is not None and full["margin_needed"] >= pag.BARS["margin_needed_min"][0])
     sep = [k for k in twice if not full["separable"].get(k)]
     cells.add("every symbol two saves show separable", sep or "all", "all", not sep)
-    # the measure
     rig = rigidity("score", {k: [it[5] for it in v] for k, v in real.items()}, shown)
-    # gate 2: once
-    once = sorted(k for k in real if shown[k] == 1)
-    dropped, seen_once, once_rows = [], [], {}
+    once = sorted(k for k in real if shown[k] == 1)           # gate 2
+    dropped, seen_once, once_rows, made = [], [], {}, {}
     for sym in once:
-        variants = [c for i, it in enumerate(items) if it[4] == sym and i in syn for c in syn[i]]   # None: not
-        others = [(it[4], it[5]) for it in items if it[4] != sym]                                  # cut -> '?'
+        variants, draws = [], 0
+        for i, it in enumerate(items):
+            if it[4] == sym and i in src and len(variants) < VARIANTS_NEEDED:
+                a, g, bgs, k = src[i]
+                v, d = test_variants(a, g, bgs, places[k], s["regions"][k], rng_v)
+                variants += v[:VARIANTS_NEEDED - len(variants)]
+                draws += d
+        made[sym] = {"draws": draws, "valid": len(variants)}
+        others = [(it[4], it[5]) for it in items if it[4] != sym]
         ok, row = _once_rule("score", sym, rig, variants, others, lambda c: read_cell(c, full, refs))
+        row["draws"] = draws
         once_rows[sym] = {"counted": ok, **row}
         (seen_once if ok else dropped).append(sym)
         cells.add(f"gate 2: {sym}, one real picture", "seen once" if ok else {"not counted": row},
-                  "counted when rigid, every variant read as itself, no other glyph read as it — else asked", True)
+                  f"counted when rigid, {VARIANTS_NEEDED} valid variants all read as itself, no other glyph read as "
+                  "it — else asked", True)
     if dropped:
         full, refs = fit(drop=dropped)
-    # gate 3: never seen (or seen once and not counted) -> asked
-    never = sorted(x for x in syms if counts.get(x, 0) == 0)
+    never = sorted(x for x in syms if counts.get(x, 0) == 0)  # gate 3
     ask = sorted(set(never) | set(dropped))
     cells.add("gate 3: every symbol the result can show learnt (none never seen)", ask or "all", "all", not ask)
-    # the spec
+    out.update(full=full, refs=refs, real=real, shown=shown, counts=counts, rig=rig, seen_once=seen_once,
+               dropped=dropped, once=once_rows, ask=ask, never=never,
+               synthetic={"templates per glyph": SYN_PER_GLYPH, "seed": seed, "variants": made,
+                          "made": sum(1 for v in syn.values() for c in v if c is not None),
+                          "not cut": sum(1 for v in syn.values() for c in v if c is None)})
+    return out
+
+
+def train_score(code: str, b: dict, kept: dict) -> int:
+    s = b["survey"]
+    ends = end_roles(kept)
+    cells = pag.Cells()
+    g = score_gates(code, b, kept, cells)
+    if "stop" in g:
+        rc = pag.finish(code, "train", cells, train_inputs(code, b))
+        pag.out(g["stop"])
+        return rc
+    texts, places, full, refs = g["texts"], g["places"], g["full"], g["refs"]
     pdir = pag._pictures(code, b, kept)
     spec, arrays, screens = screens_v4(pdir, kept, b["game"])
     spec["score"] = {"sides": len(places), "places": places, "found": True, "pooled": False, "columns": [],
                      **{k: full[k] for k in ("keys", "thresholds", "separable", "margin_needed")},
                      "max_score": int(max([int(b["max_score"])] + [int(x) for t in texts.values() for x in t.split("-")]))
                      if b.get("max_score") is not None else None,
-                     "region_source": "survey", "regions": s["regions"], "seen_once": seen_once,
-                     "glyphs": {k: len(real[k]) for k in full["keys"]}, "saves_showing": shown}
+                     "region_source": "survey", "regions": s["regions"], "seen_once": g["seen_once"],
+                     "glyphs": {k: len(g["real"][k]) for k in full["keys"]}, "saves_showing": g["shown"]}
     if spec["score"]["max_score"] is None:
         spec["score"].pop("max_score")
-    spec["usable"] = bool(all(g["threshold"] is not None for g in screens.values()) and full["keys"]
+    spec["usable"] = bool(all(x["threshold"] is not None for x in screens.values()) and full["keys"]
                           and full["margin_needed"] is not None)
     arrays["digit_refs"] = refs
-    cells.add("the screens: start and end thresholds", {c: g["threshold"] for c, g in screens.items()}, "both set",
-              all(g["threshold"] is not None for g in screens.values()))
+    cells.add("the screens: start and end thresholds", {c: x["threshold"] for c, x in screens.items()}, "both set",
+              all(x["threshold"] is not None for x in screens.values()))
     want = {r: sides_of("score", texts[r]) for r in ends}
     replay_cells(cells, spec, arrays, pdir, kept, want)
-    recorded = {"rigidity": rig, "seen once": seen_once, "once": once_rows, "not counted": dropped,
-                "pictures showing": counts, "margin_needed": full.get("margin_needed"),
-                "synthetic": {"per glyph": SYN_PER_GLYPH, "seed": seed_of(texts),
-                              "made": sum(1 for v in syn.values() for c in v if c is not None),
-                              "not cut": sum(1 for v in syn.values() for c in v if c is None)}}
-    line = ask_line("score", ask)
+    recorded = {"rigidity": g["rig"], "seen once": g["seen_once"], "once": g["once"], "not counted": g["dropped"],
+                "pictures showing": g["counts"], "margin_needed": full.get("margin_needed"), "synthetic": g["synthetic"]}
+    line = ask_line("score", g["ask"])
     key = train_inputs(code, b)
     if cells.passed:
         _write_rules(code, b, spec, arrays, cells, key)
@@ -966,7 +1046,8 @@ def train_score(code: str, b: dict, kept: dict) -> int:
 
 
 # --- B209: train (letters) ------------------------------------------------------------------------------------------
-def train_letters(code: str, b: dict, kept: dict) -> int:
+def letters_gates(code: str, b: dict, kept: dict, cells: pag.Cells) -> dict:
+    """B215: train's gates 1-3 for a letters title, writing nothing (as `score_gates`)."""
     import numpy as np
     E = es()
     s = b["survey"]
@@ -976,7 +1057,6 @@ def train_letters(code: str, b: dict, kept: dict) -> int:
     starts, others, endp = pag._letters_inputs_of(pdir, kept)
     sides = {r: texts[r].split("/") for r in ends}
     regions = {k + 1: list(reg) for k, reg in enumerate(s["regions"])}
-    cells = pag.Cells()
 
     def learn(without=()):
         use = {r: p for r, p in endp.items() if r not in without}
@@ -984,14 +1064,14 @@ def train_letters(code: str, b: dict, kept: dict) -> int:
                                name=b["game"], regions=regions)
 
     spec, arrays, rep = learn()
+    out: dict = {"spec": spec, "arrays": arrays, "rep": rep, "pdir": pdir}
     syms = plan_symbols(b, texts)
     counts = shown_counts("letters", texts, syms)
     found = bool(spec["letters"].get("found")) and "places" in spec["letters"]
     cells.add("the letters found in every region", found, True, found)
     if not found:
-        rc = pag.finish(code, "train", cells, train_inputs(code, b), note=str(spec["letters"].get("not_found")))
-        pag.out(f"{code}: {spec['letters'].get('not_found')} — mark the regions again (survey {code} again P1)")
-        return rc
+        out["stop"] = f"{code}: {spec['letters'].get('not_found')} — mark the regions again (survey {code} again P1)"
+        return out
     places = {int(p): tuple(v) for p, v in spec["letters"]["places"].items()}
     bins = {p: arrays["letters_bins"][i].astype(bool) for i, p in enumerate(sorted(places))}
     glyph_min = float(spec["letters"]["glyph_min"])
@@ -1010,9 +1090,9 @@ def train_letters(code: str, b: dict, kept: dict) -> int:
             from PIL import Image
             with Image.open(p) as im:
                 got = rd.sides(im.convert("RGB"))
-            for k, (g, w) in enumerate(zip(got, sides[role]), 1):
-                if all(counts.get(c, 0) >= 2 for c in w if c != "_") and g != w:
-                    wrong.append(f"{role} P{k} read {g}")
+            for k, (g_, w) in enumerate(zip(got, sides[role]), 1):
+                if all(counts.get(c, 0) >= 2 for c in w if c != "_") and g_ != w:
+                    wrong.append(f"{role} P{k} read {g_}")
     cells.add("gate 1: every corner of symbols two or more saves show, read right without its save", wrong or "all",
               "all", not wrong)
     fitted = {"keys": list(spec["letters"]["keys"]), "refs": arrays["letters_refs"].astype(np.float32),
@@ -1030,29 +1110,43 @@ def train_letters(code: str, b: dict, kept: dict) -> int:
             else "?"
 
     once = sorted(k for k in real if shown.get(k, 0) == 1)
-    rng = np.random.default_rng(seed_of(texts))
+    rng_v = np.random.default_rng([seed_of(texts), 1])       # B214: the test stream (letters' templates are B192's)
     dropped, seen_once, once_rows = [], [], {}
     for sym in once:
         variants = []
-        for c in real[sym]:                                    # letters: the glyph's own cell at a shift (the colour
-            for _ in range(SYN_PER_GLYPH):                     # bins already take the background away)
-                dy, dx = int(rng.integers(-2, 3)), int(rng.integers(-SYN_DX, SYN_DX + 1))
+        for c in real[sym]:                                    # the glyph's own cell at a shift: the pasted glyph
+            while len(variants) < VARIANTS_NEEDED:             # by construction (the colour bins take the background)
+                dy, dx = int(rng_v.integers(-2, 3)), int(rng_v.integers(-SYN_DX, SYN_DX + 1))
                 variants.append(np.roll(np.roll(c, dy, 0), dx, 1))
         others_ = [(k, c) for k, v in real.items() if k != sym for c in v]
         ok, row = _once_rule("letters", sym, rig, variants, others_, read_letter)
         once_rows[sym] = {"counted": ok, **row}
         (seen_once if ok else dropped).append(sym)
         cells.add(f"gate 2: {sym}, one real picture", "seen once" if ok else {"not counted": row},
-                  "counted when rigid, every variant read as itself, no other glyph read as it — else asked", True)
+                  f"counted when rigid, {VARIANTS_NEEDED} valid variants all read as itself, no other glyph read as "
+                  "it — else asked", True)
     never = sorted(x for x in syms if counts.get(x, 0) == 0)
     ask = sorted(set(never) | set(dropped))
     cells.add("gate 3: every symbol the result can show learnt (none never seen)", ask or "all", "all", not ask)
+    out.update(counts=counts, rig=rig, seen_once=seen_once, dropped=dropped, once=once_rows, ask=ask, never=never)
+    return out
+
+
+def train_letters(code: str, b: dict, kept: dict) -> int:
+    ends = end_roles(kept)
+    cells = pag.Cells()
+    g = letters_gates(code, b, kept, cells)
+    if "stop" in g:
+        rc = pag.finish(code, "train", cells, train_inputs(code, b), note=g["stop"])
+        pag.out(g["stop"])
+        return rc
+    spec, arrays = g["spec"], g["arrays"]
     cells.add("the reader usable", spec.get("usable"), True, bool(spec.get("usable")))
     want = {r: pag._role_class(r) for r in ends}
-    replay_cells(cells, spec, arrays, pdir, kept, want)
-    recorded = {"rigidity": rig, "seen once": seen_once, "once": once_rows, "not counted": dropped,
-                "pictures showing": counts, "synthetic": (rep.get("synthetic") or {})}
-    line = ask_line("letters", ask)
+    replay_cells(cells, spec, arrays, g["pdir"], kept, want)
+    recorded = {"rigidity": g["rig"], "seen once": g["seen_once"], "once": g["once"], "not counted": g["dropped"],
+                "pictures showing": g["counts"], "synthetic": (g["rep"].get("synthetic") or {})}
+    line = ask_line("letters", g["ask"])
     key = train_inputs(code, b)
     if cells.passed:
         _write_rules(code, b, spec, arrays, cells, key)

@@ -131,8 +131,9 @@ class Path_(Made):
         self.assertEqual(rc, 0, out)
         self.assertEqual(out.strip().splitlines()[-1], "Nothing more is needed.")
         rec = self.verdict("T83", "plan")["recorded"]
-        self.assertEqual(rec["symbols"], {"0": "twice or more", "1": "twice or more", "2": "once", "3": "once",
-                                          "4": "twice or more"})
+        self.assertEqual(rec["symbols"], {"0": "twice or more", "1": "twice or more",       # B215 (queue BQ): plan
+                                          "2": "once (counted: seen once)",                  # runs train's gates
+                                          "3": "once (counted: seen once)", "4": "twice or more"})
         saved = (es._find_place, es.learn_scores, es._find_columns)
 
         def no(*a, **k):
@@ -192,13 +193,14 @@ class Gates(unittest.TestCase):
         st = self.st
         bar = self.pag.BARS["rigid_min"][0]
         read = {"a": "5", "b": "5", "x": "3"}.get
-        ok, _ = st._once_rule("score", "5", {"rigidity": bar}, ["a", "b"], [("3", "x")], read)
+        eight = ["a", "b"] * 4                                          # B214 (queue BQ): eight valid variants
+        ok, _ = st._once_rule("score", "5", {"rigidity": bar}, eight, [("3", "x")], read)
         self.assertTrue(ok)
-        ok, _ = st._once_rule("score", "5", {"rigidity": bar - 0.0001}, ["a", "b"], [("3", "x")], read)
+        ok, _ = st._once_rule("score", "5", {"rigidity": bar - 0.0001}, eight, [("3", "x")], read)
         self.assertFalse(ok)                                             # not rigid
-        ok, _ = st._once_rule("score", "5", {"rigidity": 0.9}, ["a", "x"], [], read)
+        ok, _ = st._once_rule("score", "5", {"rigidity": 0.9}, ["a"] * 7 + ["x"], [], read)
         self.assertFalse(ok)                                             # a variant not read as itself
-        ok, _ = st._once_rule("score", "5", {"rigidity": 0.9}, ["a"], [("3", "b")], read)
+        ok, _ = st._once_rule("score", "5", {"rigidity": 0.9}, eight, [("3", "b")], read)
         self.assertFalse(ok)                                             # another symbol's glyph read as it
         ok, _ = st._once_rule("score", "5", {"rigidity": 0.9}, [], [], read)
         self.assertFalse(ok)                                             # no variant: not counted

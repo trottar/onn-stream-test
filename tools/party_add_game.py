@@ -472,6 +472,20 @@ def ps1_four_on(game: str) -> bool:
     return isinstance(entry, dict) and entry.get("ps1_multitap") == "port1"
 
 
+def new_path(old_b: dict, result: str, game: str | None = None) -> bool:
+    """B216: a score or letters title on the new path — its binding has a survey of that kind, or the old path's learn
+    never learnt it (no `learnt` in its binding, and no sidecar of the old learn's — one without `code` — in the rules
+    folder). T90 / T91 (learnt by learn), winner / places and --rules-players: the old path."""
+    if result not in ("score", "letters") or old_b.get("described"):
+        return False
+    if (old_b.get("survey") or {}).get("kind") == result:
+        return True
+    side = read_json(rules_folder() / f"{game}.party.json") if game else None
+    if isinstance(side, dict) and "code" not in side:
+        return False
+    return not old_b.get("learnt")
+
+
 def _roles_needed(players: int, result: str, per_ending: int = 2) -> list[str]:
     """B171: two saves of every ending from the start (`winner`), each from a different match; rehearse asks one for
     learn to run at all (per_ending=1). `places`: the rows that cover every place (each row another match already)."""
@@ -576,10 +590,16 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
         kept = {}
     else:
         kept = kept_states(code)
-        need = _roles_needed(players, result)
-        missing = [x for x in need if x not in kept]
-        cells.add("kept states present", sorted(kept), need + (["end_r<rows>"] if result == "places" else []),
-                  not missing)
+        if new_path(old_b, result, b.get("game")):           # B216: the new path — begin, other, one ending
+            need = ["begin", "other"]
+            missing = [x for x in need if x not in kept] + (
+                [] if any(k.startswith("end_P") for k in kept) else ["an ending (end_P1 or end_P2)"])
+            cells.add("kept states present", sorted(kept), "begin, other, one ending (the new path)", not missing)
+        else:
+            need = _roles_needed(players, result)
+            missing = [x for x in need if x not in kept]
+            cells.add("kept states present", sorted(kept), need + (["end_r<rows>"] if result == "places" else []),
+                      not missing)
         if missing:
             cells.add("missing", missing, [], False)
         cells.add("kept states distinct", len(set(kept.values())), len(kept), len(set(kept.values())) == len(kept))
@@ -601,6 +621,8 @@ def _register(code: str, a: dict) -> tuple[Cells, dict, str]:
               len(flag_lines) == BARS["flag_lines_found"][0] or b.get("described"))
     inputs = register_inputs(b, kept)
     b["register_inputs"] = inputs
+    if (old_b.get("survey") or {}).get("kind") == result:   # B216: a later --collect keeps the survey
+        b["survey"] = old_b["survey"]
     if collected:
         b["collected"] = {r: v for r, v in collected.items() if v.get("sha") == kept_states(code).get(r)}
     if not check:
