@@ -1137,11 +1137,14 @@ def read_scores(a: np.ndarray, score: dict, refs: np.ndarray) -> dict:
             "margin": round(least, 4) if least is not None else None}
 
 
-def _digit_stats(cells: dict, shown: dict) -> tuple:
-    """B178's templates, thresholds and margin from {key: [cells]} -> (keys, refs, gaps, need, noise, smallest)."""
+def _digit_stats(cells: dict, shown: dict, train: dict | None = None) -> tuple:
+    """B178's templates, thresholds and margin from {key: [cells]} -> (keys, refs, gaps, need, noise, smallest).
+    B205: `train` ({key: [synthetic cells]}) joins the templates only; every measure is of the real cells alone."""
     empty = np.zeros((0, SCORE_CELL[0] + 2, SCORE_CELL[1] + 2), np.float32)
     keys = sorted(cells)
-    refs = np.stack([np.mean(cells[k], axis=0) for k in keys]).astype(np.float32) if keys else empty
+    train = train or {}
+    refs = (np.stack([np.mean(list(cells[k]) + list(train.get(k, []))[:len(cells[k])], axis=0)   # B205: the
+                      for k in keys]).astype(np.float32) if keys else empty)    # synthetic weigh at most as the real
     own_of = {k: max(float(cell_dists(c, refs[i:i + 1])[0]) for c in cells[k]) for i, k in enumerate(keys)}
     noise = max([own_of[k] for k in keys if shown.get(k, 0) >= 2] or [0.0])     # one digit from save to save
     gaps, margins = {}, []
@@ -1455,6 +1458,107 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
 
 
 SIZES_PER_DIGIT = 12             # B204: the glyphs of one digit and one size weighed (the first, in save order)
+SYN_DIGIT_HELD, SYN_DIGIT_PER_ROUND, SYN_DIGIT_ROUNDS = 6, 12, 4    # B205: per digit: held out, added a round, rounds
+
+
+def real_glyphs(first: dict, saves: dict, places: list, columns: list) -> list:
+    """B205: every labelled glyph on each save's first picture -> [(key, crop, ink)], the crop the place's rows and the
+    glyph's columns 2 px around, its ink by the place's own polarity and radius."""
+    out = []
+    for r in sorted(first):
+        a = first[r]
+        nums, lines, _paths = saves[r]
+        contrast = _contrast(a)
+        spots = [(p_, nums[k]) for k, p_ in enumerate(places)]
+        spots += [(p_, lines[k][c]) for k, row in enumerate(columns) for c, p_ in enumerate(row)
+                  if p_ is not None and k < len(lines) and c < len(lines[k]) and lines[k][c] is not None]
+        for pl, v in spots:
+            gl = place_glyphs(a, pl, contrast)
+            if gl is None or len(gl) != len(str(v)):
+                continue
+            for ch, g in zip(str(v), gl):
+                y0, y1 = max(0, pl["top"] - 2), min(a.shape[0], pl["bot"] + 3)
+                x0, x1 = max(0, g[1] - 2), min(a.shape[1], g[3] + 3)
+                crop = a[y0:y1, x0:x1].copy()
+                ink = _ink(a, pl["pol"], int(pl["r"]), contrast)[y0:y1, x0:x1]
+                out.append((pl["group"] + ch, crop, ink, pl["pol"]))
+    return out
+
+
+def synthetic_digits(real: list, frames: list, heights: dict, rng, per: int) -> dict:
+    """B205: `per` synthetic glyphs of each key — a real glyph of that key, scaled to one of the heights its group is
+    drawn at, its ink pasted over a patch of one of the title's own pictures (a random place), moved by up to 1 px,
+    then a cell as `glyph_cell` makes it. -> {key: [cells]}. Never a key no real glyph has."""
+    by: dict = {}
+    for key, crop, ink, pol in real:
+        by.setdefault(key, []).append((crop, ink, pol))
+    out: dict = {}
+    for key in sorted(by):
+        hs = sorted(heights.get(key[:-1]) or [by[key][0][0].shape[0] - 4])
+        for _j in range(per):
+            crop, ink, pol = by[key][int(rng.integers(len(by[key])))]
+            h = int(hs[int(rng.integers(len(hs)))]) + 4
+            w = max(3, int(round(crop.shape[1] * h / crop.shape[0])))
+            c2 = np.asarray(Image.fromarray(np.clip(crop, 0, 255).astype(np.uint8)).resize((w, h), Image.BILINEAR),
+                            np.float32)
+            m2 = np.asarray(Image.fromarray(ink.astype(np.uint8) * 255).resize((w, h), Image.NEAREST)) > 127
+            src = frames[int(rng.integers(len(frames)))]
+            H, W = src.shape
+            if h >= H or w >= W:
+                continue
+            sy, sx = int(rng.integers(0, H - h)), int(rng.integers(0, W - w))
+            b = src[sy:sy + h, sx:sx + w].copy()
+            dy, dx = (int(v) for v in rng.integers(-1, 2, 2))
+            m2 = np.roll(np.roll(m2, dy, 0), dx, 1)
+            b[m2] = np.roll(np.roll(c2, dy, 0), dx, 1)[m2]
+            g = (2, 2, h - 3, w - 3)
+            out.setdefault(key, []).append(glyph_cell(b, g, {"top": 2, "bot": h - 3, "pol": pol}))
+    return out
+
+
+def _held_read(held: dict, keys: list, refs: np.ndarray, gaps: dict, need) -> tuple[int, int]:
+    """B205: how many held-out synthetic glyphs B178's rule reads as their own digit (nearest of the group, within its
+    threshold, the margin needed) -> (read, of)."""
+    got = n = 0
+    for key, cs in held.items():
+        idx = [i for i, k in enumerate(keys) if k[:-1] == key[:-1]]
+        thr = gaps.get(key, {}).get("threshold")
+        for c in cs:
+            n += 1
+            d = cell_dists(c, refs[idx])
+            o = np.argsort(d, kind="stable")
+            best = keys[idx[int(o[0])]]
+            margin = float(d[o[1]] - d[o[0]]) if len(idx) > 1 else float("inf")
+            got += (best == key and thr is not None and float(d[o[0]]) <= thr and need is not None and margin >= need)
+    return got, n
+
+
+def train_digits(first: dict, saves: dict, places: list, columns: list, keys: list, gaps: dict, need, cells: dict,
+                 shown: dict) -> tuple[dict, dict]:
+    """B205 (B192's way, for digits): held-out synthetic glyphs made first, then rounds of training glyphs until every
+    held-out one is read by templates learnt from the real and the training glyphs (the gates measured on the real
+    ones alone) -> ({key: [training cells]}, the record: held out, trained, rounds, read, seed)."""
+    real = real_glyphs(first, saves, places, columns)
+    if not real:
+        return {}, {"held out": 0, "trained": 0, "rounds": 0}
+    heights: dict = {}
+    for p_ in list(places) + [q for row in columns for q in row if q is not None]:
+        heights.setdefault(p_["group"], set()).add(p_["bot"] - p_["top"] + 1)
+    seed = letters_seed([(first[r], [str(x) for x in saves[r][0]] + [str(x) for row in saves[r][1] for x in row])
+                         for r in sorted(first)])
+    rng = np.random.default_rng(seed)
+    frames = [first[r] for r in sorted(first)]
+    held = synthetic_digits(real, frames, heights, rng, SYN_DIGIT_HELD)
+    train: dict = {}
+    read, of, rounds = _held_read(held, keys, _digit_stats(cells, shown)[1], gaps, need) + (0,)
+    while read < of and rounds < SYN_DIGIT_ROUNDS:
+        rounds += 1
+        for k, v in synthetic_digits(real, frames, heights, rng, SYN_DIGIT_PER_ROUND).items():
+            train.setdefault(k, []).extend(v)
+        k2, refs2, gaps2, need2, _n, _s = _digit_stats(cells, shown, train)
+        read, of = _held_read(held, k2, refs2, gaps2, need2)
+    return train, {"held out": of, "held out read": read, "trained": sum(len(v) for v in train.values()),
+                   "rounds": rounds, "seed": seed}
 
 
 def _one_font(cells: dict, fg: str, og: str) -> tuple[bool, float | None, float | None]:
@@ -1585,8 +1689,15 @@ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
             if any(v["counted"] for v in sizes.values()):
                 cells, unfit, shown = gather(columns)
         keys, refs, gaps, need, noise, small = _digit_stats(cells, shown)
+    trained = None
+    if keys and need is not None:                             # B205: synthetic glyphs for the templates only
+        t0 = time.perf_counter()
+        train, trained = train_digits(first, saves, places, columns, keys, gaps, need, cells, shown)
+        if train:
+            keys, refs, gaps, need, noise, small = _digit_stats(cells, shown, train)
+        trained["seconds"] = round(time.perf_counter() - t0, 2)
     score = {**base, "found": True, "pooled": pooled, **_stat_score(keys, gaps, need), "columns": columns,
-             **({"sizes": sizes} if sizes else {}),
+             **({"sizes": sizes} if sizes else {}), **({"trained": trained} if trained else {}),
              "glyphs": {k: len(cells[k]) for k in keys}, "saves_showing": shown, "noise": round(noise, 4),
              "unfit": {r: sorted(v) for r, v in sorted(unfit.items())}}
     report = {"found": True, "places": places, "columns": columns, "digits": gaps, "margin_needed": need,

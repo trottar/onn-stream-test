@@ -7,7 +7,7 @@ Written by `tools/party_add_game.py` (B157). Every cell as read / bar / met; no 
 | spec usable | true | true | yes |
 | the score places found | "found" | "found" | yes |
 | every digit separable | [] | [] | yes |
-| digit margin_needed | 0.1943 | ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))" | yes |
+| digit margin_needed | 0.0882 | ">= 0.0796 (T89's kept spec (the lower of T88 0.0921 / T89 0.0796))" | yes |
 | held-out frames read as another class | 0 | 0 | yes |
 | held-out frames read unknown (share) | 0.0 | "<= 0.105" | yes |
 | other read as a screen | 0 | 0 | yes |
@@ -25,7 +25,7 @@ Written by `tools/party_add_game.py` (B157). Every cell as read / bar / met; no 
 | no two saves of one ending the same picture | [] | ">= 1.0 grey (64 x 48 grey, mean |difference| of the screens that stay; H7-V1: one state run twice, 391 of 400 frames under 1.0)" | yes |
 | left out: end_P1 | ["02+_+_+_+_+13+00+00+00+01+00=02-00+_+_+_+_+00+00+00+00+00+00=00", 1.5] | "02+_+_+_+_=02:13.00.00.00.01.00-00+_+_+_+_=00:00.00.00.00.00.00 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)" | yes |
 | left out: end_P1_2 | ["0?+_+_+_+_+00+00+00+00+00+00=0?-04+_+_+_+_+00+00+00+00+00+00=04", "1.5 (the full reader's)"] | "05+_+_+_+_=05:00.00.00.00.00.00-04+_+_+_+_=04:00.00.00.00.00.00 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)" | **no** |
-| left out: end_P2 | ["02+_+_+_+_+00+00+00+00+00+00=02-03+_+_+_+_+00+00+00+00+00+00=03", 14.0] | "02+_+_+_+_=02:00.00.00.00.00.00-03+_+_+_+_=03:00.00.00.00.00.00 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)" | **no** |
+| left out: end_P2 | ["02+_+_+_+_+00+00+00+00+00+00=02-03+_+_+_+_+00+00+00+00+00+00=03", 2.0] | "02+_+_+_+_=02:00.00.00.00.00.00-03+_+_+_+_=03:00.00.00.00.00.00 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)" | yes |
 | left out: end_P2_2 | ["00+_+_+_+_+00+00+00+00+00+00=00-02+_+_+_+_+00+00+00+00+00+00=02", 2.0] | "00+_+_+_+_=00:00.00.00.00.00.00-02+_+_+_+_=02:00.00.00.00.00.00 (every number) within <= 2.0 s, never other numbers (a digit only it shows read with its own other glyphs; a column only it fills shown only here)" | yes |
 | every digit that can occur up to 5 (0, 1, 2, 3, 4, 5) read by a reader learnt without each save that shows it | {"across-save spread": {"across": 0.6741, "bar": "across <= within + 0.05", "met": true, "pairs": [4800, 1546], "within": 0.6658}, "learnt from one save": {"1": "2 glyphs in end_P1, 2 read back", "4": "2 glyphs in end_P1_2, 2 read back", "5": "2 glyphs in end_P1_2, 0 read back \u2014 not learnt"}, "not expected (above the highest score)": ["6", "7", "8", "9"], "shown by fewer than two saves": ["5"]} | {"shown by fewer than two saves": []} | **no** |
 
