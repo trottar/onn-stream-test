@@ -4,7 +4,8 @@ as_of: 2026-11-20
 status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture; B198 / B199 a score title's highest score, `--max-score`, and whether a match can end level; B200 a score title's
 numbers read as drawn, leading zeros included; B201 `--find` takes the user's words as said; B202 the user's saves asked
 only after register names them missing, no "other teams / characters" for score and letters, the highest score's later
-change taken as said). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+change taken as said; B204 every number on the final screen read, the stats table included, another size of the
+score's font counted when the numbers say so). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
 
 # ADD-GAME — one title, by its code, through the tool's five stages
@@ -290,6 +291,11 @@ python3 tools/party_add_game.py close <code>                                    
     row's digit: `label <code> look=all`. Else, for each row holding a tile that is not its digit: `label <code>
     look=<the row's digit>:<the tile numbers joined by '.'>` (e.g. `look=9:2.5`). The tool then names the saves those
     tiles came from: read them again as below. Nothing to the user.
+  - **B204: read every number on the final screen** — the finals, every period cell, and a stats table's rows (shots,
+    fouls, corners …) after `:`, top to bottom, joined by `.`: T92's `end_P1=02+_+_+_+_=02:13.00.00.00.01.00-00+_+_+_+_=00:00.00.00.00.00.00`.
+    Only the final is the result; the period cells add up to it; the stats have no sum (the two readings, the
+    read-back and the last look guard them). Glyphs of the score's font at another size count as their digit when the
+    title's own numbers show it is one font (B204); else they check the reading only.
   - **B200: read every number as drawn, leading zeros included** — a screen that draws 03 is read `03`, not `3`
     (T92's: `end_P1=02+_+_+_+_=02-00+_+_+_+_=00,…`); a screen that draws 3 is read `3`. The tool counts each drawn
     glyph (the leading 0 is a 0 it learns) and checks the values (03 is 3).

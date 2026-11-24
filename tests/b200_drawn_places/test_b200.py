@@ -9,8 +9,9 @@ a place whose glyphs are the same shape in saves labelled with different digits 
   first cells found off the finals' line, in their own group "c:"), learn PASS, the spec's places the numbers.
 - `Single`: the same saves read as single numbers ("3+_+_+_+_=3-1+_+_+_+_=1") -> label FAIL, never a PASS; never a
   place on the hollow of a final's leading 0 (the trap T92's first run fell into); learn refused.
-- `Counted`: two periods filled (the cells 01 + 02 = the final 03): the cells' 2 is never in a final -> learn's
-  every-digit cell names 2 short (the small cells teach no final's digit).
+- `Counted`: two periods filled (the cells 01 + 02 = the final 03): the cells' 2 is never in a final; B204 (queue BN):
+  the cells are the finals' font at another size, so their 2 counts and learn passes (B200 had it
+  short; a small font of another face teaches nothing: `tests/b204_every_number`, `Sizes`).
 - `Panel` (B198's disclosed case): B178's own made-up final screen (a dark panel under each number) with single-digit
   finals -> the places found are the numbers (never the panel), or the place cell is not met; never a panel taken.
 - `Value`: `Drawn` — its value for checks, its glyphs for counts; a reading without a leading 0 is today's text.
@@ -119,9 +120,10 @@ class Drawn(Made):
         for k in range(2):                                     # the first period's cell, off the finals' line
             self.assertTrue(cols[k][0] and inside(cols[k][0], cell_box(k)), cols)
             self.assertTrue(cols[k][0]["offline"])
-            self.assertEqual(cols[k][0]["group"], "c:")
+            self.assertEqual(cols[k][0]["group"], "")            # B204 (queue BN): one font at another size, counted
             self.assertEqual(cols[k][1:], [None] * 4)
-        self.assertEqual(sorted({k[:-1] for k in spec["score"]["keys"]}), ["", "c:"])
+        self.assertEqual(sorted({k[:-1] for k in spec["score"]["keys"]}), [""])
+        self.assertTrue(spec["score"]["sizes"]["c:"]["counted"])
         self.assertEqual(v["recorded"]["digits"]["expected"], list("0123"))
 
 
@@ -142,17 +144,17 @@ class Single(Made):
 
 
 class Counted(Made):
-    def test_1_small_cells_teach_no_final_digit(self):
+    def test_1_small_cells_of_the_score_font_count(self):
         self.put_max("T73", COUNTED, 3)
         rc, out = self.label_with("T73", COUNTED, drawn)
         v = self.verdict("T73", "label")
         self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
         rc, out = self.tool("learn", "T73")
         v = self.verdict("T73", "learn")
-        self.assertEqual(rc, 1, out)
-        cell = b198.cell(3, "0123")
-        self.assertIn(cell, v["bad"])
-        self.assertEqual(v["cells"][cell]["shown by fewer than two saves"], ["2"])
+        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))     # B204 (queue BN): the cells are the finals' font at
+        cell = b198.cell(3, "0123")                             # another size, so their 2 counts and learn passes
+        self.assertEqual(v["cells"][cell]["shown by fewer than two saves"], [])   # (B200 had 2 short; another face
+        #                                                                           teaches nothing: test_b204.Sizes)
 
 
 class Panel(Made):

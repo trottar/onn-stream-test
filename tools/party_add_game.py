@@ -1169,7 +1169,8 @@ def learn_inputs(code: str, b: dict) -> str:
 
 # --- B178: label — the session reads each end save's final score; the tool checks every reading -----------------------
 SCORE_VERSION = 4                                            # h7_endscreen's version-4 spec (each side's number)
-SIDE = r"(?:(?:\d{1,4}|_)(?:\+(?:\d{1,4}|_))*=)?\d{1,4}"     # B181: a side's final, or its line score 9+2+2+2+_+_=15
+SIDE = (r"(?:(?:\d{1,4}|_)(?:\+(?:\d{1,4}|_))*=)?\d{1,4}"    # B181: a side's final, or its line score 9+2+2+2+_+_=15
+        r"(?::(?:\d{1,4}|_)(?:\.(?:\d{1,4}|_))*)?")             # B204: then ':' and its stats rows, 13.00.01
 READING = re.compile(rf"^{SIDE}(?:-{SIDE}){{1,3}}$")
 LOOK = re.compile(r"^look=(all|[0-9]:\d+(?:\.\d+)*)$")      # B183: the last look's answer
 LEFT_OUT_TRIES = 2                                           # a save named this often after the session read it again:
@@ -1207,20 +1208,44 @@ def label_inputs(code: str, b: dict) -> str:
     return digest({"register": b["register_inputs"], "kept": kept_states(code), "labels": readings(code)})
 
 
+class Row(list):
+    """B204: a side's numbers besides its final — its period cells, then its stats rows (`periods`: how many are period
+    cells; only they add up to the final)."""
+
+    def __init__(self, items=(), periods: int | None = None):
+        super().__init__(items)
+        self.periods = len(self) if periods is None else periods
+
+
 def _sides(text: str) -> list[tuple[list, int]]:
     """B181: a reading's sides, P1 first: (its cells left to right — a number, or None for a blank — , its final);
-    B200: every number as drawn (`_drawn`: "03" is 3, its glyphs 0 and 3)."""
+    B200: every number as drawn (`_drawn`: "03" is 3, its glyphs 0 and 3); B204: the cells a `Row` — the period
+    cells, then the stats rows after ':' (each one more column for the learner, never in the sum)."""
     out = []
     for side in text.split("-"):
+        side, colon, stats = side.partition(":")
         cells, eq, fin = side.rpartition("=")
-        out.append(([None if x == "_" else _drawn(x) for x in cells.split("+")] if eq else [], _drawn(fin)))
+        per = [None if x == "_" else _drawn(x) for x in cells.split("+")] if eq else []
+        st = [None if x == "_" else _drawn(x) for x in stats.split(".")] if colon else []
+        out.append((Row(per + st, len(per)), _drawn(fin)))
     return out
 
 
+def _periods(cells) -> list:
+    """B204: the period cells of a side's cells (the stats rows left out)."""
+    return list(cells[:getattr(cells, "periods", len(cells))])
+
+
 def _text(sides) -> str:
-    """B200: every number as given (a drawn leading 0 kept; a number without one as today)."""
-    return "-".join(("+".join("_" if c is None else str(c) for c in cells) + "=" if cells else "") + str(fin)
-                    for cells, fin in sides)
+    """B200: every number as given (a drawn leading 0 kept; a number without one as today); B204: the stats rows after
+    ':'."""
+    def one(cells, fin):
+        n = getattr(cells, "periods", len(cells))
+        per, st = list(cells[:n]), list(cells[n:])
+        word = lambda c: "_" if c is None else str(c)
+        return (("+".join(map(word, per)) + "=" if per else "") + str(fin)
+                + (":" + ".".join(map(word, st)) if st else ""))
+    return "-".join(one(cells, fin) for cells, fin in sides)
 
 
 def _finals(text: str) -> list[int]:
@@ -1237,7 +1262,11 @@ def _numbers(code: str, role: str) -> list[int] | None:
 
 
 def _score_class(text: str) -> str:
-    return "end_s" + text
+    """The learner's class: B204 — every period cell and stats row one column of its side (no ':' there)."""
+    if ":" not in text:
+        return "end_s" + text
+    return "end_s" + "-".join(("+".join("_" if c is None else str(c) for c in cells) + "=" if cells else "") + str(fin)
+                              for cells, fin in _sides(text))
 
 
 def _side_words(n: int, cells: bool = False) -> str:
@@ -1530,7 +1559,8 @@ def _culprit(es, b: dict, pics: Path, kept: dict, ends: list, texts: dict, contr
     save read back as labelled; None when no single one does."""
     for x in sorted(contradicted):
         got = contradicted[x]
-        mended = [([_mend(w, g) for w, g in zip(wc, gc)], wf if _mend(wf, gf) is None else _mend(wf, gf))
+        mended = [(Row([_mend(w, g) for w, g in zip(wc, gc)], getattr(wc, "periods", None)),
+                   wf if _mend(wf, gf) is None else _mend(wf, gf))
                   for (wc, wf), (gc, gf) in zip(_sides(texts[x]), got)]   # B200: a final read blank keeps its label
         t2 = {**texts, x: _text(mended)}
         labels2 = _labels(pics, kept, es, {r: _score_class(t2[r]) for r in ends})
@@ -1622,7 +1652,7 @@ def _ask_line(code: str, b: dict, rec: dict, role: str, why: str, texts: dict, f
     match = f"the match player {k} won {{final}}{' in overtime' if overtime else ''}, {_when_saved(code, b, role)}"
     doubt = []
     for j, ((c1, f1), (c2, f2)) in enumerate(zip(one, two)):
-        bad_sum = why == "sum" and c1 and sum(x for x in c1 if x is not None) != f1
+        bad_sum = why == "sum" and _periods(c1) and sum(x for x in _periods(c1) if x is not None) != f1
         cols = [c for c in range(len(c1)) if why == "readings" and (c >= len(c2) or c1[c] != c2[c])]
         cols = list(range(len(c1))) if bad_sum else cols
         fin = bad_sum or (why == "readings" and f1 != f2)
@@ -1718,7 +1748,8 @@ def cmd_label(code: str, a: dict) -> int:
         ahead = all(nums[k - 1] > x for j, x in enumerate(nums) if j != k - 1)
         if not cells.add(f"{role}: the role's player ahead", nums, f"P{k} more than every other side", ahead):
             name(role, f"P{k} is not ahead in it", "ahead")
-        sums = [(k_ + 1, sum(x for x in cl if x is not None), fin) for k_, (cl, fin) in enumerate(_sides(rd[0])) if cl]
+        sums = [(k_ + 1, sum(x for x in _periods(cl) if x is not None), fin)                # B204: periods only
+                for k_, (cl, fin) in enumerate(_sides(rd[0])) if _periods(cl)]
         if sums:                                             # B181: each side's cells add up to its final
             bad = [x for x in sums if x[1] != x[2]]
             if not cells.add(f"{role}: the cells add up to the finals", [[s_, f_] for _k, s_, f_ in sums],
@@ -1816,7 +1847,9 @@ def cmd_label(code: str, a: dict) -> int:
         line = (f"Read the final score on each end save's two pictures in the title's add_game folder, label/ "
                 f"(<role>.1.png and <role>.2.png), each side's number, P1 first, each number as drawn, leading zeros "
                 f"included (a drawn 03 is 03, not 3) — with a line score, each side's cells "
-                f"left to right joined by '+' ('_' for a blank cell) then '=' and its final; then label {code} "
+                f"left to right joined by '+' ('_' for a blank cell) then '=' and its final; with a stats table "
+                f"under it, then ':' and each stats row's number, top to bottom, joined by '.' (every number on "
+                f"the screen; only the final is the result); then label {code} "
                 + " ".join(f"{r}={words},{words}" for r in missing) + " (the first reading from .1, the second from .2).")
         recorded["read"] = missing
     elif named:

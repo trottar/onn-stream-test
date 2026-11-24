@@ -1,0 +1,455 @@
+diff --git a/docs/memory/handoffs/ADD_GAME_TASK.md b/docs/memory/handoffs/ADD_GAME_TASK.md
+index b9b956e9..ec275d6f 100644
+--- a/docs/memory/handoffs/ADD_GAME_TASK.md
++++ b/docs/memory/handoffs/ADD_GAME_TASK.md
+@@ -4,7 +4,8 @@ as_of: 2026-11-20
+ status: FIXED TASK (session A, hardware) — add one party mini game by its code with tools/party_add_game.py (B157; B162 solo's one-title setting, its title cell, S's listed switches, the in-game saves recorded, the pads' words; B163 rehearse for a title already added; B171 two saves per ending, learn's line for one more save, the cap; B172 the solo mark ended at close; B175 every save read by a spec learnt without it; B176 a save in the wrong role, the same match saved twice; B178 `--result score` and its label stage, the one picture the session reads; B179 a stop at the questions for a way of showing who won the tool has no kind for; B181 the whole line score read, every digit 0-9 learnt; B182 an unreadable final screen given up at once; B183 the last look at every glyph; B185 a column only one save fills (overtime) never refused; B186 a digit one save shows several times learnt from it; B187 the ask to the user, rare, plain, with the picture; B198 / B199 a score title's highest score, `--max-score`, and whether a match can end level; B200 a score title's
+ numbers read as drawn, leading zeros included; B201 `--find` takes the user's words as said; B202 the user's saves asked
+ only after register names them missing, no "other teams / characters" for score and letters, the highest score's later
+-change taken as said). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
++change taken as said; B204 every number on the final screen read, the stats table included, another size of the
++score's font counted when the numbers say so). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
+ ---
+ 
+ # ADD-GAME — one title, by its code, through the tool's five stages
+@@ -290,6 +291,11 @@ python3 tools/party_add_game.py close <code>
+     row's digit: `label <code> look=all`. Else, for each row holding a tile that is not its digit: `label <code>
+     look=<the row's digit>:<the tile numbers joined by '.'>` (e.g. `look=9:2.5`). The tool then names the saves those
+     tiles came from: read them again as below. Nothing to the user.
++  - **B204: read every number on the final screen** — the finals, every period cell, and a stats table's rows (shots,
++    fouls, corners …) after `:`, top to bottom, joined by `.`: T92's `end_P1=02+_+_+_+_=02:13.00.00.00.01.00-00+_+_+_+_=00:00.00.00.00.00.00`.
++    Only the final is the result; the period cells add up to it; the stats have no sum (the two readings, the
++    read-back and the last look guard them). Glyphs of the score's font at another size count as their digit when the
++    title's own numbers show it is one font (B204); else they check the reading only.
+   - **B200: read every number as drawn, leading zeros included** — a screen that draws 03 is read `03`, not `3`
+     (T92's: `end_P1=02+_+_+_+_=02-00+_+_+_+_=00,…`); a screen that draws 3 is read `3`. The tool counts each drawn
+     glyph (the leading 0 is a 0 it learns) and checks the values (03 is 3).
+diff --git a/tests/b200_drawn_places/test_b200.py b/tests/b200_drawn_places/test_b200.py
+index a003f021..4d347d4b 100644
+--- a/tests/b200_drawn_places/test_b200.py
++++ b/tests/b200_drawn_places/test_b200.py
+@@ -9,8 +9,9 @@ a place whose glyphs are the same shape in saves labelled with different digits
+   first cells found off the finals' line, in their own group "c:"), learn PASS, the spec's places the numbers.
+ - `Single`: the same saves read as single numbers ("3+_+_+_+_=3-1+_+_+_+_=1") -> label FAIL, never a PASS; never a
+   place on the hollow of a final's leading 0 (the trap T92's first run fell into); learn refused.
+-- `Counted`: two periods filled (the cells 01 + 02 = the final 03): the cells' 2 is never in a final -> learn's
+-  every-digit cell names 2 short (the small cells teach no final's digit).
++- `Counted`: two periods filled (the cells 01 + 02 = the final 03): the cells' 2 is never in a final; B204 (queue BN):
++  the cells are the finals' font at another size, so their 2 counts and learn passes (B200 had it
++  short; a small font of another face teaches nothing: `tests/b204_every_number`, `Sizes`).
+ - `Panel` (B198's disclosed case): B178's own made-up final screen (a dark panel under each number) with single-digit
+   finals -> the places found are the numbers (never the panel), or the place cell is not met; never a panel taken.
+ - `Value`: `Drawn` — its value for checks, its glyphs for counts; a reading without a leading 0 is today's text.
+@@ -119,9 +120,10 @@ class Drawn(Made):
+         for k in range(2):                                     # the first period's cell, off the finals' line
+             self.assertTrue(cols[k][0] and inside(cols[k][0], cell_box(k)), cols)
+             self.assertTrue(cols[k][0]["offline"])
+-            self.assertEqual(cols[k][0]["group"], "c:")
++            self.assertEqual(cols[k][0]["group"], "")            # B204 (queue BN): one font at another size, counted
+             self.assertEqual(cols[k][1:], [None] * 4)
+-        self.assertEqual(sorted({k[:-1] for k in spec["score"]["keys"]}), ["", "c:"])
++        self.assertEqual(sorted({k[:-1] for k in spec["score"]["keys"]}), [""])
++        self.assertTrue(spec["score"]["sizes"]["c:"]["counted"])
+         self.assertEqual(v["recorded"]["digits"]["expected"], list("0123"))
+ 
+ 
+@@ -142,17 +144,17 @@ class Single(Made):
+ 
+ 
+ class Counted(Made):
+-    def test_1_small_cells_teach_no_final_digit(self):
++    def test_1_small_cells_of_the_score_font_count(self):
+         self.put_max("T73", COUNTED, 3)
+         rc, out = self.label_with("T73", COUNTED, drawn)
+         v = self.verdict("T73", "label")
+         self.assertEqual(rc, 0, out + json.dumps(v["bad"]))
+         rc, out = self.tool("learn", "T73")
+         v = self.verdict("T73", "learn")
+-        self.assertEqual(rc, 1, out)
+-        cell = b198.cell(3, "0123")
+-        self.assertIn(cell, v["bad"])
+-        self.assertEqual(v["cells"][cell]["shown by fewer than two saves"], ["2"])
++        self.assertEqual(rc, 0, out + json.dumps(v["bad"]))     # B204 (queue BN): the cells are the finals' font at
++        cell = b198.cell(3, "0123")                             # another size, so their 2 counts and learn passes
++        self.assertEqual(v["cells"][cell]["shown by fewer than two saves"], [])   # (B200 had 2 short; another face
++        #                                                                           teaches nothing: test_b204.Sizes)
+ 
+ 
+ class Panel(Made):
+diff --git a/tools/h7_endscreen.py b/tools/h7_endscreen.py
+index b453c83f..1c6b1bd1 100644
+--- a/tools/h7_endscreen.py
++++ b/tools/h7_endscreen.py
+@@ -1288,7 +1288,21 @@ def _clusters(points: list) -> list:
+     return out
+ 
+ 
+-def _offline_column(first: dict, want: dict, taken: list) -> tuple[list, list]:
++def _centre(p_: dict) -> tuple[float, float]:
++    return (p_["x0"] + p_["x1"]) / 2.0, (p_["top"] + p_["bot"]) / 2.0
++
++
++def _nearest_own(pl: dict, own: dict | None, finals: list) -> bool:
++    """B204: an off-line column is its side's when it is no farther from that side's final than from any other's."""
++    if own is None:
++        return True
++    cx, cy = _centre(pl)
++    dist = lambda f: ((_centre(f)[0] - cx) ** 2 + (_centre(f)[1] - cy) ** 2) ** 0.5
++    return all(dist(own) <= dist(f) for f in finals if f is not own)
++
++
++def _offline_column(first: dict, want: dict, taken: list, own: dict | None = None,
++                    finals: list | None = None) -> tuple[list, list]:
+     """B200: a filled column with no place on its final's line, looked for anywhere on the picture as a final is: a
+     string with as many glyphs as each save's cell is drawn with, at one place in every save that fills it, its shapes
+     explained by the labels, overlapping no place already taken, no number there in a save whose cell is blank. ->
+@@ -1300,7 +1314,7 @@ def _offline_column(first: dict, want: dict, taken: list) -> tuple[list, list]:
+     excused: list = []
+ 
+     def ok(pl):
+-        if any(_overlap(pl, t) for t in taken):
++        if any(_overlap(pl, t) for t in taken) or not _nearest_own(pl, own, finals or []):
+             return False, []
+         if any(place_glyphs(first[r], pl) is not None for r in blank):
+             return False, blank
+@@ -1330,24 +1344,31 @@ def _before(a: dict, b: dict) -> bool:
+ def _choose_offline(cands: dict) -> dict:
+     """B200: a side's off-line columns chosen together — none overlapping another, the periods in the order they are
+     drawn (a later column never before an earlier one in reading order) first, then the fewest explained only with a
+-    save left out, then the glyphs' fit summed, then each column's own order. {column: candidates} -> {column: place} (empty when no choice holds)."""
+-    import itertools
++    save left out, then the glyphs' fit summed, then each column's own order. B204: each column weighs as many
++    candidates as the side has off-line columns (at least SCORE_CHOICES), searched depth first, overlaps pruned.
++    {column: candidates} -> {column: place} (empty when no choice holds)."""
+     cols = sorted(cands)
+-    best = None
+-    for combo in itertools.product(*[cands[c][:SCORE_CHOICES] for c in cols]):
+-        pls = [x[1] for x in combo]
+-        if any(_overlap(a_, b_) for i, a_ in enumerate(pls) for b_ in pls[i + 1:]):
+-            continue
+-        out_of_order = sum(1 for i in range(len(pls)) for j in range(i + 1, len(pls)) if _before(pls[j], pls[i]))
+-        key = (out_of_order, sum(1 for x in combo if x[2]), round(sum(x[0] for x in combo), 4),
+-               [cands[c].index(x) for c, x in zip(cols, combo)])
+-        if best is None or key < best[0]:
+-            best = (key, {c: dict(x[1]) for c, x in zip(cols, combo)})
+-    return best[1] if best else {}
++    cap = max(SCORE_CHOICES, len(cols))
++    best = [None]
++
++    def walk(i: int, combo: list) -> None:
++        if i == len(cols):
++            pls = [x[1] for x in combo]
++            out_of_order = sum(1 for a_ in range(len(pls)) for b_ in range(a_ + 1, len(pls)) if _before(pls[b_], pls[a_]))
++            key = (out_of_order, sum(1 for x in combo if x[2]), round(sum(x[0] for x in combo), 4),
++                   [cands[c].index(x) for c, x in zip(cols, combo)])
++            if best[0] is None or key < best[0][0]:
++                best[0] = (key, {c: dict(x[1]) for c, x in zip(cols, combo)})
++            return
++        for x in cands[cols[i]][:cap]:
++            if not any(_overlap(x[1], y[1]) for y in combo):
++                walk(i + 1, combo + [x])
++    walk(0, [])
++    return best[0][1] if best[0] else {}
+ 
+ 
+ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, refs1: np.ndarray,
+-                  taken: list | None = None) -> tuple:
++                  taken: list | None = None, finals: list | None = None) -> tuple:
+     """B181: side k's line-score columns, left to right, on its final's line (section B181 of the design). ->
+     ([place or None per column], {column: the saves where it breaks} for a labelled column with no place). B200: a
+     place whose shapes its labels do not explain is never taken; a column with no place on the line is looked for off
+@@ -1404,7 +1425,7 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
+             if ok:
+                 valid.append((cx, agree, pl))
+         if not valid:                                         # B200: off the final's line
+-            got, miss = _offline_column(first, want, taken + [p_ for p_ in cols if p_ is not None])
++            got, miss = _offline_column(first, want, taken + [p_ for p_ in cols if p_ is not None], fin, finals)
+             if got:
+                 off[c] = got
+                 cols.append(None)                             # chosen with the side's other off-line columns
+@@ -1433,6 +1454,26 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
+     return cols, broken
+ 
+ 
++SIZES_PER_DIGIT = 12             # B204: the glyphs of one digit and one size weighed (the first, in save order)
++
++
++def _one_font(cells: dict, fg: str, og: str) -> tuple[bool, float | None, float | None]:
++    """B204: whether a group of another size is the score's own font — every pair of one digit across the two groups
++    (the digits both show) nearer than every pair of two digits (either group). {key: [cells]} -> (counted, the
++    farthest one-digit pair across sizes, the nearest two-digit pair); not counted when no digit is in both."""
++    def own(g):
++        return {k[-1]: v[:SIZES_PER_DIGIT] for k, v in cells.items() if k[:-1] == g}
++    a, b = own(fg), own(og)
++    both = sorted(set(a) & set(b))
++    if not both:
++        return False, None, None
++    same = max(float(cell_dists(x, y[None])[0]) for d in both for x in a[d] for y in b[d])
++    glyphs = [(d, c) for grp in (a, b) for d, v in grp.items() for c in v]
++    two = min(float(cell_dists(x, y[None])[0]) for i, (d1, x) in enumerate(glyphs) for d2, y in glyphs[i + 1:]
++              if d1 != d2) if len({d for d, _c in glyphs}) > 1 else None
++    return (two is not None and same < two), round(same, 4), (round(two, 4) if two is not None else None)
++
++
+ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
+     """From {save: (its finals, its line-score cells per side, [its pictures])} -> (the spec's `score`, its arrays, a
+     report): each side's final's place (the same in every save), B181's line-score columns, each digit's template,
+@@ -1503,12 +1544,12 @@ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
+ 
+     cells, unfit, shown = gather([])                          # the finals alone first (B178)
+     keys, refs, gaps, need, noise, small = _digit_stats(cells, shown)
+-    columns, cbroken = [], {}
++    columns, cbroken, sizes = [], {}, None
+     if any(saves[r][1][k] for r in runs for k in range(n)):   # B181: the line score's columns
+         score1 = _stat_score(keys, gaps, need)
+         for k in range(n):
+             taken = places + [p_ for row in columns for p_ in row if p_ is not None]
+-            cols, br = _find_columns(first, saves, k, places[k], score1, refs, taken)
++            cols, br = _find_columns(first, saves, k, places[k], score1, refs, taken, places)
+             columns.append(cols)
+             for c, who in br.items():
+                 cbroken[f"{k + 1}.{c}"] = who
+@@ -1527,8 +1568,25 @@ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
+             return ({**base, "found": False, "not_found": cbroken, "pooled": pooled, "columns": columns},
+                     {"digit_refs": empty}, {"found": False, "not_found": cbroken})
+         cells, unfit, shown = gather(columns)                 # then every labelled number
++        fgs = {p_["group"] for p_ in places}
++        ogs = {p_["group"] for row in columns for p_ in row if p_ is not None} - fgs
++        if pooled and len(fgs) == 1 and ogs:                  # B204: another size, the score's font or not
++            fg = fgs.pop()
++            sizes = {}
++            for og in sorted(ogs):
++                one, same, two = _one_font(cells, fg, og)
++                sizes[og] = {"counted": one, "one digit across sizes, farthest": same,
++                             "two digits, nearest": two}
++                if one:
++                    for row in columns:
++                        for p_ in row:
++                            if p_ is not None and p_["group"] == og:
++                                p_["group"] = fg
++            if any(v["counted"] for v in sizes.values()):
++                cells, unfit, shown = gather(columns)
+         keys, refs, gaps, need, noise, small = _digit_stats(cells, shown)
+     score = {**base, "found": True, "pooled": pooled, **_stat_score(keys, gaps, need), "columns": columns,
++             **({"sizes": sizes} if sizes else {}),
+              "glyphs": {k: len(cells[k]) for k in keys}, "saves_showing": shown, "noise": round(noise, 4),
+              "unfit": {r: sorted(v) for r, v in sorted(unfit.items())}}
+     report = {"found": True, "places": places, "columns": columns, "digits": gaps, "margin_needed": need,
+diff --git a/tools/party_add_game.py b/tools/party_add_game.py
+index d5234619..3363859f 100644
+--- a/tools/party_add_game.py
++++ b/tools/party_add_game.py
+@@ -1169,7 +1169,8 @@ def learn_inputs(code: str, b: dict) -> str:
+ 
+ # --- B178: label — the session reads each end save's final score; the tool checks every reading -----------------------
+ SCORE_VERSION = 4                                            # h7_endscreen's version-4 spec (each side's number)
+-SIDE = r"(?:(?:\d{1,4}|_)(?:\+(?:\d{1,4}|_))*=)?\d{1,4}"     # B181: a side's final, or its line score 9+2+2+2+_+_=15
++SIDE = (r"(?:(?:\d{1,4}|_)(?:\+(?:\d{1,4}|_))*=)?\d{1,4}"    # B181: a side's final, or its line score 9+2+2+2+_+_=15
++        r"(?::(?:\d{1,4}|_)(?:\.(?:\d{1,4}|_))*)?")             # B204: then ':' and its stats rows, 13.00.01
+ READING = re.compile(rf"^{SIDE}(?:-{SIDE}){{1,3}}$")
+ LOOK = re.compile(r"^look=(all|[0-9]:\d+(?:\.\d+)*)$")      # B183: the last look's answer
+ LEFT_OUT_TRIES = 2                                           # a save named this often after the session read it again:
+@@ -1207,20 +1208,44 @@ def label_inputs(code: str, b: dict) -> str:
+     return digest({"register": b["register_inputs"], "kept": kept_states(code), "labels": readings(code)})
+ 
+ 
++class Row(list):
++    """B204: a side's numbers besides its final — its period cells, then its stats rows (`periods`: how many are period
++    cells; only they add up to the final)."""
++
++    def __init__(self, items=(), periods: int | None = None):
++        super().__init__(items)
++        self.periods = len(self) if periods is None else periods
++
++
+ def _sides(text: str) -> list[tuple[list, int]]:
+     """B181: a reading's sides, P1 first: (its cells left to right — a number, or None for a blank — , its final);
+-    B200: every number as drawn (`_drawn`: "03" is 3, its glyphs 0 and 3)."""
++    B200: every number as drawn (`_drawn`: "03" is 3, its glyphs 0 and 3); B204: the cells a `Row` — the period
++    cells, then the stats rows after ':' (each one more column for the learner, never in the sum)."""
+     out = []
+     for side in text.split("-"):
++        side, colon, stats = side.partition(":")
+         cells, eq, fin = side.rpartition("=")
+-        out.append(([None if x == "_" else _drawn(x) for x in cells.split("+")] if eq else [], _drawn(fin)))
++        per = [None if x == "_" else _drawn(x) for x in cells.split("+")] if eq else []
++        st = [None if x == "_" else _drawn(x) for x in stats.split(".")] if colon else []
++        out.append((Row(per + st, len(per)), _drawn(fin)))
+     return out
+ 
+ 
++def _periods(cells) -> list:
++    """B204: the period cells of a side's cells (the stats rows left out)."""
++    return list(cells[:getattr(cells, "periods", len(cells))])
++
++
+ def _text(sides) -> str:
+-    """B200: every number as given (a drawn leading 0 kept; a number without one as today)."""
+-    return "-".join(("+".join("_" if c is None else str(c) for c in cells) + "=" if cells else "") + str(fin)
+-                    for cells, fin in sides)
++    """B200: every number as given (a drawn leading 0 kept; a number without one as today); B204: the stats rows after
++    ':'."""
++    def one(cells, fin):
++        n = getattr(cells, "periods", len(cells))
++        per, st = list(cells[:n]), list(cells[n:])
++        word = lambda c: "_" if c is None else str(c)
++        return (("+".join(map(word, per)) + "=" if per else "") + str(fin)
++                + (":" + ".".join(map(word, st)) if st else ""))
++    return "-".join(one(cells, fin) for cells, fin in sides)
+ 
+ 
+ def _finals(text: str) -> list[int]:
+@@ -1237,7 +1262,11 @@ def _numbers(code: str, role: str) -> list[int] | None:
+ 
+ 
+ def _score_class(text: str) -> str:
+-    return "end_s" + text
++    """The learner's class: B204 — every period cell and stats row one column of its side (no ':' there)."""
++    if ":" not in text:
++        return "end_s" + text
++    return "end_s" + "-".join(("+".join("_" if c is None else str(c) for c in cells) + "=" if cells else "") + str(fin)
++                              for cells, fin in _sides(text))
+ 
+ 
+ def _side_words(n: int, cells: bool = False) -> str:
+@@ -1530,7 +1559,8 @@ def _culprit(es, b: dict, pics: Path, kept: dict, ends: list, texts: dict, contr
+     save read back as labelled; None when no single one does."""
+     for x in sorted(contradicted):
+         got = contradicted[x]
+-        mended = [([_mend(w, g) for w, g in zip(wc, gc)], wf if _mend(wf, gf) is None else _mend(wf, gf))
++        mended = [(Row([_mend(w, g) for w, g in zip(wc, gc)], getattr(wc, "periods", None)),
++                   wf if _mend(wf, gf) is None else _mend(wf, gf))
+                   for (wc, wf), (gc, gf) in zip(_sides(texts[x]), got)]   # B200: a final read blank keeps its label
+         t2 = {**texts, x: _text(mended)}
+         labels2 = _labels(pics, kept, es, {r: _score_class(t2[r]) for r in ends})
+@@ -1622,7 +1652,7 @@ def _ask_line(code: str, b: dict, rec: dict, role: str, why: str, texts: dict, f
+     match = f"the match player {k} won {{final}}{' in overtime' if overtime else ''}, {_when_saved(code, b, role)}"
+     doubt = []
+     for j, ((c1, f1), (c2, f2)) in enumerate(zip(one, two)):
+-        bad_sum = why == "sum" and c1 and sum(x for x in c1 if x is not None) != f1
++        bad_sum = why == "sum" and _periods(c1) and sum(x for x in _periods(c1) if x is not None) != f1
+         cols = [c for c in range(len(c1)) if why == "readings" and (c >= len(c2) or c1[c] != c2[c])]
+         cols = list(range(len(c1))) if bad_sum else cols
+         fin = bad_sum or (why == "readings" and f1 != f2)
+@@ -1718,7 +1748,8 @@ def cmd_label(code: str, a: dict) -> int:
+         ahead = all(nums[k - 1] > x for j, x in enumerate(nums) if j != k - 1)
+         if not cells.add(f"{role}: the role's player ahead", nums, f"P{k} more than every other side", ahead):
+             name(role, f"P{k} is not ahead in it", "ahead")
+-        sums = [(k_ + 1, sum(x for x in cl if x is not None), fin) for k_, (cl, fin) in enumerate(_sides(rd[0])) if cl]
++        sums = [(k_ + 1, sum(x for x in _periods(cl) if x is not None), fin)                # B204: periods only
++                for k_, (cl, fin) in enumerate(_sides(rd[0])) if _periods(cl)]
+         if sums:                                             # B181: each side's cells add up to its final
+             bad = [x for x in sums if x[1] != x[2]]
+             if not cells.add(f"{role}: the cells add up to the finals", [[s_, f_] for _k, s_, f_ in sums],
+@@ -1816,7 +1847,9 @@ def cmd_label(code: str, a: dict) -> int:
+         line = (f"Read the final score on each end save's two pictures in the title's add_game folder, label/ "
+                 f"(<role>.1.png and <role>.2.png), each side's number, P1 first, each number as drawn, leading zeros "
+                 f"included (a drawn 03 is 03, not 3) — with a line score, each side's cells "
+-                f"left to right joined by '+' ('_' for a blank cell) then '=' and its final; then label {code} "
++                f"left to right joined by '+' ('_' for a blank cell) then '=' and its final; with a stats table "
++                f"under it, then ':' and each stats row's number, top to bottom, joined by '.' (every number on "
++                f"the screen; only the final is the result); then label {code} "
+                 + " ".join(f"{r}={words},{words}" for r in missing) + " (the first reading from .1, the second from .2).")
+         recorded["read"] = missing
+     elif named:
+diff --git a/tests/b204_every_number/test_b204.py b/tests/b204_every_number/test_b204.py
+new file mode 100644
+index 00000000..82453716
+--- /dev/null
++++ b/tests/b204_every_number/test_b204.py
+@@ -0,0 +1,95 @@
++#!/usr/bin/env python3
++"""B204 (host): every number on a score title's final screen, and another size of the score's font counted only when
++the title's own numbers say so. Fast tests (no pictures but made-up glyph cells); no title.
++
++- `Reading`: a side's stats rows after ':' parsed and written back as given; a reading without ':' is today's text;
++  the learner's class carries every stats row as one more column; the sum is over the period cells only.
++- `Sizes`: `_one_font` — one font drawn at two sizes (each digit's two cells near, two digits far) -> counted; two
++  faces (one size's 3 drawn like another's 8) -> not counted; no digit in both -> not counted.
++Temp dirs: none made.
++
++    python3 -m unittest discover -s tests/b204_every_number -v
++"""
++from __future__ import annotations
++
++import sys
++import unittest
++from pathlib import Path
++
++import numpy as np
++
++ROOT = Path(__file__).resolve().parents[2]
++sys.path[:0] = [str(ROOT / "tools")]
++import h7_endscreen as es  # noqa: E402
++import party_add_game as pag  # noqa: E402
++
++T92_LIKE = "02+_+_+_+_=02:13.00.00.00.01.00-00+_+_+_+_=00:00.00.00.00.00.00"
++
++
++class Reading(unittest.TestCase):
++    def test_1_stats_round_trip(self):
++        self.assertTrue(pag.READING.match(T92_LIKE))
++        self.assertEqual(pag._text(pag._sides(T92_LIKE)), T92_LIKE)
++        for t in ("9+2+2+2+_+_=15-0+0+2+0+_+_=2", "21-14", "03+_=03-00+_=00", "5:1.2-3:0.0"):
++            self.assertEqual(pag._text(pag._sides(t)), t)
++
++    def test_2_the_learners_class(self):
++        self.assertEqual(pag._score_class(T92_LIKE),
++                         "end_s02+_+_+_+_+13+00+00+00+01+00=02-00+_+_+_+_+00+00+00+00+00+00=00")
++        self.assertEqual(pag._score_class("21-14"), "end_s21-14")
++        self.assertTrue(es.SCORE_LABEL.match(pag._score_class(T92_LIKE)))
++
++    def test_3_the_sum_over_the_periods_only(self):
++        cells, fin = pag._sides(T92_LIKE)[0]
++        self.assertEqual([str(c) if c is not None else None for c in pag._periods(cells)], ["02", None, None, None, None])
++        self.assertEqual(sum(x for x in pag._periods(cells) if x is not None), fin)
++        self.assertEqual(len(cells), 11)                       # every stats row one more column
++        self.assertEqual(pag._digits_of(T92_LIKE), {"0", "1", "2", "3"})
++
++
++def glyph(pattern: list[str], scale: int, rng) -> np.ndarray:
++    """A made-up glyph cell: a 5 x 7 pattern drawn at `scale`, then brought to the cell's size (as `glyph_cell` does)."""
++    from PIL import Image
++    a = np.kron(np.array([[1.0 if c == "1" else 0.0 for c in row] for row in pattern], np.float32),
++                np.ones((scale, scale), np.float32))
++    a = np.clip(a + rng.normal(0, 0.03, a.shape), 0, 1)
++    ch, cw = es.SCORE_CELL
++    w = min(cw, max(1, int(round(a.shape[1] * ch / a.shape[0]))))
++    arr = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).resize((w, ch), Image.BOX), np.float32) / 255.0
++    cell = np.zeros((ch + 2, cw + 2), np.float32)
++    off = (cw + 2 - w) // 2
++    cell[1:ch + 1, off:off + w] = arr
++    return cell
++
++
++FONT = {"0": ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
++        "3": ["11111", "00010", "00100", "00010", "00001", "10001", "01110"],
++        "8": ["01110", "10001", "10001", "01110", "10001", "10001", "01110"]}
++
++
++class Sizes(unittest.TestCase):
++    def cells(self, small_font: dict) -> dict:
++        rng = np.random.default_rng(204)
++        out = {}
++        for d in "038":
++            out[d] = [glyph(FONT[d], 8, rng) for _ in range(3)]
++            out["c:" + d] = [glyph(small_font[d], 2, rng) for _ in range(3)]
++        return out
++
++    def test_1_one_font_counted(self):
++        one, same, two = es._one_font(self.cells(FONT), "", "c:")
++        self.assertTrue(one, (same, two))
++        self.assertLess(same, two)
++
++    def test_2_two_faces_not_counted(self):
++        other = {**FONT, "3": FONT["8"], "8": FONT["3"]}         # the small face's 3 and 8 swapped shapes
++        one, same, two = es._one_font(self.cells(other), "", "c:")
++        self.assertFalse(one, (same, two))
++
++    def test_3_no_digit_in_both(self):
++        cells = {"0": self.cells(FONT)["0"], "c:3": self.cells(FONT)["c:3"]}
++        self.assertEqual(es._one_font(cells, "", "c:"), (False, None, None))
++
++
++if __name__ == "__main__":
++    unittest.main()

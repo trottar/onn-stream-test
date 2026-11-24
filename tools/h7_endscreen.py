@@ -1288,7 +1288,21 @@ def _clusters(points: list) -> list:
     return out
 
 
-def _offline_column(first: dict, want: dict, taken: list) -> tuple[list, list]:
+def _centre(p_: dict) -> tuple[float, float]:
+    return (p_["x0"] + p_["x1"]) / 2.0, (p_["top"] + p_["bot"]) / 2.0
+
+
+def _nearest_own(pl: dict, own: dict | None, finals: list) -> bool:
+    """B204: an off-line column is its side's when it is no farther from that side's final than from any other's."""
+    if own is None:
+        return True
+    cx, cy = _centre(pl)
+    dist = lambda f: ((_centre(f)[0] - cx) ** 2 + (_centre(f)[1] - cy) ** 2) ** 0.5
+    return all(dist(own) <= dist(f) for f in finals if f is not own)
+
+
+def _offline_column(first: dict, want: dict, taken: list, own: dict | None = None,
+                    finals: list | None = None) -> tuple[list, list]:
     """B200: a filled column with no place on its final's line, looked for anywhere on the picture as a final is: a
     string with as many glyphs as each save's cell is drawn with, at one place in every save that fills it, its shapes
     explained by the labels, overlapping no place already taken, no number there in a save whose cell is blank. ->
@@ -1300,7 +1314,7 @@ def _offline_column(first: dict, want: dict, taken: list) -> tuple[list, list]:
     excused: list = []
 
     def ok(pl):
-        if any(_overlap(pl, t) for t in taken):
+        if any(_overlap(pl, t) for t in taken) or not _nearest_own(pl, own, finals or []):
             return False, []
         if any(place_glyphs(first[r], pl) is not None for r in blank):
             return False, blank
@@ -1330,24 +1344,31 @@ def _before(a: dict, b: dict) -> bool:
 def _choose_offline(cands: dict) -> dict:
     """B200: a side's off-line columns chosen together — none overlapping another, the periods in the order they are
     drawn (a later column never before an earlier one in reading order) first, then the fewest explained only with a
-    save left out, then the glyphs' fit summed, then each column's own order. {column: candidates} -> {column: place} (empty when no choice holds)."""
-    import itertools
+    save left out, then the glyphs' fit summed, then each column's own order. B204: each column weighs as many
+    candidates as the side has off-line columns (at least SCORE_CHOICES), searched depth first, overlaps pruned.
+    {column: candidates} -> {column: place} (empty when no choice holds)."""
     cols = sorted(cands)
-    best = None
-    for combo in itertools.product(*[cands[c][:SCORE_CHOICES] for c in cols]):
-        pls = [x[1] for x in combo]
-        if any(_overlap(a_, b_) for i, a_ in enumerate(pls) for b_ in pls[i + 1:]):
-            continue
-        out_of_order = sum(1 for i in range(len(pls)) for j in range(i + 1, len(pls)) if _before(pls[j], pls[i]))
-        key = (out_of_order, sum(1 for x in combo if x[2]), round(sum(x[0] for x in combo), 4),
-               [cands[c].index(x) for c, x in zip(cols, combo)])
-        if best is None or key < best[0]:
-            best = (key, {c: dict(x[1]) for c, x in zip(cols, combo)})
-    return best[1] if best else {}
+    cap = max(SCORE_CHOICES, len(cols))
+    best = [None]
+
+    def walk(i: int, combo: list) -> None:
+        if i == len(cols):
+            pls = [x[1] for x in combo]
+            out_of_order = sum(1 for a_ in range(len(pls)) for b_ in range(a_ + 1, len(pls)) if _before(pls[b_], pls[a_]))
+            key = (out_of_order, sum(1 for x in combo if x[2]), round(sum(x[0] for x in combo), 4),
+                   [cands[c].index(x) for c, x in zip(cols, combo)])
+            if best[0] is None or key < best[0][0]:
+                best[0] = (key, {c: dict(x[1]) for c, x in zip(cols, combo)})
+            return
+        for x in cands[cols[i]][:cap]:
+            if not any(_overlap(x[1], y[1]) for y in combo):
+                walk(i + 1, combo + [x])
+    walk(0, [])
+    return best[0][1] if best[0] else {}
 
 
 def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, refs1: np.ndarray,
-                  taken: list | None = None) -> tuple:
+                  taken: list | None = None, finals: list | None = None) -> tuple:
     """B181: side k's line-score columns, left to right, on its final's line (section B181 of the design). ->
     ([place or None per column], {column: the saves where it breaks} for a labelled column with no place). B200: a
     place whose shapes its labels do not explain is never taken; a column with no place on the line is looked for off
@@ -1404,7 +1425,7 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
             if ok:
                 valid.append((cx, agree, pl))
         if not valid:                                         # B200: off the final's line
-            got, miss = _offline_column(first, want, taken + [p_ for p_ in cols if p_ is not None])
+            got, miss = _offline_column(first, want, taken + [p_ for p_ in cols if p_ is not None], fin, finals)
             if got:
                 off[c] = got
                 cols.append(None)                             # chosen with the side's other off-line columns
@@ -1431,6 +1452,26 @@ def _find_columns(first: dict, saves: dict, k: int, fin: dict, score1: dict, ref
             else:
                 broken[str(c + 1)] = [Path(r).name for r in runs]
     return cols, broken
+
+
+SIZES_PER_DIGIT = 12             # B204: the glyphs of one digit and one size weighed (the first, in save order)
+
+
+def _one_font(cells: dict, fg: str, og: str) -> tuple[bool, float | None, float | None]:
+    """B204: whether a group of another size is the score's own font — every pair of one digit across the two groups
+    (the digits both show) nearer than every pair of two digits (either group). {key: [cells]} -> (counted, the
+    farthest one-digit pair across sizes, the nearest two-digit pair); not counted when no digit is in both."""
+    def own(g):
+        return {k[-1]: v[:SIZES_PER_DIGIT] for k, v in cells.items() if k[:-1] == g}
+    a, b = own(fg), own(og)
+    both = sorted(set(a) & set(b))
+    if not both:
+        return False, None, None
+    same = max(float(cell_dists(x, y[None])[0]) for d in both for x in a[d] for y in b[d])
+    glyphs = [(d, c) for grp in (a, b) for d, v in grp.items() for c in v]
+    two = min(float(cell_dists(x, y[None])[0]) for i, (d1, x) in enumerate(glyphs) for d2, y in glyphs[i + 1:]
+              if d1 != d2) if len({d for d, _c in glyphs}) > 1 else None
+    return (two is not None and same < two), round(same, 4), (round(two, 4) if two is not None else None)
 
 
 def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
@@ -1503,12 +1544,12 @@ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
 
     cells, unfit, shown = gather([])                          # the finals alone first (B178)
     keys, refs, gaps, need, noise, small = _digit_stats(cells, shown)
-    columns, cbroken = [], {}
+    columns, cbroken, sizes = [], {}, None
     if any(saves[r][1][k] for r in runs for k in range(n)):   # B181: the line score's columns
         score1 = _stat_score(keys, gaps, need)
         for k in range(n):
             taken = places + [p_ for row in columns for p_ in row if p_ is not None]
-            cols, br = _find_columns(first, saves, k, places[k], score1, refs, taken)
+            cols, br = _find_columns(first, saves, k, places[k], score1, refs, taken, places)
             columns.append(cols)
             for c, who in br.items():
                 cbroken[f"{k + 1}.{c}"] = who
@@ -1527,8 +1568,25 @@ def learn_scores(saves: dict) -> tuple[dict, dict, dict]:
             return ({**base, "found": False, "not_found": cbroken, "pooled": pooled, "columns": columns},
                     {"digit_refs": empty}, {"found": False, "not_found": cbroken})
         cells, unfit, shown = gather(columns)                 # then every labelled number
+        fgs = {p_["group"] for p_ in places}
+        ogs = {p_["group"] for row in columns for p_ in row if p_ is not None} - fgs
+        if pooled and len(fgs) == 1 and ogs:                  # B204: another size, the score's font or not
+            fg = fgs.pop()
+            sizes = {}
+            for og in sorted(ogs):
+                one, same, two = _one_font(cells, fg, og)
+                sizes[og] = {"counted": one, "one digit across sizes, farthest": same,
+                             "two digits, nearest": two}
+                if one:
+                    for row in columns:
+                        for p_ in row:
+                            if p_ is not None and p_["group"] == og:
+                                p_["group"] = fg
+            if any(v["counted"] for v in sizes.values()):
+                cells, unfit, shown = gather(columns)
         keys, refs, gaps, need, noise, small = _digit_stats(cells, shown)
     score = {**base, "found": True, "pooled": pooled, **_stat_score(keys, gaps, need), "columns": columns,
+             **({"sizes": sizes} if sizes else {}),
              "glyphs": {k: len(cells[k]) for k in keys}, "saves_showing": shown, "noise": round(noise, 4),
              "unfit": {r: sorted(v) for r, v in sorted(unfit.items())}}
     report = {"found": True, "places": places, "columns": columns, "digits": gaps, "margin_needed": need,
