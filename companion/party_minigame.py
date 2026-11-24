@@ -89,6 +89,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -121,6 +122,16 @@ SCORE_VERSION = 4           # B178: an end-screen spec with each side's number (
 LETTERS_VERSION = 5         # B191: an end-screen spec reading each player's letters (the one who spelled the word lost)
 TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
          "stop": "end"}
+# B210
+PLAYED_KEEP = 200           # the newest results kept a title (the hub's own ring)
+PLAYED_CODE = re.compile(r"^T\d\d$")
+
+
+def _add_game_home(environ) -> Path:
+    v = (environ.get("PRIVYHUB_ADD_GAME_HOME") or "").strip()
+    return Path(v) if v else Path.home() / "privyhub_h7" / "add_game"
+
+
 # B127
 SETUP_GONE = "the cheat setup this mini game names is not on the hub (or its cheats changed): nothing was launched"
 SETUP_CHECK_S = 1.5         # the setup check's one manager call: given up after this (the start refused, nothing done)
@@ -1231,6 +1242,7 @@ class PartyMinigames:
                         top = max(got)                                    # a tie: no winner (the board's draw)
                         won = mg["seats"][got.index(top)] if got.count(top) == 1 else None
                         self._final(mg, "ended", **{"class": cls, "scores": list(got), "winner": won})
+                    self._keep_result(mg, runner)                         # B210
                     continue
                 if mg["entry"].get("places_to_scores") is not None:      # B123: the row of places -> the seats' scores
                     places = r.get("places")
@@ -1251,9 +1263,11 @@ class PartyMinigames:
                     port = (mg["entry"].get("winner_of") or {}).get(cls)              # B158: winner-only
                     won = {"winner": mg["seats"][port - 1]} if port is not None else {}
                     self._final(mg, "ended", **{"class": cls, "scores": list(scores), **won})
+                    self._keep_result(mg, runner)                         # B210 (a letters title; else nothing)
                 continue
             if r.get("state") == "unreadable":                      # B182: the final screen seen, a number on it
                 self._final(mg, "given_up", why="the final screen was seen and a number on it was not read")
+                self._keep_result(mg, runner)                             # B210
                 continue                                              # not read: given up now, no result
             if r.get("state") in ("no_game", "idle", "no_spec"):
                 self._final(mg, "given_up", why="the watch stopped")
@@ -1264,6 +1278,58 @@ class PartyMinigames:
                     self._final(mg, "given_up", why=f"an unknown screen for {self.unknown_limit_s:.0f} s")
             else:
                 unknown_since = None
+
+    # --- B210: the hub keeps what it read -----------------------------------------------------------------------------
+    def _code_of(self, game: str, side: dict) -> str | None:
+        """The title's add-a-game code: the sidecar's `code`, else the add-game binding naming this game."""
+        code = side.get("code")
+        if isinstance(code, str) and PLAYED_CODE.match(code):
+            return code
+        for bp in sorted(_add_game_home(self.environ).glob("T*/binding.json")):
+            try:
+                if json.loads(bp.read_text(encoding="utf-8")).get("game") == game and PLAYED_CODE.match(bp.parent.name):
+                    return bp.parent.name
+            except (OSError, ValueError):
+                continue
+        return None
+
+    def _keep_result(self, mg: dict, runner: Any) -> None:
+        """B210 (PRIVYHUB_PARTY=1): a score or letters mini game ended, or given up on its final screen — the pictures
+        the reader ended on (or could not read), what it read, the seats and the time, off the repo under the title's
+        code (<add_game home>/<code>/played/<UTC stamp>/); the newest PLAYED_KEEP a title. Keeping only; never raises."""
+        if self.environ.get("PRIVYHUB_PARTY") != "1":
+            return
+        try:
+            game = mg["entry"]["game"]
+            side = json.loads((live.rules_folder(self.environ) / f"{game}.party.json").read_text(encoding="utf-8"))
+            if side.get("result") not in ("score", "letters"):
+                return
+            code = self._code_of(game, side)
+            if code is None:
+                self.row({"step": "result_not_kept", "why": "no add-game code for this title"})
+                return
+            pics = runner.end_pictures() if hasattr(runner, "end_pictures") else []
+            base = _add_game_home(self.environ) / code / "played"
+            stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+            d, n = base / stamp, 1
+            while d.exists():
+                n += 1
+                d = base / f"{stamp}_{n}"
+            d.mkdir(parents=True)
+            for i, (img, _r) in enumerate(pics, 1):
+                pic = img if getattr(img, "mode", "RGB") in ("L", "RGB") else img.convert("RGB")
+                pic.save(d / f"f{i}.jpg", "JPEG", quality=90)
+            read = {"state": mg["state"], "class": mg.get("class"), "scores": mg.get("scores"),
+                    "winner": mg.get("winner"), "why": mg.get("why"), "seats": list(mg["seats"]),
+                    "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "result": side.get("result"),
+                    "reads": [r for _img, r in pics]}
+            (d / "read.json").write_text(json.dumps(read, sort_keys=True) + "\n", encoding="utf-8")
+            old = sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name)
+            for p in old[:max(0, len(old) - PLAYED_KEEP)]:
+                shutil.rmtree(p, ignore_errors=True)
+            self.row({"step": "result_kept", "code": code, "pictures": len(pics)})
+        except Exception as exc:
+            self.row({"step": "result_not_kept", "why": str(exc)[:200]})
 
     # --- result / end -------------------------------------------------------------------------------------------------
     def result(self) -> dict:

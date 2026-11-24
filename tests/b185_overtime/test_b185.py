@@ -73,6 +73,13 @@ def text(st: dict) -> str:
                     for cells, fin in zip(st["q"], st["s"]))
 
 
+
+def save_n(code: str, role: str, st: dict) -> int:
+    """B212: a made-up save's noise number from the save itself (its code, role and content), not from the order the
+    tests ran in."""
+    import hashlib as _h
+    return int(_h.sha256(json.dumps([code, role, st], sort_keys=True).encode()).hexdigest()[:6], 16)
+
 class Made(unittest.TestCase):
     N = [0]
 
@@ -112,8 +119,8 @@ class Made(unittest.TestCase):
         kf = pag.kept_folder(code)
         kf.mkdir(parents=True, exist_ok=True)
         for role, st in saves.items():
-            self.N[0] += 1
-            (kf / f"{role}.state").write_text(json.dumps({**st, "n": self.N[0]}))
+            self.N[0] += 1                                        # (the count of saves put; no longer a seed)
+            (kf / f"{role}.state").write_text(json.dumps({**st, "n": save_n(code, role, st)}))   # B212: the save's own
         bp = pag.binding_path(code)
         b = json.loads(bp.read_text()) if bp.is_file() else {
             "code": code, "game": "madeup" + code.lower(), "players": 2, "system": "ps1", "result": "score",

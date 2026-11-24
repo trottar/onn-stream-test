@@ -2000,15 +2000,16 @@ def read_corner(a: np.ndarray, box, bins: np.ndarray, fitted: dict, word: str, g
     return "".join(out)
 
 
-def _letters_places(A: dict, sides: dict, word: str, n: int) -> tuple:
-    """-> ({p: box}, {p: [(save, string, cut, zone)]}) or (None, why)."""
+def _letters_places(A: dict, sides: dict, word: str, n: int, regions: dict | None = None) -> tuple:
+    """-> ({p: box}, {p: [(save, string, cut, zone)]}) or (None, why). B208: `regions` ({p: [x0, y0, x1, y1]}, the
+    session's survey) — each player's letters looked for only inside its region, and its box the region itself."""
     ends = sorted(A)
     fixed = np.all([np.abs(A[e] - A[ends[0]]).max(axis=2) <= LETTERS_EQ for e in ends], axis=0) \
         if len(ends) > 1 else np.zeros(A[ends[0]].shape[:2], bool)
     found = {}
     for p in range(1, n + 1):
         cands = []
-        for zone in letters_zones(n)[p]:
+        for zone in ([tuple(regions[p])] if regions else letters_zones(n)[p]):
             for e in ends:
                 want = 0 if sides[e][p - 1] == "_" else len(sides[e][p - 1])
                 if not want:
@@ -2062,6 +2063,8 @@ def _letters_places(A: dict, sides: dict, word: str, n: int) -> tuple:
             top, bot = (top + bot) / 2.0 - gh / 2.0, (top + bot) / 2.0 + gh / 2.0
         places[p] = [int(max(0, cl["cx"] - half)), int(max(0, top - 3)), int(min(W, cl["cx"] + half)),
                      int(min(H, bot + 4))]
+        if regions:                                            # B208: the surveyed region, as the session drew it
+            places[p] = [int(v) for v in regions[p]]
     return places, found
 
 
@@ -2163,7 +2166,7 @@ def _read_sides(places: dict, bins: dict, fitted: dict, word: str, glyph_min: fl
 
 
 def learn_letters(starts: list, others: list, ends: dict, sides: dict, word: str, players: int, name: str = "",
-                  start_class: str = START) -> tuple:
+                  start_class: str = START, regions: dict | None = None) -> tuple:
     """B191 / B192: starts / others — picture paths of the begin's and the mid-match save's screens; ends — {role:
     [picture paths]} (the label stage's two of each end save); sides — {role: [P1's corner, P2's, ...]} as the session
     read them; word — the user's. -> (spec, arrays, report). Synthetic pictures only train; nothing here proves."""
@@ -2191,7 +2194,7 @@ def learn_letters(starts: list, others: list, ends: dict, sides: dict, word: str
     items = [(A[r], list(sides[r])) for r in roles]                      # B192: one picture of each end save
     checks = items + [(colour(p), list(sides[r])) for r in roles for p in ends[r][1:]]   # every picture read right
     frames = [colour(p) for p in list(starts[:1]) + list(others[:1])] + [A[r] for r in roles]
-    places, found = _letters_places(A, sides, word, players)
+    places, found = _letters_places(A, sides, word, players, regions)       # B208: regions given -> inside them
     spec = {"version": VERSION_LETTERS, "kind": "privyhub-h7-endscreen", "measure": MEASURE, "size": list(SIZE),
             "classes": [start_class] + [f"end_P{k}" for k in range(1, players + 1)], "start_class": start_class,
             "end_classes": [f"end_P{k}" for k in range(1, players + 1)], "k": K,

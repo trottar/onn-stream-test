@@ -54,6 +54,11 @@ glyphs are the same shape in saves labelled with different digits is never taken
 final's line (a box of small cells) found where they are; learn counts the digits of the finals and of the cells
 read in a final's size only (the hub reads finals).
 
+B208 / B209 (queue BP): the front of the path rebuilt once — `survey <code>` (the session marks each player's result
+region and the kind once; kept in the binding as numbers), `label` on those regions only, `plan <code>` (every symbol
+the result can show, how many real pictures show each, its last line the whole ask), `train <code>` (templates from the
+regions' real glyphs, synthetic variants, the once rule). A binding without a survey: today's path. `tools/party_steps.py`.
+
 B201: `--find <words>` — the tool lists the system's titles (the library's `q` applies only to its search view) and
 takes the user's words as said: the whole name, the name without its bracketed parts, or every word in it; one title,
 or the candidates' names on stderr for the chat only (never written), or none.
@@ -96,7 +101,8 @@ from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
-STAGES = ("register", "label", "learn", "rehearse", "bench", "solo", "close")
+STAGES = ("register", "label", "learn", "rehearse", "bench", "solo", "close",
+          "survey", "plan", "train")                       # B208 / B209: the front of the path, rebuilt (party_steps)
 CODE = re.compile(r"^T\d\d$")
 SYSTEMS = {"ps1", "n64", "snes"}                       # h7-start's systems (B103 / B123)
 NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B159)",
@@ -132,6 +138,9 @@ BARS = {
                                                   "listed (the user readied sooner than 4 s after it)"),
     "flag_lines_task": (20, "PP-H4: twenty lines with the two flags"),
     "flag_lines_found": (18, "the eighteen adopted lines"),
+    "rigid_min": (0.0995, "B211 (2026-11-24, set before T92 was looked at): half the smaller rigidity of T90 0.5693 "
+                          "and T91 0.1990 on the new path (1 - the farthest pair of one symbol's real glyphs / the "
+                          "nearest pair of two symbols'); the learner's SAFETY 0.5"),
     "synthetic_held_wrong_max": (0, "B192: the training's own bar — every held-out synthetic picture read; it never "
                                     "counts toward a pass"),
 }
@@ -1672,8 +1681,30 @@ def _ask_line(code: str, b: dict, rec: dict, role: str, why: str, texts: dict, f
             "Ask the user about " + match.format(final="<its final as read: run time only>") + tail)
 
 
+def surveyed(b: dict) -> bool:
+    """B208: a binding whose title went through `survey` as score or letters — its label, plan and train are
+    party_steps'; a binding without a survey runs today's code."""
+    return (b.get("survey") or {}).get("kind") in ("score", "letters")
+
+
+def _steps():
+    if str(TOOLS) not in sys.path:
+        sys.path.insert(0, str(TOOLS))
+    import party_steps
+    return party_steps
+
+
+def trained(code: str, b: dict) -> tuple[str, str]:
+    """The stage bench follows and its inputs: B209's train for a surveyed title, else learn (today)."""
+    if surveyed(b):
+        return "train", _steps().train_inputs(code, b)
+    return "learn", learn_inputs(code, b)
+
+
 def cmd_label(code: str, a: dict) -> int:
     b = load_binding(code)
+    if surveyed(b):                                          # B208: the regions' label
+        return _steps().cmd_label(code, a)
     if b.get("result") == "letters":                         # B191
         return _label_letters(code, b, a)
     if b.get("result") != "score":
@@ -3057,6 +3088,9 @@ def _scratch_load(b: dict, kept_file: Path, port: int | None) -> Path | None:
 def bench_inputs(code: str, b: dict) -> str:
     r = rules_folder()
     files = [r / f"{b['game']}.endscreen.json", r / f"{b['game']}.party.json", r / _begin_name(b)]
+    if surveyed(b):                                          # B209
+        return digest({"train": _steps().train_inputs(code, b),
+                       "rules": [sha(p) if p.is_file() else None for p in files]})
     return digest({"learn": learn_inputs(code, b), "rules": [sha(p) if p.is_file() else None for p in files]})
 
 
@@ -3064,7 +3098,7 @@ def cmd_bench(code: str, a: dict) -> int:
     b = load_binding(code)
     if b.get("described"):
         raise Refused("a title already in the rules folder had its bench in its own task: go on with solo")
-    require(code, "learn", learn_inputs(code, b))
+    require(code, *trained(code, b))                         # B209: train's PASS for a surveyed title
     _private_paths()
     cells = Cells()
     lines = flags(True)
@@ -3482,6 +3516,11 @@ def parse(argv: list[str]) -> tuple[str, str, dict]:
         raise Usage(__doc__.split("\n\n")[1])
     stage, code, rest = argv[0], argv[1], argv[2:]
     a: dict = {"check": False, "collect": [], "read": False, "readings": []}
+    if stage == "survey":                                    # B208: the session's answer, word by word
+        if any(w.startswith("--") for w in rest):
+            raise Usage("survey takes words, no options")
+        a["words"] = rest
+        return stage, code, a
     i = 0
     while i < len(rest):
         k = rest[i]
@@ -3519,6 +3558,11 @@ def main(argv: list[str]) -> int:
         _private_paths()
         if stage == "register":
             return cmd_register(code, a)
+        if stage in ("survey", "plan", "train"):            # B208 / B209
+            return {"survey": _steps().cmd_survey, "plan": _steps().cmd_plan, "train": _steps().cmd_train}[stage](
+                code, a)
+        if stage == "learn" and surveyed(load_binding(code)):
+            raise Refused("this title went through survey: its learning is train")
         return {"label": cmd_label, "learn": cmd_learn, "rehearse": cmd_rehearse, "bench": cmd_bench,
                 "solo": cmd_solo, "close": cmd_close}[stage](code, a)
     except Usage as exc:

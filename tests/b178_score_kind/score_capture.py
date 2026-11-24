@@ -157,13 +157,13 @@ def capture(state_path, binding, out_dir, seconds, every):
 
 def _capture(st: dict, out_dir, seconds, every):
     CALLS.append((st["kind"], tuple(st.get("s") or ())))
-    rng = np.random.default_rng(178 + 7 * int(st.get("look", 0)) + 101 * int(st.get("n", 0)) + len(st["kind"]))
+    seed = [178, int(st.get("look", 0)), int(st.get("n", 0)), len(st["kind"])]   # B212: noise drawn per picture
     rows = []
     for k in range(int(seconds / every) + 1):
         if k % 2:
             continue
         t = round(k * every, 2)
         name = f"f{k:04d}.png"
-        picture(st, t, k, rng).save(Path(out_dir) / name)
+        picture(st, t, k, np.random.default_rng(seed + [k])).save(Path(out_dir) / name)
         rows.append((t, name))
     return rows

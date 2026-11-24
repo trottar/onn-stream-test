@@ -7,6 +7,7 @@ only after register names them missing, no "other teams / characters" for score 
 change taken as said; B204 every number on the final screen read, the stats table included, another size of the
 score's font counted when the numbers say so). The same task for every title; only the code changes (ADD_GAME_PROMPT_TEMPLATE.txt). Nothing adopted by it
 ---
+RETIRED 2026-11-24 — kept for T90's and T91's history; the path is `ADD_GAME_STEPS.md`.
 
 # ADD-GAME — one title, by its code, through the tool's five stages
 

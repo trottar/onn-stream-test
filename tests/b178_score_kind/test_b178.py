@@ -58,6 +58,13 @@ def rd(nums, again=None) -> str:
     return f"{a},{'-'.join(map(str, again)) if again is not None else a}"
 
 
+
+def save_n(code: str, role: str, st: dict) -> int:
+    """B212: a made-up save's noise number from the save itself (its code, role and content), not from the order the
+    tests ran in."""
+    import hashlib as _h
+    return int(_h.sha256(json.dumps([code, role, st], sort_keys=True).encode()).hexdigest()[:6], 16)
+
 class Made(unittest.TestCase):
     """A temp add_game home, evidence and rules folder; the made-up picture source."""
     N = [0]
@@ -90,8 +97,8 @@ class Made(unittest.TestCase):
         kf = pag.kept_folder(code)
         kf.mkdir(parents=True, exist_ok=True)
         for role, st in saves.items():
-            self.N[0] += 1
-            (kf / f"{role}.state").write_text(json.dumps({**st, "n": self.N[0]}))
+            self.N[0] += 1                                        # (the count of saves put; no longer a seed)
+            (kf / f"{role}.state").write_text(json.dumps({**st, "n": save_n(code, role, st)}))   # B212: the save's own
         bp = pag.binding_path(code)
         b = json.loads(bp.read_text()) if bp.is_file() else {
             "code": code, "game": "madeup" + code.lower(), "players": 2, "system": "ps1", "result": "score",

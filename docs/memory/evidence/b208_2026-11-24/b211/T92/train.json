@@ -1,0 +1,238 @@
+{
+ "cells": [
+  {
+   "bar": "all",
+   "cell": "gate 1: every glyph of a symbol two or more saves show, read right without its save",
+   "met": true,
+   "read": "all"
+  },
+  {
+   "bar": ">= 0.0796",
+   "cell": "margin_needed",
+   "met": true,
+   "read": 0.1039
+  },
+  {
+   "bar": "all",
+   "cell": "every symbol two saves show separable",
+   "met": true,
+   "read": "all"
+  },
+  {
+   "bar": "counted when rigid, every variant read as itself, no other glyph read as it \u2014 else asked",
+   "cell": "gate 2: 3, one real picture",
+   "met": true,
+   "read": {
+    "not counted": {
+     "bar": 0.0995,
+     "other symbols' real glyphs read as it": 0,
+     "rigid": 0.6465,
+     "synthetic read as itself": "7 of 8"
+    }
+   }
+  },
+  {
+   "bar": "counted when rigid, every variant read as itself, no other glyph read as it \u2014 else asked",
+   "cell": "gate 2: 4, one real picture",
+   "met": true,
+   "read": "seen once"
+  },
+  {
+   "bar": "counted when rigid, every variant read as itself, no other glyph read as it \u2014 else asked",
+   "cell": "gate 2: 6, one real picture",
+   "met": true,
+   "read": {
+    "not counted": {
+     "bar": 0.0995,
+     "other symbols' real glyphs read as it": 0,
+     "rigid": 0.6465,
+     "synthetic read as itself": "7 of 8"
+    }
+   }
+  },
+  {
+   "bar": "all",
+   "cell": "gate 3: every symbol the result can show learnt (none never seen)",
+   "met": false,
+   "read": [
+    "1",
+    "3",
+    "6"
+   ]
+  },
+  {
+   "bar": "both set",
+   "cell": "the screens: start and end thresholds",
+   "met": true,
+   "read": {
+    "end": 0.1868,
+    "start": 0.1651
+   }
+  },
+  {
+   "bar": true,
+   "cell": "begin: never ended",
+   "met": true,
+   "read": true
+  },
+  {
+   "bar": "<= 8.0 s",
+   "cell": "begin: recognised within",
+   "met": true,
+   "read": 0.0
+  },
+  {
+   "bar": [
+    "02",
+    "00"
+   ],
+   "cell": "end_P1: ended as itself",
+   "met": true,
+   "read": [
+    "02",
+    "00"
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P1: ended within",
+   "met": true,
+   "read": 1.5
+  },
+  {
+   "bar": [
+    "05",
+    "04"
+   ],
+   "cell": "end_P1_2: ended as itself",
+   "met": true,
+   "read": [
+    "05",
+    "04"
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P1_2: ended within",
+   "met": true,
+   "read": 1.5
+  },
+  {
+   "bar": [
+    "02",
+    "03"
+   ],
+   "cell": "end_P2: ended as itself",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2: ended within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": [
+    "00",
+    "02"
+   ],
+   "cell": "end_P2_2: ended as itself",
+   "met": true,
+   "read": [
+    "00",
+    "02"
+   ]
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2_2: ended within",
+   "met": true,
+   "read": 2.0
+  },
+  {
+   "bar": [
+    "05",
+    "06"
+   ],
+   "cell": "end_P2_3: ended as itself",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": "<= 2.0 s",
+   "cell": "end_P2_3: ended within",
+   "met": false,
+   "read": null
+  },
+  {
+   "bar": true,
+   "cell": "other: never ended",
+   "met": true,
+   "read": true
+  }
+ ],
+ "code": "T92",
+ "inputs": "896eb3eaa4478a8b4f29f94968c3a66474da6242232234763dc5bf2149f30707",
+ "recorded": {
+  "margin_needed": 0.1623,
+  "not counted": [
+   "3",
+   "6"
+  ],
+  "once": {
+   "3": {
+    "bar": 0.0995,
+    "counted": false,
+    "other symbols' real glyphs read as it": 0,
+    "rigid": 0.6465,
+    "synthetic read as itself": "7 of 8"
+   },
+   "4": {
+    "bar": 0.0995,
+    "counted": true,
+    "other symbols' real glyphs read as it": 0,
+    "rigid": 0.6465,
+    "synthetic read as itself": "8 of 8"
+   },
+   "6": {
+    "bar": 0.0995,
+    "counted": false,
+    "other symbols' real glyphs read as it": 0,
+    "rigid": 0.6465,
+    "synthetic read as itself": "7 of 8"
+   }
+  },
+  "pictures showing": {
+   "0": 5,
+   "1": 0,
+   "2": 3,
+   "3": 1,
+   "4": 1,
+   "5": 2,
+   "6": 1
+  },
+  "rigidity": {
+   "farthest same": 0.3277,
+   "nearest different": 0.9268,
+   "rigidity": 0.6465,
+   "symbols": [
+    "0",
+    "2",
+    "5"
+   ]
+  },
+  "seen once": [
+   "4"
+  ],
+  "synthetic": {
+   "made": 160,
+   "not cut": 0,
+   "per glyph": 8,
+   "seed": 3193475139
+  }
+ },
+ "schema": 1,
+ "stage": "train",
+ "verdict": "FAIL"
+}

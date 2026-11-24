@@ -1,0 +1,1971 @@
+diff --git a/companion/h7_minigame.py b/companion/h7_minigame.py
+index fbfff35f..24529647 100644
+--- a/companion/h7_minigame.py
++++ b/companion/h7_minigame.py
+@@ -434,6 +434,13 @@ class MiniGame:
+             self._row({"step": "stopped_by_call", "game": w["game"], "reads": w["reads"], "state": w["state"]})
+             return {"ok": True, "watch": "stopped", "game": w["game"], "reads": w["reads"]}
+ 
++    def end_pictures(self) -> list:
++        """B210: [(picture, its read)] the reader ended on or could not read, newest last (only with PRIVYHUB_PARTY=1
++        and a version-4 / 5 spec; else [])."""
++        with self._lock:
++            w = self._watch
++            return list(w.get("_end_seen") or []) if w is not None else []
++
+     def _keep_folder(self, game: str) -> Path | None:
+         """runtime/h7_frames/<game id>_<UTC stamp>/ with its index.csv header (None + one row when it cannot be made)."""
+         try:
+@@ -561,6 +568,11 @@ class MiniGame:
+                         return
+                     w["reads"] += 1
+                     w["class"] = r["class"]
++                    if (self._environ.get("PRIVYHUB_PARTY") == "1" and spec.get("version") in (4, 5)   # B210
++                            and (r["class"] in spec.get("end_classes", ()) or r.get("end_unread"))):
++                        seen = w.setdefault("_end_seen", [])
++                        seen.append((img.copy(), {k: r.get(k) for k in ("class", "scores", "letters", "end_unread")}))
++                        del seen[:-int(getattr(ended, "k", 3))]
+                     w["seen_start"] = ended.seen_start
+                     w["last"] = {"class": r["class"], "distances": r["distances"], "margin": r["margin"],
+                                  "thresholds": thresholds, "spec_version": spec.get("version")}
+diff --git a/companion/party_minigame.py b/companion/party_minigame.py
+index 20c429f7..0f86f4f0 100644
+--- a/companion/party_minigame.py
++++ b/companion/party_minigame.py
+@@ -89,6 +89,7 @@ import hashlib
+ import json
+ import os
+ import re
++import shutil
+ import threading
+ import time
+ from pathlib import Path
+@@ -121,6 +122,16 @@ SCORE_VERSION = 4           # B178: an end-screen spec with each side's number (
+ LETTERS_VERSION = 5         # B191: an end-screen spec reading each player's letters (the one who spelled the word lost)
+ TAKEN = {"native-stream-stop": "home", "native-stream-start": "resume_start", "native-stream-ready": "resume_ready",
+          "stop": "end"}
++# B210
++PLAYED_KEEP = 200           # the newest results kept a title (the hub's own ring)
++PLAYED_CODE = re.compile(r"^T\d\d$")
++
++
++def _add_game_home(environ) -> Path:
++    v = (environ.get("PRIVYHUB_ADD_GAME_HOME") or "").strip()
++    return Path(v) if v else Path.home() / "privyhub_h7" / "add_game"
++
++
+ # B127
+ SETUP_GONE = "the cheat setup this mini game names is not on the hub (or its cheats changed): nothing was launched"
+ SETUP_CHECK_S = 1.5         # the setup check's one manager call: given up after this (the start refused, nothing done)
+@@ -1231,6 +1242,7 @@ class PartyMinigames:
+                         top = max(got)                                    # a tie: no winner (the board's draw)
+                         won = mg["seats"][got.index(top)] if got.count(top) == 1 else None
+                         self._final(mg, "ended", **{"class": cls, "scores": list(got), "winner": won})
++                    self._keep_result(mg, runner)                         # B210
+                     continue
+                 if mg["entry"].get("places_to_scores") is not None:      # B123: the row of places -> the seats' scores
+                     places = r.get("places")
+@@ -1251,9 +1263,11 @@ class PartyMinigames:
+                     port = (mg["entry"].get("winner_of") or {}).get(cls)              # B158: winner-only
+                     won = {"winner": mg["seats"][port - 1]} if port is not None else {}
+                     self._final(mg, "ended", **{"class": cls, "scores": list(scores), **won})
++                    self._keep_result(mg, runner)                         # B210 (a letters title; else nothing)
+                 continue
+             if r.get("state") == "unreadable":                      # B182: the final screen seen, a number on it
+                 self._final(mg, "given_up", why="the final screen was seen and a number on it was not read")
++                self._keep_result(mg, runner)                             # B210
+                 continue                                              # not read: given up now, no result
+             if r.get("state") in ("no_game", "idle", "no_spec"):
+                 self._final(mg, "given_up", why="the watch stopped")
+@@ -1265,6 +1279,58 @@ class PartyMinigames:
+             else:
+                 unknown_since = None
+ 
++    # --- B210: the hub keeps what it read -----------------------------------------------------------------------------
++    def _code_of(self, game: str, side: dict) -> str | None:
++        """The title's add-a-game code: the sidecar's `code`, else the add-game binding naming this game."""
++        code = side.get("code")
++        if isinstance(code, str) and PLAYED_CODE.match(code):
++            return code
++        for bp in sorted(_add_game_home(self.environ).glob("T*/binding.json")):
++            try:
++                if json.loads(bp.read_text(encoding="utf-8")).get("game") == game and PLAYED_CODE.match(bp.parent.name):
++                    return bp.parent.name
++            except (OSError, ValueError):
++                continue
++        return None
++
++    def _keep_result(self, mg: dict, runner: Any) -> None:
++        """B210 (PRIVYHUB_PARTY=1): a score or letters mini game ended, or given up on its final screen — the pictures
++        the reader ended on (or could not read), what it read, the seats and the time, off the repo under the title's
++        code (<add_game home>/<code>/played/<UTC stamp>/); the newest PLAYED_KEEP a title. Keeping only; never raises."""
++        if self.environ.get("PRIVYHUB_PARTY") != "1":
++            return
++        try:
++            game = mg["entry"]["game"]
++            side = json.loads((live.rules_folder(self.environ) / f"{game}.party.json").read_text(encoding="utf-8"))
++            if side.get("result") not in ("score", "letters"):
++                return
++            code = self._code_of(game, side)
++            if code is None:
++                self.row({"step": "result_not_kept", "why": "no add-game code for this title"})
++                return
++            pics = runner.end_pictures() if hasattr(runner, "end_pictures") else []
++            base = _add_game_home(self.environ) / code / "played"
++            stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
++            d, n = base / stamp, 1
++            while d.exists():
++                n += 1
++                d = base / f"{stamp}_{n}"
++            d.mkdir(parents=True)
++            for i, (img, _r) in enumerate(pics, 1):
++                pic = img if getattr(img, "mode", "RGB") in ("L", "RGB") else img.convert("RGB")
++                pic.save(d / f"f{i}.jpg", "JPEG", quality=90)
++            read = {"state": mg["state"], "class": mg.get("class"), "scores": mg.get("scores"),
++                    "winner": mg.get("winner"), "why": mg.get("why"), "seats": list(mg["seats"]),
++                    "utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "result": side.get("result"),
++                    "reads": [r for _img, r in pics]}
++            (d / "read.json").write_text(json.dumps(read, sort_keys=True) + "\n", encoding="utf-8")
++            old = sorted((p for p in base.iterdir() if p.is_dir()), key=lambda p: p.name)
++            for p in old[:max(0, len(old) - PLAYED_KEEP)]:
++                shutil.rmtree(p, ignore_errors=True)
++            self.row({"step": "result_kept", "code": code, "pictures": len(pics)})
++        except Exception as exc:
++            self.row({"step": "result_not_kept", "why": str(exc)[:200]})
++
+     # --- result / end -------------------------------------------------------------------------------------------------
+     def result(self) -> dict:
+         with self._lock:
+diff --git a/tests/b114_party_minigame_hang/b114_scenario.py b/tests/b114_party_minigame_hang/b114_scenario.py
+index a822c6d6..befd87fb 100644
+--- a/tests/b114_party_minigame_hang/b114_scenario.py
++++ b/tests/b114_party_minigame_hang/b114_scenario.py
+@@ -568,6 +568,8 @@ if args["mode"] == "b157":                              # B157: its own file (te
+     exec(compile(Path(args["fake_dir"], "b157_scenario.py").read_text(), "b157_scenario.py", "exec"))
+ if args["mode"] == "b178":                              # B178: its own file (tests/b178_score_kind)
+     exec(compile(Path(args["b178_dir"], "b178_scenario.py").read_text(), "b178_scenario.py", "exec"))
++if args["mode"] == "b210":                              # B210: its own file (tests/b210_keep_result)
++    exec(compile(Path(args["b210_dir"], "b210_scenario.py").read_text(), "b210_scenario.py", "exec"))
+ if args["mode"] == "b162":                              # B162: its own file (tests/b162_solo_safe)
+     exec(compile(Path(args["b162_dir"], "b162_scenario.py").read_text(), "b162_scenario.py", "exec"))
+ if args["mode"] == "cheat":
+diff --git a/tests/b178_score_kind/score_capture.py b/tests/b178_score_kind/score_capture.py
+index 543144e6..047dd3f8 100644
+--- a/tests/b178_score_kind/score_capture.py
++++ b/tests/b178_score_kind/score_capture.py
+@@ -157,13 +157,13 @@ def capture(state_path, binding, out_dir, seconds, every):
+ 
+ def _capture(st: dict, out_dir, seconds, every):
+     CALLS.append((st["kind"], tuple(st.get("s") or ())))
+-    rng = np.random.default_rng(178 + 7 * int(st.get("look", 0)) + 101 * int(st.get("n", 0)) + len(st["kind"]))
++    seed = [178, int(st.get("look", 0)), int(st.get("n", 0)), len(st["kind"])]   # B212: noise drawn per picture
+     rows = []
+     for k in range(int(seconds / every) + 1):
+         if k % 2:
+             continue
+         t = round(k * every, 2)
+         name = f"f{k:04d}.png"
+-        picture(st, t, k, rng).save(Path(out_dir) / name)
++        picture(st, t, k, np.random.default_rng(seed + [k])).save(Path(out_dir) / name)
+         rows.append((t, name))
+     return rows
+diff --git a/tests/b178_score_kind/test_b178.py b/tests/b178_score_kind/test_b178.py
+index 2faf1b1f..53aed0df 100644
+--- a/tests/b178_score_kind/test_b178.py
++++ b/tests/b178_score_kind/test_b178.py
+@@ -58,6 +58,13 @@ def rd(nums, again=None) -> str:
+     return f"{a},{'-'.join(map(str, again)) if again is not None else a}"
+ 
+ 
++
++def save_n(code: str, role: str, st: dict) -> int:
++    """B212: a made-up save's noise number from the save itself (its code, role and content), not from the order the
++    tests ran in."""
++    import hashlib as _h
++    return int(_h.sha256(json.dumps([code, role, st], sort_keys=True).encode()).hexdigest()[:6], 16)
++
+ class Made(unittest.TestCase):
+     """A temp add_game home, evidence and rules folder; the made-up picture source."""
+     N = [0]
+@@ -90,8 +97,8 @@ class Made(unittest.TestCase):
+         kf = pag.kept_folder(code)
+         kf.mkdir(parents=True, exist_ok=True)
+         for role, st in saves.items():
+-            self.N[0] += 1
+-            (kf / f"{role}.state").write_text(json.dumps({**st, "n": self.N[0]}))
++            self.N[0] += 1                                        # (the count of saves put; no longer a seed)
++            (kf / f"{role}.state").write_text(json.dumps({**st, "n": save_n(code, role, st)}))   # B212: the save's own
+         bp = pag.binding_path(code)
+         b = json.loads(bp.read_text()) if bp.is_file() else {
+             "code": code, "game": "madeup" + code.lower(), "players": 2, "system": "ps1", "result": "score",
+diff --git a/tests/b181_every_digit/line_capture.py b/tests/b181_every_digit/line_capture.py
+index de6494d2..a2373c3d 100644
+--- a/tests/b181_every_digit/line_capture.py
++++ b/tests/b181_every_digit/line_capture.py
+@@ -81,14 +81,14 @@ def _still(rng) -> Image.Image:
+ 
+ def capture(state_path, binding, out_dir, seconds, every):
+     st = json.loads(Path(state_path).read_text())
+-    rng = np.random.default_rng(181 + 7 * int(st.get("look", 0)) + 101 * int(st.get("n", 0)) + len(st["kind"]))
++    seed = [181, int(st.get("look", 0)), int(st.get("n", 0)), len(st["kind"])]   # B212: noise drawn per picture
+     rows = []
+     for k in range(int(seconds / every) + 1):
+         if k % 2:
+             continue
+         t = round(k * every, 2)
+         name = f"f{k:04d}.png"
+-        picture(st, t, k, rng).save(Path(out_dir) / name)
++        picture(st, t, k, np.random.default_rng(seed + [k])).save(Path(out_dir) / name)
+         rows.append((t, name))
+     return rows
+ 
+diff --git a/tests/b181_every_digit/test_b181.py b/tests/b181_every_digit/test_b181.py
+index 6e8d423d..9ff04b0a 100644
+--- a/tests/b181_every_digit/test_b181.py
++++ b/tests/b181_every_digit/test_b181.py
+@@ -54,6 +54,13 @@ def text(st: dict) -> str:
+                     for cells, fin in zip(st["q"], st["s"]))
+ 
+ 
++
++def save_n(code: str, role: str, st: dict) -> int:
++    """B212: a made-up save's noise number from the save itself (its code, role and content), not from the order the
++    tests ran in."""
++    import hashlib as _h
++    return int(_h.sha256(json.dumps([code, role, st], sort_keys=True).encode()).hexdigest()[:6], 16)
++
+ class Made(unittest.TestCase):
+     N = [0]
+ 
+@@ -83,8 +90,8 @@ class Made(unittest.TestCase):
+         kf = pag.kept_folder(code)
+         kf.mkdir(parents=True, exist_ok=True)
+         for role, st in saves.items():
+-            self.N[0] += 1
+-            (kf / f"{role}.state").write_text(json.dumps({**st, "n": self.N[0]}))
++            self.N[0] += 1                                        # (the count of saves put; no longer a seed)
++            (kf / f"{role}.state").write_text(json.dumps({**st, "n": save_n(code, role, st)}))   # B212: the save's own
+         bp = pag.binding_path(code)
+         b = json.loads(bp.read_text()) if bp.is_file() else {
+             "code": code, "game": "madeup" + code.lower(), "players": 2, "system": "ps1", "result": "score",
+diff --git a/tests/b185_overtime/test_b185.py b/tests/b185_overtime/test_b185.py
+index 86e14c01..d0e06ddf 100644
+--- a/tests/b185_overtime/test_b185.py
++++ b/tests/b185_overtime/test_b185.py
+@@ -73,6 +73,13 @@ def text(st: dict) -> str:
+                     for cells, fin in zip(st["q"], st["s"]))
+ 
+ 
++
++def save_n(code: str, role: str, st: dict) -> int:
++    """B212: a made-up save's noise number from the save itself (its code, role and content), not from the order the
++    tests ran in."""
++    import hashlib as _h
++    return int(_h.sha256(json.dumps([code, role, st], sort_keys=True).encode()).hexdigest()[:6], 16)
++
+ class Made(unittest.TestCase):
+     N = [0]
+ 
+@@ -112,8 +119,8 @@ class Made(unittest.TestCase):
+         kf = pag.kept_folder(code)
+         kf.mkdir(parents=True, exist_ok=True)
+         for role, st in saves.items():
+-            self.N[0] += 1
+-            (kf / f"{role}.state").write_text(json.dumps({**st, "n": self.N[0]}))
++            self.N[0] += 1                                        # (the count of saves put; no longer a seed)
++            (kf / f"{role}.state").write_text(json.dumps({**st, "n": save_n(code, role, st)}))   # B212: the save's own
+         bp = pag.binding_path(code)
+         b = json.loads(bp.read_text()) if bp.is_file() else {
+             "code": code, "game": "madeup" + code.lower(), "players": 2, "system": "ps1", "result": "score",
+diff --git a/tests/b198_max_score/low_capture.py b/tests/b198_max_score/low_capture.py
+index 444bbc54..69eeeab6 100644
+--- a/tests/b198_max_score/low_capture.py
++++ b/tests/b198_max_score/low_capture.py
+@@ -60,13 +60,13 @@ def picture(st: dict, t: float, k: int, rng) -> Image.Image:
+ 
+ def capture(state_path, binding, out_dir, seconds, every):
+     st = json.loads(Path(state_path).read_text())
+-    rng = np.random.default_rng(198 + 7 * int(st.get("look", 0)) + 101 * int(st.get("n", 0)) + len(st["kind"]))
++    seed = [198, int(st.get("look", 0)), int(st.get("n", 0)), len(st["kind"])]   # B212: noise drawn per picture
+     rows = []
+     for k in range(int(seconds / every) + 1):
+         if k % 2:
+             continue
+         t = round(k * every, 2)
+         name = f"f{k:04d}.png"
+-        picture(st, t, k, rng).save(Path(out_dir) / name)
++        picture(st, t, k, np.random.default_rng(seed + [k])).save(Path(out_dir) / name)
+         rows.append((t, name))
+     return rows
+diff --git a/tests/b200_drawn_places/pad_capture.py b/tests/b200_drawn_places/pad_capture.py
+index 886fac5f..01a8e1f1 100644
+--- a/tests/b200_drawn_places/pad_capture.py
++++ b/tests/b200_drawn_places/pad_capture.py
+@@ -89,13 +89,13 @@ def picture(st: dict, t: float, k: int, rng) -> Image.Image:
+ 
+ def capture(state_path, binding, out_dir, seconds, every):
+     st = json.loads(Path(state_path).read_text())
+-    rng = np.random.default_rng(200 + 7 * int(st.get("look", 0)) + 101 * int(st.get("n", 0)) + len(st["kind"]))
++    seed = [200, int(st.get("look", 0)), int(st.get("n", 0)), len(st["kind"])]   # B212: noise drawn per picture
+     rows = []
+     for k in range(int(seconds / every) + 1):
+         if k % 2:
+             continue
+         t = round(k * every, 2)
+         name = f"f{k:04d}.png"
+-        picture(st, t, k, rng).save(Path(out_dir) / name)
++        picture(st, t, k, np.random.default_rng(seed + [k])).save(Path(out_dir) / name)
+         rows.append((t, name))
+     return rows
+diff --git a/tools/h7_endscreen.py b/tools/h7_endscreen.py
+index 9d8aef4a..72ae3bca 100644
+--- a/tools/h7_endscreen.py
++++ b/tools/h7_endscreen.py
+@@ -2000,15 +2000,16 @@ def read_corner(a: np.ndarray, box, bins: np.ndarray, fitted: dict, word: str, g
+     return "".join(out)
+ 
+ 
+-def _letters_places(A: dict, sides: dict, word: str, n: int) -> tuple:
+-    """-> ({p: box}, {p: [(save, string, cut, zone)]}) or (None, why)."""
++def _letters_places(A: dict, sides: dict, word: str, n: int, regions: dict | None = None) -> tuple:
++    """-> ({p: box}, {p: [(save, string, cut, zone)]}) or (None, why). B208: `regions` ({p: [x0, y0, x1, y1]}, the
++    session's survey) — each player's letters looked for only inside its region, and its box the region itself."""
+     ends = sorted(A)
+     fixed = np.all([np.abs(A[e] - A[ends[0]]).max(axis=2) <= LETTERS_EQ for e in ends], axis=0) \
+         if len(ends) > 1 else np.zeros(A[ends[0]].shape[:2], bool)
+     found = {}
+     for p in range(1, n + 1):
+         cands = []
+-        for zone in letters_zones(n)[p]:
++        for zone in ([tuple(regions[p])] if regions else letters_zones(n)[p]):
+             for e in ends:
+                 want = 0 if sides[e][p - 1] == "_" else len(sides[e][p - 1])
+                 if not want:
+@@ -2062,6 +2063,8 @@ def _letters_places(A: dict, sides: dict, word: str, n: int) -> tuple:
+             top, bot = (top + bot) / 2.0 - gh / 2.0, (top + bot) / 2.0 + gh / 2.0
+         places[p] = [int(max(0, cl["cx"] - half)), int(max(0, top - 3)), int(min(W, cl["cx"] + half)),
+                      int(min(H, bot + 4))]
++        if regions:                                            # B208: the surveyed region, as the session drew it
++            places[p] = [int(v) for v in regions[p]]
+     return places, found
+ 
+ 
+@@ -2163,7 +2166,7 @@ def _read_sides(places: dict, bins: dict, fitted: dict, word: str, glyph_min: fl
+ 
+ 
+ def learn_letters(starts: list, others: list, ends: dict, sides: dict, word: str, players: int, name: str = "",
+-                  start_class: str = START) -> tuple:
++                  start_class: str = START, regions: dict | None = None) -> tuple:
+     """B191 / B192: starts / others — picture paths of the begin's and the mid-match save's screens; ends — {role:
+     [picture paths]} (the label stage's two of each end save); sides — {role: [P1's corner, P2's, ...]} as the session
+     read them; word — the user's. -> (spec, arrays, report). Synthetic pictures only train; nothing here proves."""
+@@ -2191,7 +2194,7 @@ def learn_letters(starts: list, others: list, ends: dict, sides: dict, word: str
+     items = [(A[r], list(sides[r])) for r in roles]                      # B192: one picture of each end save
+     checks = items + [(colour(p), list(sides[r])) for r in roles for p in ends[r][1:]]   # every picture read right
+     frames = [colour(p) for p in list(starts[:1]) + list(others[:1])] + [A[r] for r in roles]
+-    places, found = _letters_places(A, sides, word, players)
++    places, found = _letters_places(A, sides, word, players, regions)       # B208: regions given -> inside them
+     spec = {"version": VERSION_LETTERS, "kind": "privyhub-h7-endscreen", "measure": MEASURE, "size": list(SIZE),
+             "classes": [start_class] + [f"end_P{k}" for k in range(1, players + 1)], "start_class": start_class,
+             "end_classes": [f"end_P{k}" for k in range(1, players + 1)], "k": K,
+diff --git a/tools/party_add_game.py b/tools/party_add_game.py
+index 3363859f..b34e843b 100644
+--- a/tools/party_add_game.py
++++ b/tools/party_add_game.py
+@@ -54,6 +54,11 @@ glyphs are the same shape in saves labelled with different digits is never taken
+ final's line (a box of small cells) found where they are; learn counts the digits of the finals and of the cells
+ read in a final's size only (the hub reads finals).
+ 
++B208 / B209 (queue BP): the front of the path rebuilt once — `survey <code>` (the session marks each player's result
++region and the kind once; kept in the binding as numbers), `label` on those regions only, `plan <code>` (every symbol
++the result can show, how many real pictures show each, its last line the whole ask), `train <code>` (templates from the
++regions' real glyphs, synthetic variants, the once rule). A binding without a survey: today's path. `tools/party_steps.py`.
++
+ B201: `--find <words>` — the tool lists the system's titles (the library's `q` applies only to its search view) and
+ takes the user's words as said: the whole name, the name without its bracketed parts, or every word in it; one title,
+ or the candidates' names on stderr for the chat only (never written), or none.
+@@ -96,7 +101,8 @@ from pathlib import Path
+ 
+ TOOLS = Path(__file__).resolve().parent
+ REPO = TOOLS.parent
+-STAGES = ("register", "label", "learn", "rehearse", "bench", "solo", "close")
++STAGES = ("register", "label", "learn", "rehearse", "bench", "solo", "close",
++          "survey", "plan", "train")                       # B208 / B209: the front of the path, rebuilt (party_steps)
+ CODE = re.compile(r"^T\d\d$")
+ SYSTEMS = {"ps1", "n64", "snes"}                       # h7-start's systems (B103 / B123)
+ NOT_YET = {"ps2": "PS2: no paused load, no frame advance for a held title yet (B159)",
+@@ -132,6 +138,9 @@ BARS = {
+                                                   "listed (the user readied sooner than 4 s after it)"),
+     "flag_lines_task": (20, "PP-H4: twenty lines with the two flags"),
+     "flag_lines_found": (18, "the eighteen adopted lines"),
++    "rigid_min": (0.0995, "B211 (2026-11-24, set before T92 was looked at): half the smaller rigidity of T90 0.5693 "
++                          "and T91 0.1990 on the new path (1 - the farthest pair of one symbol's real glyphs / the "
++                          "nearest pair of two symbols'); the learner's SAFETY 0.5"),
+     "synthetic_held_wrong_max": (0, "B192: the training's own bar — every held-out synthetic picture read; it never "
+                                     "counts toward a pass"),
+ }
+@@ -1672,8 +1681,30 @@ def _ask_line(code: str, b: dict, rec: dict, role: str, why: str, texts: dict, f
+             "Ask the user about " + match.format(final="<its final as read: run time only>") + tail)
+ 
+ 
++def surveyed(b: dict) -> bool:
++    """B208: a binding whose title went through `survey` as score or letters — its label, plan and train are
++    party_steps'; a binding without a survey runs today's code."""
++    return (b.get("survey") or {}).get("kind") in ("score", "letters")
++
++
++def _steps():
++    if str(TOOLS) not in sys.path:
++        sys.path.insert(0, str(TOOLS))
++    import party_steps
++    return party_steps
++
++
++def trained(code: str, b: dict) -> tuple[str, str]:
++    """The stage bench follows and its inputs: B209's train for a surveyed title, else learn (today)."""
++    if surveyed(b):
++        return "train", _steps().train_inputs(code, b)
++    return "learn", learn_inputs(code, b)
++
++
+ def cmd_label(code: str, a: dict) -> int:
+     b = load_binding(code)
++    if surveyed(b):                                          # B208: the regions' label
++        return _steps().cmd_label(code, a)
+     if b.get("result") == "letters":                         # B191
+         return _label_letters(code, b, a)
+     if b.get("result") != "score":
+@@ -3057,6 +3088,9 @@ def _scratch_load(b: dict, kept_file: Path, port: int | None) -> Path | None:
+ def bench_inputs(code: str, b: dict) -> str:
+     r = rules_folder()
+     files = [r / f"{b['game']}.endscreen.json", r / f"{b['game']}.party.json", r / _begin_name(b)]
++    if surveyed(b):                                          # B209
++        return digest({"train": _steps().train_inputs(code, b),
++                       "rules": [sha(p) if p.is_file() else None for p in files]})
+     return digest({"learn": learn_inputs(code, b), "rules": [sha(p) if p.is_file() else None for p in files]})
+ 
+ 
+@@ -3064,7 +3098,7 @@ def cmd_bench(code: str, a: dict) -> int:
+     b = load_binding(code)
+     if b.get("described"):
+         raise Refused("a title already in the rules folder had its bench in its own task: go on with solo")
+-    require(code, "learn", learn_inputs(code, b))
++    require(code, *trained(code, b))                         # B209: train's PASS for a surveyed title
+     _private_paths()
+     cells = Cells()
+     lines = flags(True)
+@@ -3482,6 +3516,11 @@ def parse(argv: list[str]) -> tuple[str, str, dict]:
+         raise Usage(__doc__.split("\n\n")[1])
+     stage, code, rest = argv[0], argv[1], argv[2:]
+     a: dict = {"check": False, "collect": [], "read": False, "readings": []}
++    if stage == "survey":                                    # B208: the session's answer, word by word
++        if any(w.startswith("--") for w in rest):
++            raise Usage("survey takes words, no options")
++        a["words"] = rest
++        return stage, code, a
+     i = 0
+     while i < len(rest):
+         k = rest[i]
+@@ -3519,6 +3558,11 @@ def main(argv: list[str]) -> int:
+         _private_paths()
+         if stage == "register":
+             return cmd_register(code, a)
++        if stage in ("survey", "plan", "train"):            # B208 / B209
++            return {"survey": _steps().cmd_survey, "plan": _steps().cmd_plan, "train": _steps().cmd_train}[stage](
++                code, a)
++        if stage == "learn" and surveyed(load_binding(code)):
++            raise Refused("this title went through survey: its learning is train")
+         return {"label": cmd_label, "learn": cmd_learn, "rehearse": cmd_rehearse, "bench": cmd_bench,
+                 "solo": cmd_solo, "close": cmd_close}[stage](code, a)
+     except Usage as exc:
+diff --git a/tools/party_steps.py b/tools/party_steps.py
+new file mode 100644
+index 00000000..d9eb5aee
+--- /dev/null
++++ b/tools/party_steps.py
+@@ -0,0 +1,1061 @@
++#!/usr/bin/env python3
++"""B208-B209 (queue BP): the front of the add-a-game path, rebuilt once around the user's five steps — survey, label
++on the surveyed regions, plan, train. Called by `tools/party_add_game.py` (its stages `survey`, `plan`, `train`, and
++`label` for a binding that has a survey); a binding without a survey never reaches this file.
++
++    python3 tools/party_add_game.py survey <code>                               the boxes picture; the answer's grammar
++    python3 tools/party_add_game.py survey <code> score <P1> <P2>               a box number or x0,y0,x1,y1 per player
++    python3 tools/party_add_game.py survey <code> letters <WORD> <P1> <P2>
++    python3 tools/party_add_game.py survey <code> winner|places                 recorded; the path goes on as today
++    python3 tools/party_add_game.py survey <code> ok | again P<k> | P<k> <box or rectangle>
++    python3 tools/party_add_game.py label <code> <role>=<P1>-<P2>,<P1>-<P2> ... [look=all|look=<symbol>:<i>]
++    python3 tools/party_add_game.py plan <code>
++    python3 tools/party_add_game.py train <code>
++
++Where the result is comes from the survey (the session's answer, kept in the binding as numbers); nothing here
++searches a picture for where a number or a letter is. What is missing is said once, as plan's last line. The gates
++(design: docs/memory/evidence/b208_2026-11-24/design_written_before_code.md): a symbol two or more real pictures show
++is read right by a reader learnt without its save; a symbol one real picture shows counts ("seen once") when the
++title's font is rigid (`rigidity` >= BARS["rigid_min"]), every synthetic variant of it is read as itself and no other
++symbol's real glyph is read as it; a symbol never shown is never learnt and is asked for.
++"""
++from __future__ import annotations
++
++import csv
++import hashlib
++import json
++import re
++from pathlib import Path
++
++import party_add_game as pag
++
++KINDS = ("winner", "places", "score", "letters")
++SURVEY_MARGIN = 6           # px of the reader's 640 x 480 picture around a numbered box
++SURVEY_GRID = 40            # px: the ruled grid's step (reader pixels)
++SURVEY_SCALE = 2            # the boxes picture is drawn at this scale
++REGION_ZOOM = 4             # the regions picture: each region at this scale
++SYN_PER_GLYPH = 8           # synthetic variants of each real glyph (training and gate 2)
++SYN_DX, SYN_DY = 3, 1       # px: the synthetic shift's range
++RECT = re.compile(r"^(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})$")
++SCORE_LABEL = re.compile(r"^\d{1,4}(?:-\d{1,4}){1,3}$")
++
++
++def es():
++    return pag._endscreen()
++
++
++# --- places on disk (off the repo) ----------------------------------------------------------------------------------
++def survey_folder(code: str) -> Path:
++    return pag.home(code) / "survey"
++
++
++def label_path(code: str) -> Path:
++    return pag.home(code) / "regions_label.json"
++
++
++def label_folder(code: str) -> Path:
++    return pag.home(code) / "regions"
++
++
++def save_binding(code: str, b: dict) -> None:
++    pag.write_if_changed(pag.binding_path(code), json.dumps(b, indent=1, sort_keys=True) + "\n")
++
++
++def end_roles(kept) -> list:
++    return sorted(r for r in kept if r.startswith("end_P"))
++
++
++def final_pictures(code: str, b: dict, kept: dict, role: str) -> list[Path]:
++    pics = pag._pictures(code, b, kept)
++    return [pics / role / n for n in pag._two_pictures(pics, role)]
++
++
++def grey(path) -> "np.ndarray":
++    from PIL import Image
++    with Image.open(path) as im:
++        return es().score_picture(im)
++
++
++def colour(path) -> "np.ndarray":
++    from PIL import Image
++    with Image.open(path) as im:
++        return es().letters_area(im)
++
++
++# --- B208: survey -----------------------------------------------------------------------------------------------------
++def survey_boxes(a) -> list[list[int]]:
++    """Every string today's segmentation (`score_strings`) finds, as [x0, y0, x1, y1] (inclusive, reader pixels); the
++    strings of each polarity and radius merged when they overlap by half of the smaller; numbered by (top, left)."""
++    boxes = [[s["x0"], s["top"], s["x1"], s["bot"]] for s in es().score_strings(a)]
++    merged: list[list[int]] = []
++    for bx in sorted(boxes, key=lambda q: -((q[2] - q[0] + 1) * (q[3] - q[1] + 1))):
++        for m in merged:
++            ix = min(m[2], bx[2]) - max(m[0], bx[0]) + 1
++            iy = min(m[3], bx[3]) - max(m[1], bx[1]) + 1
++            small = min((m[2] - m[0] + 1) * (m[3] - m[1] + 1), (bx[2] - bx[0] + 1) * (bx[3] - bx[1] + 1))
++            if ix > 0 and iy > 0 and ix * iy * 2 >= small:
++                m[:] = [min(m[0], bx[0]), min(m[1], bx[1]), max(m[2], bx[2]), max(m[3], bx[3])]
++                break
++        else:
++            merged.append(list(bx))
++    return sorted(merged, key=lambda q: (q[1], q[0]))
++
++
++def draw_boxes(col, boxes: list, path: Path) -> None:
++    import numpy as np
++    from PIL import Image, ImageDraw
++    im = Image.fromarray(np.clip(col, 0, 255).astype(np.uint8)).resize(
++        (col.shape[1] * SURVEY_SCALE, col.shape[0] * SURVEY_SCALE), Image.NEAREST)
++    d = ImageDraw.Draw(im)
++    W, H = im.size
++    for x in range(0, col.shape[1] + 1, SURVEY_GRID):
++        d.line([(x * SURVEY_SCALE, 0), (x * SURVEY_SCALE, H)], fill=(0, 160, 255), width=1)
++        d.text((x * SURVEY_SCALE + 2, 2), str(x), fill=(0, 200, 255))
++    for y in range(0, col.shape[0] + 1, SURVEY_GRID):
++        d.line([(0, y * SURVEY_SCALE), (W, y * SURVEY_SCALE)], fill=(0, 160, 255), width=1)
++        d.text((2, y * SURVEY_SCALE + 2), str(y), fill=(0, 200, 255))
++    for i, (x0, y0, x1, y1) in enumerate(boxes, 1):
++        d.rectangle([x0 * SURVEY_SCALE - 2, y0 * SURVEY_SCALE - 2, x1 * SURVEY_SCALE + 2, y1 * SURVEY_SCALE + 2],
++                    outline=(255, 40, 40), width=2)
++        d.text((x0 * SURVEY_SCALE, max(0, y0 * SURVEY_SCALE - 14)), str(i), fill=(255, 255, 0))
++    path.parent.mkdir(parents=True, exist_ok=True)
++    im.save(path)
++
++
++def draw_regions(col, regions: list, path: Path) -> None:
++    import numpy as np
++    from PIL import Image, ImageDraw
++    crops = []
++    for (x0, y0, x1, y1) in regions:
++        c = Image.fromarray(np.clip(col[y0:y1 + 1, x0:x1 + 1], 0, 255).astype(np.uint8))
++        crops.append(c.resize((c.size[0] * REGION_ZOOM, c.size[1] * REGION_ZOOM), Image.NEAREST))
++    W = sum(c.size[0] for c in crops) + 20 * (len(crops) + 1)
++    H = max(c.size[1] for c in crops) + 40
++    sheet = Image.new("RGB", (W, H), (40, 40, 40))
++    d = ImageDraw.Draw(sheet)
++    x = 20
++    for k, c in enumerate(crops, 1):
++        sheet.paste(c, (x, 30))
++        d.text((x, 8), f"P{k}", fill=(255, 255, 0))
++        x += c.size[0] + 20
++    path.parent.mkdir(parents=True, exist_ok=True)
++    sheet.save(path)
++
++
++def region_of(answer: str, boxes: list, size=(640, 480)) -> list[int] | None:
++    """A box number's box grown by SURVEY_MARGIN (clipped), or a rectangle x0,y0,x1,y1 as given; None: neither."""
++    W, H = size
++    if answer.isdigit():
++        i = int(answer)
++        if not 1 <= i <= len(boxes):
++            return None
++        x0, y0, x1, y1 = boxes[i - 1]
++        return [max(0, x0 - SURVEY_MARGIN), max(0, y0 - SURVEY_MARGIN), min(W - 1, x1 + SURVEY_MARGIN),
++                min(H - 1, y1 + SURVEY_MARGIN)]
++    m = RECT.match(answer)
++    if not m:
++        return None
++    x0, y0, x1, y1 = (int(v) for v in m.groups())
++    if not (0 <= x0 < x1 < W and 0 <= y0 < y1 < H):
++        return None
++    return [x0, y0, x1, y1]
++
++
++def survey_inputs(b: dict) -> str:
++    return pag.digest({"register": b["register_inputs"], "survey": b.get("survey")})
++
++
++def _survey_cells(b: dict) -> pag.Cells:
++    s = b.get("survey") or {}
++    cells = pag.Cells()
++    cells.add("the kind as register's", s.get("kind"), b["result"], s.get("kind") == b["result"])
++    if s.get("kind") in ("score", "letters"):
++        regs = s.get("regions") or []
++        n = int(b["players"])
++        whole = len(regs) == n and all(r is not None for r in regs)
++        cells.add("one region per player, P1 first", sum(r is not None for r in regs), n, whole)
++        if whole:
++            inside = all(0 <= r[0] < r[2] < 640 and 0 <= r[1] < r[3] < 480 for r in regs)
++            cells.add("every region inside the picture", inside, True, inside)
++            apart = all(min(p[2], q[2]) < max(p[0], q[0]) or min(p[3], q[3]) < max(p[1], q[1])
++                        for i, p in enumerate(regs) for q in regs[i + 1:])
++            cells.add("the regions do not overlap", apart, True, apart)
++        cells.add("the regions confirmed by the session", bool(s.get("confirmed")), True, bool(s.get("confirmed")))
++    return cells
++
++
++def registered(code: str, b: dict, kept: dict) -> None:
++    """Survey runs once register holds the three saves (begin, other, one ending) — register's verdict for these saves,
++    whatever it says about more endings (register is today's: it still names a second save of each ending)."""
++    v = pag.load_verdict(code, "register")
++    if not v or v.get("inputs") != pag.register_inputs(b, kept):
++        raise pag.Refused("register has not kept these saves: run register first")
++    if "begin" not in kept or not any(r.startswith("other") for r in kept) or not end_roles(kept):
++        raise pag.Refused("survey needs register's three saves: begin, other and one ending")
++
++
++def cmd_survey(code: str, a: dict) -> int:
++    b = pag.load_binding(code)
++    kept = pag.kept_states(code)
++    registered(code, b, kept)
++    words = list(a.get("words") or [])
++    ends = end_roles(kept)
++    role = ends[0]
++    folder = survey_folder(code)
++    first = final_pictures(code, b, kept, role)[0]
++    boxes = survey_boxes(grey(first))
++    pag.write_if_changed(folder / "boxes.json", json.dumps({"from": role, "boxes": boxes}, sort_keys=True))
++    if not (folder / "boxes.png").is_file() or not words:
++        draw_boxes(colour(first), boxes, folder / "boxes.png")
++    n = int(b["players"])
++    s = dict(b.get("survey") or {})
++    if not words:
++        pag.out(f"survey {code}: look at survey/boxes.png ({len(boxes)} numbered boxes, a grid every {SURVEY_GRID} "
++                f"px) — answer: survey {code} <kind> " + ("<WORD> " if b["result"] == "letters" else "")
++                + " ".join(f"<P{k}: a box number or x0,y0,x1,y1>" for k in range(1, n + 1)))
++        return 3
++    if words[0] in KINDS:
++        kind = words[0]
++        if kind != b["result"]:
++            raise pag.Refused(f"register named this title {b['result']}, the survey says {kind}: one of them is wrong")
++        rest = words[1:]
++        if kind == "letters":
++            if not rest or rest[0] != b.get("word"):
++                raise pag.Refused("the word is not register's --word")
++            rest = rest[1:]
++        if kind in ("winner", "places"):
++            b["survey"] = {"kind": kind}
++            save_binding(code, b)
++            rc = pag.finish(code, "survey", _survey_cells(b), survey_inputs(b))
++            pag.out(f"survey {code}: {kind} — the path goes on as today (label, learn)")
++            return rc
++        if len(rest) != n:
++            raise pag.Usage(f"survey {code} {kind}: one region per player ({n}), P1 first")
++        regs = [region_of(x, boxes) for x in rest]
++        bad = [f"P{k}" for k, r in enumerate(regs, 1) if r is None]
++        if bad:
++            raise pag.Usage(f"not a box number (1-{len(boxes)}) or x0,y0,x1,y1 inside 640 x 480: {', '.join(bad)}")
++        s = {"kind": kind, "regions": regs, "margin": SURVEY_MARGIN, "size": [640, 480], "from": role,
++             "confirmed": False}
++    elif words[0] == "ok":
++        if not s.get("regions") or any(r is None for r in s["regions"]):
++            raise pag.Refused("no region to confirm: answer the survey first")
++        s["confirmed"] = True
++    elif words[0] == "again" and len(words) == 2 and re.match(r"^P[1-4]$", words[1]):
++        k = int(words[1][1])
++        if not s.get("regions") or k > len(s["regions"]):
++            raise pag.Refused("no such region")
++        s["regions"][k - 1] = None
++        s["confirmed"] = False
++    elif re.match(r"^P[1-4]$", words[0]) and len(words) == 2:
++        k = int(words[0][1])
++        if not s.get("regions") or k > len(s["regions"]):
++            raise pag.Refused("no such region")
++        r = region_of(words[1], boxes)
++        if r is None:
++            raise pag.Usage(f"not a box number (1-{len(boxes)}) or x0,y0,x1,y1 inside 640 x 480")
++        s["regions"][k - 1] = r
++        s["confirmed"] = False
++    else:
++        raise pag.Usage(f"survey {code} <kind> ... | ok | again P<k> | P<k> <box or rectangle>")
++    b["survey"] = s
++    save_binding(code, b)
++    missing = [f"P{k}" for k, r in enumerate(s["regions"], 1) if r is None]
++    if missing:
++        pag.out(f"survey {code}: mark {', '.join(missing)} again — survey {code} {missing[0]} <a box number or "
++                "x0,y0,x1,y1>")
++        return 3
++    if not s["confirmed"]:
++        draw_regions(colour(first), s["regions"], folder / "regions.png")
++        pag.out(f"survey {code}: look at survey/regions.png — answer survey {code} ok, or survey {code} again P<k>")
++        return 3
++    return pag.finish(code, "survey", _survey_cells(b), survey_inputs(b))
++
++
++# --- the place from a region (score; no search) ---------------------------------------------------------------------
++def region_place(a, region: list) -> dict | None:
++    """The region's own line of glyphs: today's ink and parts, inside the region only; the line the most parts share
++    (tops and bottoms within SCORE_TOL; the tallest on a tie), the first polarity / radius that has one. The place's
++    x0 / x1 the region's edges brought in by `place_glyphs`'s own pad, so its window is the region."""
++    E = es()
++    x0, y0, x1, y1 = region
++    contrast = E._contrast(a)
++    for pol in (1, -1):
++        for r in E.SCORE_RS:
++            m = E._ink(a, pol, r, contrast)[y0:y1 + 1, x0:x1 + 1]
++            parts = [c for c in E._components(m) if c[2] - c[0] + 1 >= E.SCORE_HMIN
++                     and c[3] - c[1] + 1 <= 1.5 * (c[2] - c[0] + 1)]
++            if not parts:
++                continue
++            lines: list[list] = []
++            for c in sorted(parts, key=lambda c: c[0]):
++                for ln in lines:
++                    if abs(ln[0][0] - c[0]) <= E.SCORE_TOL and abs(ln[0][2] - c[2]) <= E.SCORE_TOL:
++                        ln.append(c)
++                        break
++                else:
++                    lines.append([c])
++            best = max(lines, key=lambda ln: (len(ln), ln[0][2] - ln[0][0]))
++            top = int(sorted(c[0] for c in best)[len(best) // 2]) + y0
++            bot = int(sorted(c[2] for c in best)[len(best) // 2]) + y0
++            h = bot - top + 1
++            pad = int(round(h * E.SCORE_CELL[1] / E.SCORE_CELL[0])) + 2
++            px0, px1 = x0 + pad, x1 - pad
++            if px1 < px0:
++                px0 = px1 = (x0 + x1) // 2
++            return {"top": top, "bot": bot, "pol": pol, "r": r, "x0": px0, "x1": px1, "group": "",
++                    "align": "region"}
++    return None
++
++
++def region_glyphs(a, place: dict) -> list:
++    return es().place_glyphs(a, place) or []
++
++
++def letters_text(col, region: list) -> bool:
++    """Letters: a region holds text when the existing cut (today's letter strings over the region's own off-colour
++    pixels) finds a part there — the corner's own pixels off its commonest colour, never a dark one."""
++    import numpy as np
++    E = es()
++    x0, y0, x1, y1 = region
++    sub = col[y0:y1 + 1, x0:x1 + 1]
++    q = (sub // 16).astype(int)
++    keyv = q[..., 0] * 256 + q[..., 1] * 16 + q[..., 2]
++    vals, counts = np.unique(keyv, return_counts=True)
++    common = vals[int(np.argmax(counts))]
++    m = (keyv != common) & (sub.sum(axis=2) >= E.LETTERS_FILL)
++    return bool(E.letter_strings(m, 0, 0))
++
++
++def regions_hold(code: str, b: dict, kept: dict) -> dict:
++    """{role: [P<k> whose region holds no text]} for every end save's final picture."""
++    s = b["survey"]
++    out = {}
++    for role in end_roles(kept):
++        p = final_pictures(code, b, kept, role)[0]
++        miss = []
++        if s["kind"] == "score":
++            a = grey(p)
++            for k, reg in enumerate(s["regions"], 1):
++                if region_place(a, reg) is None:
++                    miss.append(f"P{k}")
++        else:
++            col = colour(p)
++            for k, reg in enumerate(s["regions"], 1):
++                if not letters_text(col, reg):
++                    miss.append(f"P{k}")
++        if miss:
++            out[role] = miss
++    return out
++
++
++def hold_cell(cells: pag.Cells, code: str, held: dict) -> None:
++    words = [f"{r}: no text in {', '.join(m)}'s region — mark it again (survey {code} again {m[0]})"
++             for r, m in sorted(held.items())]
++    cells.add("every end save shows text in every region", words or "yes", "yes", not held)
++
++
++def score_places(code: str, b: dict, kept: dict) -> list:
++    """The places, from the regions on the ending the survey was made on (the same for every save)."""
++    s = b["survey"]
++    a = grey(final_pictures(code, b, kept, s["from"])[0])
++    return [region_place(a, reg) for reg in s["regions"]]
++
++
++# --- B209: label on the regions -------------------------------------------------------------------------------------
++def label_record(code: str) -> dict:
++    rec = pag.read_json(label_path(code), {}) or {}
++    rec.setdefault("saves", {})
++    return rec
++
++
++def label_inputs(code: str, b: dict) -> str:
++    return pag.digest({"register": b["register_inputs"], "survey": b.get("survey"), "kept": pag.kept_states(code),
++                       "labels": {r: v.get("readings") for r, v in sorted(label_record(code)["saves"].items())}})
++
++
++def sides_of(kind: str, text: str) -> list[str]:
++    return text.split("-") if kind == "score" else text.split("/")
++
++
++def _fits(kind: str, text: str, n: int, word: str | None) -> bool:
++    if kind == "score":
++        return bool(SCORE_LABEL.match(text)) and len(text.split("-")) == n
++    parts = text.split("/")
++    return len(parts) == n and all(re.match(r"^(?:[A-Z-]{1,12}|_)$", p) for p in parts)
++
++
++def role_agrees(kind: str, role: str, sides: list, word: str | None) -> bool:
++    k = int(role[5])
++    if kind == "score":
++        vals = [int(x) for x in sides]
++        return vals[k - 1] == max(vals) and vals.count(max(vals)) == 1
++    other = [p for i, p in enumerate(sides, 1) if i != k]
++    return all(p == word for p in other) and sides[k - 1] != word
++
++
++def glyph_items(code: str, b: dict, kept: dict, roles=None) -> list:
++    """Every glyph in the regions as read: [(role, picture index, player, position, symbol, cell)] — score: B178's
++    cells at the region's place; letters: B191's cells from the corner the region is."""
++    rec = label_record(code)["saves"]
++    s = b["survey"]
++    items = []
++    if s["kind"] == "score":
++        places = score_places(code, b, kept)
++        for role in roles or end_roles(kept):
++            if role not in rec:
++                continue
++            sides = sides_of("score", rec[role]["readings"][0])
++            for pi, p in enumerate(final_pictures(code, b, kept, role)):
++                a = grey(p)
++                for k, pl in enumerate(places):
++                    gl = region_glyphs(a, pl) if pl else []
++                    if len(gl) != len(sides[k]):
++                        items.append((role, pi, k + 1, None, None, None))
++                        continue
++                    for j, (ch, g) in enumerate(zip(sides[k], gl)):
++                        items.append((role, pi, k + 1, j, ch, es().glyph_cell(a, g, pl)))
++    return items
++
++
++def draw_look(items: list, path: Path, scale: int = 3) -> list:
++    """The last look: every glyph grouped by the symbol it was read as, one row a symbol, numbered from 1."""
++    import numpy as np
++    from PIL import Image, ImageDraw
++    rows: dict = {}
++    for it in items:
++        if it[4] is not None:
++            rows.setdefault(it[4], []).append(it)
++    if not rows:
++        return []
++    ch, cw = items[[i for i, it in enumerate(items) if it[5] is not None][0]][5].shape
++    width = 40 + max(len(v) for v in rows.values()) * (cw * scale + 6)
++    sheet = Image.new("RGB", (width, len(rows) * (ch * scale + 20) + 10), (30, 30, 30))
++    d = ImageDraw.Draw(sheet)
++    order = []
++    for r_i, sym in enumerate(sorted(rows)):
++        y = 10 + r_i * (ch * scale + 20)
++        d.text((6, y + 4), sym, fill=(255, 255, 0))
++        for j, it in enumerate(rows[sym], 1):
++            c = Image.fromarray((np.clip(it[5], 0, 1) * 255).astype(np.uint8)).resize((cw * scale, ch * scale),
++                                                                                     Image.NEAREST)
++            x = 40 + (j - 1) * (cw * scale + 6)
++            sheet.paste(c.convert("RGB"), (x, y + 14))
++            d.text((x, y), str(j), fill=(160, 200, 255))
++            order.append((sym, j, it[0]))
++    path.parent.mkdir(parents=True, exist_ok=True)
++    sheet.save(path)
++    return order
++
++
++def cmd_label(code: str, a: dict) -> int:
++    b = pag.load_binding(code)
++    kept = pag.kept_states(code)
++    s = b.get("survey") or {}
++    pag.require(code, "survey", survey_inputs(b))
++    if s.get("kind") not in ("score", "letters"):
++        raise pag.Refused(f"a {s.get('kind')} title's label is today's: run learn")
++    n, word, kind = int(b["players"]), b.get("word"), s["kind"]
++    rec = label_record(code)
++    folder = label_folder(code)
++    ends = end_roles(kept)
++    for role in ends:                                       # the pictures: two of each final screen, each region x4
++        for pi, p in enumerate(final_pictures(code, b, kept, role), 1):
++            if not (folder / f"{role}.{pi}.png").is_file():
++                draw_regions(colour(p), s["regions"], folder / f"{role}.{pi}.png")
++    look = None
++    for item in a.get("readings") or []:
++        k, _, v = item.partition("=")
++        if k == "look":
++            look = v
++            continue
++        if k not in ends:
++            raise pag.Usage(f"{k}: not an end save of {code}")
++        pair = v.split(",")
++        if len(pair) != 2 or not all(_fits(kind, x, n, word) for x in pair):
++            raise pag.Usage(f"{k}=<reading>,<reading>: two readings of its two pictures, "
++                            + ("<P1>-<P2> numbers as drawn" if kind == "score" else "<P1>/<P2> corners"))
++        rec["saves"][k] = {"readings": pair, "sha": kept[k]}
++    rec["saves"] = {r: v for r, v in rec["saves"].items() if r in ends and v.get("sha") == kept[r]}
++    pag.write_if_changed(label_path(code), json.dumps(rec, indent=1, sort_keys=True) + "\n")
++    cells = pag.Cells()
++    missing = [r for r in ends if r not in rec["saves"]]
++    if missing:
++        cells.add("every end save read (two pictures each)", missing, [], False)
++        pag.finish(code, "label", cells, label_inputs(code, b))
++        pag.out(f"label {code}: read the regions on label pictures regions/<role>.1.png and .2.png — label {code} "
++                + " ".join(f"{r}=<reading>,<reading>" for r in missing))
++        return 1
++    for role in ends:
++        pair = rec["saves"][role]["readings"]
++        cells.add(f"{role}: the two readings the same", pair, "the same", pair[0] == pair[1])
++        cells.add(f"{role}: the role agrees", pair[0], "its player won", role_agrees(kind, role, sides_of(kind, pair[0]),
++                                                                                       word))
++        if kind == "letters":
++            fits = all(p == "_" or p == word or (len(p) == len(word) and all(c in (w, "-") for c, w in zip(p, word)))
++                       for p in sides_of(kind, pair[0]))
++            cells.add(f"{role}: each corner fits the word", pair[0], "letters of the word or -", fits)
++    held = regions_hold(code, b, kept)
++    hold_cell(cells, code, held)
++    if kind == "score":
++        items = glyph_items(code, b, kept)
++        wrong = sorted({(it[0], f"P{it[2]}") for it in items if it[5] is None})
++        cells.add("every region's glyphs as many as its reading", [f"{r} {p}" for r, p in wrong] or "yes", "yes",
++                  not wrong)
++        order = draw_look([it for it in items if it[1] == 0], folder / "look.png")
++    else:
++        order = letters_look(code, b, kept, rec, folder / "look.png")
++    key = pag.digest({r: v["readings"] for r, v in sorted(rec["saves"].items())})
++    if look is not None:
++        m = re.match(r"^(all|([A-Z0-9-]):(\d+(?:\.\d+)*))$", look)
++        if not m:
++            raise pag.Usage("look=all, or look=<symbol>:<i>[.<j>] (the glyphs read wrong)")
++        bad = {} if m.group(1) == "all" else {m.group(2): [int(x) for x in m.group(3).split(".")]}
++        rec["look"] = {"for": key, "bad": bad}
++        pag.write_if_changed(label_path(code), json.dumps(rec, indent=1, sort_keys=True) + "\n")
++    lk = rec.get("look") or {}
++    fresh = lk.get("for") == key
++    bad_roles = sorted({role for sym, js in (lk.get("bad") or {}).items() for (s_, j, role) in order
++                        if s_ == sym and j in js}) if fresh else []
++    cells.add("the last look (regions/look.png): every glyph in the row of what it was read as",
++              "all" if fresh and not lk.get("bad") else (bad_roles or "not looked at"), "all",
++              fresh and not lk.get("bad"))
++    rc = pag.finish(code, "label", cells, label_inputs(code, b))
++    if not fresh:
++        pag.out(f"label {code}: look at regions/look.png — label {code} look=all, or look=<symbol>:<i> for a glyph in "
++                "the wrong row")
++    elif bad_roles:
++        pag.out(f"label {code}: read again: {', '.join(bad_roles)}")
++    return rc
++
++
++def letters_look(code: str, b: dict, kept: dict, rec: dict, path: Path) -> list:
++    """Letters' last look: today's letters learner (B191 / B192) on the regions as surveyed, then each end save's
++    first picture cut by its own colours inside each region; every glyph grouped by the letter read."""
++    import numpy as np
++    E = es()
++    ends = [r for r in end_roles(kept) if r in rec["saves"]]
++    pdir = pag._pictures(code, b, kept)
++    starts, others, endp = pag._letters_inputs_of(pdir, kept)
++    sides = {r: sides_of("letters", rec["saves"][r]["readings"][0]) for r in ends}
++    regions = {k + 1: list(reg) for k, reg in enumerate(b["survey"]["regions"])}
++    try:
++        spec, arrays, _rep = E.learn_letters(starts, others, {r: endp[r] for r in ends}, sides, b["word"],
++                                             b["players"], regions=regions)
++    except ValueError:
++        return []
++    lt = spec["letters"]
++    if not lt.get("found") or "places" not in lt:
++        return []
++    places = {int(p_): tuple(v) for p_, v in lt["places"].items()}
++    bins = {p_: arrays["letters_bins"][i].astype(bool) for i, p_ in enumerate(sorted(places))}
++    items = []
++    for role in ends:
++        a = colour(endp[role][0])
++        for p_, box in places.items():
++            text = sides[role][p_ - 1]
++            if text == "_":
++                continue
++            m, gl = E.letters_glyphs(a, box, bins[p_], float(lt["glyph_min"]), len(text))
++            if len(gl) == len(text):
++                for j, (ch, g) in enumerate(zip(text, gl)):
++                    items.append((role, 0, p_, j, ch, E.letter_cell(m.astype(np.float32), g)))
++    return draw_look(items, path)
++
++
++# --- B209: plan -----------------------------------------------------------------------------------------------------
++def plan_symbols(b: dict, texts: dict) -> list[str]:
++    s = b["survey"]
++    if s["kind"] == "score":
++        seen = [int(x) for t in texts.values() for x in t.split("-")]
++        if b.get("max_score") is None:
++            return list("0123456789")
++        top = max([int(b["max_score"])] + seen)
++        return sorted(set("".join(str(i) for i in range(top + 1))))
++    word = b["word"]
++    syms = sorted(set(word))
++    if any("-" in t for t in texts.values()):
++        syms.append("-")
++    return syms
++
++
++def shown_counts(kind: str, texts: dict, symbols: list) -> dict:
++    """{symbol: how many end saves' readings show it in a result region}."""
++    return {sym: sum(1 for t in texts.values() if sym in "".join(sides_of(kind, t))) for sym in symbols}
++
++
++def ask_line(kind: str, never: list) -> str:
++    if not never:
++        return "Nothing more is needed."
++    if kind == "score":
++        parts = [f"a final score with a {d} in it" for d in never]
++        tail = " (either player)." if len(parts) == 1 else " (either player; one match may show more than one)."
++        return "Still needed: " + " and ".join(parts) + tail
++    parts = [f"a match where a player's corner shows {c}" for c in never]
++    return "Still needed: " + " and ".join(parts) + "."
++
++
++def plan_inputs(code: str, b: dict) -> str:
++    return pag.digest({"label": label_inputs(code, b)})
++
++
++def texts_of(code: str) -> dict:
++    return {r: v["readings"][0] for r, v in sorted(label_record(code)["saves"].items())}
++
++
++def cmd_plan(code: str, a: dict) -> int:
++    b = pag.load_binding(code)
++    kept = pag.kept_states(code)
++    pag.require(code, "label", label_inputs(code, b))
++    s = b["survey"]
++    texts = texts_of(code)
++    syms = plan_symbols(b, texts)
++    counts = shown_counts(s["kind"], texts, syms)
++    never = [x for x in syms if counts[x] == 0]
++    cells = pag.Cells()
++    hold_cell(cells, code, regions_hold(code, b, kept))
++    line = ask_line(s["kind"], never)
++    rows = {x: ("twice or more" if counts[x] >= 2 else "once" if counts[x] == 1 else "never") for x in syms}
++    recorded = {"symbols": rows, "pictures showing": counts, "ask": line}
++    note = "\n".join(["| symbol | real pictures showing it in a result region |", "| --- | --- |"]
++                     + [f"| {x} | {counts[x]} ({rows[x]}) |" for x in syms] + ["", line])
++    rc = pag.finish(code, "plan", cells, plan_inputs(code, b), note=note, recorded=recorded)
++    for x in syms:
++        pag.out(f"  {x}: {rows[x]}")
++    pag.out(line)
++    return rc
++
++
++# --- B209: the measure ------------------------------------------------------------------------------------------------
++def pair_distance(kind: str, c1, c2) -> float:
++    E = es()
++    if kind == "score":
++        return max(float(E.cell_dists(c1, c2[None])[0]), float(E.cell_dists(c2, c1[None])[0]))
++    return max(float(E.letter_dists(c1[None], c2)[0]), float(E.letter_dists(c2[None], c1)[0]))
++
++
++def rigidity(kind: str, cells: dict, shown: dict) -> dict:
++    """1 - (the farthest pair of one symbol's real glyphs) / (the nearest pair of two symbols' real glyphs), over the
++    symbols two or more saves show. None (with why) when fewer than two such symbols."""
++    syms = sorted(k for k in cells if shown.get(k, 0) >= 2 and len(cells[k]) >= 2)
++    if len(syms) < 2:
++        return {"rigidity": None, "why": "fewer than two symbols shown by two saves", "symbols": syms}
++    same = max(pair_distance(kind, x, y) for k in syms for i, x in enumerate(cells[k]) for y in cells[k][i + 1:])
++    diff = min(pair_distance(kind, x, y) for i, k in enumerate(syms) for k2 in syms[i + 1:]
++               for x in cells[k] for y in cells[k2])
++    return {"rigidity": round(1.0 - same / diff, 4) if diff > 0 else None, "farthest same": round(same, 4),
++            "nearest different": round(diff, 4), "symbols": syms}
++
++
++# --- B209: train (score) --------------------------------------------------------------------------------------------
++def seed_of(texts: dict) -> int:
++    return int(hashlib.sha256(json.dumps(texts, sort_keys=True).encode()).hexdigest()[:8], 16)
++
++
++def erase(a, place: dict, region: list):
++    """The region with its own ink filled by the region's median non-ink grey (a background for a pasted glyph)."""
++    import numpy as np
++    E = es()
++    out = a.copy()
++    x0, y0, x1, y1 = region
++    ink = E._ink(a, place["pol"], int(place["r"]), E._contrast(a))[y0:y1 + 1, x0:x1 + 1]
++    ink = ink | np.pad(ink, 1)[2:, 1:-1] | np.pad(ink, 1)[:-2, 1:-1] | np.pad(ink, 1)[1:-1, 2:] | np.pad(ink, 1)[1:-1, :-2]
++    sub = out[y0:y1 + 1, x0:x1 + 1]
++    if (~ink).any():
++        sub[ink] = float(np.median(sub[~ink]))
++    return out
++
++
++def synthetic_glyphs(sources: list, backgrounds: list, place: dict, region: list, rng, per: int) -> dict:
++    """{source index: [cells]} — each real glyph's ink pixels pasted on an erased background region at a shift, cut
++    again by `place_glyphs` (exactly one glyph, else no cell) and `glyph_cell`."""
++    E = es()
++    out: dict = {}
++    for si, (a, g) in enumerate(sources):
++        contrast = E._contrast(a)
++        t, l, bt, r_ = g[0], g[1], g[2], g[3]
++        ink = E._ink(a, place["pol"], int(place["r"]), contrast)[t:bt + 1, l:r_ + 1]
++        pix = a[t:bt + 1, l:r_ + 1]
++        cells = []
++        for _ in range(per):
++            bg = backgrounds[int(rng.integers(len(backgrounds)))]
++            dx, dy = int(rng.integers(-SYN_DX, SYN_DX + 1)), int(rng.integers(-SYN_DY, SYN_DY + 1))
++            pic = bg.copy()
++            cx = (region[0] + region[2]) // 2 - (r_ - l + 1) // 2 + dx
++            ty = t + dy
++            if cx < 0 or ty < 0 or cx + (r_ - l + 1) > pic.shape[1] or ty + (bt - t + 1) > pic.shape[0]:
++                cells.append(None)
++                continue
++            dst = pic[ty:ty + bt - t + 1, cx:cx + r_ - l + 1]
++            dst[ink] = pix[ink]
++            gl = E.place_glyphs(pic, place)
++            cells.append(E.glyph_cell(pic, gl[0], place) if gl and len(gl) == 1 else None)
++        out[si] = cells
++    return out
++
++
++def read_cell(cell, score: dict, refs) -> str:
++    """B178's rule on one cell (group ""): its digit, or '?'."""
++    import numpy as np
++    E = es()
++    keys = list(score["keys"])
++    if not keys or cell is None:
++        return "?"
++    d = E.cell_dists(cell, refs)
++    order = np.argsort(d, kind="stable")
++    best = keys[int(order[0])]
++    margin = float(d[order[1]] - d[order[0]]) if len(keys) > 1 else float("inf")
++    thr = score["thresholds"].get(best)
++    need = score.get("margin_needed")
++    ok = (score["separable"].get(best) and thr is not None and float(d[order[0]]) <= thr and need is not None
++          and margin >= need)
++    return best if ok else "?"
++
++
++def fit_score(real: dict, shown: dict, train: dict | None = None) -> tuple:
++    E = es()
++    keys, refs, gaps, need, noise, small = E._digit_stats(real, shown, train or {})
++    return {**E._stat_score(keys, gaps, need), "noise": round(noise, 4), "smallest_margin_seen": small}, refs
++
++
++def screens_v4(pics: Path, kept: dict, name: str):
++    """Today's screens for a version-4 spec (`_learn_v4`'s own calls): start, end (every end save), other."""
++    import numpy as np
++    from PIL import Image
++    E = es()
++    labels = pag._labels(pics, kept, E, {r: "end" for r in kept if r.startswith("end_P")})
++    pag.write_if_changed(pics / "regions_labels.json", json.dumps(labels, sort_keys=True))
++    paths, _ps, _ids = E._paths(E._sources(pics, pics / "regions_labels.json"), "first")
++    aspect = E._cut_aspect([p for ps in paths.values() for p in ps])
++    frames = {}
++    for c, ps in paths.items():
++        if c in ("ignore",):
++            continue
++        frames[c] = []
++        for p in ps:
++            with Image.open(p) as im:
++                frames[c].append(E._final(E.mid(im)))
++    for c in (E.START, E.END, E.OTHER):
++        if not frames.get(c):
++            raise pag.Refused(f"the pictures have no {c} frames")
++    st = {c: np.stack(v).astype(np.float32) for c, v in frames.items()}
++    screens, arrays = {}, {}
++    for c, other_screen in ((E.START, E.END), (E.END, E.START)):
++        mask, ref, gap = E._learn_one_screen(st[c], [st[E.OTHER], st[other_screen]])
++        screens[c] = gap
++        arrays[f"{c}_mask"], arrays[f"{c}_ref"] = mask, ref
++    spec = {
++        "version": E.VERSION_SCORE, "kind": "privyhub-h7-endscreen", "measure": E.MEASURE, "size": list(E.SIZE),
++        "aspect": round(float(aspect), 5), "classes": [E.START, E.END], "start_class": E.START,
++        "end_classes": [E.END], "screens": {c: {"threshold": g["threshold"], "own_worst": g["worst_own"],
++                                                "mask_px": g["mask_px"]} for c, g in screens.items()},
++        "usable": False, "steady_r": E.STEADY_R, "shared_near": E.SHARED_NEAR, "shared_share": E.SHARED_SHARE,
++        "tol": E.TOL, "quant": 1.0 / E.QUANT, "flat": E.FLAT, "bar_max": E.BAR_MAX, "bar_share": E.BAR_SHARE,
++        "k": E.K, "search_every_s": E.SEARCH_EVERY,
++        "search": {"coarse_scales": list(E.COARSE_SCALES), "coarse_shifts_px_320": list(E.COARSE_SHIFTS),
++                   "fine_scale": E.FINE_SCALE, "fine_shift_px_320": E.FINE_SHIFT},
++        "score_size": list(E.SCORE_SIZE), "score_ink": E.SCORE_INK, "score_tol": E.SCORE_TOL,
++        "frames": {c: len(v) for c, v in frames.items()}, "arrays": f"{name}.endscreen.npz" if name else None,
++        "arrays_sha256": None,
++    }
++    return spec, arrays, screens
++
++
++def replay(spec: dict, arrays: dict, run: Path, loaded: bool) -> tuple:
++    """A run's pictures through one Reader and Ended: (seconds from its first picture, the end class, its numbers)
++    of the first end, or None; and the first second the start was read (None: never)."""
++    from PIL import Image
++    E = es()
++    with (run / "index.csv").open() as fh:
++        rows = [(float(r["seconds"]), r["file"]) for r in csv.DictReader(fh)]
++    now = [0.0]
++    reader = E.Reader(spec, arrays, clock=lambda: now[0])
++    ended = E.Ended(spec)
++    if loaded:
++        ended.start_loaded()
++    first = None
++    for t, f in rows:
++        now[0] = t
++        with Image.open(run / f) as im:
++            r = reader.read(pag._for_reader(im, spec), now=t)
++        if r["class"] == spec["start_class"] and first is None:
++            first = round(t - rows[0][0], 2)
++        done = ended.feed(r["class"], r.get("scores"))
++        if done:
++            sc = getattr(ended, "scores", None)
++            return (round(t - rows[0][0], 2), done, [str(x) for x in sc] if sc is not None else None), first
++    return None, first
++
++
++def replay_cells(cells: pag.Cells, spec: dict, arrays: dict, pics: Path, kept: dict, want: dict) -> None:
++    bar_end, bar_start = pag.BARS["ended_within_s"][0], pag.BARS["start_within_s"][0]
++    for role in sorted(kept):
++        cls = pag._role_class(role)
++        if cls == "start":
++            got, first = replay(spec, arrays, pics / role, False)
++            cells.add(f"{role}: never ended", got is None, True, got is None)
++            cells.add(f"{role}: recognised within", first, f"<= {bar_start} s", first is not None and first <= bar_start)
++        elif cls == "other":
++            got, _f = replay(spec, arrays, pics / role, True)
++            cells.add(f"{role}: never ended", got is None, True, got is None)
++        else:
++            got, _f = replay(spec, arrays, pics / role, True)
++            w = want[role]
++            ok = got is not None and (got[2] == w if spec["version"] == 4 else got[1] == w)
++            cells.add(f"{role}: ended as itself", None if got is None else (got[2] or got[1]), w, ok)
++            cells.add(f"{role}: ended within", None if got is None else got[0], f"<= {bar_end} s",
++                      got is not None and got[0] <= bar_end)
++
++
++def train_inputs(code: str, b: dict) -> str:
++    return pag.digest({"plan": plan_inputs(code, b)})
++
++
++def _write_rules(code: str, b: dict, spec: dict, arrays: dict, cells: pag.Cells, key: str) -> bool:
++    r = pag.rules_folder()
++    spec_path = r / f"{b['game']}.endscreen.json"
++    begin = r / pag._begin_name(b)
++    side_path = r / f"{b['game']}.party.json"
++    side = json.dumps({**pag._sidecar(b, spec), "code": code}, indent=1, sort_keys=True) + "\n"
++    made = b.get("learnt") or {}
++    for p_, want in ((begin, (pag.kept_folder(code) / "begin.state").read_bytes()), (side_path, side.encode())):
++        if p_.exists() and p_.read_bytes() != want and not made:
++            cells.add("rules folder: no other title's file overwritten", False, True, False)
++            return False
++    es().save_spec(spec, arrays, spec_path)
++    pag.write_if_changed(begin, (pag.kept_folder(code) / "begin.state").read_bytes())
++    pag.write_if_changed(side_path, side)
++    b["learnt"] = {"from": key, "spec": pag.sha(spec_path), "by": "train"}
++    save_binding(code, b)
++    return True
++
++
++def cmd_train(code: str, a: dict) -> int:
++    b = pag.load_binding(code)
++    kept = pag.kept_states(code)
++    pag.require(code, "plan", plan_inputs(code, b))
++    if b["survey"]["kind"] == "letters":
++        return train_letters(code, b, kept)
++    return train_score(code, b, kept)
++
++
++def _once_rule(kind: str, sym: str, rig: dict, variants: list, real_others: list, read) -> tuple[bool, dict]:
++    """The user's once rule: (a) the font rigid, (b) every synthetic variant read as itself, (c) no other symbol's
++    real glyph read as it."""
++    bar = pag.BARS.get("rigid_min", (None,))[0]               # B211: absent until T90 and T91 set it
++    a_ = bar is not None and rig.get("rigidity") is not None and rig["rigidity"] >= bar
++    got = [read(c) for c in variants]
++    b_ = bool(got) and all(g == sym for g in got)
++    c_ = [o for o, c in real_others if read(c) == sym]
++    return bool(a_ and b_ and not c_), {"rigid": rig.get("rigidity"), "bar": bar,
++                                         "synthetic read as itself": f"{sum(g == sym for g in got)} of {len(got)}",
++                                         "other symbols' real glyphs read as it": len(c_)}
++
++
++def train_score(code: str, b: dict, kept: dict) -> int:
++    import numpy as np
++    E = es()
++    s = b["survey"]
++    texts = texts_of(code)
++    ends = end_roles(kept)
++    places = score_places(code, b, kept)
++    cells = pag.Cells()
++    if any(p is None for p in places):
++        k = places.index(None) + 1
++        cells.add("a number in every region", f"none in P{k}'s on {s['from']}", "a number", False)
++        rc = pag.finish(code, "train", cells, train_inputs(code, b))
++        pag.out(f"{code}: no number in P{k}'s region on {s['from']} — mark it again (survey {code} again P{k})")
++        return rc
++    items = [it for it in glyph_items(code, b, kept) if it[5] is not None]
++    pics = {role: [grey(p) for p in final_pictures(code, b, kept, role)] for role in ends}
++    syms = plan_symbols(b, texts)
++    counts = shown_counts("score", texts, syms)
++    real = {}
++    for it in items:
++        real.setdefault(it[4], []).append(it)
++    shown = {k: len({it[0] for it in v}) for k, v in real.items()}
++    rng = np.random.default_rng(seed_of(texts))
++    backgrounds = {k: [(role, erase(a, places[k], s["regions"][k])) for role in ends for a in pics[role]]
++                   for k in range(len(places))}
++    syn: dict = {}                                            # item index -> [variant cells]
++    for i, it in enumerate(items):
++        if it[1] != 0:
++            continue
++        role, _pi, k, j = it[0], it[1], it[2] - 1, it[3]
++        a = pics[role][0]
++        g = region_glyphs(a, places[k])[j]
++        bgs = [bg for r_, bg in backgrounds[k] if r_ != role] or [bg for _r, bg in backgrounds[k]]
++        syn[i] = synthetic_glyphs([(a, g)], bgs, places[k], s["regions"][k], rng, SYN_PER_GLYPH)[0]
++
++    def fit(without=(), drop=()):
++        rc_ = {k: [it[5] for it in v if it[0] not in without] for k, v in real.items() if k not in drop}
++        rc_ = {k: v for k, v in rc_.items() if v}
++        sh = {k: len({it[0] for it in real[k] if it[0] not in without}) for k in rc_}
++        tr = {}
++        for i, it in enumerate(items):
++            if i in syn and it[0] not in without and it[4] in rc_:
++                tr.setdefault(it[4], []).extend(c for c in syn[i] if c is not None)
++        return fit_score(rc_, sh, tr)
++
++    full, refs = fit()
++    # gate 1: two or more real samples, each read by a reader learnt without its save
++    wrong = []
++    for role in ends:
++        sc, rf = fit(without=(role,))
++        for it in items:
++            if it[0] == role and shown.get(it[4], 0) >= 2:
++                got = read_cell(it[5], sc, rf)
++                if got != it[4]:
++                    wrong.append(f"{role} P{it[2]} {it[4]} read {got}")
++    twice = sorted(k for k in real if shown[k] >= 2)
++    cells.add("gate 1: every glyph of a symbol two or more saves show, read right without its save", wrong or "all",
++              "all", not wrong)
++    cells.add("margin_needed", full.get("margin_needed"), f">= {pag.BARS['margin_needed_min'][0]}",
++              full.get("margin_needed") is not None and full["margin_needed"] >= pag.BARS["margin_needed_min"][0])
++    sep = [k for k in twice if not full["separable"].get(k)]
++    cells.add("every symbol two saves show separable", sep or "all", "all", not sep)
++    # the measure
++    rig = rigidity("score", {k: [it[5] for it in v] for k, v in real.items()}, shown)
++    # gate 2: once
++    once = sorted(k for k in real if shown[k] == 1)
++    dropped, seen_once, once_rows = [], [], {}
++    for sym in once:
++        variants = [c for i, it in enumerate(items) if it[4] == sym and i in syn for c in syn[i]]   # None: not
++        others = [(it[4], it[5]) for it in items if it[4] != sym]                                  # cut -> '?'
++        ok, row = _once_rule("score", sym, rig, variants, others, lambda c: read_cell(c, full, refs))
++        once_rows[sym] = {"counted": ok, **row}
++        (seen_once if ok else dropped).append(sym)
++        cells.add(f"gate 2: {sym}, one real picture", "seen once" if ok else {"not counted": row},
++                  "counted when rigid, every variant read as itself, no other glyph read as it — else asked", True)
++    if dropped:
++        full, refs = fit(drop=dropped)
++    # gate 3: never seen (or seen once and not counted) -> asked
++    never = sorted(x for x in syms if counts.get(x, 0) == 0)
++    ask = sorted(set(never) | set(dropped))
++    cells.add("gate 3: every symbol the result can show learnt (none never seen)", ask or "all", "all", not ask)
++    # the spec
++    pdir = pag._pictures(code, b, kept)
++    spec, arrays, screens = screens_v4(pdir, kept, b["game"])
++    spec["score"] = {"sides": len(places), "places": places, "found": True, "pooled": False, "columns": [],
++                     **{k: full[k] for k in ("keys", "thresholds", "separable", "margin_needed")},
++                     "max_score": int(max([int(b["max_score"])] + [int(x) for t in texts.values() for x in t.split("-")]))
++                     if b.get("max_score") is not None else None,
++                     "region_source": "survey", "regions": s["regions"], "seen_once": seen_once,
++                     "glyphs": {k: len(real[k]) for k in full["keys"]}, "saves_showing": shown}
++    if spec["score"]["max_score"] is None:
++        spec["score"].pop("max_score")
++    spec["usable"] = bool(all(g["threshold"] is not None for g in screens.values()) and full["keys"]
++                          and full["margin_needed"] is not None)
++    arrays["digit_refs"] = refs
++    cells.add("the screens: start and end thresholds", {c: g["threshold"] for c, g in screens.items()}, "both set",
++              all(g["threshold"] is not None for g in screens.values()))
++    want = {r: sides_of("score", texts[r]) for r in ends}
++    replay_cells(cells, spec, arrays, pdir, kept, want)
++    recorded = {"rigidity": rig, "seen once": seen_once, "once": once_rows, "not counted": dropped,
++                "pictures showing": counts, "margin_needed": full.get("margin_needed"),
++                "synthetic": {"per glyph": SYN_PER_GLYPH, "seed": seed_of(texts),
++                              "made": sum(1 for v in syn.values() for c in v if c is not None),
++                              "not cut": sum(1 for v in syn.values() for c in v if c is None)}}
++    line = ask_line("score", ask)
++    key = train_inputs(code, b)
++    if cells.passed:
++        _write_rules(code, b, spec, arrays, cells, key)
++    rc = pag.finish(code, "train", cells, key, note=line, recorded=recorded)
++    pag.out(line)
++    return rc
++
++
++# --- B209: train (letters) ------------------------------------------------------------------------------------------
++def train_letters(code: str, b: dict, kept: dict) -> int:
++    import numpy as np
++    E = es()
++    s = b["survey"]
++    texts = texts_of(code)
++    ends = end_roles(kept)
++    pdir = pag._pictures(code, b, kept)
++    starts, others, endp = pag._letters_inputs_of(pdir, kept)
++    sides = {r: texts[r].split("/") for r in ends}
++    regions = {k + 1: list(reg) for k, reg in enumerate(s["regions"])}
++    cells = pag.Cells()
++
++    def learn(without=()):
++        use = {r: p for r, p in endp.items() if r not in without}
++        return E.learn_letters(starts, others, use, {r: sides[r] for r in use}, b["word"], b["players"],
++                               name=b["game"], regions=regions)
++
++    spec, arrays, rep = learn()
++    syms = plan_symbols(b, texts)
++    counts = shown_counts("letters", texts, syms)
++    found = bool(spec["letters"].get("found")) and "places" in spec["letters"]
++    cells.add("the letters found in every region", found, True, found)
++    if not found:
++        rc = pag.finish(code, "train", cells, train_inputs(code, b), note=str(spec["letters"].get("not_found")))
++        pag.out(f"{code}: {spec['letters'].get('not_found')} — mark the regions again (survey {code} again P1)")
++        return rc
++    places = {int(p): tuple(v) for p, v in spec["letters"]["places"].items()}
++    bins = {p: arrays["letters_bins"][i].astype(bool) for i, p in enumerate(sorted(places))}
++    glyph_min = float(spec["letters"]["glyph_min"])
++    checks = [(colour(p), sides[r]) for r in ends for p in endp[r]]
++    real, _bad = E._letter_cells(places, bins, checks, b["word"], glyph_min)
++    shown = {k: counts.get(k, 0) for k in real}
++    rig = rigidity("letters", real, shown)
++    wrong = []
++    for role in ends:
++        lspec, larr, _r = learn(without=(role,))
++        if not lspec.get("usable"):
++            wrong.append(f"{role}: no reader without it")
++            continue
++        rd = E.Reader(lspec, larr)
++        for p in endp[role]:
++            from PIL import Image
++            with Image.open(p) as im:
++                got = rd.sides(im.convert("RGB"))
++            for k, (g, w) in enumerate(zip(got, sides[role]), 1):
++                if all(counts.get(c, 0) >= 2 for c in w if c != "_") and g != w:
++                    wrong.append(f"{role} P{k} read {g}")
++    cells.add("gate 1: every corner of symbols two or more saves show, read right without its save", wrong or "all",
++              "all", not wrong)
++    fitted = {"keys": list(spec["letters"]["keys"]), "refs": arrays["letters_refs"].astype(np.float32),
++              "thresholds": dict(spec["letters"]["thresholds"]), "margin_needed": spec["letters"]["margin_needed"]}
++
++    def read_letter(c):
++        if c is None:
++            return "?"
++        d = E.letter_dists(fitted["refs"], c)
++        order = np.argsort(d, kind="stable")
++        best = fitted["keys"][int(order[0])]
++        thr = fitted["thresholds"].get(best)
++        margin = float(d[order[1]] - d[order[0]]) if len(d) > 1 else float("inf")
++        return best if thr is not None and float(d[order[0]]) <= thr and margin >= (fitted["margin_needed"] or 0) \
++            else "?"
++
++    once = sorted(k for k in real if shown.get(k, 0) == 1)
++    rng = np.random.default_rng(seed_of(texts))
++    dropped, seen_once, once_rows = [], [], {}
++    for sym in once:
++        variants = []
++        for c in real[sym]:                                    # letters: the glyph's own cell at a shift (the colour
++            for _ in range(SYN_PER_GLYPH):                     # bins already take the background away)
++                dy, dx = int(rng.integers(-2, 3)), int(rng.integers(-SYN_DX, SYN_DX + 1))
++                variants.append(np.roll(np.roll(c, dy, 0), dx, 1))
++        others_ = [(k, c) for k, v in real.items() if k != sym for c in v]
++        ok, row = _once_rule("letters", sym, rig, variants, others_, read_letter)
++        once_rows[sym] = {"counted": ok, **row}
++        (seen_once if ok else dropped).append(sym)
++        cells.add(f"gate 2: {sym}, one real picture", "seen once" if ok else {"not counted": row},
++                  "counted when rigid, every variant read as itself, no other glyph read as it — else asked", True)
++    never = sorted(x for x in syms if counts.get(x, 0) == 0)
++    ask = sorted(set(never) | set(dropped))
++    cells.add("gate 3: every symbol the result can show learnt (none never seen)", ask or "all", "all", not ask)
++    cells.add("the reader usable", spec.get("usable"), True, bool(spec.get("usable")))
++    want = {r: pag._role_class(r) for r in ends}
++    replay_cells(cells, spec, arrays, pdir, kept, want)
++    recorded = {"rigidity": rig, "seen once": seen_once, "once": once_rows, "not counted": dropped,
++                "pictures showing": counts, "synthetic": (rep.get("synthetic") or {})}
++    line = ask_line("letters", ask)
++    key = train_inputs(code, b)
++    if cells.passed:
++        _write_rules(code, b, spec, arrays, cells, key)
++    rc = pag.finish(code, "train", cells, key, note=line, recorded=recorded)
++    pag.out(line)
++    return rc
+diff --git a/tests/b208_survey/test_b208.py b/tests/b208_survey/test_b208.py
+new file mode 100644
+index 00000000..3054c4e8
+--- /dev/null
++++ b/tests/b208_survey/test_b208.py
+@@ -0,0 +1,226 @@
++#!/usr/bin/env python3
++"""B208 / B209 (host): the front of the add-a-game path rebuilt — survey, label on the regions, plan, train. Made-up
++score titles (B178's picture source, `score_capture.py`: each side's number centred in its panel); no title; temp
++dirs removed (B178's harness).
++
++- `Survey`: the boxes picture and its numbers; the kind checked against register's; box numbers -> regions (the box
++  and a 6-px margin); `again P2` asks for P2 alone; `ok` -> PASS; a region of the session's (a rectangle) on an empty
++  part of the screen gives no place; the place's window is the region.
++- `Path`: survey -> label -> plan -> train on four made-up end saves: plan's list and its last line; train PASS with
++  the digits one save shows counted "seen once"; the sidecar carries the code; the spec's places are the regions;
++  nothing searched for a place (the place finder and the old learner made to raise); learn refused for a surveyed
++  title. A digit no save shows: plan's last line asks for it, and train does not learn it.
++- `Gates`: rigidity, the once rule's three conditions, the bar as set (B211), plan's symbols, the ask's words.
++
++    python3 -m unittest discover -s tests/b208_survey -v
++"""
++from __future__ import annotations
++
++import json
++import sys
++import unittest
++from pathlib import Path
++
++import numpy as np
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "tests" / "b178_score_kind")]
++for sub in ("b114_party_minigame_hang", "b124_party_four_seats", "b123_h7_n64_start", "b157_add_game",
++            "b181_every_digit"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++import test_b178 as b178  # noqa: E402  (its harness: temp home, evidence, rules; the made-up picture source)
++
++B, O = {"kind": "begin"}, {"kind": "other"}
++FULL = {"begin": B, "other": O, "end_P1": {"kind": "end", "s": [4, 1], "look": 1},
++        "end_P1_2": {"kind": "end", "s": [3, 0], "look": 2}, "end_P2": {"kind": "end", "s": [1, 2], "look": 3},
++        "end_P2_2": {"kind": "end", "s": [0, 4], "look": 4}}
++NO_3 = {**FULL, "end_P1_2": {"kind": "end", "s": [4, 0], "look": 2}}
++
++
++class Made(b178.Made):
++    def put(self, code: str, saves: dict, top: int = 4) -> None:
++        super().put(code, saves)
++        bp = self.pag.binding_path(code)
++        b = json.loads(bp.read_text())
++        b["max_score"] = top
++        b["register_inputs"] = self.pag.register_inputs(b, self.pag.kept_states(code))
++        bp.write_text(json.dumps(b))
++        self.pag.verdict_path(code, "register").write_text(json.dumps({"verdict": "PASS",
++                                                                        "inputs": b["register_inputs"]}))
++
++    def boxes_at(self, code: str) -> tuple[int, int]:
++        bx = json.loads((self.pag.home(code) / "survey" / "boxes.json").read_text())["boxes"]
++        def at(x, y):
++            return next(i for i, q in enumerate(bx, 1) if q[0] <= x <= q[2] and q[1] <= y <= q[3])
++        return at(100, 290), at(540, 290)
++
++    def surveyed(self, code: str) -> None:
++        """As a session answers when the box holding a number is its whole panel: a rectangle off the grid."""
++        self.assertEqual(self.tool("survey", code)[0], 3)
++        self.assertEqual(self.tool("survey", code, "score", "60,266,140,314", "500,266,580,314")[0], 3)
++        self.assertEqual(self.tool("survey", code, "ok")[0], 0)
++
++    def labelled(self, code: str, saves: dict) -> None:
++        args = [f"{r}={'-'.join(map(str, st['s']))},{'-'.join(map(str, st['s']))}" for r, st in sorted(saves.items())
++                if r.startswith("end_")]
++        rc, out = self.tool("label", code, *args)
++        self.assertEqual(rc, 1, out)                      # the last look not yet given
++        self.assertIn("look=all", out)
++        rc, out = self.tool("label", code, "look=all")
++        self.assertEqual(rc, 0, out)
++
++
++class Survey(Made):
++    def test_1_the_answer_flow(self):
++        self.put("T81", FULL)
++        rc, out = self.tool("survey", "T81")
++        self.assertEqual(rc, 3, out)
++        self.assertTrue((self.pag.home("T81") / "survey" / "boxes.png").is_file())
++        p1, p2 = self.boxes_at("T81")
++        rc, out = self.tool("survey", "T81", "letters", "AB", p1, p2)
++        self.assertEqual(rc, 2, out)                      # the kind is register's
++        self.assertIn("REFUSED", out)
++        self.assertEqual(self.tool("survey", "T81", "score", p1, p2)[0], 3)
++        b = json.loads(self.pag.binding_path("T81").read_text())
++        bx = json.loads((self.pag.home("T81") / "survey" / "boxes.json").read_text())["boxes"]
++        self.assertEqual(b["survey"]["regions"][0], [bx[p1 - 1][0] - 6, bx[p1 - 1][1] - 6, bx[p1 - 1][2] + 6,
++                                                     bx[p1 - 1][3] + 6])
++        self.assertFalse(b["survey"]["confirmed"])
++        rc, out = self.tool("survey", "T81", "again", "P2")
++        self.assertEqual(rc, 3)
++        self.assertIn("P2", out)
++        self.assertEqual(self.tool("survey", "T81", "P2", p2)[0], 3)
++        self.assertTrue((self.pag.home("T81") / "survey" / "regions.png").is_file())
++        self.assertEqual(self.tool("survey", "T81", "ok")[0], 0)
++        self.assertEqual(self.verdict("T81", "survey")["verdict"], "PASS")
++
++    def test_3_after_register_holds_three_saves(self):
++        """register (today's) FAILs with three saves (it names a second save of each ending); survey runs on them."""
++        three = {k: FULL[k] for k in ("begin", "other", "end_P1")}
++        self.put("T85", three)
++        v = json.loads(self.pag.verdict_path("T85", "register").read_text())
++        self.pag.verdict_path("T85", "register").write_text(json.dumps({**v, "verdict": "FAIL"}))
++        self.assertEqual(self.tool("survey", "T85")[0], 3)
++        self.put("T86", {k: FULL[k] for k in ("begin", "end_P1")})
++        rc, out = self.tool("survey", "T86")
++        self.assertEqual(rc, 2)
++        self.assertIn("begin, other and one ending", out)
++
++    def test_2_a_region_holds_only_what_is_in_it(self):
++        import party_steps as st
++        self.put("T82", FULL)
++        b = self.pag.load_binding("T82")
++        kept = self.pag.kept_states("T82")
++        a = st.grey(st.final_pictures("T82", b, kept, "end_P1")[0])
++        self.assertIsNone(st.region_place(a, [8, 440, 60, 470]))        # nothing there: no place (no search)
++        pl = st.region_place(a, [60, 266, 140, 314])
++        pad = int(round((pl["bot"] - pl["top"] + 1) * 20 / 24)) + 2
++        self.assertEqual((pl["x0"] - pad, pl["x1"] + pad), (60, 140))   # its window is the region
++        self.assertEqual(len(st.region_glyphs(a, pl)), 1)               # "4"
++        self.assertEqual(len(st.region_glyphs(a, st.region_place(a, [500, 266, 580, 314]))), 1)
++
++
++class Path_(Made):
++    def test_1_the_whole_path(self):
++        import h7_endscreen as es
++        self.put("T83", FULL)
++        self.surveyed("T83")
++        self.labelled("T83", FULL)
++        rc, out = self.tool("plan", "T83")
++        self.assertEqual(rc, 0, out)
++        self.assertEqual(out.strip().splitlines()[-1], "Nothing more is needed.")
++        rec = self.verdict("T83", "plan")["recorded"]
++        self.assertEqual(rec["symbols"], {"0": "twice or more", "1": "twice or more", "2": "once", "3": "once",
++                                          "4": "twice or more"})
++        saved = (es._find_place, es.learn_scores, es._find_columns)
++
++        def no(*a, **k):
++            raise AssertionError("a place was searched for")
++        es._find_place = es.learn_scores = es._find_columns = no
++        try:
++            rc, out = self.tool("train", "T83")
++        finally:
++            es._find_place, es.learn_scores, es._find_columns = saved
++        v = self.verdict("T83", "train")
++        self.assertEqual(v["verdict"], "PASS", v["bad"])
++        self.assertEqual(sorted(v["recorded"]["seen once"]), ["2", "3"])
++        self.assertEqual(out.strip().splitlines()[-1], "Nothing more is needed.")
++        b = self.pag.load_binding("T83")
++        side = json.loads((self.pag.rules_folder() / f"{b['game']}.party.json").read_text())
++        self.assertEqual(side, {"code": "T83", "players": 2, "result": "score"})
++        spec, _arr = es.load_spec(self.pag.rules_folder() / f"{b['game']}.endscreen.json")
++        self.assertEqual((spec["version"], spec["score"]["region_source"]), (4, "survey"))
++        self.assertEqual(spec["score"]["regions"], b["survey"]["regions"])
++        self.assertEqual(self.tool("learn", "T83")[0], 2)                # its learning is train
++
++    def test_2_a_digit_no_save_shows_is_asked_and_not_learnt(self):
++        self.put("T84", NO_3)
++        self.surveyed("T84")
++        self.labelled("T84", NO_3)
++        rc, out = self.tool("plan", "T84")
++        self.assertEqual(out.strip().splitlines()[-1], "Still needed: a final score with a 3 in it (either player).")
++        rc, out = self.tool("train", "T84")
++        v = self.verdict("T84", "train")
++        self.assertEqual(v["verdict"], "FAIL")
++        self.assertIn("gate 3: every symbol the result can show learnt (none never seen)", v["bad"])
++        self.assertIn("3", v["cells"]["gate 3: every symbol the result can show learnt (none never seen)"])
++        self.assertFalse((self.pag.rules_folder() / "madeupt84.party.json").exists())
++
++
++class Gates(unittest.TestCase):
++    def cells(self):
++        import test_b204 as b204
++        rng = np.random.default_rng(208)
++        return {d: [b204.glyph(b204.FONT[d], 4, rng) for _ in range(3)] for d in "038"}
++
++    def setUp(self):
++        sys.path.insert(0, str(ROOT / "tests" / "b204_every_number"))
++        import party_add_game as pag
++        import party_steps as st
++        self.pag, self.st = pag, st
++
++    def test_1_rigidity(self):
++        c = self.cells()
++        r = self.st.rigidity("score", c, {k: 2 for k in c})
++        self.assertGreater(r["rigidity"], 0.0)
++        same = {k: [v[0]] * 2 for k, v in c.items()}
++        self.assertEqual(self.st.rigidity("score", same, {k: 2 for k in c})["rigidity"], 1.0)
++        self.assertIsNone(self.st.rigidity("score", c, {"0": 2, "3": 1, "8": 1})["rigidity"])
++
++    def test_2_the_once_rule(self):
++        st = self.st
++        bar = self.pag.BARS["rigid_min"][0]
++        read = {"a": "5", "b": "5", "x": "3"}.get
++        ok, _ = st._once_rule("score", "5", {"rigidity": bar}, ["a", "b"], [("3", "x")], read)
++        self.assertTrue(ok)
++        ok, _ = st._once_rule("score", "5", {"rigidity": bar - 0.0001}, ["a", "b"], [("3", "x")], read)
++        self.assertFalse(ok)                                             # not rigid
++        ok, _ = st._once_rule("score", "5", {"rigidity": 0.9}, ["a", "x"], [], read)
++        self.assertFalse(ok)                                             # a variant not read as itself
++        ok, _ = st._once_rule("score", "5", {"rigidity": 0.9}, ["a"], [("3", "b")], read)
++        self.assertFalse(ok)                                             # another symbol's glyph read as it
++        ok, _ = st._once_rule("score", "5", {"rigidity": 0.9}, [], [], read)
++        self.assertFalse(ok)                                             # no variant: not counted
++
++    def test_3_the_bar_as_set(self):
++        v, src = self.pag.BARS["rigid_min"]
++        self.assertEqual(v, 0.0995)
++        self.assertIn("T90 0.5693", src)
++        self.assertIn("T91 0.1990", src)
++
++    def test_4_plan_symbols_and_ask(self):
++        st = self.st
++        b = {"survey": {"kind": "score"}, "max_score": 5}
++        self.assertEqual(st.plan_symbols(b, {"end_P2": "05-06"}), list("0123456"))
++        self.assertEqual(st.plan_symbols({"survey": {"kind": "score"}}, {"end_P1": "3-1"}), list("0123456789"))
++        self.assertEqual(st.plan_symbols({"survey": {"kind": "letters"}, "word": "WOW"}, {"e": "---/WOW"}),
++                         ["O", "W", "-"])
++        self.assertEqual(st.ask_line("score", []), "Nothing more is needed.")
++        self.assertEqual(st.ask_line("score", ["1"]), "Still needed: a final score with a 1 in it (either player).")
++        self.assertEqual(st.shown_counts("score", {"a": "05-04", "b": "02-00"}, list("0245")),
++                         {"0": 2, "2": 1, "4": 1, "5": 1})
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/b210_keep_result/b210_scenario.py b/tests/b210_keep_result/b210_scenario.py
+new file mode 100644
+index 00000000..e2450135
+--- /dev/null
++++ b/tests/b210_keep_result/b210_scenario.py
+@@ -0,0 +1,24 @@
++# B210: run inside B114's child by b114_scenario.py's `b210` mode — B178's hub scenario as it is (the add-a-game path
++# for a made-up score title, then the hub's endings: two ended, a tie, two unreadable finals), and before the child
++# answers, what the hub kept under the title's code (the played/ folders: each one's read.json and its pictures).
++_b178_finish = finish
++
++
++def finish(hung_at=None):
++    try:
++        home_ = Path(os.environ["PRIVYHUB_ADD_GAME_HOME"])
++        kept_ = []
++        for d_ in sorted(home_.glob("T*/played/*")):
++            rj_ = json.loads((d_ / "read.json").read_text())
++            kept_.append({"code": d_.parent.parent.name, "read": rj_, "pictures": len(list(d_.glob("f*.jpg"))),
++                          "text": (d_ / "read.json").read_text()})
++        S["played"] = kept_
++        S["played_names"] = [title, str(root)]
++        S["result_rows"] = [r_.get("step") for r_ in rows() if r_.get("step", "").startswith("result_")]
++    except Exception:
++        import traceback as tb_
++        S["played_error"] = tb_.format_exc()[-2000:]
++    _b178_finish(hung_at)
++
++
++exec(compile(Path(args["b178_dir"], "b178_scenario.py").read_text(), "b178_scenario.py", "exec"))
+diff --git a/tests/b210_keep_result/test_b210.py b/tests/b210_keep_result/test_b210.py
+new file mode 100644
+index 00000000..94a3d7b9
+--- /dev/null
++++ b/tests/b210_keep_result/test_b210.py
+@@ -0,0 +1,156 @@
++#!/usr/bin/env python3
++"""B210 (host): the hub keeps what it read — at the end of every `score` or `letters` mini game, ended or given up on
++an unreadable final screen, the pictures its reader ended on (or could not read), what it read, the seats and the
++time, off the repo under the title's code; the newest 200 a title; only with PRIVYHUB_PARTY=1. No title; made-up
++pictures (B178's); temp dirs removed.
++
++- `Hub`: B114's harness, its `b210` mode (B178's hub scenario as it is, then the played/ folders): two endings 10-6
++  (seats 1,2 and 2,1), a tie 14-14, two unreadable finals -> those five among the kept (bench's own endings too), each with its read, its seats, the time and
++  1-3 pictures; no run-time name in any read.json.
++- `Off`: `_keep_result` with PRIVYHUB_PARTY absent writes nothing; the watch holds no picture without it; a
++  winner title keeps nothing; the ring keeps the newest 200.
++
++    python3 -m unittest discover -s tests/b210_keep_result -v
++"""
++from __future__ import annotations
++
++import json
++import shutil
++import sys
++import tempfile
++import types
++import unittest
++from pathlib import Path
++
++HERE = Path(__file__).resolve().parent
++ROOT = HERE.parents[1]
++sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "companion")]
++for sub in ("b114_party_minigame_hang", "b124_party_four_seats", "b123_h7_n64_start", "b157_add_game",
++            "b178_score_kind", "b181_every_digit"):
++    sys.path.insert(0, str(ROOT / "tests" / sub))
++
++
++class Hub(unittest.TestCase):
++    @classmethod
++    def setUpClass(cls):
++        import test_b114 as b114
++        import test_b124 as b124
++        import line_capture as lc
++        root, ids = b114.b99.tree()
++        try:
++            b124.IDS.clear()
++            b124.IDS.update(ids)
++
++            def extra(work, frames):
++                lc.frames(frames)
++                return {"tools": str(ROOT / "tools"), "b178_dir": str(ROOT / "tests" / "b178_score_kind"),
++                        "b181_dir": str(ROOT / "tests" / "b181_every_digit"), "b210_dir": str(HERE)}
++            cls.s = b114.run(root, b114.BOTH, ids, "b210", extra=extra, timeout=1200)["steps"]
++        finally:
++            shutil.rmtree(root, ignore_errors=True)
++
++    def test_0_no_error(self):
++        self.assertNotIn("b178_error", self.s, self.s.get("b178_error"))
++        self.assertNotIn("played_error", self.s, self.s.get("played_error"))
++
++    def test_1_every_score_ending_kept(self):
++        """The hub part's five (two ended 10-6, a tie, two unreadable) among what was kept; bench's own mini games
++        (part 1, through the same actor) are kept too — every one a score ending; one `result_kept` row each."""
++        got = [(p["read"]["state"], json.dumps(p["read"]["scores"]), json.dumps(p["read"]["seats"]))
++               for p in self.s["played"]]
++        for want in [("ended", "[10, 6]", "[1, 2]"), ("ended", "[10, 6]", "[2, 1]"), ("ended", "[14, 14]", "[1, 2]"),
++                     ("given_up", "null", "[1, 2]"), ("given_up", "null", "[1, 2]")]:
++            self.assertIn(want, got)
++            got.remove(want)
++        for state, scores, _seats in got:                  # the rest: bench's endings, each read with its numbers
++            self.assertEqual(state, "ended")
++            self.assertEqual(len(json.loads(scores)), 2)
++        self.assertEqual(self.s["result_rows"], ["result_kept"] * len(self.s["played"]))
++
++    def test_2_each_kept_with_its_pictures_read_time_and_code(self):
++        for p in self.s["played"]:
++            self.assertRegex(p["code"], r"^T\d\d$")
++            self.assertTrue(1 <= p["pictures"] <= 3, p)
++            self.assertEqual(len(p["read"]["reads"]), p["pictures"])
++            self.assertRegex(p["read"]["utc"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
++            self.assertEqual(p["read"]["result"], "score")
++            if p["read"]["state"] == "given_up":
++                self.assertTrue(all(r.get("end_unread") for r in p["read"]["reads"]), p)
++
++    def test_3_no_run_time_name(self):
++        for p in self.s["played"]:
++            for n in self.s["played_names"]:
++                self.assertNotIn(str(n).casefold(), p["text"].casefold())
++
++
++class Off(unittest.TestCase):
++    def setUp(self):
++        self.tmp = Path(tempfile.mkdtemp(prefix="b210_"))
++        (self.tmp / "rules").mkdir()
++        (self.tmp / "home" / "T97").mkdir(parents=True)
++        (self.tmp / "home" / "T97" / "binding.json").write_text(json.dumps({"game": "madeupgame"}))
++
++    def tearDown(self):
++        shutil.rmtree(self.tmp, ignore_errors=True)
++
++    def owner(self, party: bool, result: str = "score"):
++        import party_minigame as pm
++        (self.tmp / "rules" / "madeupgame.party.json").write_text(json.dumps({"players": 2, "result": result}))
++        env = {"PRIVYHUB_H7_RULES": str(self.tmp / "rules"), "PRIVYHUB_ADD_GAME_HOME": str(self.tmp / "home")}
++        if party:
++            env["PRIVYHUB_PARTY"] = "1"
++        rows = []
++        o = types.SimpleNamespace(environ=env, row=rows.append)
++        o._code_of = types.MethodType(pm.PartyMinigames._code_of, o)
++        return pm, o, rows
++
++    def mg(self):
++        return {"entry": {"game": "madeupgame"}, "state": "ended", "class": "end", "scores": [3, 1], "winner": 1,
++                "why": None, "seats": [1, 2]}
++
++    def runner(self):
++        from PIL import Image
++        return types.SimpleNamespace(end_pictures=lambda: [(Image.new("L", (64, 48), 9), {"class": "end"})] * 3)
++
++    def played(self):
++        return sorted((self.tmp / "home" / "T97" / "played").glob("*")) if (self.tmp / "home" / "T97" / "played").is_dir() else []
++
++    def test_1_flag_absent_writes_nothing(self):
++        pm, o, rows = self.owner(False)
++        pm.PartyMinigames._keep_result(o, self.mg(), self.runner())
++        self.assertEqual((self.played(), rows), ([], []))
++
++    def test_2_flag_set_keeps_under_the_code(self):
++        pm, o, rows = self.owner(True)
++        pm.PartyMinigames._keep_result(o, self.mg(), self.runner())
++        self.assertEqual(len(self.played()), 1)
++        self.assertEqual(len(list(self.played()[0].glob("f*.jpg"))), 3)
++        self.assertEqual(rows, [{"step": "result_kept", "code": "T97", "pictures": 3}])
++
++    def test_3_a_winner_title_keeps_nothing(self):
++        pm, o, rows = self.owner(True, "winner")
++        pm.PartyMinigames._keep_result(o, self.mg(), self.runner())
++        self.assertEqual(self.played(), [])
++
++    def test_4_the_newest_200(self):
++        pm, o, rows = self.owner(True)
++        base = self.tmp / "home" / "T97" / "played"
++        for i in range(205):
++            (base / f"20200101T0000{i:03d}Z").mkdir(parents=True)
++        pm.PartyMinigames._keep_result(o, self.mg(), self.runner())
++        names = sorted(p.name for p in base.iterdir())
++        self.assertEqual(len(names), pm.PLAYED_KEEP)
++        self.assertEqual(pm.PLAYED_KEEP, 200)
++        self.assertNotIn("20200101T0000000Z", names)
++
++    def test_5_the_watch_holds_nothing_without_the_flag(self):
++        import h7_minigame as hm
++        src = Path(hm.__file__).read_text()
++        i = src.index('w.setdefault("_end_seen"')
++        self.assertIn('self._environ.get("PRIVYHUB_PARTY") == "1"', src[i - 400:i])
++        o = types.SimpleNamespace(_lock=__import__("threading").Lock(), _watch={"game": "x"})
++        self.assertEqual(hm.MiniGame.end_pictures(o), [])
++
++
++if __name__ == "__main__":
++    unittest.main()

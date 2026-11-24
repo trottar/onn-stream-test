@@ -434,6 +434,13 @@ class MiniGame:
             self._row({"step": "stopped_by_call", "game": w["game"], "reads": w["reads"], "state": w["state"]})
             return {"ok": True, "watch": "stopped", "game": w["game"], "reads": w["reads"]}
 
+    def end_pictures(self) -> list:
+        """B210: [(picture, its read)] the reader ended on or could not read, newest last (only with PRIVYHUB_PARTY=1
+        and a version-4 / 5 spec; else [])."""
+        with self._lock:
+            w = self._watch
+            return list(w.get("_end_seen") or []) if w is not None else []
+
     def _keep_folder(self, game: str) -> Path | None:
         """runtime/h7_frames/<game id>_<UTC stamp>/ with its index.csv header (None + one row when it cannot be made)."""
         try:
@@ -561,6 +568,11 @@ class MiniGame:
                         return
                     w["reads"] += 1
                     w["class"] = r["class"]
+                    if (self._environ.get("PRIVYHUB_PARTY") == "1" and spec.get("version") in (4, 5)   # B210
+                            and (r["class"] in spec.get("end_classes", ()) or r.get("end_unread"))):
+                        seen = w.setdefault("_end_seen", [])
+                        seen.append((img.copy(), {k: r.get(k) for k in ("class", "scores", "letters", "end_unread")}))
+                        del seen[:-int(getattr(ended, "k", 3))]
                     w["seen_start"] = ended.seen_start
                     w["last"] = {"class": r["class"], "distances": r["distances"], "margin": r["margin"],
                                  "thresholds": thresholds, "spec_version": spec.get("version")}

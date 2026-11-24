@@ -1,7 +1,7 @@
 ---
 memory_schema: 1
-as_of: 2026-11-16
-baseline_commit: da2d580f (queue AF)
+as_of: 2026-11-24
+baseline_commit: ef8a0ce5 (T92 second run; audit)
 ---
 
 # Current State
@@ -14,13 +14,16 @@ Headings are fixed by `tools/check_memory_health.py`; do not rename. The history
 **Phase H CLOSED at its checkpoint 2026-11-09** on the user's "Close H" (`evidence/H5_CHECKPOINT_2026-11-09.md`).
 **H6 (feature parity) OPEN**: the first parity queue met (B76-B81, B84-B92; HOME-12V); its rest on the user's pick. The G track CLOSED (G9, 2026-11-07). Phase E stays ACTIVE (E1 FROZEN,
 E2 MEASURED, E3 / E4 CLOSED). The adopted environ is **EIGHTEEN lines**. APK **`ca53df0d…` CONFIRMED**.
-**H7 (PrivyParty) OPEN**: the hub side begun on the user's word 2026-11-11 (B93's tool; the first 2-player state made at HOME-12V); PC side in a separate repo (`docs/ROADMAP.md` §H7; design notes `architecture/H7_PRIVYPARTY_DESIGN_NOTES_2026-11-10.md`)
+**H7 (PrivyParty) OPEN**: hub side since 2026-11-11; PC side in a separate repo (`docs/ROADMAP.md` §H7, §PrivyParty).
 **G6 (the tablet handheld) OPEN** 2026-11-19 at secondary priority: G6-S1 met (`architecture/G6_HANDHELD_PLAN_2026-11-19.md`).
 
 ## Current Work Item
 
-- **PP-H4 MET** (`evidence/PP_H4_2026-11-18.md`): four people, four pads; two T89 rounds' ends and two T88 duels from
-  the board, five practices left by Select, S met on all 18 switches, Home / RESUME, END. Flags off; eighteen lines.
+- **Adding mini games** (`tools/party_add_game.py`, B157 on): T88 / T89 (PP-H4 MET); **T90 (score) and T91 (letters)
+  added** and proven by real matches (2026-11-21 / 23), offered only under the two bench flags; **T92 (score) open** —
+  stopped at label twice (2026-11-23 / 24). Cowork's audit (`handoffs/AUDIT_ADD_GAME_2026-11-24.md`): freeze the old
+  score path; queue BP rebuilt the front of the path once around the user's five steps (`survey`, `plan`, `train`;
+  `handoffs/SESSION_B_DONE_2026-11-24BP.md`). Nothing adopted; eighteen lines.
 
 ## Verified State
 
@@ -89,8 +92,8 @@ GameCube — art 24 / 27 (1 no match, 2 no picture); the same.
 
 ## Next Action
 
-1. **H7 — the PC side:** the host silent on every load screen (the users' ask at PP-H4); the board's second before the
-   load screen. For B: the sound ~15 s after the onn's Home. PrivyParty's adoption only on the user's own go.
+1. **H7:** T92 through the rebuilt path (survey → label → plan → train → bench → solo → close), session A's one-page
+   task from Cowork (`ADD_GAME_STEPS.md`); a drawn mini game pays half (PC side, pending). Adoption only on the user's go.
 2. H6's rest on the user's pick: the PS2 disc change (designed); a second source for PS2 / GameCube details, art
    misses; the user's cheat files; the rejected N64 list; a core-side cheat check. **Open:** G-A8; a real "insert disc" prompt; the H5 checkpoint's open items.
 3. G6 (secondary): G6-JOIN1 NOT MET as scored (c4 one 283-ms gap; c7 / c12 the right stick short) with the hold-to-join itself met (c5; the user: "worked just as expected"; `evidence/G6_JOIN1_…` §6); G6-SWAP1 part 1 done: face buttons up, right stick down (the user reversing HM1b's choice), candidate `0a631e79…` tablet only, its run pre-registered (`evidence/G6_SWAP1_…`); next: the user's run; never beside another run; the stale pairing's removal.
