@@ -14,6 +14,6 @@ Written by `tools/party_add_game.py` (B157). Every cell as read / bar / met; no 
 | 3 | 2 (twice or more) |
 | 4 | 1 (once (counted: seen once)) |
 | 5 | 2 (twice or more) |
-| 6 | 1 (once (not counted: asked)) |
+| 6 | 1 (once (counted: seen once)) |
 
-Still needed: a final score with a 6 in it (either player).
+Nothing more is needed.
