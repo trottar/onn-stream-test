@@ -1292,6 +1292,19 @@ def _numbers(code: str, role: str) -> list[int] | None:
     return _finals(v["readings"][0]) if v and v.get("readings") else None
 
 
+def _bench_numbers(code: str, b: dict, role: str) -> list[int] | None:
+    """B223: a score ending's expected numbers for bench. A surveyed title: the regions' label record (party_steps'
+    `regions_label.json`: "03-01" -> [3, 1]), never the old `label.json`, whether or not an old one is there. A title
+    without a survey: `_numbers`, as before. None: no reading for that ending."""
+    if not surveyed(b):
+        return _numbers(code, role)
+    v = (_steps().label_record(code).get("saves") or {}).get(role) or {}
+    text = (v.get("readings") or [None])[0]
+    if not isinstance(text, str) or not re.match(r"^\d{1,4}(-\d{1,4}){1,3}$", text):
+        return None
+    return [int(x) for x in text.split("-")]
+
+
 def _score_class(text: str) -> str:
     """The learner's class: B204 — every period cell and stats row one column of its side (no ':' there)."""
     if ":" not in text:
@@ -3192,9 +3205,12 @@ def cmd_bench(code: str, a: dict) -> int:
         want_cls = (_role_class(ending) if ending.startswith("end_P") and side.get("result") != "score"
                     else "end")                              # B171: end_P1_2 ends as end_P1; B178: a score title, end
         if side.get("result") == "score":                    # B178: the numbers the label stage checked, the winner
-            exp_scores = _numbers(code, ending)              # the seat of the side ahead (seats 1..n: port k = seat k)
-            top = max(exp_scores)
-            exp_winner = exp_scores.index(top) + 1 if exp_scores.count(top) == 1 else None
+            exp_scores = _bench_numbers(code, b, ending)     # the seat of the side ahead (seats 1..n: port k = seat k)
+            if exp_scores is None:                           # B223: no reading for this ending — a cell, no traceback
+                cells.add(f"{ending}: the label's reading", None, "a reading of this ending", False)
+                exp_scores = ["no reading"]
+            top = max(exp_scores) if all(isinstance(x, int) for x in exp_scores) else None
+            exp_winner = exp_scores.index(top) + 1 if top is not None and exp_scores.count(top) == 1 else None
         else:
             exp_scores, exp_winner = _expected(b, side, _role_class(ending))
         cells.add(f"{ending}: ended with its class", [got.get("state"), got.get("class")], ["ended", want_cls],
