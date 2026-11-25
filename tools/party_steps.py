@@ -39,6 +39,7 @@ SYN_DX, SYN_DY = 3, 1       # px: the synthetic shift's range
 VARIANTS_NEEDED = 8         # B214: valid test variants the once rule reads (each the glyph that was pasted)
 VARIANT_DRAWS = 24          # B214: at most this many draws a glyph
 SYN_OWN = 0.85              # B214: B192's share — a variant's cut ink at least this much pasted ink
+VARIANT_SIZE_TOL = 2        # B221: px — a valid test variant's cut box is the pasted glyph's, width and height
 RECT = re.compile(r"^(\d{1,3}),(\d{1,3}),(\d{1,3}),(\d{1,3})$")
 SCORE_LABEL = re.compile(r"^\d{1,4}(?:-\d{1,4}){1,3}$")
 
@@ -877,7 +878,7 @@ def _once_rule(kind: str, sym: str, rig: dict, variants: list, real_others: list
 def test_variants(a, g, backgrounds: list, place: dict, region: list, rng) -> tuple[list, int]:
     """B214: the once rule's test variants of one real glyph — its ink pasted on an erased background region at a
     shift (BP's paste), **valid only when** cut as exactly one glyph with at least SYN_OWN of the cut's ink pasted
-    ink; an invalid one thrown away and the next drawn from the same stream; at most VARIANT_DRAWS draws, stopping at
+    ink and (B221) its cut box the pasted glyph's own size, width and height each within VARIANT_SIZE_TOL px; an invalid one thrown away and the next drawn from the same stream; at most VARIANT_DRAWS draws, stopping at
     VARIANTS_NEEDED valid. -> (the valid cells, the draws made)."""
     import numpy as np
     E = es()
@@ -902,6 +903,8 @@ def test_variants(a, g, backgrounds: list, place: dict, region: list, rng) -> tu
         if not gl or len(gl) != 1:
             continue
         c = gl[0]
+        if abs((c[3] - c[1] + 1) - w) > VARIANT_SIZE_TOL or abs((c[2] - c[0] + 1) - h) > VARIANT_SIZE_TOL:
+            continue                                          # B221: not the glyph's own size (joined or cut short)
         cut = E._ink(pic, place["pol"], int(place["r"]), E._contrast(pic))[c[0]:c[2] + 1, c[1]:c[3] + 1]
         own = pasted[c[0]:c[2] + 1, c[1]:c[3] + 1]
         if not cut.any() or float((cut & own).sum()) / float(cut.sum()) < SYN_OWN:
