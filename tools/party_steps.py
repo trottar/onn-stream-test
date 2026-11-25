@@ -681,9 +681,14 @@ def erase(a, place: dict, region: list):
     return out
 
 
-def synthetic_glyphs(sources: list, backgrounds: list, place: dict, region: list, rng, per: int) -> dict:
+def synthetic_glyphs(sources: list, backgrounds: list, place: dict, region: list, rng, per: int,
+                     log: dict | None = None) -> dict:
     """{source index: [cells]} — each real glyph's ink pixels pasted on an erased background region at a shift, cut
-    again by `place_glyphs` (exactly one glyph, else no cell) and `glyph_cell`."""
+    again by `place_glyphs` and `glyph_cell`. B224: a draw is kept only when valid as a test variant is (`paste_cut`:
+    one glyph, at least SYN_OWN of its cut ink pasted, its cut box the pasted glyph's own size within
+    VARIANT_SIZE_TOL); one that is not is thrown away and the next drawn from the same stream, until `per` are valid or
+    VARIANT_DRAWS draws are spent (fewer: those made). With no draw thrown away the rng calls and the cells are
+    today's. `log` (optional) gathers made / thrown away / draws / why."""
     E = es()
     out: dict = {}
     for si, (a, g) in enumerate(sources):
@@ -691,22 +696,58 @@ def synthetic_glyphs(sources: list, backgrounds: list, place: dict, region: list
         t, l, bt, r_ = g[0], g[1], g[2], g[3]
         ink = E._ink(a, place["pol"], int(place["r"]), contrast)[t:bt + 1, l:r_ + 1]
         pix = a[t:bt + 1, l:r_ + 1]
-        cells = []
-        for _ in range(per):
+        cells, draws = [], 0
+        while len(cells) < per and draws < VARIANT_DRAWS:
+            draws += 1
             bg = backgrounds[int(rng.integers(len(backgrounds)))]
             dx, dy = int(rng.integers(-SYN_DX, SYN_DX + 1)), int(rng.integers(-SYN_DY, SYN_DY + 1))
-            pic = bg.copy()
-            cx = (region[0] + region[2]) // 2 - (r_ - l + 1) // 2 + dx
-            ty = t + dy
-            if cx < 0 or ty < 0 or cx + (r_ - l + 1) > pic.shape[1] or ty + (bt - t + 1) > pic.shape[0]:
-                cells.append(None)
+            cell, why = paste_cut(g, ink, pix, bg, dx, dy, place, region, size_tol=VARIANT_SIZE_TOL)
+            if cell is None:
+                if log is not None:
+                    log["thrown away"] = log.get("thrown away", 0) + 1
+                    w_ = log.setdefault("why", {})
+                    w_[why] = w_.get(why, 0) + 1
                 continue
-            dst = pic[ty:ty + bt - t + 1, cx:cx + r_ - l + 1]
-            dst[ink] = pix[ink]
-            gl = E.place_glyphs(pic, place)
-            cells.append(E.glyph_cell(pic, gl[0], place) if gl and len(gl) == 1 else None)
+            cells.append(cell)
+        if log is not None:
+            log["made"] = log.get("made", 0) + len(cells)
+            log["draws"] = log.get("draws", 0) + draws
+            log.setdefault("thrown away", 0)
+            if len(cells) < per:
+                log["glyphs short of %d" % per] = log.get("glyphs short of %d" % per, 0) + 1
         out[si] = cells
     return out
+
+
+def paste_cut(g, ink, pix, bg, dx, dy, place: dict, region: list, size_tol: int | None = None):
+    """B224: one draw of BP's paste — the glyph `g`'s ink (`ink`, `pix`: its box's mask and pixels) on `bg` at the
+    region's centre shifted (dx, dy), cut again — and whether it is valid as a test variant (B214 / B221): exactly one
+    glyph cut, its box within `size_tol` (VARIANT_SIZE_TOL) px of the pasted glyph's width and height, at least SYN_OWN
+    of its cut ink pasted ink. -> (its cell, None), or (None, why)."""
+    import numpy as np
+    E = es()
+    tol = VARIANT_SIZE_TOL if size_tol is None else size_tol
+    t = g[0]
+    h, w = ink.shape
+    cx = (region[0] + region[2]) // 2 - w // 2 + dx
+    ty = t + dy
+    if cx < 0 or ty < 0 or cx + w > bg.shape[1] or ty + h > bg.shape[0]:
+        return None, "outside the picture"
+    pic = bg.copy()
+    pic[ty:ty + h, cx:cx + w][ink] = pix[ink]
+    pasted = np.zeros(pic.shape, bool)
+    pasted[ty:ty + h, cx:cx + w] = ink
+    gl = E.place_glyphs(pic, place)
+    if not gl or len(gl) != 1:
+        return None, "not one glyph"
+    c = gl[0]
+    if abs((c[3] - c[1] + 1) - w) > tol or abs((c[2] - c[0] + 1) - h) > tol:
+        return None, "not its own size"                      # B221: joined or cut short
+    cut = E._ink(pic, place["pol"], int(place["r"]), E._contrast(pic))[c[0]:c[2] + 1, c[1]:c[3] + 1]
+    own = pasted[c[0]:c[2] + 1, c[1]:c[3] + 1]
+    if not cut.any() or float((cut & own).sum()) / float(cut.sum()) < SYN_OWN:
+        return None, "not its own ink"
+    return E.glyph_cell(pic, c, place), None
 
 
 def read_cell(cell, score: dict, refs) -> str:
@@ -880,36 +921,18 @@ def test_variants(a, g, backgrounds: list, place: dict, region: list, rng) -> tu
     shift (BP's paste), **valid only when** cut as exactly one glyph with at least SYN_OWN of the cut's ink pasted
     ink and (B221) its cut box the pasted glyph's own size, width and height each within VARIANT_SIZE_TOL px; an invalid one thrown away and the next drawn from the same stream; at most VARIANT_DRAWS draws, stopping at
     VARIANTS_NEEDED valid. -> (the valid cells, the draws made)."""
-    import numpy as np
     E = es()
     t, l, bt, r_ = g[0], g[1], g[2], g[3]
     ink = E._ink(a, place["pol"], int(place["r"]), E._contrast(a))[t:bt + 1, l:r_ + 1]
     pix = a[t:bt + 1, l:r_ + 1]
-    h, w = bt - t + 1, r_ - l + 1
     valid, draws = [], 0
     while draws < VARIANT_DRAWS and len(valid) < VARIANTS_NEEDED:
         draws += 1
         bg = backgrounds[int(rng.integers(len(backgrounds)))]
         dx, dy = int(rng.integers(-SYN_DX, SYN_DX + 1)), int(rng.integers(-SYN_DY, SYN_DY + 1))
-        cx = (region[0] + region[2]) // 2 - w // 2 + dx
-        ty = t + dy
-        if cx < 0 or ty < 0 or cx + w > bg.shape[1] or ty + h > bg.shape[0]:
-            continue
-        pic = bg.copy()
-        pic[ty:ty + h, cx:cx + w][ink] = pix[ink]
-        pasted = np.zeros(pic.shape, bool)
-        pasted[ty:ty + h, cx:cx + w] = ink
-        gl = E.place_glyphs(pic, place)
-        if not gl or len(gl) != 1:
-            continue
-        c = gl[0]
-        if abs((c[3] - c[1] + 1) - w) > VARIANT_SIZE_TOL or abs((c[2] - c[0] + 1) - h) > VARIANT_SIZE_TOL:
-            continue                                          # B221: not the glyph's own size (joined or cut short)
-        cut = E._ink(pic, place["pol"], int(place["r"]), E._contrast(pic))[c[0]:c[2] + 1, c[1]:c[3] + 1]
-        own = pasted[c[0]:c[2] + 1, c[1]:c[3] + 1]
-        if not cut.any() or float((cut & own).sum()) / float(cut.sum()) < SYN_OWN:
-            continue
-        valid.append(E.glyph_cell(pic, c, place))
+        cell, _why = paste_cut(g, ink, pix, bg, dx, dy, place, region)      # B224: the same code as the templates'
+        if cell is not None:
+            valid.append(cell)
     return valid, draws
 
 
@@ -941,6 +964,7 @@ def score_gates(code: str, b: dict, kept: dict, cells: pag.Cells) -> dict:
                    for k in range(len(places))}
     syn: dict = {}                                            # item index -> [template cells] (stream 0 only)
     src: dict = {}
+    tlog: dict = {}                                           # B224: made / thrown away by symbol
     for i, it in enumerate(items):
         if it[1] != 0:
             continue
@@ -949,7 +973,8 @@ def score_gates(code: str, b: dict, kept: dict, cells: pag.Cells) -> dict:
         g = region_glyphs(a, places[k])[j]
         bgs = [bg for r_, bg in backgrounds[k] if r_ != role] or [bg for _r, bg in backgrounds[k]]
         src[i] = (a, g, bgs, k)
-        syn[i] = synthetic_glyphs([(a, g)], bgs, places[k], s["regions"][k], rng_t, SYN_PER_GLYPH)[0]
+        syn[i] = synthetic_glyphs([(a, g)], bgs, places[k], s["regions"][k], rng_t, SYN_PER_GLYPH,
+                                  log=tlog.setdefault(it[4], {}))[0]
 
     def fit(without=(), drop=()):
         rc_ = {k: [it[5] for it in v if it[0] not in without] for k, v in real.items() if k not in drop}
@@ -1006,7 +1031,9 @@ def score_gates(code: str, b: dict, kept: dict, cells: pag.Cells) -> dict:
                dropped=dropped, once=once_rows, ask=ask, never=never,
                synthetic={"templates per glyph": SYN_PER_GLYPH, "seed": seed, "variants": made,
                           "made": sum(1 for v in syn.values() for c in v if c is not None),
-                          "not cut": sum(1 for v in syn.values() for c in v if c is None)})
+                          "not cut": sum(1 for v in syn.values() for c in v if c is None),   # B224: always 0 now
+                          "thrown away": sum(x.get("thrown away", 0) for x in tlog.values()),     # B224
+                          "by symbol": {k: tlog[k] for k in sorted(tlog)}})
     return out
 
 
